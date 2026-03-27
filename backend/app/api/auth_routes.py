@@ -48,10 +48,10 @@ def verify_password(password: str, hashed: str) -> bool:
 def create_token(user_id: int, username: str, is_admin: bool, session_token: str) -> str:
     settings = get_settings()
     payload = {
-        "sub": user_id,
+        "sub": str(user_id),  # PyJWT 2.12+ requires sub to be string
         "username": username,
         "is_admin": is_admin,
-        "sid": session_token,  # ties JWT to a specific device session
+        "sid": session_token,
         "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
@@ -60,7 +60,11 @@ def create_token(user_id: int, username: str, is_admin: bool, session_token: str
 def decode_token(token: str) -> dict:
     settings = get_settings()
     try:
-        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        # Convert sub back to int for internal use
+        if "sub" in payload:
+            payload["sub"] = int(payload["sub"])
+        return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token expired")
     except jwt.InvalidTokenError:
