@@ -4,7 +4,298 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { TeamEditor } from "@/components/config/TeamEditor";
 
+interface Circuit {
+  id: number;
+  name: string;
+  length_m: number | null;
+  pit_time_s: number | null;
+  ws_port: number;
+}
+
+interface RaceSession {
+  id: number;
+  circuit_id: number;
+  circuit_name: string | null;
+  name: string;
+  duration_min: number;
+  min_stint_min: number;
+  max_stint_min: number;
+  min_pits: number;
+  pit_time_s: number;
+  min_driver_time_min: number;
+  rain: boolean;
+  box_lines: number;
+  box_karts: number;
+  our_kart_number: number;
+  refresh_interval_s: number;
+  is_active: boolean;
+}
+
 export function ConfigPanel() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <RaceSessionEditor />
+        <div className="space-y-6">
+          <ApexConnection />
+          <ReplayControls />
+        </div>
+      </div>
+      <TeamEditor />
+    </div>
+  );
+}
+
+// --- Race Session (circuit + params) ---
+
+function RaceSessionEditor() {
+  const [circuits, setCircuits] = useState<Circuit[]>([]);
+  const [session, setSession] = useState<RaceSession | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Form state
+  const [circuitId, setCircuitId] = useState<number>(0);
+  const [name, setName] = useState("");
+  const [durationMin, setDurationMin] = useState(180);
+  const [minStint, setMinStint] = useState(15);
+  const [maxStint, setMaxStint] = useState(40);
+  const [minPits, setMinPits] = useState(3);
+  const [pitTime, setPitTime] = useState(120);
+  const [minDriverTime, setMinDriverTime] = useState(30);
+  const [rain, setRain] = useState(false);
+  const [boxLines, setBoxLines] = useState(2);
+  const [boxKarts, setBoxKarts] = useState(30);
+  const [ourKart, setOurKart] = useState(0);
+  const [refreshInterval, setRefreshInterval] = useState(30);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [circuitsData, sessionData] = await Promise.all([
+        api.getMyCircuits(),
+        api.getActiveSession(),
+      ]);
+      setCircuits(circuitsData);
+      if (sessionData) {
+        setSession(sessionData);
+        applySession(sessionData);
+      }
+    } catch {}
+    setLoading(false);
+  };
+
+  const applySession = (s: RaceSession) => {
+    setCircuitId(s.circuit_id);
+    setName(s.name);
+    setDurationMin(s.duration_min);
+    setMinStint(s.min_stint_min);
+    setMaxStint(s.max_stint_min);
+    setMinPits(s.min_pits);
+    setPitTime(s.pit_time_s);
+    setMinDriverTime(s.min_driver_time_min);
+    setRain(s.rain);
+    setBoxLines(s.box_lines);
+    setBoxKarts(s.box_karts);
+    setOurKart(s.our_kart_number);
+    setRefreshInterval(s.refresh_interval_s);
+  };
+
+  const handleCircuitChange = (id: number) => {
+    setCircuitId(id);
+    const c = circuits.find((c) => c.id === id);
+    if (c) {
+      if (c.pit_time_s) setPitTime(c.pit_time_s);
+      setName(c.name);
+    }
+  };
+
+  const saveSession = async () => {
+    if (!circuitId) return;
+    setSaving(true);
+    try {
+      const data = {
+        circuit_id: circuitId,
+        name,
+        duration_min: durationMin,
+        min_stint_min: minStint,
+        max_stint_min: maxStint,
+        min_pits: minPits,
+        pit_time_s: pitTime,
+        min_driver_time_min: minDriverTime,
+        rain,
+        box_lines: boxLines,
+        box_karts: boxKarts,
+        our_kart_number: ourKart,
+        refresh_interval_s: refreshInterval,
+      };
+
+      let result;
+      if (session) {
+        result = await api.updateSession(data);
+      } else {
+        result = await api.createSession(data);
+      }
+      setSession(result);
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    }
+    setSaving(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-surface rounded-xl p-6 border border-border">
+        <p className="text-neutral-600 text-sm">Cargando...</p>
+      </div>
+    );
+  }
+
+  const selectedCircuit = circuits.find((c) => c.id === circuitId);
+
+  return (
+    <div className="bg-surface rounded-xl p-6 border border-border">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-[11px] text-neutral-500 uppercase tracking-wider">Sesion de Carrera</h2>
+        {session && (
+          <span className="text-[10px] bg-accent/15 text-accent px-2 py-0.5 rounded uppercase tracking-wider font-medium">
+            Activa
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        {/* Circuit selector */}
+        <div>
+          <label className="block text-[11px] text-neutral-600 mb-1.5 uppercase tracking-wider">Circuito</label>
+          <select
+            value={circuitId}
+            onChange={(e) => handleCircuitChange(Number(e.target.value))}
+            className="w-full bg-black border border-border rounded-lg px-3 py-2.5 text-sm"
+          >
+            <option value={0}>Seleccionar circuito...</option>
+            {circuits.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} {c.length_m ? `(${c.length_m}m)` : ""}
+              </option>
+            ))}
+          </select>
+          {selectedCircuit && (
+            <p className="text-[10px] text-neutral-600 mt-1">
+              Puerto WS: {selectedCircuit.ws_port}
+              {selectedCircuit.pit_time_s && ` · Pit: ${selectedCircuit.pit_time_s}s`}
+              {selectedCircuit.length_m && ` · ${selectedCircuit.length_m}m`}
+            </p>
+          )}
+        </div>
+
+        {/* Two column grid for params */}
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Duracion (min)" value={durationMin} onChange={setDurationMin} />
+          <Field label="Nuestro kart" value={ourKart} onChange={setOurKart} />
+          <Field label="Stint min (min)" value={minStint} onChange={setMinStint} />
+          <Field label="Stint max (min)" value={maxStint} onChange={setMaxStint} />
+          <Field label="Pits minimos" value={minPits} onChange={setMinPits} />
+          <Field label="Tiempo pit (s)" value={pitTime} onChange={setPitTime} />
+          <Field label="Tiempo min piloto (min)" value={minDriverTime} onChange={setMinDriverTime} />
+          <Field label="Refresh (s)" value={refreshInterval} onChange={setRefreshInterval} />
+          <Field label="Lineas box" value={boxLines} onChange={setBoxLines} />
+          <Field label="Karts en box" value={boxKarts} onChange={setBoxKarts} />
+        </div>
+
+        {/* Rain toggle */}
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={rain}
+            onChange={(e) => setRain(e.target.checked)}
+            className="accent-accent w-4 h-4"
+          />
+          <span className="text-sm text-neutral-300">Modo lluvia</span>
+          <span className="text-[10px] text-neutral-600">(desactiva filtro de outliers)</span>
+        </label>
+
+        {/* Save button */}
+        <button
+          onClick={saveSession}
+          disabled={!circuitId || saving}
+          className="w-full bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-2.5 rounded-lg"
+        >
+          {saving ? "Guardando..." : session ? "Actualizar sesion" : "Crear sesion"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div>
+      <label className="block text-[10px] text-neutral-600 mb-1 uppercase tracking-wider">{label}</label>
+      <input
+        type="number"
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm font-mono"
+      />
+    </div>
+  );
+}
+
+// --- Apex Connection ---
+
+function ApexConnection() {
+  const [status, setStatus] = useState<string>("");
+
+  return (
+    <div className="bg-surface rounded-xl p-6 border border-border">
+      <h2 className="text-[11px] text-neutral-500 mb-4 uppercase tracking-wider">Conexion Apex Timing</h2>
+      {status && <p className="text-xs text-accent mb-3">{status}</p>}
+      <div className="flex gap-2">
+        <button
+          onClick={async () => {
+            try {
+              setStatus("Conectando...");
+              const res = await api.connectApex();
+              setStatus(`Conectado a ${res.circuit} (${res.teamsLoaded} equipos)`);
+            } catch (e: any) {
+              setStatus("Error: " + e.message);
+            }
+          }}
+          className="flex-1 bg-accent hover:bg-accent-hover text-black font-semibold py-2.5 px-4 rounded-lg"
+        >
+          Conectar
+        </button>
+        <button
+          onClick={async () => {
+            try {
+              await api.disconnectApex();
+              setStatus("Desconectado");
+            } catch {}
+          }}
+          className="flex-1 bg-red-900/50 hover:bg-red-800 text-red-300 font-medium py-2.5 px-4 rounded-lg"
+        >
+          Desconectar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// --- Replay Controls ---
+
+function ReplayControls() {
   const [logs, setLogs] = useState<string[]>([]);
   const [replayStatus, setReplayStatus] = useState<any>(null);
   const [selectedLog, setSelectedLog] = useState("");
@@ -16,147 +307,85 @@ export function ConfigPanel() {
     api.getReplayStatus().then(setReplayStatus).catch(() => {});
   }, []);
 
-  const startReplay = async () => {
-    if (!selectedLog) return;
-    setLoading(true);
-    try {
-      await api.startReplay(selectedLog, speed);
-      const status = await api.getReplayStatus();
-      setReplayStatus(status);
-    } catch (e) {
-      console.error("Error starting replay:", e);
-    }
-    setLoading(false);
-  };
-
-  const stopReplay = async () => {
-    await api.stopReplay();
-    const status = await api.getReplayStatus();
-    setReplayStatus(status);
-  };
-
-  const togglePause = async () => {
-    const status = await api.pauseReplay();
-    setReplayStatus(status);
-  };
-
-  const changeSpeed = async (newSpeed: number) => {
-    setSpeed(newSpeed);
-    if (replayStatus?.active) {
-      await api.setReplaySpeed(newSpeed);
-    }
-  };
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Replay Controls */}
-      <div className="bg-surface rounded-xl p-6 border border-border">
-        <h2 className="text-[11px] text-neutral-500 mb-4 uppercase tracking-wider">Replay de Carrera</h2>
+    <div className="bg-surface rounded-xl p-6 border border-border">
+      <h2 className="text-[11px] text-neutral-500 mb-4 uppercase tracking-wider">Replay</h2>
+      <div className="space-y-3">
+        <select
+          value={selectedLog}
+          onChange={(e) => setSelectedLog(e.target.value)}
+          className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">Seleccionar log...</option>
+          {logs.map((log) => (
+            <option key={log} value={log}>{log}</option>
+          ))}
+        </select>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-[11px] text-neutral-600 mb-1.5 uppercase tracking-wider">Archivo de log</label>
-            <select
-              value={selectedLog}
-              onChange={(e) => setSelectedLog(e.target.value)}
-              className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">Seleccionar archivo...</option>
-              {logs.map((log) => (
-                <option key={log} value={log}>{log}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] text-neutral-600 mb-1.5 uppercase tracking-wider">
-              Velocidad: {speed}x
-            </label>
-            <input
-              type="range"
-              min="1"
-              max="100"
-              value={speed}
-              onChange={(e) => changeSpeed(Number(e.target.value))}
-              className="w-full accent-accent"
-            />
-            <div className="flex justify-between text-[10px] text-neutral-700">
-              <span>1x</span><span>25x</span><span>50x</span><span>100x</span>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={startReplay}
-              disabled={!selectedLog || loading}
-              className="flex-1 bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-2 px-4 rounded-lg"
-            >
-              {loading ? "Iniciando..." : "Iniciar"}
-            </button>
-            <button
-              onClick={togglePause}
-              disabled={!replayStatus?.active}
-              className="flex-1 bg-black hover:bg-surface disabled:opacity-40 text-neutral-300 font-medium py-2 px-4 rounded-lg border border-border"
-            >
-              {replayStatus?.paused ? "Reanudar" : "Pausar"}
-            </button>
-            <button
-              onClick={stopReplay}
-              disabled={!replayStatus?.active}
-              className="flex-1 bg-red-900/50 hover:bg-red-800 disabled:opacity-40 text-red-300 font-medium py-2 px-4 rounded-lg"
-            >
-              Parar
-            </button>
-          </div>
-
-          {replayStatus?.active && (
-            <div className="mt-2">
-              <div className="flex justify-between text-[11px] text-neutral-500 mb-1">
-                <span>{replayStatus.filename}</span>
-                <span>{(replayStatus.progress * 100).toFixed(1)}%</span>
-              </div>
-              <div className="w-full bg-black rounded-full h-1.5">
-                <div
-                  className="bg-accent rounded-full h-1.5 transition-all"
-                  style={{ width: `${replayStatus.progress * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
+        <div>
+          <label className="block text-[10px] text-neutral-600 mb-1 uppercase tracking-wider">
+            Velocidad: {speed}x
+          </label>
+          <input
+            type="range" min="1" max="100" value={speed}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setSpeed(v);
+              if (replayStatus?.active) api.setReplaySpeed(v);
+            }}
+            className="w-full accent-accent"
+          />
         </div>
-      </div>
 
-      {/* Apex Connection */}
-      <div className="bg-surface rounded-xl p-6 border border-border">
-        <h2 className="text-[11px] text-neutral-500 mb-4 uppercase tracking-wider">Conexion Apex Timing</h2>
         <div className="flex gap-2">
           <button
             onClick={async () => {
+              if (!selectedLog) return;
+              setLoading(true);
               try {
-                const res = await api.connectApex();
-                alert(`Conectado a ${res.circuit} (${res.teamsLoaded} equipos, ${res.driversWithDifferential} pilotos con diferencial)`);
-              } catch (e: any) {
-                alert(e.message);
-              }
+                await api.startReplay(selectedLog, speed);
+                setReplayStatus(await api.getReplayStatus());
+              } catch {}
+              setLoading(false);
             }}
-            className="flex-1 bg-accent hover:bg-accent-hover text-black font-semibold py-2.5 px-4 rounded-lg"
+            disabled={!selectedLog || loading}
+            className="flex-1 bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-2 rounded-lg text-sm"
           >
-            Conectar
+            {loading ? "..." : "Iniciar"}
           </button>
           <button
             onClick={async () => {
-              try { await api.disconnectApex(); } catch {}
+              setReplayStatus(await api.pauseReplay());
             }}
-            className="flex-1 bg-red-900/50 hover:bg-red-800 text-red-300 font-medium py-2.5 px-4 rounded-lg"
+            disabled={!replayStatus?.active}
+            className="flex-1 bg-black hover:bg-surface disabled:opacity-40 text-neutral-300 py-2 rounded-lg border border-border text-sm"
           >
-            Desconectar
+            {replayStatus?.paused ? "Reanudar" : "Pausar"}
+          </button>
+          <button
+            onClick={async () => {
+              await api.stopReplay();
+              setReplayStatus(await api.getReplayStatus());
+            }}
+            disabled={!replayStatus?.active}
+            className="flex-1 bg-red-900/50 hover:bg-red-800 disabled:opacity-40 text-red-300 py-2 rounded-lg text-sm"
+          >
+            Parar
           </button>
         </div>
-      </div>
 
-      {/* Team Editor - full width */}
-      <div className="lg:col-span-2">
-        <TeamEditor />
+        {replayStatus?.active && (
+          <div>
+            <div className="flex justify-between text-[10px] text-neutral-500 mb-1">
+              <span>{replayStatus.filename}</span>
+              <span>{(replayStatus.progress * 100).toFixed(1)}%</span>
+            </div>
+            <div className="w-full bg-black rounded-full h-1.5">
+              <div className="bg-accent rounded-full h-1.5 transition-all"
+                style={{ width: `${replayStatus.progress * 100}%` }} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
