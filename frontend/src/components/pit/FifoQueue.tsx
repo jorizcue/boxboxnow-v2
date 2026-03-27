@@ -7,7 +7,7 @@ export function FifoQueue() {
   const { fifo } = useRaceStore();
 
   const scoreColor =
-    fifo.score >= 75 ? "text-tier-100" :
+    fifo.score >= 75 ? "text-accent" :
     fifo.score >= 50 ? "text-tier-75" :
     fifo.score >= 25 ? "text-tier-50" :
     "text-tier-1";
@@ -15,12 +15,12 @@ export function FifoQueue() {
   return (
     <div className="space-y-6">
       {/* Score gauge */}
-      <div className="bg-card rounded-lg p-6 text-center">
-        <h2 className="text-gray-400 text-sm mb-2">PUNTUACION BOX</h2>
+      <div className="bg-surface rounded-xl p-8 text-center border border-border">
+        <h2 className="text-[11px] text-neutral-500 mb-3 uppercase tracking-wider">Puntuacion Box</h2>
         <div className={`text-6xl font-bold ${scoreColor}`}>
           {fifo.score.toFixed(1)}
         </div>
-        <p className="text-gray-500 text-xs mt-2">
+        <p className="text-neutral-600 text-xs mt-3">
           {fifo.score >= 75
             ? "BUEN MOMENTO PARA ENTRAR"
             : fifo.score >= 50
@@ -32,13 +32,13 @@ export function FifoQueue() {
       </div>
 
       {/* Current FIFO queue */}
-      <div className="bg-card rounded-lg p-4">
-        <h3 className="text-gray-400 text-sm mb-3">COLA FIFO ACTUAL</h3>
+      <div className="bg-surface rounded-xl p-4 border border-border">
+        <h3 className="text-[11px] text-neutral-500 mb-3 uppercase tracking-wider">Cola FIFO Actual</h3>
         <div className="flex flex-wrap gap-1">
           {fifo.queue.map((score, i) => (
             <div
               key={i}
-              className="w-8 h-8 rounded flex items-center justify-center text-xs font-bold text-black"
+              className="w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold text-black"
               style={{ backgroundColor: tierHex(score) }}
               title={`Posicion ${i + 1}: ${score} pts`}
             >
@@ -49,13 +49,13 @@ export function FifoQueue() {
       </div>
 
       {/* FIFO history */}
-      <div className="bg-card rounded-lg p-4">
-        <h3 className="text-gray-400 text-sm mb-3">
-          HISTORIAL ({fifo.history.length} snapshots)
+      <div className="bg-surface rounded-xl p-4 border border-border">
+        <h3 className="text-[11px] text-neutral-500 mb-3 uppercase tracking-wider">
+          Historial ({fifo.history.length} snapshots)
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-gray-500">
+            <thead className="text-neutral-600 text-[11px] uppercase tracking-wider">
               <tr>
                 <th className="px-2 py-1 text-left">#</th>
                 <th className="px-2 py-1 text-right">Score</th>
@@ -64,8 +64,8 @@ export function FifoQueue() {
             </thead>
             <tbody>
               {[...fifo.history].reverse().slice(0, 10).map((snap, i) => (
-                <tr key={i} className="border-t border-gray-800/50">
-                  <td className="px-2 py-1 text-gray-500">{fifo.history.length - i}</td>
+                <tr key={i} className="border-t border-border">
+                  <td className="px-2 py-1 text-neutral-600">{fifo.history.length - i}</td>
                   <td className="px-2 py-1 text-right font-mono font-bold">
                     <span style={{ color: tierHex(snap.score) }}>
                       {snap.score.toFixed(1)}
@@ -73,7 +73,7 @@ export function FifoQueue() {
                   </td>
                   <td className="px-2 py-1">
                     <div className="flex gap-0.5">
-                      {snap.queue.slice(-10).map((s, j) => (
+                      {snap.queue.slice(-10).map((s: number, j: number) => (
                         <div
                           key={j}
                           className="w-4 h-4 rounded-sm"

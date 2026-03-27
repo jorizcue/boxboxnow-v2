@@ -124,3 +124,47 @@ async def disconnect_from_apex(request: Request, user: User = Depends(get_curren
     registry = request.app.state.registry
     await registry.stop_session(user.id)
     return {"status": "disconnected"}
+
+
+@router.get("/live-teams")
+async def get_live_teams(request: Request, user: User = Depends(get_current_user)):
+    """Get teams and drivers currently visible in the live timing.
+    Returns data suitable for importing into team_positions + team_drivers.
+
+    Handles races without driver breakdown gracefully by returning
+    empty drivers list for those teams.
+    """
+    state = _get_user_state(request, user)
+
+    if not state.karts:
+        return {"teams": [], "hasDrivers": False}
+
+    # Group by kart, sorted by position
+    sorted_karts = sorted(state.karts.values(), key=lambda k: k.position or 999)
+
+    teams = []
+    has_any_drivers = False
+
+    for i, kart in enumerate(sorted_karts):
+        team_data = {
+            "position": i + 1,
+            "kart": kart.kart_number,
+            "team_name": kart.team_name,
+            "drivers": [],
+        }
+
+        # If we have a driver name from the live timing, add it
+        if kart.driver_name and kart.driver_name.strip():
+            has_any_drivers = True
+            team_data["drivers"].append({
+                "driver_name": kart.driver_name.strip(),
+                "differential_ms": 0,
+            })
+
+        teams.append(team_data)
+
+    return {
+        "teams": teams,
+        "hasDrivers": has_any_drivers,
+        "kartCount": len(teams),
+    }

@@ -32,19 +32,19 @@ export function AdminPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex gap-0.5">
         <button
           onClick={() => setTab("users")}
-          className={`px-4 py-2 rounded text-sm font-medium ${
-            tab === "users" ? "bg-accent text-white" : "bg-surface text-gray-400"
+          className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+            tab === "users" ? "bg-accent text-black" : "bg-surface text-neutral-500 hover:text-neutral-300"
           }`}
         >
           Usuarios
         </button>
         <button
           onClick={() => setTab("circuits")}
-          className={`px-4 py-2 rounded text-sm font-medium ${
-            tab === "circuits" ? "bg-accent text-white" : "bg-surface text-gray-400"
+          className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+            tab === "circuits" ? "bg-accent text-black" : "bg-surface text-neutral-500 hover:text-neutral-300"
           }`}
         >
           Circuitos
@@ -76,24 +76,16 @@ function UsersManager() {
   }, []);
 
   const loadUsers = async () => {
-    try {
-      const data = await api.getUsers();
-      setUsers(data);
-    } catch {}
+    try { setUsers(await api.getUsers()); } catch {}
   };
 
   const createUser = async () => {
     if (!newUsername || !newPassword) return;
     try {
       await api.createUser({ username: newUsername, password: newPassword, is_admin: newIsAdmin, max_devices: newMaxDevices });
-      setNewUsername("");
-      setNewPassword("");
-      setNewIsAdmin(false);
-      setNewMaxDevices(1);
+      setNewUsername(""); setNewPassword(""); setNewIsAdmin(false); setNewMaxDevices(1);
       loadUsers();
-    } catch (e: any) {
-      alert(e.message);
-    }
+    } catch (e: any) { alert(e.message); }
   };
 
   const deleteUser = async (id: number) => {
@@ -102,112 +94,75 @@ function UsersManager() {
       await api.deleteUser(id);
       loadUsers();
       if (selectedUser === id) setSelectedUser(null);
-    } catch (e: any) {
-      alert(e.message);
-    }
+    } catch (e: any) { alert(e.message); }
   };
 
   const loadAccess = async (userId: number) => {
     setSelectedUser(userId);
-    try {
-      const data = await api.getUserAccess(userId);
-      setAccess(data);
-    } catch {}
+    try { setAccess(await api.getUserAccess(userId)); } catch {}
   };
 
   const grantAccess = async () => {
     if (!selectedUser || !newCircuitId || !newValidFrom || !newValidUntil) return;
     try {
       await api.grantAccess({
-        user_id: selectedUser,
-        circuit_id: newCircuitId,
+        user_id: selectedUser, circuit_id: newCircuitId,
         valid_from: new Date(newValidFrom).toISOString(),
         valid_until: new Date(newValidUntil).toISOString(),
       });
       loadAccess(selectedUser);
       setNewCircuitId(0);
-    } catch (e: any) {
-      alert(e.message);
-    }
+    } catch (e: any) { alert(e.message); }
   };
 
   const revokeAccess = async (accessId: number) => {
-    try {
-      await api.revokeAccess(accessId);
-      if (selectedUser) loadAccess(selectedUser);
-    } catch {}
+    try { await api.revokeAccess(accessId); if (selectedUser) loadAccess(selectedUser); } catch {}
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Users list */}
-      <div className="bg-card rounded-lg p-4">
-        <h3 className="text-sm text-gray-400 mb-3">USUARIOS</h3>
+      <div className="bg-surface rounded-xl p-4 border border-border">
+        <h3 className="text-[11px] text-neutral-500 mb-3 uppercase tracking-wider">Usuarios</h3>
 
-        {/* Create form */}
         <div className="flex gap-2 mb-4">
-          <input
-            placeholder="Usuario"
-            value={newUsername}
-            onChange={(e) => setNewUsername(e.target.value)}
-            className="flex-1 bg-surface border border-gray-700 rounded px-2 py-1.5 text-sm"
-          />
-          <input
-            placeholder="Password"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            className="flex-1 bg-surface border border-gray-700 rounded px-2 py-1.5 text-sm"
-          />
-          <input
-            placeholder="Disp."
-            type="number"
-            min="1"
-            max="10"
-            value={newMaxDevices}
+          <input placeholder="Usuario" value={newUsername} onChange={(e) => setNewUsername(e.target.value)}
+            className="flex-1 bg-black border border-border rounded-lg px-2 py-1.5 text-sm" />
+          <input placeholder="Password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+            className="flex-1 bg-black border border-border rounded-lg px-2 py-1.5 text-sm" />
+          <input placeholder="Disp." type="number" min="1" max="10" value={newMaxDevices}
             onChange={(e) => setNewMaxDevices(Number(e.target.value))}
-            className="w-16 bg-surface border border-gray-700 rounded px-2 py-1.5 text-sm"
-            title="Max dispositivos"
-          />
-          <label className="flex items-center gap-1 text-xs text-gray-400">
-            <input type="checkbox" checked={newIsAdmin} onChange={(e) => setNewIsAdmin(e.target.checked)} />
+            className="w-16 bg-black border border-border rounded-lg px-2 py-1.5 text-sm" title="Max dispositivos" />
+          <label className="flex items-center gap-1 text-xs text-neutral-500">
+            <input type="checkbox" checked={newIsAdmin} onChange={(e) => setNewIsAdmin(e.target.checked)} className="accent-accent" />
             Admin
           </label>
-          <button onClick={createUser} className="bg-accent text-white px-3 py-1.5 rounded text-sm">
+          <button onClick={createUser} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-sm">
             Crear
           </button>
         </div>
 
         <table className="w-full text-sm">
-          <thead className="text-gray-500">
+          <thead className="text-[11px] text-neutral-600 uppercase tracking-wider">
             <tr>
               <th className="text-left px-2 py-1">Usuario</th>
               <th className="text-center px-2 py-1">Disp.</th>
               <th className="text-center px-2 py-1">Admin</th>
-              <th className="text-right px-2 py-1">Acciones</th>
+              <th className="text-right px-2 py-1"></th>
             </tr>
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr
-                key={u.id}
-                className={`border-t border-gray-800/50 cursor-pointer hover:bg-surface/50 ${
-                  selectedUser === u.id ? "bg-surface" : ""
-                }`}
-                onClick={() => loadAccess(u.id)}
-              >
-                <td className="px-2 py-1.5">{u.username}</td>
-                <td className="px-2 py-1.5 text-center font-mono">{u.max_devices}</td>
+              <tr key={u.id}
+                className={`border-t border-border cursor-pointer hover:bg-black/50 transition-colors ${selectedUser === u.id ? "bg-black" : ""}`}
+                onClick={() => loadAccess(u.id)}>
+                <td className="px-2 py-1.5 text-white">{u.username}</td>
+                <td className="px-2 py-1.5 text-center font-mono text-neutral-400">{u.max_devices}</td>
                 <td className="px-2 py-1.5 text-center">
-                  {u.is_admin ? <span className="text-accent">Si</span> : "-"}
+                  {u.is_admin ? <span className="text-accent text-xs font-medium">SI</span> : <span className="text-neutral-700">-</span>}
                 </td>
                 <td className="px-2 py-1.5 text-right">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteUser(u.id); }}
-                    className="text-red-500 hover:text-red-400 text-xs"
-                  >
-                    Eliminar
-                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); deleteUser(u.id); }}
+                    className="text-red-400/60 hover:text-red-400 text-xs transition-colors">Eliminar</button>
                 </td>
               </tr>
             ))}
@@ -215,46 +170,30 @@ function UsersManager() {
         </table>
       </div>
 
-      {/* Circuit access for selected user */}
-      <div className="bg-card rounded-lg p-4">
-        <h3 className="text-sm text-gray-400 mb-3">
-          ACCESO A CIRCUITOS
-          {selectedUser && ` - ${users.find((u) => u.id === selectedUser)?.username}`}
+      <div className="bg-surface rounded-xl p-4 border border-border">
+        <h3 className="text-[11px] text-neutral-500 mb-3 uppercase tracking-wider">
+          Acceso a Circuitos{selectedUser && ` — ${users.find((u) => u.id === selectedUser)?.username}`}
         </h3>
 
         {selectedUser ? (
           <>
-            {/* Grant access form */}
             <div className="flex gap-2 mb-4 flex-wrap">
-              <select
-                value={newCircuitId}
-                onChange={(e) => setNewCircuitId(Number(e.target.value))}
-                className="bg-surface border border-gray-700 rounded px-2 py-1.5 text-sm"
-              >
+              <select value={newCircuitId} onChange={(e) => setNewCircuitId(Number(e.target.value))}
+                className="bg-black border border-border rounded-lg px-2 py-1.5 text-sm">
                 <option value={0}>Circuito...</option>
-                {circuits.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
+                {circuits.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-              <input
-                type="date"
-                value={newValidFrom}
-                onChange={(e) => setNewValidFrom(e.target.value)}
-                className="bg-surface border border-gray-700 rounded px-2 py-1.5 text-sm"
-              />
-              <input
-                type="date"
-                value={newValidUntil}
-                onChange={(e) => setNewValidUntil(e.target.value)}
-                className="bg-surface border border-gray-700 rounded px-2 py-1.5 text-sm"
-              />
-              <button onClick={grantAccess} className="bg-accent text-white px-3 py-1.5 rounded text-sm">
+              <input type="date" value={newValidFrom} onChange={(e) => setNewValidFrom(e.target.value)}
+                className="bg-black border border-border rounded-lg px-2 py-1.5 text-sm" />
+              <input type="date" value={newValidUntil} onChange={(e) => setNewValidUntil(e.target.value)}
+                className="bg-black border border-border rounded-lg px-2 py-1.5 text-sm" />
+              <button onClick={grantAccess} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-sm">
                 Dar acceso
               </button>
             </div>
 
             <table className="w-full text-sm">
-              <thead className="text-gray-500">
+              <thead className="text-[11px] text-neutral-600 uppercase tracking-wider">
                 <tr>
                   <th className="text-left px-2 py-1">Circuito</th>
                   <th className="text-left px-2 py-1">Desde</th>
@@ -264,32 +203,24 @@ function UsersManager() {
               </thead>
               <tbody>
                 {access.map((a) => (
-                  <tr key={a.id} className="border-t border-gray-800/50">
-                    <td className="px-2 py-1.5">{a.circuit_name}</td>
-                    <td className="px-2 py-1.5 text-gray-400">{new Date(a.valid_from).toLocaleDateString()}</td>
-                    <td className="px-2 py-1.5 text-gray-400">{new Date(a.valid_until).toLocaleDateString()}</td>
+                  <tr key={a.id} className="border-t border-border">
+                    <td className="px-2 py-1.5 text-white">{a.circuit_name}</td>
+                    <td className="px-2 py-1.5 text-neutral-500">{new Date(a.valid_from).toLocaleDateString()}</td>
+                    <td className="px-2 py-1.5 text-neutral-500">{new Date(a.valid_until).toLocaleDateString()}</td>
                     <td className="px-2 py-1.5 text-right">
-                      <button
-                        onClick={() => revokeAccess(a.id)}
-                        className="text-red-500 hover:text-red-400 text-xs"
-                      >
-                        Revocar
-                      </button>
+                      <button onClick={() => revokeAccess(a.id)}
+                        className="text-red-400/60 hover:text-red-400 text-xs transition-colors">Revocar</button>
                     </td>
                   </tr>
                 ))}
                 {access.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-2 py-4 text-center text-gray-600">
-                      Sin acceso a circuitos
-                    </td>
-                  </tr>
+                  <tr><td colSpan={4} className="px-2 py-4 text-center text-neutral-700">Sin acceso a circuitos</td></tr>
                 )}
               </tbody>
             </table>
           </>
         ) : (
-          <p className="text-gray-600 text-sm">Selecciona un usuario para gestionar su acceso</p>
+          <p className="text-neutral-700 text-sm">Selecciona un usuario para gestionar su acceso</p>
         )}
       </div>
     </div>
@@ -304,10 +235,10 @@ function CircuitsManager() {
   }, []);
 
   return (
-    <div className="bg-card rounded-lg p-4">
-      <h3 className="text-sm text-gray-400 mb-3">CATALOGO DE CIRCUITOS</h3>
+    <div className="bg-surface rounded-xl p-4 border border-border">
+      <h3 className="text-[11px] text-neutral-500 mb-3 uppercase tracking-wider">Catalogo de Circuitos</h3>
       <table className="w-full text-sm">
-        <thead className="text-gray-500">
+        <thead className="text-[11px] text-neutral-600 uppercase tracking-wider">
           <tr>
             <th className="text-left px-2 py-1">ID</th>
             <th className="text-left px-2 py-1">Nombre</th>
@@ -318,12 +249,12 @@ function CircuitsManager() {
         </thead>
         <tbody>
           {circuits.map((c) => (
-            <tr key={c.id} className="border-t border-gray-800/50">
-              <td className="px-2 py-1.5 text-gray-500">{c.id}</td>
-              <td className="px-2 py-1.5 font-medium">{c.name}</td>
-              <td className="px-2 py-1.5 text-right">{c.length_m ? `${c.length_m}m` : "-"}</td>
-              <td className="px-2 py-1.5 text-right font-mono">{c.ws_port}</td>
-              <td className="px-2 py-1.5 text-right">{c.pit_time_s || "-"}</td>
+            <tr key={c.id} className="border-t border-border">
+              <td className="px-2 py-1.5 text-neutral-600">{c.id}</td>
+              <td className="px-2 py-1.5 font-medium text-white">{c.name}</td>
+              <td className="px-2 py-1.5 text-right text-neutral-400">{c.length_m ? `${c.length_m}m` : "-"}</td>
+              <td className="px-2 py-1.5 text-right font-mono text-neutral-400">{c.ws_port}</td>
+              <td className="px-2 py-1.5 text-right text-neutral-400">{c.pit_time_s || "-"}</td>
             </tr>
           ))}
         </tbody>

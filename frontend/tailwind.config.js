@@ -4,18 +4,24 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        bg: '#0f0f0f',
-        surface: '#1a1a2e',
-        card: '#16213e',
-        accent: '#e94560',
-        'tier-100': '#00ff00',
-        'tier-75': '#80ff00',
-        'tier-50': '#ffff00',
-        'tier-25': '#ff8000',
-        'tier-1': '#ff0000',
+        // KartingNow brand
+        bg: '#000000',
+        surface: '#111111',
+        card: '#0a0a0a',
+        border: '#1a1a1a',
+        accent: '#9fe556',       // KartingNow green
+        'accent-hover': '#b8f070',
+        'accent-dim': 'rgba(159, 229, 86, 0.15)',
+        muted: '#e5e5e5',
+        // Tier colors
+        'tier-100': '#9fe556',   // Brand green for best
+        'tier-75': '#c8e946',
+        'tier-50': '#e5d43a',
+        'tier-25': '#e59a2e',
+        'tier-1': '#e54444',
       },
       fontFamily: {
-        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        sans: ['Space Grotesk', 'system-ui', 'sans-serif'],
       },
     },
   },

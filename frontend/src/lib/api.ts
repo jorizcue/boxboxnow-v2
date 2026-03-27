@@ -108,6 +108,7 @@ export const api = {
   getSnapshot: () => fetchApi<any>("/api/race/snapshot"),
   connectApex: () => fetchApi<any>("/api/race/connect", { method: "POST" }),
   disconnectApex: () => fetchApi<any>("/api/race/disconnect", { method: "POST" }),
+  getLiveTeams: () => fetchApi<any>("/api/race/live-teams"),
 
   // Replay
   getReplayLogs: () => fetchApi<{ logs: string[] }>("/api/replay/logs"),

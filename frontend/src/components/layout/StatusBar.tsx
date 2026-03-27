@@ -18,52 +18,52 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   const [showSessions, setShowSessions] = useState(false);
 
   const handleLogout = async () => {
-    try {
-      await api.logout();
-    } catch {}
+    try { await api.logout(); } catch {}
     logout();
   };
 
   return (
     <>
-      <div className="flex items-center justify-between px-4 py-2 bg-surface border-b border-gray-800">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between px-4 py-2 bg-surface border-b border-border">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold tracking-tight text-accent">K</span>
+            <span className="text-sm font-semibold tracking-wider text-white">KARTING<span className="text-accent">NOW</span></span>
+          </div>
           <div className="flex items-center gap-2">
             <div
-              className={`w-2.5 h-2.5 rounded-full ${
-                connected ? "bg-green-500" : "bg-red-500 animate-pulse"
+              className={`w-2 h-2 rounded-full ${
+                connected ? "bg-accent" : "bg-red-500 animate-pulse"
               }`}
             />
-            <span className="text-xs text-gray-400">
-              {connected ? "LIVE" : "OFFLINE"}
+            <span className="text-[11px] text-neutral-500 uppercase tracking-wider">
+              {connected ? "Live" : "Offline"}
             </span>
           </div>
-          <span className="text-sm font-semibold text-accent">BOXBOXNOW</span>
         </div>
 
-        <div className="text-sm font-medium">
+        <div className="text-sm font-medium text-neutral-300 tracking-wide">
           {trackName || "Sin circuito"}
         </div>
 
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400">CARRERA</span>
-            <span className="text-lg font-bold tabular-nums">
+            <span className="text-[11px] text-neutral-500 uppercase tracking-wider">Carrera</span>
+            <span className="text-lg font-bold tabular-nums text-white">
               {countdownMs !== 0 ? msToCountdown(countdownMs) : "--:--:--"}
             </span>
           </div>
-          <div className="flex items-center gap-2 border-l border-gray-700 pl-4">
-            <span className="text-xs text-gray-400">{username}</span>
+          <div className="flex items-center gap-3 border-l border-border pl-4">
+            <span className="text-xs text-neutral-500">{username}</span>
             <button
               onClick={() => setShowSessions(true)}
-              className="text-xs text-gray-500 hover:text-accent transition-colors"
-              title="Gestionar dispositivos"
+              className="text-[11px] text-neutral-600 hover:text-accent transition-colors uppercase tracking-wider"
             >
               Dispositivos
             </button>
             <button
               onClick={handleLogout}
-              className="text-xs text-gray-500 hover:text-accent transition-colors"
+              className="text-[11px] text-neutral-600 hover:text-accent transition-colors uppercase tracking-wider"
             >
               Salir
             </button>

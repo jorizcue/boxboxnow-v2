@@ -20,7 +20,7 @@ export function Navbar({ activeTab, onTabChange, isAdmin }: NavbarProps) {
   ];
 
   return (
-    <nav className="flex gap-1 px-3 py-1 bg-card border-b border-gray-800">
+    <nav className="flex gap-0.5 px-4 bg-black border-b border-border">
       {tabs
         .filter((tab) => !tab.adminOnly || isAdmin)
         .map((tab) => (
@@ -28,13 +28,16 @@ export function Navbar({ activeTab, onTabChange, isAdmin }: NavbarProps) {
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             className={clsx(
-              "px-4 py-2 text-sm font-medium rounded-t transition-colors min-w-[100px]",
+              "px-5 py-2.5 text-sm font-medium tracking-wide transition-colors relative",
               activeTab === tab.id
-                ? "bg-surface text-accent border-b-2 border-accent"
-                : "text-gray-400 hover:text-gray-200 hover:bg-surface/50"
+                ? "text-accent"
+                : "text-neutral-500 hover:text-neutral-300"
             )}
           >
             {tab.label}
+            {activeTab === tab.id && (
+              <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-accent" />
+            )}
           </button>
         ))}
     </nav>

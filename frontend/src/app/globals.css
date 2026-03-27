@@ -2,12 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 body {
-  background-color: #0f0f0f;
-  color: #eaeaea;
-  font-family: 'JetBrains Mono', monospace;
+  background-color: #000000;
+  color: #e5e5e5;
+  font-family: 'Space Grotesk', sans-serif;
 }
 
 /* Racing table animations */
@@ -16,7 +16,7 @@ body {
 }
 
 @keyframes flash {
-  0% { background-color: rgba(233, 69, 96, 0.3); }
+  0% { background-color: rgba(159, 229, 86, 0.2); }
   100% { background-color: transparent; }
 }
 
@@ -27,12 +27,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #1a1a2e;
+  background: #111111;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #e94560;
+  background: #9fe556;
   border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b8f070;
 }
 
 /* Tier score badge */
@@ -57,11 +61,11 @@ body {
 }
 
 .pit-indicator.racing {
-  background-color: #00ff00;
+  background-color: #9fe556;
 }
 
 .pit-indicator.in_pit {
-  background-color: #ff0000;
+  background-color: #ff4444;
   animation: pulse 1s infinite;
 }
 
@@ -72,6 +76,17 @@ body {
 
 /* Our team highlight */
 .our-team {
-  border-left: 3px solid #e94560 !important;
-  background-color: rgba(233, 69, 96, 0.1) !important;
+  border-left: 3px solid #9fe556 !important;
+  background-color: rgba(159, 229, 86, 0.08) !important;
+}
+
+/* Focus states */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #9fe556 !important;
+}
+
+/* Button transitions */
+button {
+  transition: all 0.15s ease;
 }

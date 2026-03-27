@@ -8,7 +8,7 @@ export function ClassificationTable() {
 
   if (classification.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-500">
+      <div className="flex items-center justify-center h-64 text-neutral-600">
         <p>Sin datos de clasificacion</p>
       </div>
     );
@@ -17,18 +17,18 @@ export function ClassificationTable() {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="bg-card text-gray-400 sticky top-0 z-10">
+        <thead className="bg-surface text-neutral-500 sticky top-0 z-10 text-[11px] uppercase tracking-wider">
           <tr>
-            <th className="px-3 py-2 text-left w-12">POS</th>
-            <th className="px-3 py-2 text-left w-12">KART</th>
-            <th className="px-3 py-2 text-left">EQUIPO</th>
-            <th className="px-3 py-2 text-left">PILOTO</th>
-            <th className="px-3 py-2 text-center">VUELTAS</th>
-            <th className="px-3 py-2 text-center">PITS</th>
-            <th className="px-3 py-2 text-right">GAP</th>
-            <th className="px-3 py-2 text-right">INTERV.</th>
-            <th className="px-3 py-2 text-right">MEDIA</th>
-            <th className="px-3 py-2 text-center w-12">TIER</th>
+            <th className="px-3 py-2.5 text-left w-12">Pos</th>
+            <th className="px-3 py-2.5 text-left w-12">Kart</th>
+            <th className="px-3 py-2.5 text-left">Equipo</th>
+            <th className="px-3 py-2.5 text-left">Piloto</th>
+            <th className="px-3 py-2.5 text-center">Vueltas</th>
+            <th className="px-3 py-2.5 text-center">Pits</th>
+            <th className="px-3 py-2.5 text-right">Gap</th>
+            <th className="px-3 py-2.5 text-right">Interv.</th>
+            <th className="px-3 py-2.5 text-right">Media</th>
+            <th className="px-3 py-2.5 text-center w-12">Tier</th>
           </tr>
         </thead>
         <tbody>
@@ -39,23 +39,23 @@ export function ClassificationTable() {
             return (
               <tr
                 key={entry.kartNumber}
-                className={`border-b border-gray-800/50 hover:bg-surface/50 ${
+                className={`border-b border-border hover:bg-surface/50 transition-colors ${
                   isOurTeam ? "our-team" : ""
                 }`}
               >
-                <td className="px-3 py-2 font-bold text-lg">{entry.position}</td>
-                <td className="px-3 py-2 font-mono">{entry.kartNumber}</td>
-                <td className="px-3 py-2 font-medium">{entry.teamName}</td>
-                <td className="px-3 py-2 text-gray-400">{entry.driverName}</td>
-                <td className="px-3 py-2 text-center">{entry.totalLaps}</td>
-                <td className="px-3 py-2 text-center">{entry.pitCount}</td>
-                <td className="px-3 py-2 text-right font-mono">
+                <td className="px-3 py-2 font-bold text-lg text-white">{entry.position}</td>
+                <td className="px-3 py-2 font-mono text-neutral-300">{entry.kartNumber}</td>
+                <td className="px-3 py-2 font-medium text-white">{entry.teamName}</td>
+                <td className="px-3 py-2 text-neutral-400">{entry.driverName}</td>
+                <td className="px-3 py-2 text-center text-neutral-300">{entry.totalLaps}</td>
+                <td className="px-3 py-2 text-center text-neutral-300">{entry.pitCount}</td>
+                <td className="px-3 py-2 text-right font-mono text-neutral-300">
                   {entry.gap || "-"}
                 </td>
-                <td className="px-3 py-2 text-right font-mono text-gray-400">
+                <td className="px-3 py-2 text-right font-mono text-neutral-500">
                   {entry.interval || "-"}
                 </td>
-                <td className="px-3 py-2 text-right font-mono text-gray-400">
+                <td className="px-3 py-2 text-right font-mono text-neutral-400">
                   {msToLapTime(entry.avgLapMs)}
                 </td>
                 <td className="px-3 py-2 text-center">

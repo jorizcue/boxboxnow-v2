@@ -46,51 +46,49 @@ export function SessionManager({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-card rounded-xl p-6 w-full max-w-lg border border-gray-800 shadow-2xl">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+      <div className="bg-surface rounded-2xl p-6 w-full max-w-lg border border-border">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Dispositivos conectados</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-xl">
+          <h2 className="text-lg font-semibold text-white">Dispositivos conectados</h2>
+          <button onClick={onClose} className="text-neutral-600 hover:text-neutral-300 text-xl transition-colors">
             &times;
           </button>
         </div>
 
-        <p className="text-xs text-gray-500 mb-4">
-          Maximo {user?.max_devices} dispositivo(s) &middot;{" "}
-          {sessions.length} activo(s)
+        <p className="text-[11px] text-neutral-500 mb-4 uppercase tracking-wider">
+          Maximo {user?.max_devices} dispositivo(s) &middot; {sessions.length} activo(s)
         </p>
 
         {loading ? (
-          <p className="text-gray-500 text-sm py-4 text-center">Cargando...</p>
+          <p className="text-neutral-600 text-sm py-4 text-center">Cargando...</p>
         ) : (
           <div className="space-y-2 mb-4">
             {sessions.map((s) => (
               <div
                 key={s.id}
-                className={`flex items-center justify-between rounded-lg p-3 border ${
+                className={`flex items-center justify-between rounded-xl p-3 border ${
                   s.is_current
-                    ? "bg-accent/10 border-accent/30"
-                    : "bg-surface border-gray-700"
+                    ? "bg-accent/5 border-accent/20"
+                    : "bg-black border-border"
                 }`}
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium">{s.device_name}</p>
+                    <p className="text-sm font-medium text-white">{s.device_name}</p>
                     {s.is_current && (
-                      <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded">
-                        ESTE DISPOSITIVO
+                      <span className="text-[10px] bg-accent/15 text-accent px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">
+                        Este dispositivo
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500">
-                    IP: {s.ip_address} &middot; Activo:{" "}
-                    {new Date(s.last_active).toLocaleString()}
+                  <p className="text-xs text-neutral-600">
+                    IP: {s.ip_address} &middot; Activo: {new Date(s.last_active).toLocaleString()}
                   </p>
                 </div>
                 {!s.is_current && (
                   <button
                     onClick={() => killSession(s.id)}
-                    className="ml-3 bg-red-900 hover:bg-red-800 text-white text-xs px-3 py-1.5 rounded"
+                    className="ml-3 bg-red-900/50 hover:bg-red-800 text-red-300 text-xs px-3 py-1.5 rounded-lg transition-colors"
                   >
                     Cerrar
                   </button>
@@ -103,7 +101,7 @@ export function SessionManager({ onClose }: { onClose: () => void }) {
         {sessions.length > 1 && (
           <button
             onClick={killAllOthers}
-            className="w-full bg-red-900 hover:bg-red-800 text-white text-sm font-medium py-2 rounded mb-2"
+            className="w-full bg-red-900/50 hover:bg-red-800 text-red-300 text-sm font-medium py-2 rounded-lg mb-2 transition-colors"
           >
             Cerrar todas las demas sesiones
           </button>
@@ -111,7 +109,7 @@ export function SessionManager({ onClose }: { onClose: () => void }) {
 
         <button
           onClick={onClose}
-          className="w-full bg-surface text-gray-300 text-sm py-2 rounded border border-gray-700"
+          className="w-full text-neutral-500 hover:text-white text-sm py-2 transition-colors"
         >
           Cerrar
         </button>

@@ -36,7 +36,6 @@ export function LoginPage() {
       const data = await api.login(username, password);
       setAuth(data.access_token, data.session_token, data.user);
     } catch (err: any) {
-      // Check for 409 (device limit)
       try {
         const body = JSON.parse(err.message.replace("API error 409: ", ""));
         if (body.detail?.active_sessions) {
@@ -54,53 +53,51 @@ export function LoginPage() {
   const killSession = async (sessionId: number) => {
     try {
       await api.killSessionUnauthenticated(username, password, sessionId);
-      // Remove from local list
       if (deviceLimit) {
         const updated = deviceLimit.active_sessions.filter((s) => s.id !== sessionId);
         if (updated.length < deviceLimit.max_devices) {
-          // Now there's room - retry login
           setDeviceLimit(null);
           handleLogin(new Event("submit") as any);
         } else {
           setDeviceLimit({ ...deviceLimit, active_sessions: updated });
         }
       }
-    } catch (e: any) {
+    } catch {
       setError("Error al cerrar la sesion");
     }
   };
 
-  // Device limit reached screen
+  // Device limit screen
   if (deviceLimit) {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center p-4">
-        <div className="bg-card rounded-xl p-8 w-full max-w-lg shadow-2xl border border-gray-800">
+      <div className="min-h-screen bg-black flex items-center justify-center p-4">
+        <div className="bg-surface rounded-2xl p-8 w-full max-w-lg border border-border">
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-accent">LIMITE DE DISPOSITIVOS</h1>
-            <p className="text-gray-400 text-sm mt-2">{deviceLimit.message}</p>
+            <h1 className="text-xl font-bold text-white">LIMITE DE DISPOSITIVOS</h1>
+            <p className="text-neutral-400 text-sm mt-2">{deviceLimit.message}</p>
           </div>
 
-          <div className="space-y-3 mb-6">
-            <p className="text-xs text-gray-500 uppercase tracking-wider">
+          <div className="space-y-2 mb-6">
+            <p className="text-[11px] text-neutral-500 uppercase tracking-wider">
               Sesiones activas ({deviceLimit.active_sessions.length}/{deviceLimit.max_devices})
             </p>
             {deviceLimit.active_sessions.map((session) => (
               <div
                 key={session.id}
-                className="flex items-center justify-between bg-surface rounded-lg p-3 border border-gray-700"
+                className="flex items-center justify-between bg-black rounded-lg p-3 border border-border"
               >
                 <div className="flex-1">
-                  <p className="text-sm font-medium">{session.device_name}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-sm font-medium text-white">{session.device_name}</p>
+                  <p className="text-xs text-neutral-500">
                     IP: {session.ip_address}
                     {session.last_active && (
-                      <> &middot; Activo: {new Date(session.last_active).toLocaleString()}</>
+                      <> &middot; {new Date(session.last_active).toLocaleString()}</>
                     )}
                   </p>
                 </div>
                 <button
                   onClick={() => killSession(session.id)}
-                  className="ml-3 bg-red-900 hover:bg-red-800 text-white text-xs font-medium px-3 py-1.5 rounded transition-colors"
+                  className="ml-3 bg-red-900/50 hover:bg-red-800 text-red-300 text-xs font-medium px-3 py-1.5 rounded"
                 >
                   Cerrar
                 </button>
@@ -110,7 +107,7 @@ export function LoginPage() {
 
           <button
             onClick={() => setDeviceLimit(null)}
-            className="w-full bg-surface hover:bg-surface/80 text-gray-300 font-medium py-2 rounded border border-gray-700 transition-colors"
+            className="w-full text-neutral-400 hover:text-white text-sm py-2 transition-colors"
           >
             Volver al login
           </button>
@@ -119,49 +116,57 @@ export function LoginPage() {
     );
   }
 
-  // Normal login screen
+  // Login screen
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center">
-      <div className="bg-card rounded-xl p-8 w-full max-w-sm shadow-2xl border border-gray-800">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-accent">BOXBOXNOW</h1>
-          <p className="text-gray-500 text-sm mt-1">Race Strategy Dashboard</p>
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="w-full max-w-sm">
+        {/* Brand header */}
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-2 mb-2">
+            <span className="text-4xl font-bold text-accent">K</span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-wider text-white">
+            KARTING<span className="text-accent">NOW</span>
+          </h1>
+          <p className="text-neutral-600 text-xs tracking-widest mt-1 uppercase">Race Strategy</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Usuario</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-surface border border-gray-700 rounded px-3 py-2.5 text-sm focus:border-accent focus:outline-none"
-              placeholder="usuario"
-              autoFocus
-            />
-          </div>
+        <div className="bg-surface rounded-2xl p-8 border border-border">
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div>
+              <label className="block text-[11px] text-neutral-500 mb-1.5 uppercase tracking-wider">Usuario</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700"
+                placeholder="usuario"
+                autoFocus
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Contrasena</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-surface border border-gray-700 rounded px-3 py-2.5 text-sm focus:border-accent focus:outline-none"
-              placeholder="contrasena"
-            />
-          </div>
+            <div>
+              <label className="block text-[11px] text-neutral-500 mb-1.5 uppercase tracking-wider">Contrasena</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700"
+                placeholder="contrasena"
+              />
+            </div>
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+            {error && <p className="text-red-400 text-sm">{error}</p>}
 
-          <button
-            type="submit"
-            disabled={loading || !username || !password}
-            className="w-full bg-accent hover:bg-accent/80 disabled:opacity-50 text-white font-medium py-2.5 rounded transition-colors"
-          >
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading || !username || !password}
+              className="w-full bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-3 rounded-lg transition-colors tracking-wide"
+            >
+              {loading ? "ENTRANDO..." : "ENTRAR"}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

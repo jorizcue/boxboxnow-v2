@@ -35,7 +35,7 @@ export function msToCountdown(ms: number): string {
 }
 
 /**
- * Get the CSS color class for a tier score.
+ * Get the CSS color class for a tier score (KartingNow palette).
  */
 export function tierColor(score: number): string {
   if (score >= 100) return "text-tier-100";
@@ -46,23 +46,21 @@ export function tierColor(score: number): string {
 }
 
 /**
- * Get the background color for a tier score.
+ * Get the hex color for a tier score (KartingNow palette).
  */
-export function tierBg(score: number): string {
-  if (score >= 100) return "bg-tier-100";
-  if (score >= 75) return "bg-tier-75";
-  if (score >= 50) return "bg-tier-50";
-  if (score >= 25) return "bg-tier-25";
-  return "bg-tier-1";
+export function tierHex(score: number): string {
+  if (score >= 100) return "#9fe556";  // brand green
+  if (score >= 75) return "#c8e946";
+  if (score >= 50) return "#e5d43a";
+  if (score >= 25) return "#e59a2e";
+  return "#e54444";
 }
 
 /**
- * Get the hex color for a tier score.
+ * Format a driver differential in seconds.
  */
-export function tierHex(score: number): string {
-  if (score >= 100) return "#00ff00";
-  if (score >= 75) return "#80ff00";
-  if (score >= 50) return "#ffff00";
-  if (score >= 25) return "#ff8000";
-  return "#ff0000";
+export function formatDifferential(ms: number): string {
+  if (ms === 0) return "REF";
+  const sign = ms > 0 ? "+" : "";
+  return `${sign}${(ms / 1000).toFixed(1)}s`;
 }
