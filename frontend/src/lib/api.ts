@@ -11,6 +11,16 @@ function getToken(): string | null {
   return null;
 }
 
+function clearAuth() {
+  // Clear persisted zustand state without reloading
+  try {
+    localStorage.removeItem("boxboxnow-auth");
+    // Force zustand to pick up the change
+    const { useAuth } = require("@/hooks/useAuth");
+    useAuth.getState().logout();
+  } catch {}
+}
+
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -24,9 +34,7 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { ...options, headers });
 
   if (res.status === 401) {
-    // Session killed or token expired - clear auth
-    localStorage.removeItem("boxboxnow-auth");
-    window.location.reload();
+    clearAuth();
     throw new Error("Unauthorized");
   }
 
@@ -58,7 +66,7 @@ export const api = {
       body: JSON.stringify({ username, password }),
     }),
   getMe: () => fetchApi<any>("/api/auth/me"),
-  logout: () => fetchApi<any>("/api/auth/logout", { method: "POST" }),
+  logout: () => fetchApi<any>("/api/auth/logout", { method: "POST" }).catch(() => {}),
 
   // Device sessions
   getMySessions: () => fetchApi<any[]>("/api/auth/sessions"),

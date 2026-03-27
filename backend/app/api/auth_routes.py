@@ -183,13 +183,27 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
     # Cleanup stale sessions first
     await _cleanup_stale_sessions(db, user.id)
 
-    # Count active sessions
-    count_result = await db.execute(
-        select(func.count(DeviceSession.id)).where(DeviceSession.user_id == user.id)
-    )
-    active_count = count_result.scalar() or 0
+    # Admins bypass device session limits
+    if user.is_admin:
+        # Clean old admin sessions (keep last 50 max)
+        admin_sessions = await db.execute(
+            select(DeviceSession)
+            .where(DeviceSession.user_id == user.id)
+            .order_by(DeviceSession.last_active.desc())
+        )
+        all_admin = admin_sessions.scalars().all()
+        if len(all_admin) > 50:
+            for old in all_admin[50:]:
+                await db.delete(old)
+            await db.commit()
+    else:
+        # Count active sessions for non-admin users
+        count_result = await db.execute(
+            select(func.count(DeviceSession.id)).where(DeviceSession.user_id == user.id)
+        )
+        active_count = count_result.scalar() or 0
 
-    if active_count >= user.max_devices:
+    if not user.is_admin and active_count >= user.max_devices:
         # Return active sessions so the user can decide which to kill
         sessions_result = await db.execute(
             select(DeviceSession)
