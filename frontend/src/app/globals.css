@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+body {
+  background-color: #0f0f0f;
+  color: #eaeaea;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Racing table animations */
+.kart-row-update {
+  animation: flash 0.3s ease-out;
+}
+
+@keyframes flash {
+  0% { background-color: rgba(233, 69, 96, 0.3); }
+  100% { background-color: transparent; }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #e94560;
+  border-radius: 3px;
+}
+
+/* Tier score badge */
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 24px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 12px;
+  color: #000;
+}
+
+/* Pit status indicator */
+.pit-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.pit-indicator.racing {
+  background-color: #00ff00;
+}
+
+.pit-indicator.in_pit {
+  background-color: #ff0000;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Our team highlight */
+.our-team {
+  border-left: 3px solid #e94560 !important;
+  background-color: rgba(233, 69, 96, 0.1) !important;
+}
