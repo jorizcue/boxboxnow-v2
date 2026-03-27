@@ -11,10 +11,12 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
+    max_devices = Column(Integer, default=1, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
     circuit_access = relationship("UserCircuitAccess", back_populates="user", cascade="all, delete-orphan")
     race_sessions = relationship("RaceSession", back_populates="user", cascade="all, delete-orphan")
+    device_sessions = relationship("DeviceSession", back_populates="user", cascade="all, delete-orphan")
 
 
 class Circuit(Base):
@@ -96,3 +98,22 @@ class TeamPosition(Base):
     team_name = Column(String(100), default="")
 
     race_session = relationship("RaceSession", back_populates="team_positions")
+
+
+class DeviceSession(Base):
+    """
+    Tracks active device sessions per user (OTT-style concurrent device control).
+    Each login from a new device creates a session. When max_devices is reached,
+    login is blocked until the user kills an existing session.
+    """
+    __tablename__ = "device_sessions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_token = Column(String(64), unique=True, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    device_name = Column(String(200), default="")
+    ip_address = Column(String(45), default="")
+    created_at = Column(DateTime, server_default=func.now())
+    last_active = Column(DateTime, server_default=func.now())
+
+    user = relationship("User", back_populates="device_sessions")

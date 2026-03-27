@@ -19,6 +19,7 @@ class UserOut(BaseModel):
     id: int
     username: str
     is_admin: bool
+    max_devices: int = 1
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
@@ -28,12 +29,35 @@ class UserCreate(BaseModel):
     username: str
     password: str
     is_admin: bool = False
+    max_devices: int = 1
 
 
 class UserUpdate(BaseModel):
     username: str | None = None
     password: str | None = None
     is_admin: bool | None = None
+    max_devices: int | None = None
+
+
+# --- Device Sessions ---
+
+class DeviceSessionOut(BaseModel):
+    id: int
+    session_token: str
+    device_name: str
+    ip_address: str
+    created_at: datetime | None = None
+    last_active: datetime | None = None
+    is_current: bool = False
+
+    model_config = {"from_attributes": True}
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    session_token: str
+    user: UserOut
 
 
 # --- Circuits ---

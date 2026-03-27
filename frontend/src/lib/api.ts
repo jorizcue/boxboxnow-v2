@@ -1,9 +1,6 @@
-import { useAuth } from "@/hooks/useAuth";
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 function getToken(): string | null {
-  // Access zustand store outside React
   try {
     const stored = localStorage.getItem("boxboxnow-auth");
     if (stored) {
@@ -27,7 +24,7 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { ...options, headers });
 
   if (res.status === 401) {
-    // Token expired - clear auth
+    // Session killed or token expired - clear auth
     localStorage.removeItem("boxboxnow-auth");
     window.location.reload();
     throw new Error("Unauthorized");
@@ -40,14 +37,40 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+/** Fetch that does NOT auto-clear auth on 401 (for login flow). */
+async function fetchRaw<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: { "Content-Type": "application/json", ...(options?.headers as Record<string, string>) },
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`API error ${res.status}: ${body}`);
+  }
+  return res.json();
+}
+
 export const api = {
   // Auth
   login: (username: string, password: string) =>
-    fetchApi<any>("/api/auth/login", {
+    fetchRaw<any>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ username, password }),
     }),
   getMe: () => fetchApi<any>("/api/auth/me"),
+  logout: () => fetchApi<any>("/api/auth/logout", { method: "POST" }),
+
+  // Device sessions
+  getMySessions: () => fetchApi<any[]>("/api/auth/sessions"),
+  killSession: (sessionId: number) =>
+    fetchApi<any>(`/api/auth/sessions/${sessionId}`, { method: "DELETE" }),
+  killAllOtherSessions: () =>
+    fetchApi<any>("/api/auth/sessions", { method: "DELETE" }),
+  killSessionUnauthenticated: (username: string, password: string, sessionId: number) =>
+    fetchRaw<any>(`/api/auth/kill-session?session_id=${sessionId}`, {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
 
   // Admin
   getUsers: () => fetchApi<any[]>("/api/admin/users"),

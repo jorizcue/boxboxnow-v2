@@ -37,6 +37,7 @@ async def create_user(data: UserCreate, admin: User = Depends(require_admin), db
         username=data.username,
         password_hash=hash_password(data.password),
         is_admin=data.is_admin,
+        max_devices=data.max_devices,
     )
     db.add(user)
     await db.commit()
@@ -55,6 +56,8 @@ async def update_user(user_id: int, data: UserUpdate, admin: User = Depends(requ
         user.username = data.username
     if data.password is not None:
         user.password_hash = hash_password(data.password)
+    if data.max_devices is not None:
+        user.max_devices = data.max_devices
     if data.is_admin is not None:
         user.is_admin = data.is_admin
 

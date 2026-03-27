@@ -7,6 +7,7 @@ interface UserRow {
   id: number;
   username: string;
   is_admin: boolean;
+  max_devices: number;
 }
 
 interface CircuitRow {
@@ -61,6 +62,7 @@ function UsersManager() {
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newIsAdmin, setNewIsAdmin] = useState(false);
+  const [newMaxDevices, setNewMaxDevices] = useState(1);
   const [selectedUser, setSelectedUser] = useState<number | null>(null);
   const [access, setAccess] = useState<AccessRow[]>([]);
   const [circuits, setCircuits] = useState<CircuitRow[]>([]);
@@ -83,10 +85,11 @@ function UsersManager() {
   const createUser = async () => {
     if (!newUsername || !newPassword) return;
     try {
-      await api.createUser({ username: newUsername, password: newPassword, is_admin: newIsAdmin });
+      await api.createUser({ username: newUsername, password: newPassword, is_admin: newIsAdmin, max_devices: newMaxDevices });
       setNewUsername("");
       setNewPassword("");
       setNewIsAdmin(false);
+      setNewMaxDevices(1);
       loadUsers();
     } catch (e: any) {
       alert(e.message);
@@ -156,6 +159,16 @@ function UsersManager() {
             onChange={(e) => setNewPassword(e.target.value)}
             className="flex-1 bg-surface border border-gray-700 rounded px-2 py-1.5 text-sm"
           />
+          <input
+            placeholder="Disp."
+            type="number"
+            min="1"
+            max="10"
+            value={newMaxDevices}
+            onChange={(e) => setNewMaxDevices(Number(e.target.value))}
+            className="w-16 bg-surface border border-gray-700 rounded px-2 py-1.5 text-sm"
+            title="Max dispositivos"
+          />
           <label className="flex items-center gap-1 text-xs text-gray-400">
             <input type="checkbox" checked={newIsAdmin} onChange={(e) => setNewIsAdmin(e.target.checked)} />
             Admin
@@ -169,6 +182,7 @@ function UsersManager() {
           <thead className="text-gray-500">
             <tr>
               <th className="text-left px-2 py-1">Usuario</th>
+              <th className="text-center px-2 py-1">Disp.</th>
               <th className="text-center px-2 py-1">Admin</th>
               <th className="text-right px-2 py-1">Acciones</th>
             </tr>
@@ -183,6 +197,7 @@ function UsersManager() {
                 onClick={() => loadAccess(u.id)}
               >
                 <td className="px-2 py-1.5">{u.username}</td>
+                <td className="px-2 py-1.5 text-center font-mono">{u.max_devices}</td>
                 <td className="px-2 py-1.5 text-center">
                   {u.is_admin ? <span className="text-accent">Si</span> : "-"}
                 </td>
