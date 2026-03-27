@@ -49,18 +49,17 @@ async def get_active_session(user: User = Depends(get_current_user), db: AsyncSe
     """Get the user's active race session."""
     result = await db.execute(
         select(RaceSession)
-        .options(selectinload(RaceSession.team_positions), selectinload(RaceSession.circuit))
+        .options(
+            selectinload(RaceSession.team_positions).selectinload(TeamPosition.drivers),
+            selectinload(RaceSession.circuit),
+        )
         .where(RaceSession.user_id == user.id, RaceSession.is_active == True)
     )
     session = result.scalar_one_or_none()
     if not session:
         return None
 
-    return RaceSessionOut(
-        **{c.name: getattr(session, c.name) for c in RaceSession.__table__.columns},
-        circuit_name=session.circuit.name if session.circuit else None,
-        team_positions=[TeamPositionOut.model_validate(t) for t in session.team_positions],
-    )
+    return _session_to_out(session)
 
 
 @router.post("/session", response_model=RaceSessionOut)
@@ -91,13 +90,8 @@ async def create_session(
     session = RaceSession(user_id=user.id, **session_data)
     db.add(session)
     await db.commit()
-    await db.refresh(session)
 
-    return RaceSessionOut(
-        **{col.name: getattr(session, col.name) for col in RaceSession.__table__.columns},
-        circuit_name=c.name if c else None,
-        team_positions=[],
-    )
+    return await _reload_session(user.id, db)
 
 
 @router.patch("/session", response_model=RaceSessionOut)
@@ -108,15 +102,12 @@ async def update_session(
 ):
     """Update the user's active race session."""
     result = await db.execute(
-        select(RaceSession)
-        .options(selectinload(RaceSession.team_positions), selectinload(RaceSession.circuit))
-        .where(RaceSession.user_id == user.id, RaceSession.is_active == True)
+        select(RaceSession).where(RaceSession.user_id == user.id, RaceSession.is_active == True)
     )
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(404, "No active session")
 
-    # If changing circuit, verify access
     if data.circuit_id and data.circuit_id != session.circuit_id:
         await _verify_circuit_access(user, data.circuit_id, db)
 
@@ -124,13 +115,8 @@ async def update_session(
         setattr(session, key, value)
 
     await db.commit()
-    await db.refresh(session)
 
-    return RaceSessionOut(
-        **{col.name: getattr(session, col.name) for col in RaceSession.__table__.columns},
-        circuit_name=session.circuit.name if session.circuit else None,
-        team_positions=[TeamPositionOut.model_validate(t) for t in session.team_positions],
-    )
+    return await _reload_session(user.id, db)
 
 
 @router.delete("/session")
@@ -196,12 +182,41 @@ async def replace_teams(
         new_teams.append(team)
 
     await db.commit()
-    for t in new_teams:
-        await db.refresh(t)
-    return new_teams
+
+    # Re-query with eager loading to avoid lazy load errors on serialization
+    result = await db.execute(
+        select(TeamPosition)
+        .options(selectinload(TeamPosition.drivers))
+        .where(TeamPosition.race_session_id == session.id)
+        .order_by(TeamPosition.position)
+    )
+    return result.scalars().all()
 
 
 # --- Helpers ---
+
+def _session_to_out(session: RaceSession) -> RaceSessionOut:
+    """Convert a fully-loaded RaceSession to its Pydantic output model."""
+    return RaceSessionOut(
+        **{c.name: getattr(session, c.name) for c in RaceSession.__table__.columns},
+        circuit_name=session.circuit.name if session.circuit else None,
+        team_positions=[TeamPositionOut.model_validate(t) for t in session.team_positions],
+    )
+
+
+async def _reload_session(user_id: int, db: AsyncSession) -> RaceSessionOut:
+    """Re-query the active session with all eager loads for safe serialization."""
+    result = await db.execute(
+        select(RaceSession)
+        .options(
+            selectinload(RaceSession.team_positions).selectinload(TeamPosition.drivers),
+            selectinload(RaceSession.circuit),
+        )
+        .where(RaceSession.user_id == user_id, RaceSession.is_active == True)
+    )
+    session = result.scalar_one()
+    return _session_to_out(session)
+
 
 async def _get_active_session(user: User, db: AsyncSession) -> RaceSession:
     result = await db.execute(
