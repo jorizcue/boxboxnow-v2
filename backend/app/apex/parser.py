@@ -239,10 +239,23 @@ class ApexMessageParser:
         return events
 
     def _parse_kart_row(self, row, row_id: str) -> InitKart | None:
-        """Extract kart data from an HTML table row."""
+        """Extract kart data from an HTML table row.
+
+        Note: Some columns (rk, no) have their data-id on inner <div>/<p>
+        elements rather than on the <td> itself. We check both levels.
+        """
         data = {}
         for td in row.find_all("td"):
+            # Try to find data-id on the <td> itself or on inner elements
             td_id = td.get("data-id", "")
+            if not td_id:
+                # Check inner <div> or <p> for data-id (rk/no columns)
+                for inner_el in td.find_all(["div", "p"]):
+                    inner_id = inner_el.get("data-id", "")
+                    if inner_id:
+                        td_id = inner_id
+                        break
+
             if not td_id:
                 continue
 
