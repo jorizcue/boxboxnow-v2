@@ -1,122 +1,180 @@
 """
 Distance-based race classification engine.
-Ported from boxboxnow.py resumen_karts() - computes race standings
-based on estimated real-time distance covered.
+EXACT port of boxboxnow.py resumen_karts() (lines 192-289).
+
+Key difference from previous implementation:
+  - max_pits = max pitNumber across ALL karts (not a config value)
+  - Uses created_at timestamps from all_laps for time_since_meta
+  - Excludes first lap of each stint when computing averages
 """
 
-import time
 import logging
 import numpy as np
-from app.engine.state import RaceStateManager, KartState
+import pandas as pd
+from datetime import datetime
+from app.engine.state import RaceStateManager
 
 logger = logging.getLogger(__name__)
 
 
 def compute_classification(state: RaceStateManager) -> None:
     """
-    Compute distance-based classification and update state.
-
-    For each kart:
-    1. Average lap time from valid stint laps (last 20)
-    2. Average speed = circuit_length / avg_lap_time
-    3. Base distance = total_laps * circuit_length
-    4. Extra distance since last crossing = speed * time_since_last_lap
-    5. Pit penalty = (max_pits_remaining) * speed * pit_time (for fairness)
-    6. Total distance = base + extra - penalty
-    7. Sort by total distance descending
-    8. Compute gap and interval
+    Exact port of boxboxnow.py resumen_karts().
+    Builds a DataFrame from all_laps (stage_laps_clasif equivalent),
+    computes distance-based standings.
     """
-    karts = [k for k in state.karts.values() if k.total_laps > 0]
-    if not karts:
+    longitud_circuito = state.circuit_length_m
+    tiempo_pit = state.pit_time_s
+
+    if not longitud_circuito or longitud_circuito <= 0:
         state.classification = []
         return
 
-    circuit_m = state.circuit_length_m
-    pit_time_s = state.pit_time_s
-    min_pits = state.min_pits
-    now = time.time()
+    # Build DataFrame from all_laps (stage_laps_clasif equivalent)
+    all_records = []
+    for kart in state.karts.values():
+        for lap in kart.all_laps:
+            all_records.append(lap)
 
-    results = []
-    for kart in karts:
-        # Average lap time
-        valid_laps = kart.stint_laps[-20:] if kart.stint_laps else kart.all_laps[-20:]
-        if not valid_laps:
-            avg_lap_s = 70.0  # fallback ~1:10
+    if not all_records:
+        state.classification = []
+        return
+
+    df_clasif = pd.DataFrame(all_records)
+    if df_clasif.empty or 'lapTime' not in df_clasif.columns:
+        state.classification = []
+        return
+
+    df_clasif['created_at'] = pd.to_datetime(df_clasif['created_at'])
+    df_clasif = df_clasif.sort_values(['kartNumber', 'totalLap'])
+
+    # Max pits across ALL karts (exact port)
+    max_pits = df_clasif['pitNumber'].max() if 'pitNumber' in df_clasif.columns else 0
+
+    resumen = []
+
+    for kart_num, group in df_clasif.groupby('kartNumber'):
+        last_row = group.iloc[-1]
+        last_lap = last_row['totalLap']
+        last_time = last_row['created_at']
+        last_pit = last_row['pitNumber']
+
+        # Last stint: final block where pitNumber == last_pit
+        stint_mask = group['pitNumber'] == last_pit
+        stint = group[stint_mask].copy()
+
+        # Exclude first lap of stint (exact port)
+        if len(stint) > 1:
+            stint = stint.iloc[1:]
+
+        # Last 20 laps of stint
+        stint_ultimas = stint.tail(20)
+        mean_lap_time = stint_ultimas['lapTime'].mean()  # in ms
+
+        # Speed (m/s)
+        if mean_lap_time and not np.isnan(mean_lap_time):
+            mean_lap_time_s = mean_lap_time / 1000
+            velocidad_media = longitud_circuito / mean_lap_time_s
         else:
-            avg_lap_s = float(np.mean(valid_laps)) / 1000.0
+            velocidad_media = np.nan
 
-        if avg_lap_s <= 0:
-            avg_lap_s = 70.0
+        # Distance from completed laps
+        distancia_vueltas = last_lap * longitud_circuito
 
-        # Speed in m/s
-        speed = circuit_m / avg_lap_s
+        # Time since last crossing
+        ahora = pd.Timestamp.now()
+        tiempo_desde_meta = (ahora - last_time).total_seconds()
+        metros_extra = velocidad_media * tiempo_desde_meta if not np.isnan(velocidad_media) else 0
 
-        # Base distance
-        base_distance = kart.total_laps * circuit_m
+        # Pit penalty
+        distancia_pit = velocidad_media * tiempo_pit if not np.isnan(velocidad_media) and tiempo_pit else np.nan
+        pits_restantes = max_pits - last_pit
+        distancia_no_recorrida = pits_restantes * distancia_pit if not np.isnan(distancia_pit) else np.nan
 
-        # Extra distance since last timing line crossing
-        # (estimated from time elapsed and current speed)
-        time_since_start = now - kart.stint_start_time if kart.stint_start_time > 0 else 0
-        laps_in_stint = len(kart.stint_laps)
-        if laps_in_stint > 0 and kart.stint_laps:
-            total_stint_time_s = sum(kart.stint_laps) / 1000.0
-            time_since_last_lap = max(0, time_since_start - total_stint_time_s)
-        else:
-            time_since_last_lap = 0
+        distancia_total = distancia_vueltas + metros_extra - (distancia_no_recorrida if not np.isnan(distancia_no_recorrida) else 0)
 
-        extra_distance = speed * min(time_since_last_lap, avg_lap_s)
+        # Find team name from kart state
+        team_name = ""
+        driver_name = ""
+        for k in state.karts.values():
+            if k.kart_number == kart_num:
+                team_name = k.team_name
+                driver_name = k.driver_name
+                break
 
-        # Pit penalty for karts that haven't done their minimum pits
-        pits_remaining = max(0, min_pits - kart.pit_count)
-        pit_penalty = pits_remaining * speed * pit_time_s
-
-        total_distance = base_distance + extra_distance - pit_penalty
-
-        results.append({
-            "kart": kart,
-            "total_distance": total_distance,
-            "speed": speed,
-            "avg_lap_s": avg_lap_s,
+        resumen.append({
+            'kartNumber': kart_num,
+            'teamName': team_name,
+            'driverName': driver_name,
+            'ultima_vuelta': last_lap,
+            'velocidad_media_stint': velocidad_media,
+            'distancia_total': distancia_total,
+            'last_pit': last_pit,
+            'pits_restantes': pits_restantes,
         })
 
-    # Sort by total distance (descending = leader first)
-    results.sort(key=lambda r: r["total_distance"], reverse=True)
+    if not resumen:
+        state.classification = []
+        return
 
-    # Compute gap and interval
-    classification = []
-    leader_distance = results[0]["total_distance"] if results else 0
-    prev_distance = leader_distance
+    df_resumen = pd.DataFrame(resumen)
 
-    for i, r in enumerate(results):
-        kart = r["kart"]
-        speed = r["speed"]
+    if df_resumen.empty or 'distancia_total' not in df_resumen.columns:
+        state.classification = []
+        return
 
-        # Gap to leader (in seconds)
-        if i == 0:
-            gap = ""
-            interval = ""
+    # Sort by distance (leader first)
+    df_resumen = df_resumen.sort_values('distancia_total', ascending=False).reset_index(drop=True)
+
+    # Interval (exact port)
+    interval_list = [0.0]
+    for i in range(1, len(df_resumen)):
+        dist_diff = df_resumen.loc[i - 1, 'distancia_total'] - df_resumen.loc[i, 'distancia_total']
+        v = df_resumen.loc[i, 'velocidad_media_stint']
+        if v and not np.isnan(v) and v > 0:
+            interval_list.append(dist_diff / v)
         else:
-            distance_to_leader = leader_distance - r["total_distance"]
-            gap_s = distance_to_leader / speed if speed > 0 else 0
-            gap = f"{gap_s:.3f}"
+            interval_list.append(np.nan)
+    df_resumen['Interval'] = interval_list
 
-            distance_to_prev = prev_distance - r["total_distance"]
-            interval_s = distance_to_prev / speed if speed > 0 else 0
-            interval = f"{interval_s:.3f}"
+    # Gap (exact port)
+    gap_list = [0.0]
+    lider_dist = df_resumen.loc[0, 'distancia_total']
+    for i in range(1, len(df_resumen)):
+        dist_diff = lider_dist - df_resumen.loc[i, 'distancia_total']
+        v = df_resumen.loc[i, 'velocidad_media_stint']
+        if v and not np.isnan(v) and v > 0:
+            gap_list.append(dist_diff / v)
+        else:
+            gap_list.append(np.nan)
+    df_resumen['gap'] = gap_list
 
-        prev_distance = r["total_distance"]
+    # Build classification output
+    classification = []
+    for i, row in df_resumen.iterrows():
+        # Get tier score from kart state
+        tier_score = 50
+        avg_lap_ms = 0
+        for kart in state.karts.values():
+            if kart.kart_number == row['kartNumber']:
+                tier_score = kart.tier_score
+                avg_lap_ms = kart.avg_lap_ms
+                break
+
+        gap_val = row['gap']
+        interval_val = row['Interval']
 
         classification.append({
             "position": i + 1,
-            "kartNumber": kart.kart_number,
-            "teamName": kart.team_name,
-            "driverName": kart.driver_name,
-            "totalLaps": kart.total_laps,
-            "pitCount": kart.pit_count,
-            "gap": gap,
-            "interval": interval,
-            "avgLapMs": round(r["avg_lap_s"] * 1000),
-            "tierScore": kart.tier_score,
+            "kartNumber": int(row['kartNumber']),
+            "teamName": row['teamName'],
+            "driverName": row['driverName'],
+            "totalLaps": int(row['ultima_vuelta']),
+            "pitCount": int(row['last_pit']),
+            "gap": f"{gap_val:.3f}" if not np.isnan(gap_val) and gap_val > 0 else "",
+            "interval": f"{interval_val:.3f}" if not np.isnan(interval_val) and interval_val > 0 else "",
+            "avgLapMs": round(avg_lap_ms),
+            "tierScore": tier_score,
         })
 
     state.classification = classification

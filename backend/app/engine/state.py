@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class KartState:
+    """
+    In-memory state per kart. Mirrors the data_table entry from
+    websocket_Secuencial.py + analytics from boxboxnow.py.
+    """
     row_id: str
     kart_number: int
     team_name: str = ""
@@ -22,31 +26,39 @@ class KartState:
     driver_time: str = ""
     position: int = 0
     total_laps: int = 0
-    last_lap_ms: int = 0
+    last_lap_ms: int = 0       # lastLapTime - last valid lap time in ms
     best_lap_ms: int = 0
     gap: str = ""
     interval: str = ""
-    pit_count: int = 0
+    pit_count: int = 0          # pitNumber from original
     pit_status: str = "racing"  # "racing" | "in_pit"
     pit_time: str = ""
-    visual_status: str = ""     # gs, gf, gm, gl
-    arrow_status: str = ""      # su, sd, sf, sr
+    visual_status: str = ""
+    arrow_status: str = ""
     stint_start_time: float = 0.0
-    stint_laps: list[int] = field(default_factory=list)
-    all_laps: list[int] = field(default_factory=list)
-    last_pit_lap: int = 0
+    last_pit_lap: int = 1       # lastPitLap - lap number when last pit occurred
 
-    # Analytics results (set by engines)
+    # Lap storage (replaces stage_laps_rt and stage_laps_clasif)
+    # valid_laps = stage_laps_rt equivalent (filtered, per pitNumber)
+    # all_laps = stage_laps_clasif equivalent (all laps including filtered)
+    valid_laps: list[dict] = field(default_factory=list)  # {lapTime, totalLap, pitNumber, created_at}
+    all_laps: list[dict] = field(default_factory=list)
+
+    # Analytics results (set by clustering/classification engines)
     tier_score: int = 50
     avg_lap_ms: float = 0.0
     best_avg_ms: float = 0.0
     cluster: int = 2
-    driver_differential_ms: int = 0  # current driver's differential applied
+    driver_differential_ms: int = 0
 
     def stint_duration_s(self) -> float:
         if self.stint_start_time <= 0:
             return 0.0
         return time.time() - self.stint_start_time
+
+    def stint_lap_count(self) -> int:
+        """Number of valid laps in current stint."""
+        return sum(1 for lap in self.valid_laps if lap.get("pitNumber") == self.pit_count)
 
     def to_dict(self) -> dict:
         return {
@@ -66,7 +78,7 @@ class KartState:
             "pitTime": self.pit_time,
             "visualStatus": self.visual_status,
             "arrowStatus": self.arrow_status,
-            "stintLapsCount": len(self.stint_laps),
+            "stintLapsCount": self.stint_lap_count(),
             "stintDurationS": self.stint_duration_s(),
             "tierScore": self.tier_score,
             "driverDifferentialMs": self.driver_differential_ms,
@@ -98,7 +110,7 @@ class RaceStateManager:
         self.circuit_length_m: int = 1100
         self.pit_time_s: int = 120
         self.laps_discard: int = 2
-        self.lap_differential: float = 1.15
+        self.lap_differential: int = 3000  # diferencial_vueltas in ms (absolute offset, not multiplier)
         self.rain_mode: bool = False
         self.our_kart_number: int = 0
         self.min_pits: int = 3
@@ -165,28 +177,46 @@ class RaceStateManager:
         if not kart and row_id:
             return None
 
-        if event.type == EventType.LAP:
-            lap_ms = time_to_ms(event.value)
+        if event.type in (EventType.LAP, EventType.LAP_MS):
+            lap_ms = time_to_ms(event.value) if event.type == EventType.LAP else int(event.value)
             if lap_ms > 0 and kart:
+                # Port of websocket_Secuencial.py live update lap handling
+                kart.total_laps += 1
+                now_str = datetime.now().isoformat()
+                lap_record = {
+                    "lapTime": lap_ms,
+                    "totalLap": kart.total_laps,
+                    "pitNumber": kart.pit_count,
+                    "kartNumber": kart.kart_number,
+                    "driverName": kart.driver_name,
+                    "created_at": now_str,
+                }
+
+                # Always add to all_laps (stage_laps_clasif equivalent)
+                kart.all_laps.append(lap_record)
+
+                # Outlier filter - exact port of original:
+                # 1. Skip if total_lap <= lastPitLap + num_vueltas_descarte
+                # 2. Skip if lap_time > lastLapTime + diferencial_vueltas AND not rain
+                is_valid = True
+                if kart.total_laps <= kart.last_pit_lap + self.laps_discard:
+                    is_valid = False
+                elif kart.last_lap_ms > 0 and not self.rain_mode:
+                    if lap_ms > kart.last_lap_ms + self.lap_differential:
+                        is_valid = False
+
+                if is_valid:
+                    kart.valid_laps.append(lap_record)
+
+                # Update lastLapTime AFTER filter check (matches original order)
                 kart.last_lap_ms = lap_ms
-                kart.all_laps.append(lap_ms)
-                # Only add to stint laps if it passes quality filter
-                if self._is_valid_lap(kart, lap_ms):
-                    kart.stint_laps.append(lap_ms)
+                if kart.best_lap_ms <= 0 or lap_ms < kart.best_lap_ms:
+                    kart.best_lap_ms = lap_ms
+
                 return {"event": "lap", "rowId": row_id,
                         "kartNumber": kart.kart_number,
                         "lapTimeMs": lap_ms,
                         "lapClass": event.extra.get("class", "tn")}
-
-        elif event.type == EventType.LAP_MS:
-            lap_ms = int(event.value)
-            if lap_ms > 0 and kart:
-                kart.last_lap_ms = lap_ms
-                kart.all_laps.append(lap_ms)
-                if self._is_valid_lap(kart, lap_ms):
-                    kart.stint_laps.append(lap_ms)
-                return {"event": "lapMs", "rowId": row_id,
-                        "kartNumber": kart.kart_number, "lapTimeMs": lap_ms}
 
         elif event.type == EventType.BEST_LAP:
             lap_ms = time_to_ms(event.value)
@@ -196,17 +226,19 @@ class RaceStateManager:
                         "kartNumber": kart.kart_number, "lapTimeMs": lap_ms}
 
         elif event.type == EventType.PIT_IN and kart:
+            # Port of websocket_Secuencial.py PIT IN handling
             kart.pit_status = "in_pit"
+            kart.pit_count += 1
             kart.last_pit_lap = kart.total_laps
             return {"event": "pitIn", "rowId": row_id,
                     "kartNumber": kart.kart_number,
+                    "pitCount": kart.pit_count,
                     "lap": kart.total_laps}
 
         elif event.type == EventType.PIT_OUT and kart:
+            # Port of websocket_Secuencial.py PIT OUT handling
             kart.pit_status = "racing"
             kart.stint_start_time = time.time()
-            kart.stint_laps = []
-            kart.pit_count += 1
             return {"event": "pitOut", "rowId": row_id,
                     "kartNumber": kart.kart_number,
                     "pitCount": kart.pit_count}
@@ -282,28 +314,6 @@ class RaceStateManager:
             return {"event": "message", "text": event.value}
 
         return None
-
-    def _is_valid_lap(self, kart: KartState, lap_ms: int) -> bool:
-        """Check if a lap time should be included in analytics."""
-        if lap_ms <= 0:
-            return False
-
-        # Discard first N laps after pit
-        laps_since_pit = kart.total_laps - kart.last_pit_lap
-        if laps_since_pit <= self.laps_discard:
-            return False
-
-        # In rain mode, don't filter outliers
-        if self.rain_mode:
-            return True
-
-        # Filter outlier laps (too slow)
-        if kart.best_lap_ms > 0:
-            threshold = kart.best_lap_ms * self.lap_differential
-            if lap_ms > threshold:
-                return False
-
-        return True
 
     def get_snapshot(self) -> dict:
         """Get full state snapshot for new client connections."""

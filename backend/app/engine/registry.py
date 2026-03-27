@@ -63,7 +63,7 @@ class UserSession:
         self.state.circuit_length_m = circuit_length_m or 1100
         self.state.pit_time_s = pit_time_s or 120
         self.state.laps_discard = laps_discard
-        self.state.lap_differential = lap_differential / 1000.0 if lap_differential > 10 else lap_differential
+        self.state.lap_differential = int(lap_differential)  # diferencial_vueltas in ms (absolute offset)
         self.state.rain_mode = rain
         self.state.our_kart_number = our_kart
         self.state.min_pits = min_pits

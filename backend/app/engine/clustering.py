@@ -1,77 +1,46 @@
 """
 Kart performance clustering using Jenks Natural Breaks.
-Ported from boxboxnow.py - segments karts into 5 performance tiers.
+EXACT port of boxboxnow.py lines 390-451.
 
-Driver differential adjustment:
-  Each driver can have a differential_ms that represents how much slower/faster
-  they are vs the team's reference pace. When clustering, the kart's observed
-  average is adjusted by subtracting the current driver's differential to
-  estimate the kart's "true" pace, independent of who is driving.
+Steps:
+1. Group valid_laps by kart + pitNumber, take last pit's laps
+2. Compute Tiempo_Promedio_Vuelta (mean last 20) and Best_time_avg (mean best 3)
+3. Apply JenksNaturalBreaks with 5 clusters on Best_time_avg
+4. Pad breaks with min-20 and max+20, trim to 5 bins
+5. pd.cut to assign cluster labels
+6. Sort by Best_time_avg -> assign posicion_real
+7. Adjust cluster by position gap (ajustar_cluster_por_posicion)
+8. Map cluster -> tier score
 
-  Example: Kart 7 observed avg = 67000ms, current driver "Juan" has +2500ms
-  -> adjusted avg = 64500ms (the kart is actually faster than it looks)
+Driver differential:
+  Subtracts differential from observed averages before clustering.
 """
 
 import logging
 import numpy as np
+import pandas as pd
+import jenkspy
 from app.engine.state import RaceStateManager, KartState
 
 logger = logging.getLogger(__name__)
 
-# Tier scores by cluster index
 TIER_SCORES = {0: 100, 1: 75, 2: 50, 3: 25, 4: 1}
 N_CLUSTERS = 5
-LAST_N_LAPS = 20
-BEST_N_LAPS = 3
 
 
-def adjust_cluster_by_position(cluster: int, theoretical_pos: int, actual_pos: int) -> int:
-    """
-    Adjust cluster based on gap between theoretical and actual position.
-    Ported from boxboxnow.py ajustar_cluster_por_posicion().
-    """
-    gap = theoretical_pos - actual_pos
-
-    if 6 <= gap <= 15:
-        cluster = max(0, cluster - 1)
-    elif gap > 15:
-        cluster = max(0, cluster - 2)
-    elif -15 <= gap <= -6:
-        cluster = min(N_CLUSTERS - 1, cluster + 1)
-    elif gap < -15:
-        cluster = min(N_CLUSTERS - 1, cluster + 2)
-
-    return cluster
-
-
-def _get_driver_differential(kart: KartState, driver_differentials: dict[int, dict[str, int]]) -> int:
-    """
-    Look up the current driver's differential for this kart.
-
-    Args:
-        kart: The kart state (has kart_number and driver_name)
-        driver_differentials: dict[kart_number -> dict[driver_name_lower -> differential_ms]]
-
-    Returns:
-        differential_ms for the current driver, or 0 if not configured
-    """
-    if not kart.driver_name or kart.kart_number not in driver_differentials:
-        return 0
-
-    drivers = driver_differentials[kart.kart_number]
-    # Try exact match first, then case-insensitive partial match
-    driver_lower = kart.driver_name.strip().lower()
-
-    # Exact match
-    if driver_lower in drivers:
-        return drivers[driver_lower]
-
-    # Partial match (Apex sometimes sends truncated names)
-    for name, diff in drivers.items():
-        if name in driver_lower or driver_lower in name:
-            return diff
-
-    return 0
+def ajustar_cluster_por_posicion(row):
+    """Exact port of boxboxnow.py ajustar_cluster_por_posicion()."""
+    diferencia = row['position'] - row['posicion_real']
+    if 6 < diferencia <= 15:
+        return max(0, row['cluster'] - 1)
+    elif -15 < diferencia < -6:
+        return min(4, row['cluster'] + 1)
+    elif diferencia > 15:
+        return max(0, row['cluster'] - 2)
+    elif diferencia < -15:
+        return min(4, row['cluster'] + 2)
+    else:
+        return row['cluster']
 
 
 def compute_clustering(
@@ -80,96 +49,157 @@ def compute_clustering(
     driver_differentials: dict[int, dict[str, int]] | None = None,
 ) -> None:
     """
-    Compute performance clusters for all karts and update state.
+    Exact port of boxboxnow.py main loop clustering (lines 360-451).
 
-    Args:
-        state: The race state manager
-        team_positions: Dict of kart_number -> theoretical position from teams_level
-        driver_differentials: Dict of kart_number -> {driver_name_lower: differential_ms}
-            Positive differential = driver is slower than reference
-            The differential is SUBTRACTED from observed avg to get "true kart pace"
+    Uses valid_laps from each kart, grouped by pitNumber, taking the
+    last pit's data. Then applies Jenks clustering with break padding.
     """
     if driver_differentials is None:
         driver_differentials = {}
 
-    karts = list(state.karts.values())
-    if len(karts) < 2:
+    # Build a DataFrame from all karts' valid_laps (stage_laps_rt equivalent)
+    all_records = []
+    for kart in state.karts.values():
+        for lap in kart.valid_laps:
+            all_records.append(lap)
+
+    if not all_records:
         return
 
-    kart_stats = []
-    for kart in karts:
-        valid_laps = kart.stint_laps[-LAST_N_LAPS:] if kart.stint_laps else []
-        if not valid_laps:
-            valid_laps = kart.all_laps[-LAST_N_LAPS:] if kart.all_laps else []
-
-        if not valid_laps:
-            continue
-
-        avg_ms = float(np.mean(valid_laps))
-        sorted_laps = sorted(valid_laps)
-        best_avg_ms = float(np.mean(sorted_laps[:BEST_N_LAPS])) if len(sorted_laps) >= BEST_N_LAPS else avg_ms
-
-        # Apply driver differential: subtract it to get the kart's "true" pace
-        # If driver is slow (+2500ms), subtracting makes the kart look faster (which it is)
-        driver_diff = _get_driver_differential(kart, driver_differentials)
-        adjusted_avg_ms = avg_ms - driver_diff
-        adjusted_best_avg_ms = best_avg_ms - driver_diff
-
-        kart_stats.append({
-            "kart": kart,
-            "avg_ms": avg_ms,                          # raw observed
-            "best_avg_ms": best_avg_ms,                # raw observed
-            "adjusted_avg_ms": adjusted_avg_ms,        # corrected for driver
-            "adjusted_best_avg_ms": adjusted_best_avg_ms,
-            "driver_diff": driver_diff,
-        })
-
-    if len(kart_stats) < N_CLUSTERS:
-        for ks in kart_stats:
-            ks["kart"].tier_score = 50
-            ks["kart"].avg_lap_ms = ks["avg_ms"]
-            ks["kart"].best_avg_ms = ks["best_avg_ms"]
-            ks["kart"].driver_differential_ms = ks["driver_diff"]
-            ks["kart"].cluster = 2
+    df = pd.DataFrame(all_records)
+    if df.empty or 'lapTime' not in df.columns:
         return
 
-    # Use ADJUSTED best_avg for clustering (this is the key change)
-    best_avgs = np.array([ks["adjusted_best_avg_ms"] for ks in kart_stats])
+    df.dropna(inplace=True)
+    df = df.sort_values(['kartNumber', 'pitNumber', 'totalLap'])
 
-    unique_vals = len(np.unique(best_avgs))
-    n_classes = max(2, min(unique_vals, N_CLUSTERS))
+    # Group by kart + pitNumber, compute aggregates (exact port)
+    df_grouped = df.groupby(['kartNumber', 'pitNumber']).agg({
+        'lapTime': [
+            ('Tiempo_Promedio_Vuelta', lambda x: x.tail(20).mean()),
+            ('Best_time_avg', lambda x: x.nsmallest(3).mean()),
+        ]
+    }).reset_index()
 
+    df_grouped.columns = ['kart', 'pits', 'Tiempo_Promedio_Vuelta', 'Best_time_avg']
+
+    # Filter to last pit per kart
+    df_ultimo_pit = df_grouped.loc[df_grouped.groupby('kart')['pits'].idxmax()].copy()
+
+    # Merge with team positions
+    if team_positions:
+        team_df = pd.DataFrame([
+            {'kart': k, 'position': v}
+            for k, v in team_positions.items()
+        ])
+        df_ultimo_pit = pd.merge(df_ultimo_pit, team_df, on='kart', how='left')
+    else:
+        df_ultimo_pit['position'] = range(1, len(df_ultimo_pit) + 1)
+
+    df_ultimo_pit['position'] = df_ultimo_pit['position'].fillna(len(df_ultimo_pit))
+
+    # Apply driver differentials before clustering
+    for idx, row in df_ultimo_pit.iterrows():
+        kart_num = int(row['kart'])
+        kart_state = None
+        for k in state.karts.values():
+            if k.kart_number == kart_num:
+                kart_state = k
+                break
+        if kart_state and kart_num in driver_differentials:
+            driver_name_lower = kart_state.driver_name.strip().lower()
+            drivers = driver_differentials[kart_num]
+            diff = drivers.get(driver_name_lower, 0)
+            # Try partial match
+            if diff == 0:
+                for name, d in drivers.items():
+                    if name in driver_name_lower or driver_name_lower in name:
+                        diff = d
+                        break
+            df_ultimo_pit.at[idx, 'Best_time_avg'] -= diff
+            df_ultimo_pit.at[idx, 'Tiempo_Promedio_Vuelta'] -= diff
+            if kart_state:
+                kart_state.driver_differential_ms = diff
+
+    # Check unique values
+    unique_values = df_ultimo_pit['Best_time_avg'].nunique()
+
+    if unique_values < N_CLUSTERS:
+        logger.warning("No hay suficientes valores unicos para calcular los clusters.")
+        # Still update avg/best on kart states
+        _update_kart_stats(state, df_ultimo_pit)
+        return
+
+    # Apply Jenks Natural Breaks (exact port)
     try:
-        import jenkspy
-        breaks = jenkspy.jenks_breaks(best_avgs.tolist(), n_classes=n_classes)
+        breaks = jenkspy.JenksNaturalBreaks(n_classes=N_CLUSTERS)
+        breaks.fit(df_ultimo_pit['Best_time_avg'].values)
 
-        for ks in kart_stats:
-            kart = ks["kart"]
-            kart.avg_lap_ms = ks["avg_ms"]
-            kart.best_avg_ms = ks["best_avg_ms"]
-            kart.driver_differential_ms = ks["driver_diff"]
+        # Pad breaks with min-20 and max+20
+        min_value = df_ultimo_pit['Best_time_avg'].min()
+        max_value = df_ultimo_pit['Best_time_avg'].max()
+        adjusted_breaks = np.concatenate(([min_value - 20], breaks.breaks_, [max_value + 20]))
 
-            # Cluster based on adjusted time
-            cluster = 0
-            for i in range(1, len(breaks)):
-                if ks["adjusted_best_avg_ms"] <= breaks[i]:
-                    cluster = i - 1
+        # Trim to 5 bins if too many boundaries
+        if len(adjusted_breaks) > 6:
+            adjusted_breaks = np.array([adjusted_breaks[0]] + list(breaks.breaks_[:4]) + [adjusted_breaks[-1]])
+
+        if len(adjusted_breaks) < 3:
+            logger.warning("No hay suficientes datos para generar los clusters.")
+            _update_kart_stats(state, df_ultimo_pit)
+            return
+
+        adjusted_breaks = sorted(set(adjusted_breaks))
+
+        df_ultimo_pit['cluster'] = pd.cut(
+            df_ultimo_pit['Best_time_avg'],
+            bins=adjusted_breaks,
+            labels=range(len(adjusted_breaks) - 1),
+            include_lowest=True,
+            right=True,
+            duplicates='drop',
+        )
+
+        # Assign posicion_real based on Best_time_avg sort
+        df_ultimo_pit = df_ultimo_pit.sort_values(by='Best_time_avg')
+        df_ultimo_pit['posicion_real'] = range(1, len(df_ultimo_pit) + 1)
+
+        # Adjust cluster by position gap
+        df_ultimo_pit['cluster_ajustado'] = df_ultimo_pit.apply(ajustar_cluster_por_posicion, axis=1)
+
+        # Map to tier scores
+        df_ultimo_pit['puntuacion'] = df_ultimo_pit['cluster_ajustado'].map(TIER_SCORES)
+
+        # Re-sort by Tiempo_Promedio_Vuelta and re-assign posicion_real
+        df_ultimo_pit = df_ultimo_pit.sort_values(by='Tiempo_Promedio_Vuelta')
+        df_ultimo_pit['posicion_real'] = range(1, len(df_ultimo_pit) + 1)
+
+        # Apply results to kart states
+        for _, row in df_ultimo_pit.iterrows():
+            kart_num = int(row['kart'])
+            for kart in state.karts.values():
+                if kart.kart_number == kart_num:
+                    kart.avg_lap_ms = float(row['Tiempo_Promedio_Vuelta'])
+                    kart.best_avg_ms = float(row['Best_time_avg'])
+                    kart.cluster = int(row.get('cluster_ajustado', 2))
+                    kart.tier_score = int(row.get('puntuacion', 50))
                     break
-            else:
-                cluster = n_classes - 1
 
-            theoretical_pos = team_positions.get(kart.kart_number, kart.position)
-            cluster = adjust_cluster_by_position(cluster, theoretical_pos, kart.position)
-
-            kart.cluster = cluster
-            score_idx = min(cluster, N_CLUSTERS - 1)
-            kart.tier_score = TIER_SCORES.get(score_idx, 50)
+        logger.debug(f"Clustering updated: {len(df_ultimo_pit)} karts")
 
     except Exception as e:
-        logger.error(f"Clustering error: {e}", exc_info=True)
-        for ks in kart_stats:
-            ks["kart"].tier_score = 50
-            ks["kart"].avg_lap_ms = ks["avg_ms"]
-            ks["kart"].best_avg_ms = ks["best_avg_ms"]
-            ks["kart"].driver_differential_ms = ks["driver_diff"]
-            ks["kart"].cluster = 2
+        logger.error(f"Error al crear los clusters: {e}", exc_info=True)
+        _update_kart_stats(state, df_ultimo_pit)
+
+
+def _update_kart_stats(state: RaceStateManager, df: pd.DataFrame):
+    """Update avg/best on kart states even when clustering fails."""
+    for _, row in df.iterrows():
+        kart_num = int(row['kart'])
+        for kart in state.karts.values():
+            if kart.kart_number == kart_num:
+                kart.avg_lap_ms = float(row.get('Tiempo_Promedio_Vuelta', 0))
+                kart.best_avg_ms = float(row.get('Best_time_avg', 0))
+                kart.tier_score = 50
+                kart.cluster = 2
+                break

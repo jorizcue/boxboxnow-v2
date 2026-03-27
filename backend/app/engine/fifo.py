@@ -1,10 +1,10 @@
 """
 Weighted FIFO pit queue scoring.
-Ported from boxboxnow.py - manages pit box queue and computes weighted scores.
+EXACT port of boxboxnow.py calcular_puntuacion_ponderada().
 
-The FIFO tracks which karts enter the pit. Each entry is scored by the kart's
-performance tier. The weighted score reflects whether good or bad karts are
-currently in the pit queue, helping decide when to pit.
+The score is a PERCENTAGE 0-100 where:
+  100 = all slow karts in the queue (good time to pit)
+  0   = all fast karts in the queue (bad time to pit)
 """
 
 import logging
@@ -15,12 +15,10 @@ from app.engine.state import RaceStateManager
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SCORE = 25  # Default fill value for FIFO
+DEFAULT_SCORE = 25
 
 
 class FifoManager:
-    """Manages the weighted FIFO pit queue."""
-
     def __init__(self, queue_size: int = 30, box_lines: int = 2):
         self.queue_size = queue_size
         self.box_lines = box_lines
@@ -29,7 +27,6 @@ class FifoManager:
         )
 
     def update_config(self, queue_size: int, box_lines: int):
-        """Update queue configuration."""
         if queue_size != self.queue_size:
             self.queue_size = queue_size
             self.fifo = deque(
@@ -41,51 +38,57 @@ class FifoManager:
         """Add a kart's tier score when it enters the pit."""
         self.fifo.append(tier_score)
 
+    def add_entries(self, scores: list[int]):
+        """Add multiple scores (batch pit entries)."""
+        for score in scores:
+            self.fifo.append(score)
+
+    def _calcular_pesos(self) -> np.ndarray:
+        """
+        Exact port of boxboxnow.py calcular_pesos().
+        First box_lines positions get weight 1.0.
+        Remaining get linspace(0.9, 0.1).
+        """
+        tamano_cola = len(self.fifo)
+        pesos = np.ones(tamano_cola)
+        if tamano_cola > self.box_lines:
+            pesos[self.box_lines:] = np.linspace(0.9, 0.1, tamano_cola - self.box_lines)
+        return pesos
+
     def get_weighted_score(self) -> float:
         """
-        Compute the weighted score for the current FIFO state.
-        Ported from boxboxnow.py calcular_puntuacion_ponderada().
+        Exact port of boxboxnow.py calcular_puntuacion_ponderada().
+        Returns a PERCENTAGE 0-100.
 
-        First `box_lines` positions get weight 1.0 (they're being serviced).
-        Remaining positions get linearly decreasing weights from 0.9 to 0.1.
-        Score is normalized to 0-100.
+        Formula:
+          max_score = sum(weights * 100)
+          min_score = sum(weights * 1)
+          weighted_sum = sum(fifo_values * weights)
+          percentage = (weighted_sum - min_score) / (max_score - min_score) * 100
         """
-        values = list(self.fifo)
-        n = len(values)
-
-        if n == 0:
+        tamano_cola = len(self.fifo)
+        if tamano_cola == 0:
             return 0.0
 
-        # Build weights
-        weights = []
-        for i in range(n):
-            if i < self.box_lines:
-                weights.append(1.0)
-            else:
-                remaining = n - self.box_lines
-                if remaining > 0:
-                    w = np.linspace(0.9, 0.1, remaining)
-                    weights.append(float(w[i - self.box_lines]))
-                else:
-                    weights.append(0.1)
+        pesos = self._calcular_pesos()
+        fifo_arr = np.array(list(self.fifo), dtype=float)
 
-        # Weighted average
-        weights = np.array(weights)
-        values_arr = np.array(values, dtype=float)
-        weighted_sum = np.sum(values_arr * weights)
-        weight_total = np.sum(weights)
+        max_puntuacion = np.sum(pesos * 100)
+        min_puntuacion = np.sum(pesos * 1)
 
-        if weight_total == 0:
+        puntuacion_ponderada = np.sum(fifo_arr * pesos)
+
+        if max_puntuacion == min_puntuacion:
             return 0.0
 
-        return float(weighted_sum / weight_total)
+        porcentaje = ((puntuacion_ponderada - min_puntuacion) / (max_puntuacion - min_puntuacion)) * 100
+
+        return float(max(0.0, min(porcentaje, 100.0)))
 
     def get_queue_snapshot(self) -> list[int]:
-        """Get current queue state as a list."""
         return list(self.fifo)
 
     def apply_to_state(self, state: RaceStateManager):
-        """Update the race state with current FIFO data."""
         state.fifo_queue = self.get_queue_snapshot()
         state.fifo_score = round(self.get_weighted_score(), 2)
         state.fifo_history.append({
@@ -93,6 +96,5 @@ class FifoManager:
             "queue": state.fifo_queue.copy(),
             "score": state.fifo_score,
         })
-        # Keep only last 20 history entries
         if len(state.fifo_history) > 20:
             state.fifo_history = state.fifo_history[-20:]
