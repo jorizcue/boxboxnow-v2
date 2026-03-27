@@ -1,33 +1,109 @@
 from pydantic import BaseModel
+from datetime import datetime
 
+
+# --- Auth ---
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: "UserOut"
+
+
+class UserOut(BaseModel):
+    id: int
+    username: str
+    is_admin: bool
+    created_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    is_admin: bool = False
+
+
+class UserUpdate(BaseModel):
+    username: str | None = None
+    password: str | None = None
+    is_admin: bool | None = None
+
+
+# --- Circuits ---
 
 class CircuitOut(BaseModel):
     id: int
     name: str
-    length_m: int
-    pit_time_s: int
+    length_m: int | None
+    pit_time_s: int | None
     ws_port: int
-    php_api_url: str
+    php_api_port: int
     laps_discard: int
-    lap_differential: float
+    lap_differential: int
 
     model_config = {"from_attributes": True}
 
 
 class CircuitCreate(BaseModel):
     name: str
-    length_m: int
-    pit_time_s: int = 120
+    length_m: int | None = None
+    pit_time_s: int | None = None
     ws_port: int
     php_api_port: int = 0
-    php_api_url: str = ""
     laps_discard: int = 2
-    lap_differential: float = 1.15
+    lap_differential: int = 3000
 
 
-class RaceParamsOut(BaseModel):
+class CircuitUpdate(BaseModel):
+    name: str | None = None
+    length_m: int | None = None
+    pit_time_s: int | None = None
+    ws_port: int | None = None
+    php_api_port: int | None = None
+    laps_discard: int | None = None
+    lap_differential: int | None = None
+
+
+# --- User Circuit Access ---
+
+class CircuitAccessOut(BaseModel):
     id: int
+    user_id: int
     circuit_id: int
+    circuit_name: str | None = None
+    valid_from: datetime
+    valid_until: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class CircuitAccessCreate(BaseModel):
+    user_id: int
+    circuit_id: int
+    valid_from: datetime
+    valid_until: datetime
+
+
+class CircuitAccessUpdate(BaseModel):
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+
+
+# --- Race Sessions ---
+
+class RaceSessionOut(BaseModel):
+    id: int
+    user_id: int
+    circuit_id: int
+    circuit_name: str | None = None
+    name: str
     duration_min: int
     min_stint_min: int
     max_stint_min: int
@@ -35,14 +111,19 @@ class RaceParamsOut(BaseModel):
     pit_time_s: int
     min_driver_time_min: int
     rain: bool
-    refresh_interval_s: int
+    box_lines: int
+    box_karts: int
     our_kart_number: int
+    refresh_interval_s: int
+    is_active: bool
+    team_positions: list["TeamPositionOut"] = []
 
     model_config = {"from_attributes": True}
 
 
-class RaceParamsCreate(BaseModel):
+class RaceSessionCreate(BaseModel):
     circuit_id: int
+    name: str = ""
     duration_min: int = 180
     min_stint_min: int = 15
     max_stint_min: int = 40
@@ -50,12 +131,15 @@ class RaceParamsCreate(BaseModel):
     pit_time_s: int = 120
     min_driver_time_min: int = 30
     rain: bool = False
-    refresh_interval_s: int = 30
+    box_lines: int = 2
+    box_karts: int = 30
     our_kart_number: int = 0
+    refresh_interval_s: int = 30
 
 
-class RaceParamsUpdate(BaseModel):
+class RaceSessionUpdate(BaseModel):
     circuit_id: int | None = None
+    name: str | None = None
     duration_min: int | None = None
     min_stint_min: int | None = None
     max_stint_min: int | None = None
@@ -63,28 +147,17 @@ class RaceParamsUpdate(BaseModel):
     pit_time_s: int | None = None
     min_driver_time_min: int | None = None
     rain: bool | None = None
-    refresh_interval_s: int | None = None
+    box_lines: int | None = None
+    box_karts: int | None = None
     our_kart_number: int | None = None
+    refresh_interval_s: int | None = None
 
 
-class BoxConfigOut(BaseModel):
-    id: int
-    race_params_id: int
-    number_karts: int
-    lines: int
-
-    model_config = {"from_attributes": True}
-
-
-class BoxConfigCreate(BaseModel):
-    race_params_id: int
-    number_karts: int = 30
-    lines: int = 2
-
+# --- Team Positions ---
 
 class TeamPositionOut(BaseModel):
     id: int
-    race_params_id: int
+    race_session_id: int
     position: int
     kart: int
     team_name: str
@@ -93,31 +166,32 @@ class TeamPositionOut(BaseModel):
 
 
 class TeamPositionCreate(BaseModel):
-    race_params_id: int
     position: int
     kart: int
     team_name: str = ""
 
 
+# --- Race State (read-only) ---
+
 class KartStateOut(BaseModel):
-    row_id: str
-    kart_number: int
-    team_name: str
-    driver_name: str
+    rowId: str
+    kartNumber: int
+    teamName: str
+    driverName: str
     position: int
-    total_laps: int
-    last_lap_ms: int
-    best_lap_ms: int
+    totalLaps: int
+    lastLapMs: int
+    bestLapMs: int
     gap: str
     interval: str
-    pit_count: int
-    pit_status: str
-    pit_time: str
-    stint_laps_count: int
-    stint_duration_s: float
-    tier_score: int
-    avg_lap_ms: float
-    best_avg_ms: float
+    pitCount: int
+    pitStatus: str
+    pitTime: str
+    stintLapsCount: int
+    stintDurationS: float
+    tierScore: int
+    avgLapMs: float
+    bestAvgMs: float
 
 
 class FifoStateOut(BaseModel):

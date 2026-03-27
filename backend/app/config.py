@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     port: int = 8000
     log_level: str = "info"
 
+    # Auth
+    jwt_secret: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 1440  # 24 hours
+
     # Race defaults
     default_circuit_length: int = 1100
     default_pit_time: int = 120
