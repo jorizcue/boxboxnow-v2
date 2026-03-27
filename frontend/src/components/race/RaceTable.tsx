@@ -63,10 +63,21 @@ export function RaceTable() {
                 <td className="px-2 py-1.5 font-medium truncate max-w-[200px]">
                   {kart.teamName}
                 </td>
-                <td className="px-2 py-1.5 text-gray-400 truncate max-w-[160px]">
+                <td className="px-2 py-1.5 text-gray-400 truncate max-w-[180px]">
                   {kart.driverName}
                   {kart.driverTime && (
                     <span className="ml-1 text-xs text-gray-600">[{kart.driverTime}]</span>
+                  )}
+                  {kart.driverDifferentialMs !== undefined && kart.driverDifferentialMs !== 0 && (
+                    <span
+                      className={`ml-1 text-[10px] font-mono ${
+                        kart.driverDifferentialMs > 0 ? "text-red-400" : "text-green-400"
+                      }`}
+                      title="Diferencial de piloto aplicado al clustering"
+                    >
+                      {kart.driverDifferentialMs > 0 ? "+" : ""}
+                      {(kart.driverDifferentialMs / 1000).toFixed(1)}s
+                    </span>
                   )}
                 </td>
                 <td className="px-2 py-1.5 text-right font-mono">

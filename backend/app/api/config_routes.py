@@ -7,11 +7,11 @@ from sqlalchemy import select, delete, and_
 from sqlalchemy.orm import selectinload
 
 from app.models.database import get_db
-from app.models.schemas import User, Circuit, UserCircuitAccess, RaceSession, TeamPosition
+from app.models.schemas import User, Circuit, UserCircuitAccess, RaceSession, TeamPosition, TeamDriver
 from app.models.pydantic_models import (
     CircuitOut,
     RaceSessionOut, RaceSessionCreate, RaceSessionUpdate,
-    TeamPositionOut, TeamPositionCreate,
+    TeamPositionOut, TeamPositionCreate, TeamDriverOut,
 )
 from app.api.auth_routes import get_current_user
 
@@ -152,10 +152,11 @@ async def delete_session(user: User = Depends(get_current_user), db: AsyncSessio
 
 @router.get("/teams", response_model=list[TeamPositionOut])
 async def list_teams(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """List teams in the user's active session."""
+    """List teams with their drivers in the user's active session."""
     session = await _get_active_session(user, db)
     result = await db.execute(
         select(TeamPosition)
+        .options(selectinload(TeamPosition.drivers))
         .where(TeamPosition.race_session_id == session.id)
         .order_by(TeamPosition.position)
     )
@@ -168,7 +169,7 @@ async def replace_teams(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Replace all team positions in the user's active session."""
+    """Replace all team positions and their drivers in the user's active session."""
     session = await _get_active_session(user, db)
 
     await db.execute(
@@ -177,7 +178,20 @@ async def replace_teams(
 
     new_teams = []
     for t in teams:
-        team = TeamPosition(race_session_id=session.id, **t.model_dump())
+        team = TeamPosition(
+            race_session_id=session.id,
+            position=t.position,
+            kart=t.kart,
+            team_name=t.team_name,
+        )
+        # Create drivers for this team
+        for d in t.drivers:
+            driver = TeamDriver(
+                driver_name=d.driver_name,
+                differential_ms=d.differential_ms,
+            )
+            team.drivers.append(driver)
+
         db.add(team)
         new_teams.append(team)
 

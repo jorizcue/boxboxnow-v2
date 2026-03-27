@@ -98,6 +98,28 @@ class TeamPosition(Base):
     team_name = Column(String(100), default="")
 
     race_session = relationship("RaceSession", back_populates="team_positions")
+    drivers = relationship("TeamDriver", back_populates="team_position", cascade="all, delete-orphan",
+                           order_by="TeamDriver.driver_name")
+
+
+class TeamDriver(Base):
+    """
+    Individual driver within a team.
+    Each driver has a time differential (in milliseconds) that adjusts
+    the kart's average lap time for clustering purposes.
+
+    Example: if a slow driver adds +2500ms to average, set differential_ms=2500.
+    When that driver is on track, the clustering engine subtracts this from
+    the observed average to estimate the kart's "true" pace.
+    """
+    __tablename__ = "team_drivers"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    team_position_id = Column(Integer, ForeignKey("team_positions.id", ondelete="CASCADE"), nullable=False)
+    driver_name = Column(String(100), nullable=False)
+    differential_ms = Column(Integer, default=0)  # positive = slower than reference, negative = faster
+
+    team_position = relationship("TeamPosition", back_populates="drivers")
 
 
 class DeviceSession(Base):

@@ -48,16 +48,20 @@ async def get_fifo(request: Request, user: User = Depends(get_current_user)):
 
 @router.post("/connect")
 async def connect_to_apex(request: Request, user: User = Depends(get_current_user)):
-    """Start the Apex WebSocket connection for the user's active session."""
+    """Start the Apex WebSocket connection for the user's active session.
+    Loads team positions and driver differentials for clustering."""
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
     from app.models.database import async_session
-    from app.models.schemas import RaceSession, Circuit
+    from app.models.schemas import RaceSession, Circuit, TeamPosition, TeamDriver
 
     async with async_session() as db:
         result = await db.execute(
             select(RaceSession)
-            .options(selectinload(RaceSession.circuit))
+            .options(
+                selectinload(RaceSession.circuit),
+                selectinload(RaceSession.team_positions).selectinload(TeamPosition.drivers),
+            )
             .where(RaceSession.user_id == user.id, RaceSession.is_active == True)
         )
         session = result.scalar_one_or_none()
@@ -88,7 +92,30 @@ async def connect_to_apex(request: Request, user: User = Depends(get_current_use
         refresh_s=session.refresh_interval_s,
     )
 
-    return {"status": "connected", "circuit": circuit.name, "wsPort": circuit.ws_port}
+    # Load team positions and driver differentials for clustering
+    team_positions = {}  # kart_number -> theoretical_position
+    driver_differentials = {}  # kart_number -> {driver_name_lower: differential_ms}
+
+    for tp in session.team_positions:
+        team_positions[tp.kart] = tp.position
+
+        if tp.drivers:
+            driver_differentials[tp.kart] = {
+                d.driver_name.strip().lower(): d.differential_ms
+                for d in tp.drivers
+            }
+
+    user_session.set_driver_differentials(driver_differentials, team_positions)
+
+    return {
+        "status": "connected",
+        "circuit": circuit.name,
+        "wsPort": circuit.ws_port,
+        "teamsLoaded": len(team_positions),
+        "driversWithDifferential": sum(
+            len(d) for d in driver_differentials.values()
+        ),
+    }
 
 
 @router.post("/disconnect")

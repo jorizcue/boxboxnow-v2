@@ -41,6 +41,7 @@ class KartState:
     avg_lap_ms: float = 0.0
     best_avg_ms: float = 0.0
     cluster: int = 2
+    driver_differential_ms: int = 0  # current driver's differential applied
 
     def stint_duration_s(self) -> float:
         if self.stint_start_time <= 0:
@@ -68,6 +69,7 @@ class KartState:
             "stintLapsCount": len(self.stint_laps),
             "stintDurationS": self.stint_duration_s(),
             "tierScore": self.tier_score,
+            "driverDifferentialMs": self.driver_differential_ms,
             "avgLapMs": self.avg_lap_ms,
             "bestAvgMs": self.best_avg_ms,
         }

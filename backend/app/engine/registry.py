@@ -75,13 +75,26 @@ class UserSession:
         self._refresh_s = refresh_s
         self.fifo.update_config(box_karts, box_lines)
 
+    def set_driver_differentials(self, differentials: dict[int, dict[str, int]],
+                                  team_positions: dict[int, int]):
+        """Set driver differentials and team positions for clustering.
+
+        Args:
+            differentials: {kart_number: {driver_name_lower: differential_ms}}
+            team_positions: {kart_number: theoretical_position}
+        """
+        self._driver_differentials = differentials
+        self._team_positions = team_positions
+
     async def _analytics_loop(self):
         refresh = getattr(self, "_refresh_s", 30)
         while True:
             await asyncio.sleep(max(5, refresh))
             try:
                 if len(self.state.karts) > 0:
-                    compute_clustering(self.state, {})
+                    team_pos = getattr(self, "_team_positions", {})
+                    driver_diffs = getattr(self, "_driver_differentials", {})
+                    compute_clustering(self.state, team_pos, driver_diffs)
                     self.fifo.apply_to_state(self.state)
                     compute_classification(self.state)
 

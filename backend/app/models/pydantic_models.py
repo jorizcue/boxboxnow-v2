@@ -177,7 +177,21 @@ class RaceSessionUpdate(BaseModel):
     refresh_interval_s: int | None = None
 
 
-# --- Team Positions ---
+# --- Team Positions + Drivers ---
+
+class TeamDriverOut(BaseModel):
+    id: int
+    team_position_id: int
+    driver_name: str
+    differential_ms: int
+
+    model_config = {"from_attributes": True}
+
+
+class TeamDriverCreate(BaseModel):
+    driver_name: str
+    differential_ms: int = 0
+
 
 class TeamPositionOut(BaseModel):
     id: int
@@ -185,6 +199,7 @@ class TeamPositionOut(BaseModel):
     position: int
     kart: int
     team_name: str
+    drivers: list[TeamDriverOut] = []
 
     model_config = {"from_attributes": True}
 
@@ -193,6 +208,7 @@ class TeamPositionCreate(BaseModel):
     position: int
     kart: int
     team_name: str = ""
+    drivers: list[TeamDriverCreate] = []
 
 
 # --- Race State (read-only) ---

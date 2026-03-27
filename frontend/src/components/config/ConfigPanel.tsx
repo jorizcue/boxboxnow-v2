@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { TeamEditor } from "@/components/config/TeamEditor";
 
 export function ConfigPanel() {
   const [logs, setLogs] = useState<string[]>([]);
@@ -130,22 +131,39 @@ export function ConfigPanel() {
         </div>
       </div>
 
-      {/* Race Configuration */}
+      {/* Apex Connection */}
       <div className="bg-card rounded-lg p-6">
-        <h2 className="text-lg font-semibold mb-4 text-accent">Configuracion de Carrera</h2>
-        <p className="text-gray-500 text-sm">
-          La configuracion de circuitos, parametros de carrera, equipos y box
-          se gestiona desde la API REST.
-        </p>
-        <div className="mt-4 space-y-2 text-sm text-gray-400">
-          <p>Endpoints disponibles:</p>
-          <code className="block bg-surface p-2 rounded text-xs">
-            GET /api/config/circuits<br />
-            POST /api/config/race-params<br />
-            PUT /api/config/teams/:id<br />
-            GET /api/health
-          </code>
+        <h2 className="text-lg font-semibold mb-4 text-accent">Conexion Apex Timing</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={async () => {
+              try {
+                const res = await api.connectApex();
+                alert(`Conectado a ${res.circuit} (${res.teamsLoaded} equipos, ${res.driversWithDifferential} pilotos con diferencial)`);
+              } catch (e: any) {
+                alert(e.message);
+              }
+            }}
+            className="flex-1 bg-green-800 hover:bg-green-700 text-white font-medium py-2 px-4 rounded"
+          >
+            Conectar
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                await api.disconnectApex();
+              } catch {}
+            }}
+            className="flex-1 bg-red-900 hover:bg-red-800 text-white font-medium py-2 px-4 rounded"
+          >
+            Desconectar
+          </button>
         </div>
+      </div>
+
+      {/* Team Editor - full width */}
+      <div className="lg:col-span-2">
+        <TeamEditor />
       </div>
     </div>
   );

@@ -95,6 +95,13 @@ def create_tables(conn: sqlite3.Connection):
             kart INTEGER NOT NULL,
             team_name TEXT DEFAULT ''
         );
+
+        CREATE TABLE IF NOT EXISTS team_drivers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            team_position_id INTEGER NOT NULL REFERENCES team_positions(id) ON DELETE CASCADE,
+            driver_name TEXT NOT NULL,
+            differential_ms INTEGER DEFAULT 0
+        );
     """)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.commit()

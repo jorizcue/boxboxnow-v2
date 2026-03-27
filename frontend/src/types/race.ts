@@ -20,6 +20,7 @@ export interface KartState {
   tierScore: number;
   avgLapMs: number;
   bestAvgMs: number;
+  driverDifferentialMs: number;
 }
 
 export interface FifoState {
