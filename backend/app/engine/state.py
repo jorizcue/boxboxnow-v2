@@ -131,13 +131,20 @@ class RaceStateManager:
     async def handle_events(self, events: list[RaceEvent]):
         """Process a batch of parsed events and broadcast updates."""
         updates = []
+        had_init_kart = False
         for event in events:
             update = self._apply_event(event)
             if update:
                 updates.append(update)
+            if event.type == EventType.INIT and event.value == "kart":
+                had_init_kart = True
 
-        if updates and self._ws_clients:
-            await self._broadcast({"type": "update", "events": updates})
+        if self._ws_clients:
+            if had_init_kart:
+                # After INIT populates karts, send a full snapshot so clients get the kart list
+                await self._broadcast(self.get_snapshot())
+            elif updates:
+                await self._broadcast({"type": "update", "events": updates})
 
     def _apply_event(self, event: RaceEvent) -> dict | None:
         """Apply a single event to state. Returns update dict for broadcast."""

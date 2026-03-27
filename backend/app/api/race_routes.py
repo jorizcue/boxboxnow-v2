@@ -46,6 +46,29 @@ async def get_fifo(request: Request, user: User = Depends(get_current_user)):
     }
 
 
+@router.get("/status")
+async def get_connection_status(request: Request, user: User = Depends(get_current_user)):
+    """Check if the user has an active Apex session running."""
+    registry = request.app.state.registry
+    session = registry.get(user.id)
+    if session:
+        # Get circuit name from the session's state or registry info
+        from app.models.schemas import RaceSession, Circuit
+        from sqlalchemy import select
+        from sqlalchemy.orm import selectinload
+        from app.models.database import async_session
+        async with async_session() as db:
+            result = await db.execute(
+                select(RaceSession)
+                .options(selectinload(RaceSession.circuit))
+                .where(RaceSession.user_id == user.id, RaceSession.is_active == True)
+            )
+            rs = result.scalar_one_or_none()
+            circuit_name = rs.circuit.name if rs and rs.circuit else "Desconocido"
+        return {"apex_connected": True, "circuit": circuit_name}
+    return {"apex_connected": False, "circuit": None}
+
+
 @router.post("/connect")
 async def connect_to_apex(request: Request, user: User = Depends(get_current_user)):
     """Start the Apex WebSocket connection for the user's active session.

@@ -114,6 +114,7 @@ export const api = {
 
   // Race
   getSnapshot: () => fetchApi<any>("/api/race/snapshot"),
+  getConnectionStatus: () => fetchApi<{ apex_connected: boolean; circuit: string | null }>("/api/race/status"),
   connectApex: () => fetchApi<any>("/api/race/connect", { method: "POST" }),
   disconnectApex: () => fetchApi<any>("/api/race/disconnect", { method: "POST" }),
   getLiveTeams: () => fetchApi<any>("/api/race/live-teams"),

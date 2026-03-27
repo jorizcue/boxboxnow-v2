@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { useRaceStore } from "@/hooks/useRaceState";
 import { TeamEditor } from "@/components/config/TeamEditor";
 
 interface Circuit {
@@ -30,6 +31,10 @@ interface RaceSession {
   refresh_interval_s: number;
   is_active: boolean;
 }
+
+// Module-level state for replay — survives tab changes (component re-mounts)
+let _replaySelectedLog = "";
+let _replaySpeed = 10;
 
 export function ConfigPanel() {
   return (
@@ -256,24 +261,49 @@ function Field({
 // --- Apex Connection ---
 
 function ApexConnection() {
-  const [status, setStatus] = useState<string>("");
+  const { apexConnected, apexStatusMsg, setApexStatus } = useRaceStore();
+
+  // On mount, fetch real connection status from backend
+  useEffect(() => {
+    api.getConnectionStatus()
+      .then((res) => {
+        if (res.apex_connected) {
+          setApexStatus(true, `Conectado a ${res.circuit}`);
+        }
+        // If not connected, leave existing msg as-is (don't overwrite a connecting/error message)
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="bg-surface rounded-xl p-6 border border-border">
-      <h2 className="text-[11px] text-neutral-500 mb-4 uppercase tracking-wider">Conexion Apex Timing</h2>
-      {status && <p className="text-xs text-accent mb-3">{status}</p>}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-[11px] text-neutral-500 uppercase tracking-wider">Conexion Apex Timing</h2>
+        {apexConnected && (
+          <span className="flex items-center gap-1.5 text-[10px] text-accent">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent inline-block" />
+            Conectado
+          </span>
+        )}
+      </div>
+      {apexStatusMsg && (
+        <p className={`text-xs mb-3 ${apexConnected ? "text-accent" : "text-neutral-400"}`}>
+          {apexStatusMsg}
+        </p>
+      )}
       <div className="flex gap-2">
         <button
           onClick={async () => {
             try {
-              setStatus("Conectando...");
+              setApexStatus(false, "Conectando...");
               const res = await api.connectApex();
-              setStatus(`Conectado a ${res.circuit} (${res.teamsLoaded} equipos)`);
+              setApexStatus(true, `Conectado a ${res.circuit} (${res.teamsLoaded} equipos)`);
             } catch (e: any) {
-              setStatus("Error: " + e.message);
+              setApexStatus(false, "Error: " + e.message);
             }
           }}
-          className="flex-1 bg-accent hover:bg-accent-hover text-black font-semibold py-2.5 px-4 rounded-lg"
+          disabled={apexConnected}
+          className="flex-1 bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-2.5 px-4 rounded-lg"
         >
           Conectar
         </button>
@@ -281,10 +311,11 @@ function ApexConnection() {
           onClick={async () => {
             try {
               await api.disconnectApex();
-              setStatus("Desconectado");
+              setApexStatus(false, "Desconectado");
             } catch {}
           }}
-          className="flex-1 bg-red-900/50 hover:bg-red-800 text-red-300 font-medium py-2.5 px-4 rounded-lg"
+          disabled={!apexConnected}
+          className="flex-1 bg-red-900/50 hover:bg-red-800 disabled:opacity-40 text-red-300 font-medium py-2.5 px-4 rounded-lg"
         >
           Desconectar
         </button>
@@ -298,9 +329,20 @@ function ApexConnection() {
 function ReplayControls() {
   const [logs, setLogs] = useState<string[]>([]);
   const [replayStatus, setReplayStatus] = useState<any>(null);
-  const [selectedLog, setSelectedLog] = useState("");
-  const [speed, setSpeed] = useState(10);
+  // Use module-level vars to survive tab changes
+  const [selectedLog, setSelectedLogState] = useState(_replaySelectedLog);
+  const [speed, setSpeedState] = useState(_replaySpeed);
   const [loading, setLoading] = useState(false);
+  const { apexConnected } = useRaceStore();
+
+  const setSelectedLog = (v: string) => {
+    _replaySelectedLog = v;
+    setSelectedLogState(v);
+  };
+  const setSpeed = (v: number) => {
+    _replaySpeed = v;
+    setSpeedState(v);
+  };
 
   useEffect(() => {
     api.getReplayLogs().then((data) => setLogs(data.logs)).catch(() => {});
@@ -310,6 +352,13 @@ function ReplayControls() {
   return (
     <div className="bg-surface rounded-xl p-6 border border-border">
       <h2 className="text-[11px] text-neutral-500 mb-4 uppercase tracking-wider">Replay</h2>
+
+      {apexConnected && (
+        <p className="text-[11px] text-yellow-500/80 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2 mb-3">
+          Desconéctate del Apex Timing para usar el replay
+        </p>
+      )}
+
       <div className="space-y-3">
         <select
           value={selectedLog}
@@ -345,10 +394,12 @@ function ReplayControls() {
               try {
                 await api.startReplay(selectedLog, speed);
                 setReplayStatus(await api.getReplayStatus());
-              } catch {}
+              } catch (e: any) {
+                alert("Error: " + e.message);
+              }
               setLoading(false);
             }}
-            disabled={!selectedLog || loading}
+            disabled={!selectedLog || loading || apexConnected}
             className="flex-1 bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-2 rounded-lg text-sm"
           >
             {loading ? "..." : "Iniciar"}

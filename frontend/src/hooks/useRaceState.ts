@@ -20,6 +20,11 @@ interface RaceStore {
   classification: ClassificationEntry[];
   config: RaceConfig;
 
+  // Apex connection status (persists across tab changes)
+  apexConnected: boolean;
+  apexStatusMsg: string;
+  setApexStatus: (connected: boolean, msg: string) => void;
+
   setConnected: (v: boolean) => void;
   applySnapshot: (snapshot: RaceSnapshot) => void;
   applyUpdates: (events: WsUpdateEvent[]) => void;
@@ -46,6 +51,10 @@ export const useRaceStore = create<RaceStore>((set) => ({
   fifo: defaultFifo,
   classification: [],
   config: defaultConfig,
+
+  apexConnected: false,
+  apexStatusMsg: "",
+  setApexStatus: (connected, msg) => set({ apexConnected: connected, apexStatusMsg: msg }),
 
   setConnected: (v) => set({ connected: v }),
 
