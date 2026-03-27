@@ -14,10 +14,10 @@ interface AuthStore {
   token: string | null;
   sessionToken: string | null;
   user: AuthUser | null;
+  _hydrated: boolean;
   setAuth: (token: string, sessionToken: string, user: AuthUser) => void;
   logout: () => void;
-  isLoggedIn: () => boolean;
-  isAdmin: () => boolean;
+  setHydrated: () => void;
 }
 
 export const useAuth = create<AuthStore>()(
@@ -26,17 +26,24 @@ export const useAuth = create<AuthStore>()(
       token: null,
       sessionToken: null,
       user: null,
+      _hydrated: false,
 
       setAuth: (token, sessionToken, user) => set({ token, sessionToken, user }),
 
       logout: () => set({ token: null, sessionToken: null, user: null }),
 
-      isLoggedIn: () => !!get().token,
-
-      isAdmin: () => get().user?.is_admin ?? false,
+      setHydrated: () => set({ _hydrated: true }),
     }),
     {
       name: "boxboxnow-auth",
+      onRehydrateStorage: () => (state) => {
+        state?.setHydrated();
+      },
+      partialize: (state) => ({
+        token: state.token,
+        sessionToken: state.sessionToken,
+        user: state.user,
+      }),
     }
   )
 );

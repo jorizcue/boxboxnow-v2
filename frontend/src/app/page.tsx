@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRaceWebSocket } from "@/hooks/useRaceWebSocket";
 import { useRaceStore } from "@/hooks/useRaceState";
@@ -16,10 +16,19 @@ import { AdminPanel } from "@/components/admin/AdminPanel";
 type Tab = "race" | "pit" | "classification" | "config" | "admin";
 
 export default function Home() {
-  const { token, user, isLoggedIn } = useAuth();
+  const { token, user, _hydrated } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("race");
 
-  if (!isLoggedIn()) {
+  // Wait for zustand to rehydrate from localStorage before deciding
+  if (!_hydrated) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <span className="text-accent text-lg font-bold animate-pulse">KARTINGNOW</span>
+      </div>
+    );
+  }
+
+  if (!token) {
     return <LoginPage />;
   }
 
