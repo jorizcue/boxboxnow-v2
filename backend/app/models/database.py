@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from app.config import get_settings
@@ -20,7 +21,7 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         # Enable WAL mode for concurrent reads
-        await conn.execute("PRAGMA journal_mode=WAL")
+        await conn.execute(text("PRAGMA journal_mode=WAL"))
 
 
 async def get_db():
