@@ -25,6 +25,7 @@ class FifoManager:
         self.fifo: deque[int] = deque(
             [DEFAULT_SCORE] * queue_size, maxlen=queue_size
         )
+        self._history: list[dict] = []
 
     def update_config(self, queue_size: int, box_lines: int):
         if queue_size != self.queue_size:
@@ -35,13 +36,23 @@ class FifoManager:
         self.box_lines = box_lines
 
     def add_entry(self, tier_score: int):
-        """Add a kart's tier score when it enters the pit."""
+        """Add a kart's tier score when it enters the pit.
+        Also records a history snapshot (only on actual pit entries)."""
         self.fifo.append(tier_score)
+        # Save history only when a kart actually enters pit
+        score = self.get_weighted_score()
+        self._history.append({
+            "timestamp": time.time(),
+            "queue": list(self.fifo),
+            "score": round(score, 2),
+        })
+        if len(self._history) > 50:
+            self._history = self._history[-50:]
 
     def add_entries(self, scores: list[int]):
         """Add multiple scores (batch pit entries)."""
         for score in scores:
-            self.fifo.append(score)
+            self.add_entry(score)
 
     def _calcular_pesos(self) -> np.ndarray:
         """
@@ -59,12 +70,6 @@ class FifoManager:
         """
         Exact port of boxboxnow.py calcular_puntuacion_ponderada().
         Returns a PERCENTAGE 0-100.
-
-        Formula:
-          max_score = sum(weights * 100)
-          min_score = sum(weights * 1)
-          weighted_sum = sum(fifo_values * weights)
-          percentage = (weighted_sum - min_score) / (max_score - min_score) * 100
         """
         tamano_cola = len(self.fifo)
         if tamano_cola == 0:
@@ -89,12 +94,8 @@ class FifoManager:
         return list(self.fifo)
 
     def apply_to_state(self, state: RaceStateManager):
+        """Update state with current FIFO data (called by analytics loop).
+        Does NOT record history — history is recorded only on pit entries."""
         state.fifo_queue = self.get_queue_snapshot()
         state.fifo_score = round(self.get_weighted_score(), 2)
-        state.fifo_history.append({
-            "timestamp": time.time(),
-            "queue": state.fifo_queue.copy(),
-            "score": state.fifo_score,
-        })
-        if len(state.fifo_history) > 20:
-            state.fifo_history = state.fifo_history[-20:]
+        state.fifo_history = self._history[-20:]

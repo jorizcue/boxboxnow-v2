@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
-import { tierHex, secondsToHMS, msToLapTime, formatDifferential } from "@/lib/formatters";
+import { tierHex, secondsToHMS, msToLapTime } from "@/lib/formatters";
 import clsx from "clsx";
 
 export function FifoQueue() {
@@ -20,11 +20,29 @@ export function FifoQueue() {
     fifo.score >= 25 ? "text-tier-50" :
     "text-tier-1";
 
-  const scoreBg =
-    fifo.score >= 75 ? "bg-accent/20 border-accent/40" :
-    fifo.score >= 50 ? "bg-yellow-500/10 border-yellow-500/30" :
-    fifo.score >= 25 ? "bg-orange-500/10 border-orange-500/30" :
-    "bg-red-500/10 border-red-500/30";
+  const scoreDotColor =
+    fifo.score >= 75 ? "bg-accent" :
+    fifo.score >= 50 ? "bg-yellow-500" :
+    fifo.score >= 25 ? "bg-orange-500" :
+    "bg-red-500";
+
+  const boxLines = config.boxLines || 2;
+  const boxKarts = config.boxKarts || 4;
+  const kartsPerRow = Math.max(1, Math.ceil(boxKarts / boxLines));
+
+  // Split queue into rows of `kartsPerRow`
+  const rows = useMemo(() => {
+    const result: number[][] = [];
+    const queue = fifo.queue.slice(0, boxKarts); // Only show boxKarts positions
+    for (let r = 0; r < boxLines; r++) {
+      const start = r * kartsPerRow;
+      const end = Math.min(start + kartsPerRow, queue.length);
+      if (start < queue.length) {
+        result.push(queue.slice(start, end));
+      }
+    }
+    return result;
+  }, [fifo.queue, boxLines, boxKarts, kartsPerRow]);
 
   // Our kart info
   const ourKart = config.ourKartNumber > 0
@@ -45,70 +63,50 @@ export function FifoQueue() {
     return stintSec / 60 >= config.maxStintMin - 5 && k.pitStatus !== "in_pit";
   }).length;
 
-  const boxLines = config.boxLines || 2;
-
   return (
     <div className="space-y-4">
-      {/* Score header */}
-      <div className={`rounded-xl p-4 border text-center ${scoreBg}`}>
-        <div className="flex items-center justify-center gap-3">
-          <span className="text-2xl">🏁</span>
-          <span className={`text-3xl font-bold ${scoreColor}`}>
-            Box (Score = {fifo.score.toFixed(1)})
-          </span>
+      {/* Visual FIFO queue grid */}
+      <div className="bg-surface rounded-xl p-6 border border-border">
+        <div className="space-y-4">
+          {rows.map((row, rowIdx) => (
+            <div key={rowIdx} className="flex items-center gap-3">
+              {/* Checkered flag */}
+              <div className="flex-shrink-0 w-10 text-center text-2xl">🏁</div>
+
+              {/* Cards in this row */}
+              <div className="flex gap-3 flex-1">
+                {row.map((score, colIdx) => (
+                  <div
+                    key={colIdx}
+                    className="flex-1 min-w-[100px] max-w-[160px] rounded-lg border-2 border-neutral-600 bg-neutral-800/50 flex flex-col items-center justify-center py-3 px-2"
+                  >
+                    <span
+                      className="text-3xl font-bold"
+                      style={{ color: tierHex(score) }}
+                    >
+                      {score}
+                    </span>
+                    <span className="text-xs text-neutral-400 mt-0.5">Box</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Fila label */}
+              <div className="flex-shrink-0 flex items-center gap-1.5">
+                <span className="text-sm text-red-400 font-bold">Fila {rowIdx + 1}</span>
+                <span className="text-red-400 text-lg">⬅</span>
+              </div>
+            </div>
+          ))}
         </div>
-        <p className="text-neutral-400 text-xs mt-2">
-          {fifo.score >= 75
-            ? "BUEN MOMENTO PARA ENTRAR A BOXES"
-            : fifo.score >= 50
-            ? "MOMENTO NEUTRAL"
-            : fifo.score >= 25
-            ? "MUCHOS COCHES RÁPIDOS EN BOX"
-            : "NO ENTRAR - BOX LLENO DE RÁPIDOS"}
-        </p>
       </div>
 
-      {/* Visual FIFO queue */}
-      <div className="bg-surface rounded-xl p-4 border border-border">
-        <div className="flex items-start gap-3 overflow-x-auto pb-2">
-          {/* Checkered flag at the front */}
-          <div className="flex-shrink-0 flex items-center justify-center w-10 h-20 text-3xl">
-            🏁
-          </div>
-
-          {/* Queue cards */}
-          {fifo.queue.map((score, i) => {
-            const isFirstRow = i < boxLines;
-            return (
-              <div key={i} className="flex-shrink-0 relative">
-                <div
-                  className={clsx(
-                    "w-20 h-20 rounded-lg flex flex-col items-center justify-center border-2 transition-all",
-                    isFirstRow ? "border-accent/60 shadow-lg shadow-accent/10" : "border-neutral-700"
-                  )}
-                  style={{ backgroundColor: `${tierHex(score)}20` }}
-                >
-                  <span
-                    className="text-2xl font-bold"
-                    style={{ color: tierHex(score) }}
-                  >
-                    {score}
-                  </span>
-                  <span className="text-[10px] text-neutral-400 uppercase tracking-wider">Box</span>
-                </div>
-                {/* "Fila 1" marker at the boundary */}
-                {i === boxLines - 1 && (
-                  <div className="absolute -right-2 top-0 bottom-0 flex items-center z-10">
-                    <div className="flex items-center gap-1 bg-accent/20 border border-accent/40 rounded px-1.5 py-0.5">
-                      <span className="text-[10px] text-accent font-bold whitespace-nowrap">Fila {boxLines}</span>
-                      <span className="text-accent">⬅</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+      {/* Score */}
+      <div className="bg-surface rounded-xl p-4 border border-border flex items-center justify-center gap-3">
+        <span className={`w-3 h-3 rounded-full ${scoreDotColor}`} />
+        <span className={`text-xl font-bold ${scoreColor}`}>
+          Box (Score = {fifo.score.toFixed(1)})
+        </span>
       </div>
 
       {/* Info panels */}
@@ -160,11 +158,11 @@ export function FifoQueue() {
         </div>
       </div>
 
-      {/* FIFO history */}
+      {/* FIFO history (only shows entries from actual pit events) */}
       {fifo.history.length > 0 && (
         <div className="bg-surface rounded-xl p-4 border border-border">
           <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">
-            Historial ({fifo.history.length})
+            Historial de entradas en box ({fifo.history.length})
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -176,7 +174,7 @@ export function FifoQueue() {
                 </tr>
               </thead>
               <tbody>
-                {[...fifo.history].reverse().slice(0, 10).map((snap, i) => (
+                {[...fifo.history].reverse().slice(0, 15).map((snap, i) => (
                   <tr key={i} className="border-t border-border">
                     <td className="px-2 py-1 text-neutral-400">{fifo.history.length - i}</td>
                     <td className="px-2 py-1 text-right font-mono font-bold">
@@ -186,13 +184,14 @@ export function FifoQueue() {
                     </td>
                     <td className="px-2 py-1">
                       <div className="flex gap-0.5">
-                        {snap.queue.slice(-10).map((s: number, j: number) => (
+                        {snap.queue.map((s: number, j: number) => (
                           <div
                             key={j}
-                            className="w-4 h-4 rounded-sm"
+                            className="w-5 h-5 rounded-sm flex items-center justify-center text-[8px] font-bold text-black"
                             style={{ backgroundColor: tierHex(s) }}
-                            title={`${s} pts`}
-                          />
+                          >
+                            {s}
+                          </div>
                         ))}
                       </div>
                     </td>
