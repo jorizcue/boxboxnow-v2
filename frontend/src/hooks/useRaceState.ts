@@ -155,9 +155,11 @@ export const useRaceStore = create<RaceStore>((set) => ({
     }),
 
   applyAnalytics: (data) =>
-    set({
+    set((state) => ({
       karts: data.karts || [],
       fifo: data.fifo || defaultFifo,
       classification: data.classification || [],
-    }),
+      // Merge config if present (allows live config updates without reconnect)
+      config: data.config ? { ...state.config, ...data.config } : state.config,
+    })),
 }));

@@ -98,6 +98,17 @@ async def lifespan(app: FastAPI):
                                     "history": replay_state.fifo_history[-10:],
                                 },
                                 "classification": replay_state.classification,
+                                "config": {
+                                    "circuitLengthM": replay_state.circuit_length_m,
+                                    "pitTimeS": replay_state.pit_time_s,
+                                    "ourKartNumber": replay_state.our_kart_number,
+                                    "minPits": replay_state.min_pits,
+                                    "maxStintMin": replay_state.max_stint_min,
+                                    "minStintMin": replay_state.min_stint_min,
+                                    "durationMin": replay_state.duration_min,
+                                    "boxLines": replay_state.box_lines,
+                                    "boxKarts": replay_state.box_karts,
+                                },
                             },
                         }
                         data = _json.dumps(update)

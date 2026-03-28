@@ -1,7 +1,8 @@
 """REST API routes for user-scoped race configuration."""
 
+import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, and_
 from sqlalchemy.orm import selectinload
@@ -14,6 +15,8 @@ from app.models.pydantic_models import (
     TeamPositionOut, TeamPositionCreate, TeamDriverOut,
 )
 from app.api.auth_routes import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
@@ -97,6 +100,7 @@ async def create_session(
 @router.patch("/session", response_model=RaceSessionOut)
 async def update_session(
     data: RaceSessionUpdate,
+    request: Request,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -115,6 +119,34 @@ async def update_session(
         setattr(session, key, value)
 
     await db.commit()
+
+    # If there's an active UserSession, reconfigure it with the updated values
+    # so changes take effect immediately without reconnecting.
+    registry = request.app.state.registry
+    user_session = registry.get(user.id)
+    if user_session:
+        # Reload circuit for pit_time_s and other defaults
+        circuit = await db.execute(select(Circuit).where(Circuit.id == session.circuit_id))
+        c = circuit.scalar_one_or_none()
+        user_session.configure(
+            circuit_length_m=c.length_m if c else 1100,
+            pit_time_s=session.pit_time_s,
+            laps_discard=c.laps_discard if c else 3,
+            lap_differential=c.lap_differential if c else 2000,
+            rain=session.rain,
+            our_kart=session.our_kart_number,
+            min_pits=session.min_pits,
+            max_stint_min=session.max_stint_min,
+            min_stint_min=session.min_stint_min,
+            box_lines=session.box_lines,
+            box_karts=session.box_karts,
+            duration_min=session.duration_min,
+            refresh_s=session.refresh_interval_s,
+        )
+        # Broadcast updated snapshot to all WS clients immediately
+        await user_session.broadcast_snapshot()
+        logger.info(f"Live reconfigured session for user {user.id} "
+                    f"(boxLines={session.box_lines}, boxKarts={session.box_karts})")
 
     return await _reload_session(user.id, db)
 

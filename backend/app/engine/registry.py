@@ -105,6 +105,22 @@ class UserSession:
         self._driver_differentials = differentials
         self._team_positions = team_positions
 
+    async def broadcast_snapshot(self):
+        """Broadcast a full snapshot to all connected WS clients.
+        Used when config changes so the frontend gets updated immediately."""
+        if self.state._ws_clients:
+            import json
+            snapshot = self.state.get_snapshot()
+            data = json.dumps(snapshot)
+            dead = set()
+            for client in self.state._ws_clients:
+                try:
+                    await client.send_text(data)
+                except Exception:
+                    dead.add(client)
+            for c in dead:
+                self.state._ws_clients.discard(c)
+
     async def _analytics_loop(self):
         refresh = getattr(self, "_refresh_s", 30)
         while True:
@@ -131,6 +147,17 @@ class UserSession:
                                     "history": self.state.fifo_history[-10:],
                                 },
                                 "classification": self.state.classification,
+                                "config": {
+                                    "circuitLengthM": self.state.circuit_length_m,
+                                    "pitTimeS": self.state.pit_time_s,
+                                    "ourKartNumber": self.state.our_kart_number,
+                                    "minPits": self.state.min_pits,
+                                    "maxStintMin": self.state.max_stint_min,
+                                    "minStintMin": self.state.min_stint_min,
+                                    "durationMin": self.state.duration_min,
+                                    "boxLines": self.state.box_lines,
+                                    "boxKarts": self.state.box_karts,
+                                },
                             },
                         }
                         data = json.dumps(update)
