@@ -37,7 +37,7 @@ class KartState:
     arrow_status: str = ""
     stint_start_time: float = 0.0
     stint_elapsed_ms: int = 0    # Accumulated lap time in current stint (works for replay too)
-    last_pit_lap: int = 1       # lastPitLap - lap number when last pit occurred
+    last_pit_lap: int = 0       # lastPitLap - lap number when last pit occurred (0 = race start)
 
     # Lap storage (replaces stage_laps_rt and stage_laps_clasif)
     # valid_laps = stage_laps_rt equivalent (filtered, per pitNumber)
