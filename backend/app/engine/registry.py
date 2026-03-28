@@ -28,11 +28,30 @@ class UserSession:
 
         async def on_events(events):
             await self.state.handle_events(events)
+            # Check if any kart entered pit
+            pit_in_karts = []
             for event in events:
                 if event.type.value == "pit_in":
                     kart = self.state.karts.get(event.row_id)
                     if kart:
-                        self.fifo.add_entry(kart.tier_score)
+                        pit_in_karts.append(kart)
+
+            if pit_in_karts:
+                # Re-compute clustering BEFORE adding to FIFO so tier_score
+                # is fresh (not stale from the last analytics cycle).
+                try:
+                    team_pos = getattr(self, "_team_positions", {})
+                    driver_diffs = getattr(self, "_driver_differentials", {})
+                    compute_clustering(self.state, team_pos, driver_diffs)
+                except Exception as e:
+                    logger.warning(f"Clustering before FIFO entry failed: {e}")
+
+                for kart in pit_in_karts:
+                    logger.info(
+                        f"FIFO entry: kart #{kart.kart_number} pit_in "
+                        f"tier_score={kart.tier_score}"
+                    )
+                    self.fifo.add_entry(kart.tier_score)
 
         self.on_events = on_events
         self.apex_client = ApexClient(ws_url, self.parser, on_events)

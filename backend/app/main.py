@@ -47,12 +47,28 @@ async def lifespan(app: FastAPI):
 
     async def replay_on_events(events):
         await replay_state.handle_events(events)
-        # Track pit entries for FIFO (same as UserSession)
+        # Check if any kart entered pit
+        pit_in_karts = []
         for event in events:
             if event.type.value == "pit_in":
                 kart = replay_state.karts.get(event.row_id)
                 if kart:
-                    replay_fifo.add_entry(kart.tier_score)
+                    pit_in_karts.append(kart)
+
+        if pit_in_karts:
+            # Re-compute clustering BEFORE adding to FIFO so tier_score is fresh
+            try:
+                from app.engine.clustering import compute_clustering
+                compute_clustering(replay_state, {}, {})
+            except Exception as e:
+                logger.warning(f"Replay clustering before FIFO entry failed: {e}")
+
+            for kart in pit_in_karts:
+                logger.info(
+                    f"Replay FIFO entry: kart #{kart.kart_number} pit_in "
+                    f"tier_score={kart.tier_score}"
+                )
+                replay_fifo.add_entry(kart.tier_score)
 
     replay_engine = ReplayEngine(replay_parser, replay_on_events, logs_dir="data/logs")
 
