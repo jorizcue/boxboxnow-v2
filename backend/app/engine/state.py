@@ -347,6 +347,8 @@ class RaceStateManager:
                     "maxStintMin": self.max_stint_min,
                     "minStintMin": self.min_stint_min,
                     "durationMin": self.duration_min,
+                    "boxLines": self.box_lines,
+                    "boxKarts": self.box_karts,
                 },
             },
         }

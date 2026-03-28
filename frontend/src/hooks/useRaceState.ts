@@ -44,6 +44,8 @@ const defaultConfig: RaceConfig = {
   maxStintMin: 40,
   minStintMin: 15,
   durationMin: 180,
+  boxLines: 2,
+  boxKarts: 30,
 };
 
 export const useRaceStore = create<RaceStore>((set) => ({

@@ -57,6 +57,8 @@ export interface RaceConfig {
   maxStintMin: number;
   minStintMin: number;
   durationMin: number;
+  boxLines: number;
+  boxKarts: number;
 }
 
 export interface RaceSnapshot {
