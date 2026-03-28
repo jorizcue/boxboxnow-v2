@@ -15,6 +15,7 @@ interface RaceStore {
   raceStarted: boolean;
   countdownMs: number;
   trackName: string;
+  durationMs: number;
   karts: KartState[];
   fifo: FifoState;
   classification: ClassificationEntry[];
@@ -60,6 +61,7 @@ export const useRaceStore = create<RaceStore>((set) => ({
   raceStarted: false,
   countdownMs: 0,
   trackName: "",
+  durationMs: 0,
   karts: [],
   fifo: defaultFifo,
   classification: [],
@@ -86,6 +88,7 @@ export const useRaceStore = create<RaceStore>((set) => ({
       raceStarted: snapshot.raceStarted,
       countdownMs: snapshot.countdownMs,
       trackName: snapshot.trackName,
+      durationMs: snapshot.durationMs || 0,
       karts: snapshot.karts,
       fifo: snapshot.fifo || defaultFifo,
       classification: snapshot.classification || [],
@@ -131,6 +134,9 @@ export const useRaceStore = create<RaceStore>((set) => ({
             break;
           case "pitIn":
             kart.pitStatus = "in_pit";
+            if (ev.pitRecord) {
+              kart.pitHistory = [...(kart.pitHistory || []), ev.pitRecord as any];
+            }
             break;
           case "pitOut":
             kart.pitStatus = "racing";

@@ -1,3 +1,14 @@
+export interface PitRecord {
+  pitNumber: number;
+  lap: number;
+  raceTimeMs: number;     // Race elapsed time at pit-in
+  onTrackMs: number;      // Stint duration (time on track)
+  driverName: string;
+  totalDriverMs: number;  // Cumulative on-track time for this driver
+  pitTimeMs: number;      // Time spent in pit (0 = still in pit / last pit)
+  stintLaps: number;
+}
+
 export interface KartState {
   rowId: string;
   kartNumber: number;
@@ -20,6 +31,7 @@ export interface KartState {
   stintStartTime: number;  // epoch seconds
   stintElapsedMs: number;  // accumulated lap time in stint (ms)
   stintStartCountdownMs: number;  // race clock (ms) when stint started
+  pitHistory: PitRecord[];
   tierScore: number;
   avgLapMs: number;
   bestAvgMs: number;
@@ -71,6 +83,7 @@ export interface RaceSnapshot {
   fifo: FifoState;
   classification: ClassificationEntry[];
   config: RaceConfig;
+  durationMs: number;
 }
 
 export interface WsUpdateEvent {

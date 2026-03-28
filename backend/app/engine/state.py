@@ -14,6 +14,31 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class PitRecord:
+    """A completed pit stop record (mirrors original pits_info table)."""
+    pit_number: int          # Sequential pit number
+    lap: int                 # Lap when pit-in happened
+    race_time_ms: int        # Race elapsed time at pit-in (duration_ms - countdown_ms)
+    on_track_ms: int         # Stint duration (time on track before this pit)
+    driver_name: str         # Driver at time of pit-in
+    total_driver_ms: int     # Cumulative on-track time for this driver
+    pit_time_ms: int = 0     # Time spent in the pit (0 if still in pit / last pit)
+    stint_laps: int = 0      # Number of laps in the stint
+
+    def to_dict(self) -> dict:
+        return {
+            "pitNumber": self.pit_number,
+            "lap": self.lap,
+            "raceTimeMs": self.race_time_ms,
+            "onTrackMs": self.on_track_ms,
+            "driverName": self.driver_name,
+            "totalDriverMs": self.total_driver_ms,
+            "pitTimeMs": self.pit_time_ms,
+            "stintLaps": self.stint_laps,
+        }
+
+
+@dataclass
 class KartState:
     """
     In-memory state per kart. Mirrors the data_table entry from
@@ -39,6 +64,15 @@ class KartState:
     stint_elapsed_ms: int = 0    # Accumulated lap time in current stint (works for replay too)
     stint_start_countdown_ms: int = 0  # Race clock (countdown_ms) when stint started
     last_pit_lap: int = 0       # lastPitLap - lap number when last pit occurred (0 = race start)
+
+    # Pit-in timing (saved on PIT_IN, used on PIT_OUT to compute pit duration)
+    pit_in_countdown_ms: int = 0  # Race clock when pit-in occurred
+
+    # Pit history (list of completed pit records, like pits_info table)
+    pit_history: list[PitRecord] = field(default_factory=list)
+
+    # Per-driver cumulative on-track time (for "Total" column in PITS tab)
+    driver_total_ms: dict = field(default_factory=dict)  # driver_name -> cumulative ms
 
     # Lap storage (replaces stage_laps_rt and stage_laps_clasif)
     # valid_laps = stage_laps_rt equivalent (filtered, per pitNumber)
@@ -84,6 +118,7 @@ class KartState:
             "stintStartTime": self.stint_start_time,  # kept for backwards compat
             "stintElapsedMs": self.stint_elapsed_ms,
             "stintStartCountdownMs": self.stint_start_countdown_ms,
+            "pitHistory": [p.to_dict() for p in self.pit_history],
             "tierScore": self.tier_score,
             "driverDifferentialMs": self.driver_differential_ms,
             "avgLapMs": self.avg_lap_ms,
@@ -266,17 +301,52 @@ class RaceStateManager:
             kart.pit_status = "in_pit"
             kart.pit_count += 1
             kart.last_pit_lap = kart.total_laps
+            kart.pit_in_countdown_ms = self.countdown_ms  # Save race clock at pit-in
+
+            # Calculate stint duration (time on track) and race elapsed time
+            duration_total_ms = self.duration_min * 60 * 1000
+            on_track_ms = kart.stint_start_countdown_ms - self.countdown_ms
+            race_time_ms = duration_total_ms - self.countdown_ms if self.countdown_ms > 0 else abs(self.countdown_ms) + duration_total_ms
+            stint_laps = kart.stint_lap_count()
+
+            # Update per-driver cumulative time
+            driver = kart.driver_name or "Unknown"
+            prev_total = kart.driver_total_ms.get(driver, 0)
+            kart.driver_total_ms[driver] = prev_total + on_track_ms
+
+            # Create pit history record
+            pit_record = PitRecord(
+                pit_number=kart.pit_count,
+                lap=kart.total_laps,
+                race_time_ms=race_time_ms,
+                on_track_ms=on_track_ms,
+                driver_name=driver,
+                total_driver_ms=kart.driver_total_ms[driver],
+                pit_time_ms=0,  # Will be filled on pit-out
+                stint_laps=stint_laps,
+            )
+            kart.pit_history.append(pit_record)
+
             return {"event": "pitIn", "rowId": row_id,
                     "kartNumber": kart.kart_number,
                     "pitCount": kart.pit_count,
-                    "lap": kart.total_laps}
+                    "lap": kart.total_laps,
+                    "pitRecord": pit_record.to_dict()}
 
         elif event.type == EventType.PIT_OUT and kart:
             # Port of websocket_Secuencial.py PIT OUT handling
+            # Calculate pit time (time spent in the pit)
+            if kart.pit_in_countdown_ms != 0:
+                pit_time_ms = kart.pit_in_countdown_ms - self.countdown_ms
+                # Update the last pit record with pit_time
+                if kart.pit_history:
+                    kart.pit_history[-1].pit_time_ms = pit_time_ms
+
             kart.pit_status = "racing"
             kart.stint_start_time = time.time()
             kart.stint_elapsed_ms = 0  # Reset stint timer on pit out
             kart.stint_start_countdown_ms = self.countdown_ms  # Race clock at stint start
+            kart.pit_in_countdown_ms = 0  # Clear pit-in marker
             return {"event": "pitOut", "rowId": row_id,
                     "kartNumber": kart.kart_number,
                     "pitCount": kart.pit_count,
@@ -329,10 +399,27 @@ class RaceStateManager:
                     "teamName": kart.team_name}
 
         elif event.type == EventType.COUNTDOWN:
+            prev_countdown = self.countdown_ms
             self.countdown_ms = int(event.value)
             if not self.race_started:
                 self.race_started = True
                 self.start_time = time.time()
+                # Back-calculate race start countdown for reconnection:
+                # If karts already exist (reconnect mid-race), set their
+                # stint_start_countdown_ms based on race duration config.
+                # Original: start_time = msg_time - (duration - countdown_ms)
+                race_start_countdown_ms = self.duration_min * 60 * 1000
+                for kart in self.karts.values():
+                    if kart.stint_start_countdown_ms == 0:
+                        if kart.pit_count == 0:
+                            # Never pitted: stint started at race start
+                            kart.stint_start_countdown_ms = race_start_countdown_ms
+                        else:
+                            # Has pitted but we don't know when: use current
+                            # (stint will show ~0, corrected on next pit event)
+                            kart.stint_start_countdown_ms = self.countdown_ms
+                logger.info(f"Race started. Countdown: {self.countdown_ms}ms, "
+                            f"karts with stint set: {len(self.karts)}")
             return {"event": "countdown", "ms": self.countdown_ms}
 
         elif event.type == EventType.COUNT_UP:
@@ -381,6 +468,7 @@ class RaceStateManager:
                     "boxLines": self.box_lines,
                     "boxKarts": self.box_karts,
                 },
+                "durationMs": self.duration_min * 60 * 1000,
             },
         }
 
