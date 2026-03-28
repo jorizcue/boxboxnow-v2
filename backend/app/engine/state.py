@@ -246,6 +246,11 @@ class RaceStateManager:
             # Only cell updates on the llp column count as new laps.
             lap_ms = time_to_ms(event.value)
             if lap_ms > 0 and kart:
+                # Skip CSS class repaints: Apex resends the same lap time with a
+                # different class (e.g. tb→ti) which is NOT a new lap. Two consecutive
+                # laps with identical ms is impossible in karting.
+                if lap_ms == kart.last_lap_ms and kart.total_laps > 0:
+                    return None
                 kart.total_laps += 1
                 now_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
                 lap_record = {
