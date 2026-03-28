@@ -119,6 +119,7 @@ class KartState:
             "stintElapsedMs": self.stint_elapsed_ms,
             "stintStartCountdownMs": self.stint_start_countdown_ms,
             "pitHistory": [p.to_dict() for p in self.pit_history],
+            "driverTotalMs": self.driver_total_ms,
             "tierScore": self.tier_score,
             "driverDifferentialMs": self.driver_differential_ms,
             "avgLapMs": self.avg_lap_ms,
@@ -155,6 +156,7 @@ class RaceStateManager:
         self.min_pits: int = 3
         self.max_stint_min: int = 40
         self.min_stint_min: int = 15
+        self.min_driver_time_min: int = 30
         self.box_lines: int = 2
         self.box_karts: int = 30
         self.duration_min: int = 180
@@ -487,6 +489,7 @@ class RaceStateManager:
                     "durationMin": self.duration_min,
                     "boxLines": self.box_lines,
                     "boxKarts": self.box_karts,
+                    "minDriverTimeMin": self.min_driver_time_min,
                 },
                 "durationMs": getattr(self, '_first_countdown_ms', 0) or self.duration_min * 60 * 1000,
             },

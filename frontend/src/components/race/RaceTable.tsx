@@ -17,21 +17,10 @@ export function RaceTable() {
     return aAvg - bAvg;
   });
 
-  // Map classification positions by kart number for "Posición estimada"
-  const estimatedPositions = useMemo(() => {
-    const map: Record<number, number> = {};
-    classification.forEach((c) => { map[c.kartNumber] = c.position; });
-    return map;
-  }, [classification]);
-
   // Helper: compute stint seconds from race clock
-  // stintStartCountdownMs = race clock value when stint started (set on init/pit_out)
-  // stint = how much the race clock has moved since then
   const durationMs = useRaceStore((s) => s.durationMs);
   const stintSecondsFor = (kart: typeof karts[0]) => {
     if (raceClockMs === 0) return 0;
-    // If stintStart is 0, backend hasn't set it yet - use durationMs as fallback
-    // (assumes stint started at race start: countdown was ~durationMs at that point)
     const stintStart = kart.stintStartCountdownMs || durationMs || raceClockMs;
     return Math.max(0, stintStart - raceClockMs) / 1000;
   };
@@ -76,16 +65,14 @@ export function RaceTable() {
         <table className="w-full text-xs sm:text-sm">
           <thead className="bg-surface text-neutral-200 sticky top-0 z-10 text-[10px] sm:text-[11px] uppercase tracking-wider">
             <tr>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left w-8 sm:w-12" title="Posición en pista (Apex)">Pos</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-8 sm:w-12" title="Posición estimada por distancia recorrida (penaliza pits pendientes)">Est</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-6 sm:w-8">#</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left w-8 sm:w-12">Kart</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">Equipo</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right" title="Media últimas 20 vueltas">Med.20</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">Piloto</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right" title="Media ultimas 20 vueltas">Med.20</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right" title="Media 3 mejores vueltas">Mej.3</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Ult.</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Mejor</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Gap</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Int.</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">Vlt</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">Pit</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-8 sm:w-12">Tier</th>
@@ -94,14 +81,13 @@ export function RaceTable() {
             </tr>
           </thead>
           <tbody>
-            {sorted.map((kart) => {
+            {sorted.map((kart, index) => {
               const isOurTeam = config.ourKartNumber > 0 && kart.kartNumber === config.ourKartNumber;
               const stintSec = stintSecondsFor(kart);
               const stintMin = stintSec / 60;
               const stintWarning = stintMin >= config.maxStintMin;
               const stintAlert = stintMin >= config.maxStintMin - 5 && stintMin < config.maxStintMin;
               const pitsRemaining = Math.max(0, config.minPits - kart.pitCount);
-              const estPos = estimatedPositions[kart.kartNumber];
 
               return (
                 <tr
@@ -112,13 +98,13 @@ export function RaceTable() {
                     kart.pitStatus === "in_pit" && "opacity-50"
                   )}
                 >
-                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 font-bold text-white">{kart.position}</td>
-                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center font-mono text-neutral-400">
-                    {estPos || "-"}
-                  </td>
+                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center font-mono text-neutral-500">{index + 1}</td>
                   <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 font-mono text-neutral-300">{kart.kartNumber}</td>
                   <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 font-medium truncate max-w-[100px] sm:max-w-[180px] text-white">
                     {kart.teamName}
+                  </td>
+                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 truncate max-w-[80px] sm:max-w-[140px] text-neutral-400 text-xs">
+                    {kart.driverName || "-"}
                   </td>
                   <td className="px-2 py-1.5 text-right font-mono text-neutral-300">
                     {kart.avgLapMs > 0 ? msToLapTime(Math.round(kart.avgLapMs)) : "-"}
@@ -131,12 +117,6 @@ export function RaceTable() {
                   </td>
                   <td className="px-2 py-1.5 text-right font-mono text-accent">
                     {msToLapTime(kart.bestLapMs)}
-                  </td>
-                  <td className="px-2 py-1.5 text-right font-mono text-neutral-300">
-                    {kart.gap || "-"}
-                  </td>
-                  <td className="px-2 py-1.5 text-right font-mono text-neutral-200">
-                    {kart.interval || "-"}
                   </td>
                   <td className="px-2 py-1.5 text-center text-neutral-300">{kart.totalLaps}</td>
                   <td className="px-2 py-1.5 text-center">
@@ -187,7 +167,7 @@ export function RaceTable() {
         {/* Left: Stint metrics for our kart */}
         <div className="bg-surface rounded-xl border border-border overflow-hidden">
           <div className="bg-neutral-800/50 px-4 py-2 flex justify-between">
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">Métrica</span>
+            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">Metrica</span>
             <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">Valor</span>
           </div>
           <div className="divide-y divide-border">
@@ -196,11 +176,11 @@ export function RaceTable() {
               value={secondsToHMS(ourStintSec)}
               highlight={ourStintSec / 60 >= config.maxStintMin}
             />
-            <InfoRow label="Tiempo hasta stint máximo" value={secondsToHMS(timeToMaxStint)} />
-            <InfoRow label="Vueltas hasta stint máximo" value={String(lapsToMaxStint)} />
+            <InfoRow label="Tiempo hasta stint maximo" value={secondsToHMS(timeToMaxStint)} />
+            <InfoRow label="Vueltas hasta stint maximo" value={String(lapsToMaxStint)} />
             <InfoRow label="Karts cerca de PIT" value={String(kartsNearPit)} />
-            <InfoRow label="Stint máximo" value={secondsToHMS(config.maxStintMin * 60)} />
-            <InfoRow label="Stint mínimo" value={secondsToHMS(config.minStintMin * 60)} />
+            <InfoRow label="Stint maximo" value={secondsToHMS(config.maxStintMin * 60)} />
+            <InfoRow label="Stint minimo" value={secondsToHMS(config.minStintMin * 60)} />
           </div>
         </div>
 

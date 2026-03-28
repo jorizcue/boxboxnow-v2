@@ -54,6 +54,7 @@ const defaultConfig: RaceConfig = {
   durationMin: 180,
   boxLines: 2,
   boxKarts: 30,
+  minDriverTimeMin: 30,
 };
 
 export const useRaceStore = create<RaceStore>((set) => ({

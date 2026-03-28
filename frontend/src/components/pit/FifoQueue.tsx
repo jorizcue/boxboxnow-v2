@@ -183,16 +183,30 @@ export function FifoQueue() {
                       </span>
                     </td>
                     <td className="px-2 py-1">
-                      <div className="flex gap-0.5">
-                        {snap.queue.map((s: number, j: number) => (
-                          <div
-                            key={j}
-                            className="w-5 h-5 rounded-sm flex items-center justify-center text-[8px] font-bold text-black"
-                            style={{ backgroundColor: tierHex(s) }}
-                          >
-                            {s}
-                          </div>
-                        ))}
+                      <div className="space-y-0.5">
+                        {(() => {
+                          const q = snap.queue.slice(0, boxKarts);
+                          const histRows: number[][] = [];
+                          for (let r = 0; r < boxLines; r++) {
+                            const start = r * kartsPerRow;
+                            const end = Math.min(start + kartsPerRow, q.length);
+                            if (start < q.length) histRows.push(q.slice(start, end));
+                          }
+                          return histRows.map((hr: number[], ri: number) => (
+                            <div key={ri} className="flex gap-0.5 items-center">
+                              <span className="text-[7px] text-neutral-600 w-3 flex-shrink-0">F{ri + 1}</span>
+                              {hr.map((s: number, j: number) => (
+                                <div
+                                  key={j}
+                                  className="w-5 h-5 rounded-sm flex items-center justify-center text-[8px] font-bold text-black"
+                                  style={{ backgroundColor: tierHex(s) }}
+                                >
+                                  {s}
+                                </div>
+                              ))}
+                            </div>
+                          ));
+                        })()}
                       </div>
                     </td>
                   </tr>

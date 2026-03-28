@@ -112,6 +112,7 @@ async def lifespan(app: FastAPI):
                                     "durationMin": replay_state.duration_min,
                                     "boxLines": replay_state.box_lines,
                                     "boxKarts": replay_state.box_karts,
+                                    "minDriverTimeMin": replay_state.min_driver_time_min,
                                 },
                             },
                         }

@@ -32,6 +32,7 @@ export interface KartState {
   stintElapsedMs: number;  // accumulated lap time in stint (ms)
   stintStartCountdownMs: number;  // race clock (ms) when stint started
   pitHistory: PitRecord[];
+  driverTotalMs: Record<string, number>;
   tierScore: number;
   avgLapMs: number;
   bestAvgMs: number;
@@ -73,6 +74,7 @@ export interface RaceConfig {
   durationMin: number;
   boxLines: number;
   boxKarts: number;
+  minDriverTimeMin: number;
 }
 
 export interface RaceSnapshot {

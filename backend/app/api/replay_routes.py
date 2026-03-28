@@ -70,6 +70,7 @@ async def start_replay(
         replay_state.min_stint_min = session.min_stint_min or 15
         replay_state.min_pits = session.min_pits or 3
         replay_state.pit_time_s = session.pit_time_s or 120
+        replay_state.min_driver_time_min = session.min_driver_time_min or 30
         # Load circuit config if available
         if session.circuit_id:
             circuit = (await db.execute(
@@ -84,6 +85,7 @@ async def start_replay(
 
     replay_fifo.update_config(replay_state.box_karts, replay_state.box_lines)
     replay_fifo._history.clear()
+    replay_fifo.apply_to_state(replay_state)  # Populate initial FIFO (all 25s) in state
 
     try:
         await replay.start(data.filename, data.speed)

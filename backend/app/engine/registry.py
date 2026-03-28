@@ -165,6 +165,7 @@ class UserSession:
                                     "durationMin": self.state.duration_min,
                                     "boxLines": self.state.box_lines,
                                     "boxKarts": self.state.box_karts,
+                                    "minDriverTimeMin": self.state.min_driver_time_min,
                                 },
                             },
                         }
