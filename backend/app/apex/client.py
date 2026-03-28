@@ -16,10 +16,12 @@ logger = logging.getLogger(__name__)
 class ApexClient:
     """Async WebSocket client for Apex Timing systems."""
 
-    def __init__(self, ws_url: str, parser: ApexMessageParser, on_events_callback):
+    def __init__(self, ws_url: str, parser: ApexMessageParser, on_events_callback,
+                 recorder=None):
         self.ws_url = ws_url
         self.parser = parser
         self.on_events = on_events_callback
+        self.recorder = recorder  # Optional RaceRecorder instance
         self._task: asyncio.Task | None = None
         self._running = False
         self._reconnect_delay = 1.0
@@ -93,6 +95,10 @@ class ApexClient:
         while True:
             message = await self._queue.get()
             try:
+                # Record raw message if recording is active
+                if self.recorder and self.recorder.is_recording:
+                    self.recorder.write(message)
+
                 events = self.parser.parse(message)
                 if events:
                     await self.on_events(events)

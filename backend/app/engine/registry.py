@@ -12,6 +12,7 @@ from app.engine.clustering import compute_clustering
 from app.engine.classification import compute_classification
 from app.apex.parser import ApexMessageParser
 from app.apex.client import ApexClient
+from app.apex.recorder import RaceRecorder
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ class UserSession:
         self.parser = ApexMessageParser()
         self.state = RaceStateManager()
         self.fifo = FifoManager()
+        self.recorder = RaceRecorder()
 
         async def on_events(events):
             await self.state.handle_events(events)
@@ -54,7 +56,7 @@ class UserSession:
                     self.fifo.add_entry(kart.tier_score)
 
         self.on_events = on_events
-        self.apex_client = ApexClient(ws_url, self.parser, on_events)
+        self.apex_client = ApexClient(ws_url, self.parser, on_events, recorder=self.recorder)
         self._analytics_task: asyncio.Task | None = None
 
     async def start(self):
@@ -66,6 +68,8 @@ class UserSession:
     async def stop(self):
         """Stop all tasks."""
         await self.apex_client.stop()
+        if self.recorder.is_recording:
+            self.recorder.stop()
         if self._analytics_task:
             self._analytics_task.cancel()
             try:

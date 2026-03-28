@@ -119,6 +119,11 @@ export const api = {
   disconnectApex: () => fetchApi<any>("/api/race/disconnect", { method: "POST" }),
   getLiveTeams: () => fetchApi<any>("/api/race/live-teams"),
 
+  // Recording
+  getRecordingStatus: () => fetchApi<any>("/api/race/recording/status"),
+  startRecording: () => fetchApi<any>("/api/race/recording/start", { method: "POST" }),
+  stopRecording: () => fetchApi<any>("/api/race/recording/stop", { method: "POST" }),
+
   // Replay
   getReplayLogs: () => fetchApi<{ logs: string[] }>("/api/replay/logs"),
   getReplayStatus: () => fetchApi<any>("/api/replay/status"),

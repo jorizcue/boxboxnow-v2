@@ -191,3 +191,56 @@ async def get_live_teams(request: Request, user: User = Depends(get_current_user
         "hasDrivers": has_any_drivers,
         "kartCount": len(teams),
     }
+
+
+# --- Race Recording ---
+
+@router.get("/recording/status")
+async def recording_status(request: Request, user: User = Depends(get_current_user)):
+    """Check if race recording is active."""
+    registry = request.app.state.registry
+    session = registry.get(user.id)
+    if session:
+        return session.recorder.status
+    return {"recording": False, "filename": None, "messages": 0, "started_at": None}
+
+
+@router.post("/recording/start")
+async def start_recording(request: Request, user: User = Depends(get_current_user)):
+    """Start recording all Apex messages to a .log file."""
+    registry = request.app.state.registry
+    session = registry.get(user.id)
+    if not session:
+        raise HTTPException(400, "No active Apex session. Connect first.")
+
+    # Use circuit name as label if available
+    from app.models.database import async_session
+    from app.models.schemas import RaceSession as RaceSessionModel
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    label = "race"
+    async with async_session() as db:
+        result = await db.execute(
+            select(RaceSessionModel)
+            .options(selectinload(RaceSessionModel.circuit))
+            .where(RaceSessionModel.user_id == user.id, RaceSessionModel.is_active == True)
+        )
+        rs = result.scalar_one_or_none()
+        if rs and rs.circuit:
+            label = rs.circuit.name
+
+    filename = session.recorder.start(label=label)
+    return {"status": "recording", "filename": filename}
+
+
+@router.post("/recording/stop")
+async def stop_recording(request: Request, user: User = Depends(get_current_user)):
+    """Stop recording and save the log file."""
+    registry = request.app.state.registry
+    session = registry.get(user.id)
+    if not session:
+        raise HTTPException(400, "No active Apex session.")
+
+    result = session.recorder.stop()
+    return {"status": "stopped", **result}

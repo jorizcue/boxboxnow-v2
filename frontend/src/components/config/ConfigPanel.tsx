@@ -262,53 +262,87 @@ function Field({
 
 function ApexConnection() {
   const { apexConnected, apexStatusMsg, setApexStatus, requestWsReconnect } = useRaceStore();
+  const [recording, setRecording] = useState(false);
+  const [recordingInfo, setRecordingInfo] = useState<string>("");
 
-  // On mount, sync connection status with backend
+  // On mount, sync connection + recording status with backend
   useEffect(() => {
     api.getConnectionStatus()
       .then((res) => {
         if (res.apex_connected) {
           setApexStatus(true, `Conectado a ${res.circuit}`);
         } else if (apexConnected) {
-          // Backend says not connected but we thought we were — sync
           setApexStatus(false, "");
+        }
+      })
+      .catch(() => {});
+    api.getRecordingStatus()
+      .then((res) => {
+        setRecording(res.recording);
+        if (res.recording) {
+          setRecordingInfo(`${res.filename} (${res.messages} msgs)`);
         }
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Poll recording message count while recording
+  useEffect(() => {
+    if (!recording) return;
+    const interval = setInterval(() => {
+      api.getRecordingStatus()
+        .then((res) => {
+          if (res.recording) {
+            setRecordingInfo(`${res.filename} (${res.messages} msgs)`);
+          } else {
+            setRecording(false);
+            setRecordingInfo("");
+          }
+        })
+        .catch(() => {});
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [recording]);
+
   return (
-    <div className="bg-surface rounded-xl p-6 border border-border">
+    <div className="bg-surface rounded-xl p-4 sm:p-6 border border-border">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-[11px] text-neutral-200 uppercase tracking-wider">Conexion Apex Timing</h2>
-        {apexConnected && (
-          <span className="flex items-center gap-1.5 text-[10px] text-accent">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent inline-block" />
-            Conectado
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {recording && (
+            <span className="flex items-center gap-1 text-[10px] text-red-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
+              REC
+            </span>
+          )}
+          {apexConnected && (
+            <span className="flex items-center gap-1.5 text-[10px] text-accent">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent inline-block" />
+              Conectado
+            </span>
+          )}
+        </div>
       </div>
       {apexStatusMsg && (
         <p className={`text-xs mb-3 ${apexConnected ? "text-accent" : "text-neutral-400"}`}>
           {apexStatusMsg}
         </p>
       )}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <button
           onClick={async () => {
             try {
               setApexStatus(false, "Conectando...");
               const res = await api.connectApex();
               setApexStatus(true, `Conectado a ${res.circuit} (${res.teamsLoaded} equipos)`);
-              // Force WS to reconnect so it binds to the user's new session state
               requestWsReconnect();
             } catch (e: any) {
               setApexStatus(false, "Error: " + e.message);
             }
           }}
           disabled={apexConnected}
-          className="flex-1 bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-2.5 px-4 rounded-lg"
+          className="flex-1 min-w-[100px] bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-2.5 px-4 rounded-lg text-sm"
         >
           Conectar
         </button>
@@ -317,16 +351,59 @@ function ApexConnection() {
             try {
               await api.disconnectApex();
               setApexStatus(false, "Desconectado");
-              // Force WS to reconnect so it falls back to replay_state
+              setRecording(false);
+              setRecordingInfo("");
               requestWsReconnect();
             } catch {}
           }}
           disabled={!apexConnected}
-          className="flex-1 bg-red-900/50 hover:bg-red-800 disabled:opacity-40 text-red-300 font-medium py-2.5 px-4 rounded-lg"
+          className="flex-1 min-w-[100px] bg-red-900/50 hover:bg-red-800 disabled:opacity-40 text-red-300 font-medium py-2.5 px-4 rounded-lg text-sm"
         >
           Desconectar
         </button>
       </div>
+
+      {/* Recording controls */}
+      {apexConnected && (
+        <div className="mt-3 pt-3 border-t border-border">
+          <div className="flex items-center gap-2 flex-wrap">
+            {!recording ? (
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await api.startRecording();
+                    setRecording(true);
+                    setRecordingInfo(res.filename);
+                  } catch (e: any) {
+                    alert("Error: " + e.message);
+                  }
+                }}
+                className="flex items-center gap-1.5 bg-red-900/30 hover:bg-red-900/50 text-red-300 text-xs font-medium px-3 py-2 rounded-lg border border-red-900/30 transition-colors"
+              >
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                Grabar carrera
+              </button>
+            ) : (
+              <button
+                onClick={async () => {
+                  try {
+                    await api.stopRecording();
+                    setRecording(false);
+                    setRecordingInfo("");
+                  } catch {}
+                }}
+                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3 py-2 rounded-lg transition-colors"
+              >
+                <span className="w-2 h-2 rounded-sm bg-white" />
+                Parar grabacion
+              </button>
+            )}
+            {recordingInfo && (
+              <span className="text-[10px] text-neutral-400">{recordingInfo}</span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
