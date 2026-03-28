@@ -19,6 +19,7 @@ export interface KartState {
   stintDurationS: number;
   stintStartTime: number;  // epoch seconds
   stintElapsedMs: number;  // accumulated lap time in stint (ms)
+  stintStartCountdownMs: number;  // race clock (ms) when stint started
   tierScore: number;
   avgLapMs: number;
   bestAvgMs: number;

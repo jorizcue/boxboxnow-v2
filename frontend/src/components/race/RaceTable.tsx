@@ -2,13 +2,20 @@
 
 import { useMemo } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
+import { useRaceClock } from "@/hooks/useRaceClock";
 import { msToLapTime, secondsToStint, secondsToHMS, tierHex, formatDifferential } from "@/lib/formatters";
 import clsx from "clsx";
 
 export function RaceTable() {
   const { karts, config, classification } = useRaceStore();
+  const raceClockMs = useRaceClock();
 
-  const sorted = [...karts].sort((a, b) => (a.position || 999) - (b.position || 999));
+  // Sort by avg lap time (fastest first), karts without avg go to the end
+  const sorted = [...karts].sort((a, b) => {
+    const aAvg = a.avgLapMs > 0 ? a.avgLapMs : Infinity;
+    const bAvg = b.avgLapMs > 0 ? b.avgLapMs : Infinity;
+    return aAvg - bAvg;
+  });
 
   // Map classification positions by kart number for "Posición estimada"
   const estimatedPositions = useMemo(() => {
@@ -17,13 +24,19 @@ export function RaceTable() {
     return map;
   }, [classification]);
 
+  // Helper: compute stint seconds from race clock
+  const stintSecondsFor = (kart: typeof karts[0]) => {
+    if (kart.stintStartCountdownMs === 0 && raceClockMs === 0) return 0;
+    return Math.abs(raceClockMs - kart.stintStartCountdownMs) / 1000;
+  };
+
   // Find our kart
   const ourKart = config.ourKartNumber > 0
     ? sorted.find((k) => k.kartNumber === config.ourKartNumber)
     : undefined;
 
-  // Compute stint duration for our kart (lap-based, works for live and replay)
-  const ourStintSec = ourKart ? ourKart.stintDurationS : 0;
+  // Compute stint duration for our kart (clock-based, ticks every second)
+  const ourStintSec = ourKart ? stintSecondsFor(ourKart) : 0;
 
   // Time until max stint
   const timeToMaxStint = Math.max(0, config.maxStintMin * 60 - ourStintSec);
@@ -77,7 +90,7 @@ export function RaceTable() {
           <tbody>
             {sorted.map((kart) => {
               const isOurTeam = config.ourKartNumber > 0 && kart.kartNumber === config.ourKartNumber;
-              const stintSec = kart.stintDurationS;
+              const stintSec = stintSecondsFor(kart);
               const stintMin = stintSec / 60;
               const stintWarning = stintMin >= config.maxStintMin;
               const stintAlert = stintMin >= config.maxStintMin - 5 && stintMin < config.maxStintMin;

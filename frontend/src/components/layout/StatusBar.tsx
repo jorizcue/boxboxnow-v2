@@ -4,6 +4,7 @@ import { useState } from "react";
 import { msToCountdown } from "@/lib/formatters";
 import { useAuth } from "@/hooks/useAuth";
 import { useRaceStore } from "@/hooks/useRaceState";
+import { useRaceClock } from "@/hooks/useRaceClock";
 import { api } from "@/lib/api";
 import { SessionManager } from "@/components/auth/SessionManager";
 
@@ -24,13 +25,16 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   const replayFilename = useRaceStore((s) => s.replayFilename);
   const replayProgress = useRaceStore((s) => s.replayProgress);
 
+  // Use interpolated race clock that ticks every second
+  const raceClockMs = useRaceClock();
+
   const handleLogout = async () => {
     try { await api.logout(); } catch {}
     logout();
   };
 
-  // Format the timer display
-  const timerDisplay = countdownMs !== 0 ? msToCountdown(countdownMs) : "00:00:00";
+  // Format the timer display using the interpolated clock
+  const timerDisplay = raceClockMs !== 0 ? msToCountdown(raceClockMs) : "00:00:00";
 
   return (
     <>

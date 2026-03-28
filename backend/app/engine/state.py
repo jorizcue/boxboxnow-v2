@@ -37,6 +37,7 @@ class KartState:
     arrow_status: str = ""
     stint_start_time: float = 0.0
     stint_elapsed_ms: int = 0    # Accumulated lap time in current stint (works for replay too)
+    stint_start_countdown_ms: int = 0  # Race clock (countdown_ms) when stint started
     last_pit_lap: int = 0       # lastPitLap - lap number when last pit occurred (0 = race start)
 
     # Lap storage (replaces stage_laps_rt and stage_laps_clasif)
@@ -82,6 +83,7 @@ class KartState:
             "stintDurationS": self.stint_duration_s(),
             "stintStartTime": self.stint_start_time,  # kept for backwards compat
             "stintElapsedMs": self.stint_elapsed_ms,
+            "stintStartCountdownMs": self.stint_start_countdown_ms,
             "tierScore": self.tier_score,
             "driverDifferentialMs": self.driver_differential_ms,
             "avgLapMs": self.avg_lap_ms,
@@ -185,6 +187,7 @@ class RaceStateManager:
             if best_lap_str:
                 kart.best_lap_ms = time_to_ms(best_lap_str)
             kart.stint_start_time = time.time()
+            kart.stint_start_countdown_ms = self.countdown_ms
             self.karts[row_id] = kart
             return None  # Init sends snapshot, not individual updates
 
@@ -273,9 +276,11 @@ class RaceStateManager:
             kart.pit_status = "racing"
             kart.stint_start_time = time.time()
             kart.stint_elapsed_ms = 0  # Reset stint timer on pit out
+            kart.stint_start_countdown_ms = self.countdown_ms  # Race clock at stint start
             return {"event": "pitOut", "rowId": row_id,
                     "kartNumber": kart.kart_number,
-                    "pitCount": kart.pit_count}
+                    "pitCount": kart.pit_count,
+                    "stintStartCountdownMs": self.countdown_ms}
 
         elif event.type == EventType.RANKING and kart:
             kart.position = int(event.value)
