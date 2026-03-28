@@ -30,13 +30,15 @@ class UserSession:
 
         async def on_events(events):
             await self.state.handle_events(events)
-            # Check if any kart entered pit
+            # Check if any kart entered pit (deduplicate by row_id)
             pit_in_karts = []
+            seen_pit_row_ids = set()
             for event in events:
-                if event.type.value == "pit_in":
+                if event.type.value == "pit_in" and event.row_id not in seen_pit_row_ids:
                     kart = self.state.karts.get(event.row_id)
                     if kart:
                         pit_in_karts.append(kart)
+                        seen_pit_row_ids.add(event.row_id)
 
             if pit_in_karts:
                 # Re-compute clustering BEFORE adding to FIFO so tier_score

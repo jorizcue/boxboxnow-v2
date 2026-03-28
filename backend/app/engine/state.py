@@ -243,7 +243,7 @@ class RaceStateManager:
             lap_ms = time_to_ms(event.value)
             if lap_ms > 0 and kart:
                 kart.total_laps += 1
-                now_str = datetime.now().isoformat()
+                now_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
                 lap_record = {
                     "lapTime": lap_ms,
                     "totalLap": kart.total_laps,
@@ -298,6 +298,9 @@ class RaceStateManager:
 
         elif event.type == EventType.PIT_IN and kart:
             # Port of websocket_Secuencial.py PIT IN handling
+            # Guard against duplicate pit-in (both *in| and si fire for same pit)
+            if kart.pit_status == "in_pit":
+                return None  # Already in pit, skip duplicate
             kart.pit_status = "in_pit"
             kart.pit_count += 1
             kart.last_pit_lap = kart.total_laps
@@ -335,6 +338,9 @@ class RaceStateManager:
 
         elif event.type == EventType.PIT_OUT and kart:
             # Port of websocket_Secuencial.py PIT OUT handling
+            # Guard against duplicate pit-out (both *out| and so fire for same pit)
+            if kart.pit_status == "racing":
+                return None  # Already racing, skip duplicate
             # Calculate pit time (time spent in the pit)
             if kart.pit_in_countdown_ms != 0:
                 pit_time_ms = kart.pit_in_countdown_ms - self.countdown_ms
