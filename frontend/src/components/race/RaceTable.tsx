@@ -76,8 +76,8 @@ export function RaceTable() {
         <table className="w-full text-xs sm:text-sm">
           <thead className="bg-surface text-neutral-200 sticky top-0 z-10 text-[10px] sm:text-[11px] uppercase tracking-wider">
             <tr>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left w-8 sm:w-12">Pos</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-8 sm:w-12">Est</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left w-8 sm:w-12" title="Posición en pista (Apex)">Pos</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-8 sm:w-12" title="Posición estimada por distancia recorrida (penaliza pits pendientes)">Est</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left w-8 sm:w-12">Kart</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">Equipo</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right" title="Media últimas 20 vueltas">Med.20</th>

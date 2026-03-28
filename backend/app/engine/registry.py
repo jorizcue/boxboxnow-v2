@@ -29,16 +29,18 @@ class UserSession:
         self.recorder = RaceRecorder()
 
         async def on_events(events):
+            # Track which karts were NOT in pit before processing
+            pre_pit_status = {
+                row_id: kart.pit_status
+                for row_id, kart in self.state.karts.items()
+            }
             await self.state.handle_events(events)
-            # Check if any kart entered pit (deduplicate by row_id)
+            # Only add to FIFO karts that TRANSITIONED to in_pit (not already in pit)
             pit_in_karts = []
-            seen_pit_row_ids = set()
-            for event in events:
-                if event.type.value == "pit_in" and event.row_id not in seen_pit_row_ids:
-                    kart = self.state.karts.get(event.row_id)
-                    if kart:
-                        pit_in_karts.append(kart)
-                        seen_pit_row_ids.add(event.row_id)
+            for row_id, kart in self.state.karts.items():
+                if (kart.pit_status == "in_pit"
+                        and pre_pit_status.get(row_id) != "in_pit"):
+                    pit_in_karts.append(kart)
 
             if pit_in_karts:
                 # Re-compute clustering BEFORE adding to FIFO so tier_score

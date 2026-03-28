@@ -77,7 +77,15 @@ body {
 /* Our team highlight */
 .our-team {
   border-left: 3px solid #9fe556 !important;
-  background-color: rgba(159, 229, 86, 0.08) !important;
+  background-color: rgba(159, 229, 86, 0.12) !important;
+  box-shadow: inset 0 0 0 1px rgba(159, 229, 86, 0.15);
+}
+.our-team td:first-child {
+  color: #9fe556 !important;
+  font-weight: 800 !important;
+}
+.our-team td:nth-child(4) {
+  color: #9fe556 !important;
 }
 
 /* Focus states */
