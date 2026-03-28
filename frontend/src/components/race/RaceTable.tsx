@@ -63,25 +63,25 @@ export function RaceTable() {
   return (
     <div className="space-y-4">
       {/* Main race table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-surface text-neutral-200 sticky top-0 z-10 text-[11px] uppercase tracking-wider">
+      <div className="overflow-x-auto -mx-2 sm:mx-0">
+        <table className="w-full text-xs sm:text-sm">
+          <thead className="bg-surface text-neutral-200 sticky top-0 z-10 text-[10px] sm:text-[11px] uppercase tracking-wider">
             <tr>
-              <th className="px-2 py-2.5 text-left w-12">Pos</th>
-              <th className="px-2 py-2.5 text-center w-12">Est.</th>
-              <th className="px-2 py-2.5 text-left w-12">Kart</th>
-              <th className="px-2 py-2.5 text-left">Equipo</th>
-              <th className="px-2 py-2.5 text-right">Tiempo medio</th>
-              <th className="px-2 py-2.5 text-right">Best Avg</th>
-              <th className="px-2 py-2.5 text-right">Ult. Vuelta</th>
-              <th className="px-2 py-2.5 text-right">Mejor</th>
-              <th className="px-2 py-2.5 text-right">Gap</th>
-              <th className="px-2 py-2.5 text-right">Interv.</th>
-              <th className="px-2 py-2.5 text-center">Vueltas</th>
-              <th className="px-2 py-2.5 text-center">Pits</th>
-              <th className="px-2 py-2.5 text-center w-12">Punt.</th>
-              <th className="px-2 py-2.5 text-center">Stint</th>
-              <th className="px-2 py-2.5 text-center w-8"></th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left w-8 sm:w-12">Pos</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-8 sm:w-12">Est</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left w-8 sm:w-12">Kart</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">Equipo</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Media</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Best</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Ult.</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Mejor</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Gap</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Int.</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">Vlt</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">Pit</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-8 sm:w-12">Tier</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">Stint</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-6 sm:w-8"></th>
             </tr>
           </thead>
           <tbody>
@@ -105,12 +105,12 @@ export function RaceTable() {
                     kart.pitStatus === "in_pit" && "opacity-50"
                   )}
                 >
-                  <td className="px-2 py-1.5 font-bold text-white">{kart.position}</td>
-                  <td className="px-2 py-1.5 text-center font-mono text-neutral-400">
+                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 font-bold text-white">{kart.position}</td>
+                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center font-mono text-neutral-400">
                     {estPos || "-"}
                   </td>
-                  <td className="px-2 py-1.5 font-mono text-neutral-300">{kart.kartNumber}</td>
-                  <td className="px-2 py-1.5 font-medium truncate max-w-[180px] text-white">
+                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 font-mono text-neutral-300">{kart.kartNumber}</td>
+                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 font-medium truncate max-w-[100px] sm:max-w-[180px] text-white">
                     {kart.teamName}
                   </td>
                   <td className="px-2 py-1.5 text-right font-mono text-neutral-300">

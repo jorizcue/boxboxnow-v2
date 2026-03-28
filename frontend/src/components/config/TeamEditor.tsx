@@ -245,31 +245,31 @@ export function TeamEditor() {
 
   return (
     <div className="bg-surface rounded-xl p-4 border border-border">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
         <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">
           Equipos y Pilotos
-          <span className="text-neutral-700 ml-2 normal-case tracking-normal">
+          <span className="text-neutral-700 ml-2 normal-case tracking-normal hidden sm:inline">
             (arrastra para reordenar)
           </span>
         </h3>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={importFromLiveTiming}
             disabled={importing}
-            className="bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-40 text-xs font-medium px-3 py-1.5 rounded-lg border border-accent/20 transition-colors"
+            className="bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-40 text-xs font-medium px-3 py-2 rounded-lg border border-accent/20 transition-colors"
           >
-            {importing ? "Importando..." : "Cargar del LiveTiming"}
+            {importing ? "Importando..." : "Cargar Live"}
           </button>
           <button
             onClick={addTeam}
-            className="bg-black text-neutral-400 hover:text-white text-xs px-3 py-1.5 rounded-lg border border-border transition-colors"
+            className="bg-black text-neutral-400 hover:text-white text-xs px-3 py-2 rounded-lg border border-border transition-colors"
           >
             + Equipo
           </button>
           <button
             onClick={saveTeams}
             disabled={saving}
-            className="bg-accent hover:bg-accent-hover disabled:opacity-40 text-black text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors"
+            className="bg-accent hover:bg-accent-hover disabled:opacity-40 text-black text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
           >
             {saving ? "Guardando..." : "Guardar"}
           </button>
@@ -366,12 +366,12 @@ function SortableTeamRow({
       className="border border-border rounded-lg overflow-hidden"
     >
       {/* Team header */}
-      <div className="flex items-center gap-2 px-2 py-2 hover:bg-black/50 transition-colors">
+      <div className="flex items-center gap-1.5 sm:gap-2 px-2 py-2 hover:bg-black/50 transition-colors">
         {/* Drag handle */}
         <button
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing text-neutral-700 hover:text-neutral-400 px-1 touch-none"
+          className="cursor-grab active:cursor-grabbing text-neutral-700 hover:text-neutral-400 px-0.5 sm:px-1 touch-none shrink-0"
           title="Arrastrar para reordenar"
         >
           <svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor">
@@ -384,7 +384,7 @@ function SortableTeamRow({
           </svg>
         </button>
 
-        <span className="text-neutral-400 w-7 text-center text-xs font-mono">
+        <span className="text-neutral-400 w-5 sm:w-7 text-center text-xs font-mono shrink-0">
           {team.position}
         </span>
 
@@ -394,11 +394,11 @@ function SortableTeamRow({
           onChange={(e) =>
             onUpdate(team.id, "kart", Number(e.target.value))
           }
-          className="w-14 bg-black border border-border rounded-md px-2 py-1 text-sm text-center"
-          placeholder="Kart"
+          className="w-12 sm:w-14 bg-black border border-border rounded-md px-1.5 sm:px-2 py-1 text-sm text-center shrink-0"
+          placeholder="K"
         />
 
-        <div className="flex-1 cursor-pointer" onClick={onToggle}>
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={onToggle}>
           <input
             value={team.team_name}
             onChange={(e) =>
@@ -406,28 +406,31 @@ function SortableTeamRow({
             }
             onClick={(e) => e.stopPropagation()}
             className="w-full bg-black border border-border rounded-md px-2 py-1 text-sm"
-            placeholder="Nombre equipo"
+            placeholder="Equipo"
           />
         </div>
 
         <span
-          className="text-[11px] text-neutral-400 w-20 text-center cursor-pointer"
+          className="text-[10px] sm:text-[11px] text-neutral-400 shrink-0 cursor-pointer"
           onClick={onToggle}
         >
-          {team.drivers.length === 0
-            ? "sin pilotos"
-            : `${team.drivers.length} piloto(s)`}
+          <span className="hidden sm:inline">
+            {team.drivers.length === 0
+              ? "sin pilotos"
+              : `${team.drivers.length} piloto(s)`}
+          </span>
+          <span className="sm:hidden">{team.drivers.length}p</span>
         </span>
 
         {team.drivers.some((d) => d.differential_ms !== 0) && (
-          <span className="text-[10px] text-accent font-medium px-1.5 py-0.5 rounded bg-accent/10">
+          <span className="text-[10px] text-accent font-medium px-1 py-0.5 rounded bg-accent/10 shrink-0 hidden sm:inline">
             DIFF
           </span>
         )}
 
         <button
           onClick={() => onRemove(team.id)}
-          className="text-neutral-700 hover:text-red-400 text-xs px-2 transition-colors"
+          className="text-neutral-700 hover:text-red-400 text-xs px-1.5 sm:px-2 transition-colors shrink-0"
         >
           X
         </button>
@@ -455,9 +458,9 @@ function SortableTeamRow({
               manualmente.
             </p>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-2">
               {team.drivers.map((driver, driverIdx) => (
-                <div key={driverIdx} className="flex items-center gap-2">
+                <div key={driverIdx} className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-2">
                   <input
                     value={driver.driver_name}
                     onChange={(e) =>
@@ -468,8 +471,8 @@ function SortableTeamRow({
                         e.target.value
                       )
                     }
-                    className="flex-1 bg-surface border border-border rounded-md px-2 py-1 text-sm"
-                    placeholder="Nombre del piloto"
+                    className="flex-1 min-w-[120px] bg-surface border border-border rounded-md px-2 py-1.5 text-sm"
+                    placeholder="Piloto"
                   />
                   <div className="flex items-center gap-1">
                     <input
@@ -484,15 +487,13 @@ function SortableTeamRow({
                           Number(e.target.value)
                         )
                       }
-                      className="w-24 bg-surface border border-border rounded-md px-2 py-1 text-sm text-right font-mono"
+                      className="w-20 sm:w-24 bg-surface border border-border rounded-md px-2 py-1.5 text-sm text-right font-mono"
                       placeholder="0"
                     />
-                    <span className="text-[11px] text-neutral-400 w-6">
-                      ms
-                    </span>
+                    <span className="text-[10px] text-neutral-400">ms</span>
                   </div>
                   <span
-                    className={`text-xs w-14 text-center font-mono ${
+                    className={`text-xs w-12 sm:w-14 text-center font-mono ${
                       driver.differential_ms > 0
                         ? "text-tier-1"
                         : driver.differential_ms < 0
@@ -504,7 +505,7 @@ function SortableTeamRow({
                   </span>
                   <button
                     onClick={() => onRemoveDriver(team.id, driverIdx)}
-                    className="text-neutral-700 hover:text-red-400 text-xs px-1 transition-colors"
+                    className="text-neutral-700 hover:text-red-400 text-sm px-1.5 py-1 transition-colors"
                   >
                     X
                   </button>

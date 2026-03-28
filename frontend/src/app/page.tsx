@@ -59,7 +59,7 @@ function Dashboard({
         onTabChange={setActiveTab}
         isAdmin={user?.is_admin ?? false}
       />
-      <main className="flex-1 overflow-auto p-3">
+      <main className="flex-1 overflow-auto p-2 sm:p-3">
         {activeTab === "race" && <RaceTable />}
         {activeTab === "pit" && <FifoQueue />}
         {activeTab === "classification" && <ClassificationTable />}

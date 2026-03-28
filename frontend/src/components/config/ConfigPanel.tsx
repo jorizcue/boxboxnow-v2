@@ -198,7 +198,7 @@ function RaceSessionEditor() {
         </div>
 
         {/* Two column grid for params */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Duracion (min)" value={durationMin} onChange={setDurationMin} />
           <Field label="Nuestro kart" value={ourKart} onChange={setOurKart} />
           <Field label="Stint min (min)" value={minStint} onChange={setMinStint} />

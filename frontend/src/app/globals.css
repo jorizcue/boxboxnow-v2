@@ -90,3 +90,12 @@ input:focus, select:focus, textarea:focus {
 button {
   transition: all 0.15s ease;
 }
+
+/* Hide scrollbar but allow scroll */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

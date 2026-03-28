@@ -66,35 +66,35 @@ export function FifoQueue() {
   return (
     <div className="space-y-4">
       {/* Visual FIFO queue grid */}
-      <div className="bg-surface rounded-xl p-6 border border-border">
-        <div className="space-y-4">
+      <div className="bg-surface rounded-xl p-3 sm:p-6 border border-border">
+        <div className="space-y-3 sm:space-y-4">
           {rows.map((row, rowIdx) => (
-            <div key={rowIdx} className="flex items-center gap-3">
+            <div key={rowIdx} className="flex items-center gap-2 sm:gap-3">
               {/* Checkered flag */}
-              <div className="flex-shrink-0 w-10 text-center text-2xl">🏁</div>
+              <div className="flex-shrink-0 w-7 sm:w-10 text-center text-lg sm:text-2xl">🏁</div>
 
               {/* Cards in this row */}
-              <div className="flex gap-3 flex-1">
+              <div className="flex gap-1.5 sm:gap-3 flex-1 overflow-x-auto">
                 {row.map((score, colIdx) => (
                   <div
                     key={colIdx}
-                    className="flex-1 min-w-[100px] max-w-[160px] rounded-lg border-2 border-neutral-600 bg-neutral-800/50 flex flex-col items-center justify-center py-3 px-2"
+                    className="flex-1 min-w-[56px] sm:min-w-[100px] max-w-[160px] rounded-lg border-2 border-neutral-600 bg-neutral-800/50 flex flex-col items-center justify-center py-2 sm:py-3 px-1 sm:px-2"
                   >
                     <span
-                      className="text-3xl font-bold"
+                      className="text-xl sm:text-3xl font-bold"
                       style={{ color: tierHex(score) }}
                     >
                       {score}
                     </span>
-                    <span className="text-xs text-neutral-400 mt-0.5">Box</span>
+                    <span className="text-[10px] sm:text-xs text-neutral-400 mt-0.5">Box</span>
                   </div>
                 ))}
               </div>
 
               {/* Fila label */}
-              <div className="flex-shrink-0 flex items-center gap-1.5">
-                <span className="text-sm text-red-400 font-bold">Fila {rowIdx + 1}</span>
-                <span className="text-red-400 text-lg">⬅</span>
+              <div className="flex-shrink-0 flex items-center gap-1">
+                <span className="text-xs sm:text-sm text-red-400 font-bold">F{rowIdx + 1}</span>
+                <span className="text-red-400 text-sm sm:text-lg">⬅</span>
               </div>
             </div>
           ))}
@@ -102,10 +102,10 @@ export function FifoQueue() {
       </div>
 
       {/* Score */}
-      <div className="bg-surface rounded-xl p-4 border border-border flex items-center justify-center gap-3">
-        <span className={`w-3 h-3 rounded-full ${scoreDotColor}`} />
-        <span className={`text-xl font-bold ${scoreColor}`}>
-          Box (Score = {fifo.score.toFixed(1)})
+      <div className="bg-surface rounded-xl p-3 sm:p-4 border border-border flex items-center justify-center gap-2 sm:gap-3">
+        <span className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${scoreDotColor}`} />
+        <span className={`text-base sm:text-xl font-bold ${scoreColor}`}>
+          Score = {fifo.score.toFixed(1)}
         </span>
       </div>
 

@@ -71,7 +71,7 @@ export function LoginPage() {
   if (deviceLimit) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
-        <div className="bg-surface rounded-2xl p-8 w-full max-w-lg border border-border">
+        <div className="bg-surface rounded-2xl p-5 sm:p-8 w-full max-w-lg border border-border">
           <div className="text-center mb-6">
             <h1 className="text-xl font-bold text-white">LIMITE DE DISPOSITIVOS</h1>
             <p className="text-neutral-400 text-sm mt-2">{deviceLimit.message}</p>
@@ -97,7 +97,7 @@ export function LoginPage() {
                 </div>
                 <button
                   onClick={() => killSession(session.id)}
-                  className="ml-3 bg-red-900/50 hover:bg-red-800 text-red-300 text-xs font-medium px-3 py-1.5 rounded"
+                  className="ml-3 bg-red-900/50 hover:bg-red-800 text-red-300 text-xs font-medium px-3 py-2 rounded min-h-[44px]"
                 >
                   Cerrar
                 </button>
@@ -118,10 +118,10 @@ export function LoginPage() {
 
   // Login screen
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
+    <div className="min-h-screen bg-black flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         {/* Brand header */}
-        <div className="text-center mb-10">
+        <div className="text-center mb-8 sm:mb-10">
           <div className="inline-flex items-center gap-2 mb-2">
             <span className="text-4xl font-bold text-accent">K</span>
           </div>
@@ -131,7 +131,7 @@ export function LoginPage() {
           <p className="text-neutral-400 text-xs tracking-widest mt-1 uppercase">Race Strategy</p>
         </div>
 
-        <div className="bg-surface rounded-2xl p-8 border border-border">
+        <div className="bg-surface rounded-2xl p-5 sm:p-8 border border-border">
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">Usuario</label>
