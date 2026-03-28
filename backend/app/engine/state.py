@@ -36,6 +36,7 @@ class KartState:
     visual_status: str = ""
     arrow_status: str = ""
     stint_start_time: float = 0.0
+    stint_elapsed_ms: int = 0    # Accumulated lap time in current stint (works for replay too)
     last_pit_lap: int = 1       # lastPitLap - lap number when last pit occurred
 
     # Lap storage (replaces stage_laps_rt and stage_laps_clasif)
@@ -52,13 +53,12 @@ class KartState:
     driver_differential_ms: int = 0
 
     def stint_duration_s(self) -> float:
-        if self.stint_start_time <= 0:
-            return 0.0
-        return time.time() - self.stint_start_time
+        """Stint duration in seconds, based on accumulated lap times."""
+        return self.stint_elapsed_ms / 1000.0
 
     def stint_lap_count(self) -> int:
-        """Number of valid laps in current stint."""
-        return sum(1 for lap in self.valid_laps if lap.get("pitNumber") == self.pit_count)
+        """Number of laps in current stint (all laps, not just valid)."""
+        return sum(1 for lap in self.all_laps if lap.get("pitNumber") == self.pit_count)
 
     def to_dict(self) -> dict:
         return {
@@ -80,7 +80,8 @@ class KartState:
             "arrowStatus": self.arrow_status,
             "stintLapsCount": self.stint_lap_count(),
             "stintDurationS": self.stint_duration_s(),
-            "stintStartTime": self.stint_start_time,  # epoch seconds for client-side countdown
+            "stintStartTime": self.stint_start_time,  # kept for backwards compat
+            "stintElapsedMs": self.stint_elapsed_ms,
             "tierScore": self.tier_score,
             "driverDifferentialMs": self.driver_differential_ms,
             "avgLapMs": self.avg_lap_ms,
@@ -198,10 +199,11 @@ class RaceStateManager:
         if not kart and row_id:
             return None
 
-        if event.type in (EventType.LAP, EventType.LAP_MS):
-            lap_ms = time_to_ms(event.value) if event.type == EventType.LAP else int(event.value)
+        if event.type == EventType.LAP:
+            # Lap counting from cell update (exact port of original websocket_Secuencial.py)
+            # Only cell updates on the llp column count as new laps.
+            lap_ms = time_to_ms(event.value)
             if lap_ms > 0 and kart:
-                # Port of websocket_Secuencial.py live update lap handling
                 kart.total_laps += 1
                 now_str = datetime.now().isoformat()
                 lap_record = {
@@ -234,10 +236,20 @@ class RaceStateManager:
                 if kart.best_lap_ms <= 0 or lap_ms < kart.best_lap_ms:
                     kart.best_lap_ms = lap_ms
 
+                # Accumulate stint elapsed time (works for both live and replay)
+                kart.stint_elapsed_ms += lap_ms
+
                 return {"event": "lap", "rowId": row_id,
                         "kartNumber": kart.kart_number,
                         "lapTimeMs": lap_ms,
                         "lapClass": event.extra.get("class", "tn")}
+
+        elif event.type == EventType.LAP_MS:
+            # The r{id}|*|{ms}| pattern is NOT a lap event.
+            # It carries a timing metric (not always the actual lap time).
+            # The original code did not process this for lap counting.
+            # We ignore it — laps are counted exclusively from cell updates.
+            return None
 
         elif event.type == EventType.BEST_LAP:
             lap_ms = time_to_ms(event.value)
@@ -260,6 +272,7 @@ class RaceStateManager:
             # Port of websocket_Secuencial.py PIT OUT handling
             kart.pit_status = "racing"
             kart.stint_start_time = time.time()
+            kart.stint_elapsed_ms = 0  # Reset stint timer on pit out
             return {"event": "pitOut", "rowId": row_id,
                     "kartNumber": kart.kart_number,
                     "pitCount": kart.pit_count}

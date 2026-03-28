@@ -1,19 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { msToLapTime, secondsToStint, secondsToHMS, tierHex, formatDifferential } from "@/lib/formatters";
 import clsx from "clsx";
 
 export function RaceTable() {
   const { karts, config, classification } = useRaceStore();
-  const [now, setNow] = useState(() => Date.now() / 1000);
-
-  // Tick every second for real-time stint timer
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now() / 1000), 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const sorted = [...karts].sort((a, b) => (a.position || 999) - (b.position || 999));
 
@@ -29,10 +22,8 @@ export function RaceTable() {
     ? sorted.find((k) => k.kartNumber === config.ourKartNumber)
     : undefined;
 
-  // Compute stint duration for our kart
-  const ourStintSec = ourKart
-    ? (ourKart.stintStartTime > 0 ? Math.max(0, now - ourKart.stintStartTime) : ourKart.stintDurationS)
-    : 0;
+  // Compute stint duration for our kart (lap-based, works for live and replay)
+  const ourStintSec = ourKart ? ourKart.stintDurationS : 0;
 
   // Time until max stint
   const timeToMaxStint = Math.max(0, config.maxStintMin * 60 - ourStintSec);
@@ -44,8 +35,7 @@ export function RaceTable() {
 
   // Count karts near PIT (within 5 min of max stint)
   const kartsNearPit = sorted.filter((k) => {
-    const stintSec = k.stintStartTime > 0 ? Math.max(0, now - k.stintStartTime) : k.stintDurationS;
-    const stintMin = stintSec / 60;
+    const stintMin = k.stintDurationS / 60;
     return stintMin >= config.maxStintMin - 5 && k.pitStatus !== "in_pit";
   }).length;
 
@@ -71,8 +61,8 @@ export function RaceTable() {
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-8 sm:w-12">Est</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left w-8 sm:w-12">Kart</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">Equipo</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Media</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Best</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right" title="Media últimas 20 vueltas">Med.20</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right" title="Media 3 mejores vueltas">Mej.3</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Ult.</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Mejor</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Gap</th>
@@ -87,9 +77,7 @@ export function RaceTable() {
           <tbody>
             {sorted.map((kart) => {
               const isOurTeam = config.ourKartNumber > 0 && kart.kartNumber === config.ourKartNumber;
-              const stintSec = kart.stintStartTime > 0
-                ? Math.max(0, now - kart.stintStartTime)
-                : kart.stintDurationS;
+              const stintSec = kart.stintDurationS;
               const stintMin = stintSec / 60;
               const stintWarning = stintMin >= config.maxStintMin;
               const stintAlert = stintMin >= config.maxStintMin - 5 && stintMin < config.maxStintMin;

@@ -136,6 +136,7 @@ export const useRaceStore = create<RaceStore>((set) => ({
             kart.pitStatus = "racing";
             if (typeof ev.pitCount === "number") kart.pitCount = ev.pitCount;
             kart.stintDurationS = 0;
+            kart.stintElapsedMs = 0;
             kart.stintLapsCount = 0;
             break;
           case "gap":
