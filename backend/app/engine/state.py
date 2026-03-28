@@ -121,6 +121,19 @@ class RaceStateManager:
         self.box_karts: int = 30
         self.duration_min: int = 180
 
+    def reset(self):
+        """Reset all race state (used when starting/stopping replay)."""
+        self.karts.clear()
+        self.race_started = False
+        self.countdown_ms = 0
+        self.track_name = ""
+        self.start_time = 0.0
+        self._event_buffer.clear()
+        self.fifo_queue.clear()
+        self.fifo_score = 0.0
+        self.fifo_history.clear()
+        self.classification.clear()
+
     def add_client(self, ws):
         self._ws_clients.add(ws)
         logger.info(f"Client connected. Total: {len(self._ws_clients)}")

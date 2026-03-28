@@ -412,12 +412,14 @@ function ApexConnection() {
 
 function ReplayControls() {
   const [logs, setLogs] = useState<string[]>([]);
-  const [replayStatus, setReplayStatus] = useState<any>(null);
   // Use module-level vars to survive tab changes
   const [selectedLog, setSelectedLogState] = useState(_replaySelectedLog);
   const [speed, setSpeedState] = useState(_replaySpeed);
   const [loading, setLoading] = useState(false);
-  const { apexConnected, setApexStatus, requestWsReconnect } = useRaceStore();
+  const {
+    apexConnected, setApexStatus, requestWsReconnect,
+    replayActive, replayPaused, replayFilename, replayProgress, setReplayStatus,
+  } = useRaceStore();
 
   const setSelectedLog = (v: string) => {
     _replaySelectedLog = v;
@@ -428,10 +430,25 @@ function ReplayControls() {
     setSpeedState(v);
   };
 
+  // Sync replay status from backend on mount and poll while active
+  const syncStatus = async () => {
+    try {
+      const st = await api.getReplayStatus();
+      setReplayStatus(st.active, st.paused, st.filename || "", st.progress || 0);
+    } catch {}
+  };
+
   useEffect(() => {
     api.getReplayLogs().then((data) => setLogs(data.logs)).catch(() => {});
-    api.getReplayStatus().then(setReplayStatus).catch(() => {});
+    syncStatus();
   }, []);
+
+  // Poll status while replay is active
+  useEffect(() => {
+    if (!replayActive) return;
+    const interval = setInterval(syncStatus, 2000);
+    return () => clearInterval(interval);
+  }, [replayActive]);
 
   return (
     <div className="bg-surface rounded-xl p-6 border border-border">
@@ -447,7 +464,8 @@ function ReplayControls() {
         <select
           value={selectedLog}
           onChange={(e) => setSelectedLog(e.target.value)}
-          className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm"
+          disabled={replayActive}
+          className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
         >
           <option value="">Seleccionar log...</option>
           {logs.map((log) => (
@@ -464,13 +482,14 @@ function ReplayControls() {
             onChange={(e) => {
               const v = Number(e.target.value);
               setSpeed(v);
-              if (replayStatus?.active) api.setReplaySpeed(v);
+              if (replayActive) api.setReplaySpeed(v);
             }}
             className="w-full accent-accent"
           />
         </div>
 
         <div className="flex gap-2">
+          {/* Iniciar: disabled when replay already active, no log selected, or loading */}
           <button
             onClick={async () => {
               if (!selectedLog) return;
@@ -485,47 +504,50 @@ function ReplayControls() {
                   await new Promise((r) => setTimeout(r, 500));
                 }
                 await api.startReplay(selectedLog, speed);
-                setReplayStatus(await api.getReplayStatus());
+                await syncStatus();
               } catch (e: any) {
                 alert("Error: " + e.message);
               }
               setLoading(false);
             }}
-            disabled={!selectedLog || loading}
+            disabled={!selectedLog || loading || replayActive}
             className="flex-1 bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-2 rounded-lg text-sm"
           >
             {loading ? "..." : "Iniciar"}
           </button>
+          {/* Pausar/Reanudar: only when replay is active */}
           <button
             onClick={async () => {
-              setReplayStatus(await api.pauseReplay());
+              await api.pauseReplay();
+              await syncStatus();
             }}
-            disabled={!replayStatus?.active}
+            disabled={!replayActive}
             className="flex-1 bg-black hover:bg-surface disabled:opacity-40 text-neutral-300 py-2 rounded-lg border border-border text-sm"
           >
-            {replayStatus?.paused ? "Reanudar" : "Pausar"}
+            {replayPaused ? "Reanudar" : "Pausar"}
           </button>
+          {/* Parar: only when replay is active */}
           <button
             onClick={async () => {
               await api.stopReplay();
-              setReplayStatus(await api.getReplayStatus());
+              await syncStatus();
             }}
-            disabled={!replayStatus?.active}
+            disabled={!replayActive}
             className="flex-1 bg-red-900/50 hover:bg-red-800 disabled:opacity-40 text-red-300 py-2 rounded-lg text-sm"
           >
             Parar
           </button>
         </div>
 
-        {replayStatus?.active && (
+        {replayActive && (
           <div>
             <div className="flex justify-between text-[10px] text-neutral-200 mb-1">
-              <span>{replayStatus.filename}</span>
-              <span>{(replayStatus.progress * 100).toFixed(1)}%</span>
+              <span>{replayFilename}</span>
+              <span>{(replayProgress * 100).toFixed(1)}%</span>
             </div>
             <div className="w-full bg-black rounded-full h-1.5">
-              <div className="bg-accent rounded-full h-1.5 transition-all"
-                style={{ width: `${replayStatus.progress * 100}%` }} />
+              <div className="bg-orange-400 rounded-full h-1.5 transition-all"
+                style={{ width: `${replayProgress * 100}%` }} />
             </div>
           </div>
         )}

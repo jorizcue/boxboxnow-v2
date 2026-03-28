@@ -129,6 +129,7 @@ async def lifespan(app: FastAPI):
     app.state.registry = registry
     app.state.replay_engine = replay_engine
     app.state.replay_state = replay_state
+    app.state.replay_fifo = replay_fifo
 
     logger.info("BoxboxNow v2 started (multi-tenant)")
 

@@ -19,11 +19,18 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   const [showSessions, setShowSessions] = useState(false);
   const apexConnected = useRaceStore((s) => s.apexConnected);
   const apexStatusMsg = useRaceStore((s) => s.apexStatusMsg);
+  const replayActive = useRaceStore((s) => s.replayActive);
+  const replayPaused = useRaceStore((s) => s.replayPaused);
+  const replayFilename = useRaceStore((s) => s.replayFilename);
+  const replayProgress = useRaceStore((s) => s.replayProgress);
 
   const handleLogout = async () => {
     try { await api.logout(); } catch {}
     logout();
   };
+
+  // Format the timer display
+  const timerDisplay = countdownMs !== 0 ? msToCountdown(countdownMs) : "00:00:00";
 
   return (
     <>
@@ -54,13 +61,24 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
                 </span>
               </div>
             )}
+            {replayActive && (
+              <div className="flex items-center gap-1 border-l border-border pl-2 min-w-0">
+                <div className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse shrink-0" />
+                <span className="text-[10px] sm:text-[11px] text-orange-400 font-medium truncate">
+                  {replayPaused ? "Replay (pausa)" : "Replay"}
+                </span>
+                <span className="text-[10px] text-neutral-500 hidden sm:inline">
+                  {(replayProgress * 100).toFixed(0)}%
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Center: countdown (hidden on very small, visible on sm+) */}
           <div className="hidden sm:flex items-center gap-2">
             <span className="text-[11px] text-neutral-400 uppercase tracking-wider">Carrera</span>
             <span className="text-base font-bold tabular-nums text-white">
-              {countdownMs !== 0 ? msToCountdown(countdownMs) : "--:--:--"}
+              {timerDisplay}
             </span>
           </div>
 
@@ -92,7 +110,7 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
             {trackName || "Sin circuito"}
           </span>
           <span className="text-sm font-bold tabular-nums text-white shrink-0">
-            {countdownMs !== 0 ? msToCountdown(countdownMs) : "--:--:--"}
+            {timerDisplay}
           </span>
         </div>
 

@@ -25,6 +25,13 @@ interface RaceStore {
   apexStatusMsg: string;
   setApexStatus: (connected: boolean, msg: string) => void;
 
+  // Replay status (persists across tab changes)
+  replayActive: boolean;
+  replayPaused: boolean;
+  replayFilename: string;
+  replayProgress: number;
+  setReplayStatus: (active: boolean, paused?: boolean, filename?: string, progress?: number) => void;
+
   // WS reconnect trigger - increment to force WS to close and reconnect
   wsReconnectTrigger: number;
   requestWsReconnect: () => void;
@@ -61,6 +68,13 @@ export const useRaceStore = create<RaceStore>((set) => ({
   apexConnected: false,
   apexStatusMsg: "",
   setApexStatus: (connected, msg) => set({ apexConnected: connected, apexStatusMsg: msg }),
+
+  replayActive: false,
+  replayPaused: false,
+  replayFilename: "",
+  replayProgress: 0,
+  setReplayStatus: (active, paused = false, filename = "", progress = 0) =>
+    set({ replayActive: active, replayPaused: paused, replayFilename: filename, replayProgress: progress }),
 
   wsReconnectTrigger: 0,
   requestWsReconnect: () => set((s) => ({ wsReconnectTrigger: s.wsReconnectTrigger + 1 })),
