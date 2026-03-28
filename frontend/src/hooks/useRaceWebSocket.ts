@@ -15,12 +15,13 @@ export function useRaceWebSocket() {
   const { token } = useAuth();
   const { setConnected, applySnapshot, applyUpdates, applyAnalytics } =
     useRaceStore();
+  const wsReconnectTrigger = useRaceStore((s) => s.wsReconnectTrigger);
 
+  // Main WS connection effect
   useEffect(() => {
     if (!token) return;
 
     function connect() {
-      // Pass JWT as query parameter for WS auth
       const ws = new WebSocket(`${WS_BASE}?token=${token}`);
       wsRef.current = ws;
 
@@ -74,7 +75,8 @@ export function useRaceWebSocket() {
         wsRef.current.close();
       }
     };
-  }, [token, setConnected, applySnapshot, applyUpdates, applyAnalytics]);
+    // wsReconnectTrigger in deps => entire effect re-runs (close old WS, open new)
+  }, [token, wsReconnectTrigger, setConnected, applySnapshot, applyUpdates, applyAnalytics]);
 
   return wsRef;
 }

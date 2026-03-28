@@ -17,6 +17,7 @@ export interface KartState {
   arrowStatus: string;
   stintLapsCount: number;
   stintDurationS: number;
+  stintStartTime: number;  // epoch seconds
   tierScore: number;
   avgLapMs: number;
   bestAvgMs: number;

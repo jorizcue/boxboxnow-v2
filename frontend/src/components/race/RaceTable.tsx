@@ -1,11 +1,19 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { msToLapTime, secondsToStint, tierHex, formatDifferential } from "@/lib/formatters";
 import clsx from "clsx";
 
 export function RaceTable() {
   const { karts, config } = useRaceStore();
+  const [now, setNow] = useState(() => Date.now() / 1000);
+
+  // Tick every second for real-time stint timer
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now() / 1000), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const sorted = [...karts].sort((a, b) => (a.position || 999) - (b.position || 999));
 
@@ -44,7 +52,12 @@ export function RaceTable() {
         <tbody>
           {sorted.map((kart) => {
             const isOurTeam = config.ourKartNumber > 0 && kart.kartNumber === config.ourKartNumber;
-            const stintMin = kart.stintDurationS / 60;
+
+            // Compute stint duration in real-time from epoch start time
+            const stintSec = kart.stintStartTime > 0
+              ? Math.max(0, now - kart.stintStartTime)
+              : kart.stintDurationS;
+            const stintMin = stintSec / 60;
             const stintWarning = stintMin >= config.maxStintMin;
             const stintAlert = stintMin >= config.maxStintMin - 5 && stintMin < config.maxStintMin;
             const pitsRemaining = Math.max(0, config.minPits - kart.pitCount);
@@ -111,7 +124,7 @@ export function RaceTable() {
                       stintAlert && "text-tier-25"
                     )}
                   >
-                    {secondsToStint(kart.stintDurationS)}
+                    {secondsToStint(stintSec)}
                   </span>
                   <span className="text-xs text-neutral-700 ml-0.5">
                     ({kart.stintLapsCount}v)

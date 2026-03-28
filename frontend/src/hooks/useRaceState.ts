@@ -25,6 +25,10 @@ interface RaceStore {
   apexStatusMsg: string;
   setApexStatus: (connected: boolean, msg: string) => void;
 
+  // WS reconnect trigger - increment to force WS to close and reconnect
+  wsReconnectTrigger: number;
+  requestWsReconnect: () => void;
+
   setConnected: (v: boolean) => void;
   applySnapshot: (snapshot: RaceSnapshot) => void;
   applyUpdates: (events: WsUpdateEvent[]) => void;
@@ -55,6 +59,9 @@ export const useRaceStore = create<RaceStore>((set) => ({
   apexConnected: false,
   apexStatusMsg: "",
   setApexStatus: (connected, msg) => set({ apexConnected: connected, apexStatusMsg: msg }),
+
+  wsReconnectTrigger: 0,
+  requestWsReconnect: () => set((s) => ({ wsReconnectTrigger: s.wsReconnectTrigger + 1 })),
 
   setConnected: (v) => set({ connected: v }),
 

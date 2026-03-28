@@ -80,6 +80,7 @@ class KartState:
             "arrowStatus": self.arrow_status,
             "stintLapsCount": self.stint_lap_count(),
             "stintDurationS": self.stint_duration_s(),
+            "stintStartTime": self.stint_start_time,  # epoch seconds for client-side countdown
             "tierScore": self.tier_score,
             "driverDifferentialMs": self.driver_differential_ms,
             "avgLapMs": self.avg_lap_ms,

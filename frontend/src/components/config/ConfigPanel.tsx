@@ -261,7 +261,7 @@ function Field({
 // --- Apex Connection ---
 
 function ApexConnection() {
-  const { apexConnected, apexStatusMsg, setApexStatus } = useRaceStore();
+  const { apexConnected, apexStatusMsg, setApexStatus, requestWsReconnect } = useRaceStore();
 
   // On mount, fetch real connection status from backend
   useEffect(() => {
@@ -298,6 +298,8 @@ function ApexConnection() {
               setApexStatus(false, "Conectando...");
               const res = await api.connectApex();
               setApexStatus(true, `Conectado a ${res.circuit} (${res.teamsLoaded} equipos)`);
+              // Force WS to reconnect so it binds to the user's new session state
+              requestWsReconnect();
             } catch (e: any) {
               setApexStatus(false, "Error: " + e.message);
             }
@@ -312,6 +314,8 @@ function ApexConnection() {
             try {
               await api.disconnectApex();
               setApexStatus(false, "Desconectado");
+              // Force WS to reconnect so it falls back to replay_state
+              requestWsReconnect();
             } catch {}
           }}
           disabled={!apexConnected}
@@ -333,7 +337,7 @@ function ReplayControls() {
   const [selectedLog, setSelectedLogState] = useState(_replaySelectedLog);
   const [speed, setSpeedState] = useState(_replaySpeed);
   const [loading, setLoading] = useState(false);
-  const { apexConnected } = useRaceStore();
+  const { apexConnected, setApexStatus, requestWsReconnect } = useRaceStore();
 
   const setSelectedLog = (v: string) => {
     _replaySelectedLog = v;
@@ -392,6 +396,14 @@ function ReplayControls() {
               if (!selectedLog) return;
               setLoading(true);
               try {
+                // Disconnect Apex if connected, so WS falls back to replay_state
+                if (apexConnected) {
+                  await api.disconnectApex();
+                  setApexStatus(false, "Desconectado (replay)");
+                  requestWsReconnect();
+                  // Small delay so WS reconnects before replay starts
+                  await new Promise((r) => setTimeout(r, 500));
+                }
                 await api.startReplay(selectedLog, speed);
                 setReplayStatus(await api.getReplayStatus());
               } catch (e: any) {
@@ -399,7 +411,7 @@ function ReplayControls() {
               }
               setLoading(false);
             }}
-            disabled={!selectedLog || loading || apexConnected}
+            disabled={!selectedLog || loading}
             className="flex-1 bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-2 rounded-lg text-sm"
           >
             {loading ? "..." : "Iniciar"}
