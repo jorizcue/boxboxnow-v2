@@ -25,9 +25,15 @@ export function RaceTable() {
   }, [classification]);
 
   // Helper: compute stint seconds from race clock
+  // stintStartCountdownMs = race clock value when stint started (set on init/pit_out)
+  // stint = how much the race clock has moved since then
+  const durationMs = useRaceStore((s) => s.durationMs);
   const stintSecondsFor = (kart: typeof karts[0]) => {
-    if (kart.stintStartCountdownMs === 0 && raceClockMs === 0) return 0;
-    return Math.abs(raceClockMs - kart.stintStartCountdownMs) / 1000;
+    if (raceClockMs === 0) return 0;
+    // If stintStart is 0, backend hasn't set it yet - use durationMs as fallback
+    // (assumes stint started at race start: countdown was ~durationMs at that point)
+    const stintStart = kart.stintStartCountdownMs || durationMs || raceClockMs;
+    return Math.max(0, stintStart - raceClockMs) / 1000;
   };
 
   // Find our kart

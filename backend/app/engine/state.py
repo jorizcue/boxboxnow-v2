@@ -171,6 +171,8 @@ class RaceStateManager:
         self.fifo_score = 0.0
         self.fifo_history.clear()
         self.classification.clear()
+        self._first_countdown_ms = 0
+        self._needs_snapshot = False
 
     def add_client(self, ws):
         self._ws_clients.add(ws)
@@ -192,8 +194,10 @@ class RaceStateManager:
                 had_init_kart = True
 
         if self._ws_clients:
-            if had_init_kart:
-                # After INIT populates karts, send a full snapshot so clients get the kart list
+            if had_init_kart or getattr(self, '_needs_snapshot', False):
+                # Send full snapshot when karts init'd or race just started
+                # (so frontend gets updated stintStartCountdownMs values)
+                self._needs_snapshot = False
                 await self._broadcast(self.get_snapshot())
             elif updates:
                 await self._broadcast({"type": "update", "events": updates})
@@ -405,27 +409,32 @@ class RaceStateManager:
                     "teamName": kart.team_name}
 
         elif event.type == EventType.COUNTDOWN:
-            prev_countdown = self.countdown_ms
             self.countdown_ms = int(event.value)
             if not self.race_started:
                 self.race_started = True
                 self.start_time = time.time()
-                # Back-calculate race start countdown for reconnection:
-                # If karts already exist (reconnect mid-race), set their
-                # stint_start_countdown_ms based on race duration config.
-                # Original: start_time = msg_time - (duration - countdown_ms)
-                race_start_countdown_ms = self.duration_min * 60 * 1000
+                self._first_countdown_ms = self.countdown_ms
+                # Set stint_start for all existing karts.
+                # For fresh start: first countdown IS the race start.
+                # For reconnection: use duration config to back-calculate.
+                has_laps = any(k.total_laps > 0 for k in self.karts.values())
+                if has_laps:
+                    # Reconnection mid-race: use config duration
+                    race_start_ms = self.duration_min * 60 * 1000
+                else:
+                    # Fresh start: first countdown = race start
+                    race_start_ms = self.countdown_ms
                 for kart in self.karts.values():
                     if kart.stint_start_countdown_ms == 0:
                         if kart.pit_count == 0:
-                            # Never pitted: stint started at race start
-                            kart.stint_start_countdown_ms = race_start_countdown_ms
+                            kart.stint_start_countdown_ms = race_start_ms
                         else:
-                            # Has pitted but we don't know when: use current
-                            # (stint will show ~0, corrected on next pit event)
                             kart.stint_start_countdown_ms = self.countdown_ms
                 logger.info(f"Race started. Countdown: {self.countdown_ms}ms, "
-                            f"karts with stint set: {len(self.karts)}")
+                            f"race_start_ms: {race_start_ms}, "
+                            f"karts: {len(self.karts)}, reconnect: {has_laps}")
+                # Flag to trigger snapshot broadcast (so frontend gets updated stints)
+                self._needs_snapshot = True
             return {"event": "countdown", "ms": self.countdown_ms}
 
         elif event.type == EventType.COUNT_UP:
@@ -474,7 +483,7 @@ class RaceStateManager:
                     "boxLines": self.box_lines,
                     "boxKarts": self.box_karts,
                 },
-                "durationMs": self.duration_min * 60 * 1000,
+                "durationMs": getattr(self, '_first_countdown_ms', 0) or self.duration_min * 60 * 1000,
             },
         }
 
