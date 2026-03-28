@@ -263,16 +263,19 @@ function Field({
 function ApexConnection() {
   const { apexConnected, apexStatusMsg, setApexStatus, requestWsReconnect } = useRaceStore();
 
-  // On mount, fetch real connection status from backend
+  // On mount, sync connection status with backend
   useEffect(() => {
     api.getConnectionStatus()
       .then((res) => {
         if (res.apex_connected) {
           setApexStatus(true, `Conectado a ${res.circuit}`);
+        } else if (apexConnected) {
+          // Backend says not connected but we thought we were — sync
+          setApexStatus(false, "");
         }
-        // If not connected, leave existing msg as-is (don't overwrite a connecting/error message)
       })
       .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

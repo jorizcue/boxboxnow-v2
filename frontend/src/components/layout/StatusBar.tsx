@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { msToCountdown } from "@/lib/formatters";
 import { useAuth } from "@/hooks/useAuth";
+import { useRaceStore } from "@/hooks/useRaceState";
 import { api } from "@/lib/api";
 import { SessionManager } from "@/components/auth/SessionManager";
 
@@ -16,6 +17,8 @@ interface StatusBarProps {
 export function StatusBar({ connected, trackName, countdownMs, username }: StatusBarProps) {
   const { logout } = useAuth();
   const [showSessions, setShowSessions] = useState(false);
+  const apexConnected = useRaceStore((s) => s.apexConnected);
+  const apexStatusMsg = useRaceStore((s) => s.apexStatusMsg);
 
   const handleLogout = async () => {
     try { await api.logout(); } catch {}
@@ -40,6 +43,14 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
               {connected ? "Live" : "Offline"}
             </span>
           </div>
+          {apexConnected && (
+            <div className="flex items-center gap-1.5 border-l border-border pl-3">
+              <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+              <span className="text-[11px] text-accent font-medium">
+                {apexStatusMsg || "Apex"}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="text-sm font-medium text-neutral-300 tracking-wide">
