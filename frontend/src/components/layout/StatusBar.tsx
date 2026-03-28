@@ -36,7 +36,7 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
                 connected ? "bg-accent" : "bg-red-500 animate-pulse"
               }`}
             />
-            <span className="text-[11px] text-neutral-500 uppercase tracking-wider">
+            <span className="text-[11px] text-neutral-200 uppercase tracking-wider">
               {connected ? "Live" : "Offline"}
             </span>
           </div>
@@ -48,22 +48,22 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
 
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-neutral-500 uppercase tracking-wider">Carrera</span>
+            <span className="text-[11px] text-neutral-200 uppercase tracking-wider">Carrera</span>
             <span className="text-lg font-bold tabular-nums text-white">
               {countdownMs !== 0 ? msToCountdown(countdownMs) : "--:--:--"}
             </span>
           </div>
           <div className="flex items-center gap-3 border-l border-border pl-4">
-            <span className="text-xs text-neutral-500">{username}</span>
+            <span className="text-xs text-neutral-200">{username}</span>
             <button
               onClick={() => setShowSessions(true)}
-              className="text-[11px] text-neutral-600 hover:text-accent transition-colors uppercase tracking-wider"
+              className="text-[11px] text-neutral-400 hover:text-accent transition-colors uppercase tracking-wider"
             >
               Dispositivos
             </button>
             <button
               onClick={handleLogout}
-              className="text-[11px] text-neutral-600 hover:text-accent transition-colors uppercase tracking-wider"
+              className="text-[11px] text-neutral-400 hover:text-accent transition-colors uppercase tracking-wider"
             >
               Salir
             </button>

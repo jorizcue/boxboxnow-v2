@@ -154,7 +154,7 @@ function RaceSessionEditor() {
   if (loading) {
     return (
       <div className="bg-surface rounded-xl p-6 border border-border">
-        <p className="text-neutral-600 text-sm">Cargando...</p>
+        <p className="text-neutral-400 text-sm">Cargando...</p>
       </div>
     );
   }
@@ -164,7 +164,7 @@ function RaceSessionEditor() {
   return (
     <div className="bg-surface rounded-xl p-6 border border-border">
       <div className="flex items-center justify-between mb-5">
-        <h2 className="text-[11px] text-neutral-500 uppercase tracking-wider">Sesion de Carrera</h2>
+        <h2 className="text-[11px] text-neutral-200 uppercase tracking-wider">Sesion de Carrera</h2>
         {session && (
           <span className="text-[10px] bg-accent/15 text-accent px-2 py-0.5 rounded uppercase tracking-wider font-medium">
             Activa
@@ -175,7 +175,7 @@ function RaceSessionEditor() {
       <div className="space-y-4">
         {/* Circuit selector */}
         <div>
-          <label className="block text-[11px] text-neutral-600 mb-1.5 uppercase tracking-wider">Circuito</label>
+          <label className="block text-[11px] text-neutral-400 mb-1.5 uppercase tracking-wider">Circuito</label>
           <select
             value={circuitId}
             onChange={(e) => handleCircuitChange(Number(e.target.value))}
@@ -189,7 +189,7 @@ function RaceSessionEditor() {
             ))}
           </select>
           {selectedCircuit && (
-            <p className="text-[10px] text-neutral-600 mt-1">
+            <p className="text-[10px] text-neutral-400 mt-1">
               Puerto WS: {selectedCircuit.ws_port}
               {selectedCircuit.pit_time_s && ` · Pit: ${selectedCircuit.pit_time_s}s`}
               {selectedCircuit.length_m && ` · ${selectedCircuit.length_m}m`}
@@ -220,7 +220,7 @@ function RaceSessionEditor() {
             className="accent-accent w-4 h-4"
           />
           <span className="text-sm text-neutral-300">Modo lluvia</span>
-          <span className="text-[10px] text-neutral-600">(desactiva filtro de outliers)</span>
+          <span className="text-[10px] text-neutral-400">(desactiva filtro de outliers)</span>
         </label>
 
         {/* Save button */}
@@ -247,7 +247,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-[10px] text-neutral-600 mb-1 uppercase tracking-wider">{label}</label>
+      <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{label}</label>
       <input
         type="number"
         value={value}
@@ -278,7 +278,7 @@ function ApexConnection() {
   return (
     <div className="bg-surface rounded-xl p-6 border border-border">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-[11px] text-neutral-500 uppercase tracking-wider">Conexion Apex Timing</h2>
+        <h2 className="text-[11px] text-neutral-200 uppercase tracking-wider">Conexion Apex Timing</h2>
         {apexConnected && (
           <span className="flex items-center gap-1.5 text-[10px] text-accent">
             <span className="w-1.5 h-1.5 rounded-full bg-accent inline-block" />
@@ -351,7 +351,7 @@ function ReplayControls() {
 
   return (
     <div className="bg-surface rounded-xl p-6 border border-border">
-      <h2 className="text-[11px] text-neutral-500 mb-4 uppercase tracking-wider">Replay</h2>
+      <h2 className="text-[11px] text-neutral-200 mb-4 uppercase tracking-wider">Replay</h2>
 
       {apexConnected && (
         <p className="text-[11px] text-yellow-500/80 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2 mb-3">
@@ -372,7 +372,7 @@ function ReplayControls() {
         </select>
 
         <div>
-          <label className="block text-[10px] text-neutral-600 mb-1 uppercase tracking-wider">
+          <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">
             Velocidad: {speed}x
           </label>
           <input
@@ -427,7 +427,7 @@ function ReplayControls() {
 
         {replayStatus?.active && (
           <div>
-            <div className="flex justify-between text-[10px] text-neutral-500 mb-1">
+            <div className="flex justify-between text-[10px] text-neutral-200 mb-1">
               <span>{replayStatus.filename}</span>
               <span>{(replayStatus.progress * 100).toFixed(1)}%</span>
             </div>

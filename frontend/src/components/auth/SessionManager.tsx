@@ -50,17 +50,17 @@ export function SessionManager({ onClose }: { onClose: () => void }) {
       <div className="bg-surface rounded-2xl p-6 w-full max-w-lg border border-border">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-white">Dispositivos conectados</h2>
-          <button onClick={onClose} className="text-neutral-600 hover:text-neutral-300 text-xl transition-colors">
+          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-300 text-xl transition-colors">
             &times;
           </button>
         </div>
 
-        <p className="text-[11px] text-neutral-500 mb-4 uppercase tracking-wider">
+        <p className="text-[11px] text-neutral-200 mb-4 uppercase tracking-wider">
           Maximo {user?.max_devices} dispositivo(s) &middot; {sessions.length} activo(s)
         </p>
 
         {loading ? (
-          <p className="text-neutral-600 text-sm py-4 text-center">Cargando...</p>
+          <p className="text-neutral-400 text-sm py-4 text-center">Cargando...</p>
         ) : (
           <div className="space-y-2 mb-4">
             {sessions.map((s) => (
@@ -81,7 +81,7 @@ export function SessionManager({ onClose }: { onClose: () => void }) {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-neutral-600">
+                  <p className="text-xs text-neutral-400">
                     IP: {s.ip_address} &middot; Activo: {new Date(s.last_active).toLocaleString()}
                   </p>
                 </div>
@@ -109,7 +109,7 @@ export function SessionManager({ onClose }: { onClose: () => void }) {
 
         <button
           onClick={onClose}
-          className="w-full text-neutral-500 hover:text-white text-sm py-2 transition-colors"
+          className="w-full text-neutral-200 hover:text-white text-sm py-2 transition-colors"
         >
           Cerrar
         </button>

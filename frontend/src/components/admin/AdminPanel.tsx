@@ -36,7 +36,7 @@ export function AdminPanel() {
         <button
           onClick={() => setTab("users")}
           className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === "users" ? "bg-accent text-black" : "bg-surface text-neutral-500 hover:text-neutral-300"
+            tab === "users" ? "bg-accent text-black" : "bg-surface text-neutral-200 hover:text-neutral-300"
           }`}
         >
           Usuarios
@@ -44,7 +44,7 @@ export function AdminPanel() {
         <button
           onClick={() => setTab("circuits")}
           className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === "circuits" ? "bg-accent text-black" : "bg-surface text-neutral-500 hover:text-neutral-300"
+            tab === "circuits" ? "bg-accent text-black" : "bg-surface text-neutral-200 hover:text-neutral-300"
           }`}
         >
           Circuitos
@@ -122,7 +122,7 @@ function UsersManager() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="bg-surface rounded-xl p-4 border border-border">
-        <h3 className="text-[11px] text-neutral-500 mb-3 uppercase tracking-wider">Usuarios</h3>
+        <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">Usuarios</h3>
 
         <div className="flex gap-2 mb-4">
           <input placeholder="Usuario" value={newUsername} onChange={(e) => setNewUsername(e.target.value)}
@@ -132,7 +132,7 @@ function UsersManager() {
           <input placeholder="Disp." type="number" min="1" max="10" value={newMaxDevices}
             onChange={(e) => setNewMaxDevices(Number(e.target.value))}
             className="w-16 bg-black border border-border rounded-lg px-2 py-1.5 text-sm" title="Max dispositivos" />
-          <label className="flex items-center gap-1 text-xs text-neutral-500">
+          <label className="flex items-center gap-1 text-xs text-neutral-200">
             <input type="checkbox" checked={newIsAdmin} onChange={(e) => setNewIsAdmin(e.target.checked)} className="accent-accent" />
             Admin
           </label>
@@ -142,7 +142,7 @@ function UsersManager() {
         </div>
 
         <table className="w-full text-sm">
-          <thead className="text-[11px] text-neutral-600 uppercase tracking-wider">
+          <thead className="text-[11px] text-neutral-400 uppercase tracking-wider">
             <tr>
               <th className="text-left px-2 py-1">Usuario</th>
               <th className="text-center px-2 py-1">Disp.</th>
@@ -171,7 +171,7 @@ function UsersManager() {
       </div>
 
       <div className="bg-surface rounded-xl p-4 border border-border">
-        <h3 className="text-[11px] text-neutral-500 mb-3 uppercase tracking-wider">
+        <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">
           Acceso a Circuitos{selectedUser && ` — ${users.find((u) => u.id === selectedUser)?.username}`}
         </h3>
 
@@ -193,7 +193,7 @@ function UsersManager() {
             </div>
 
             <table className="w-full text-sm">
-              <thead className="text-[11px] text-neutral-600 uppercase tracking-wider">
+              <thead className="text-[11px] text-neutral-400 uppercase tracking-wider">
                 <tr>
                   <th className="text-left px-2 py-1">Circuito</th>
                   <th className="text-left px-2 py-1">Desde</th>
@@ -205,8 +205,8 @@ function UsersManager() {
                 {access.map((a) => (
                   <tr key={a.id} className="border-t border-border">
                     <td className="px-2 py-1.5 text-white">{a.circuit_name}</td>
-                    <td className="px-2 py-1.5 text-neutral-500">{new Date(a.valid_from).toLocaleDateString()}</td>
-                    <td className="px-2 py-1.5 text-neutral-500">{new Date(a.valid_until).toLocaleDateString()}</td>
+                    <td className="px-2 py-1.5 text-neutral-200">{new Date(a.valid_from).toLocaleDateString()}</td>
+                    <td className="px-2 py-1.5 text-neutral-200">{new Date(a.valid_until).toLocaleDateString()}</td>
                     <td className="px-2 py-1.5 text-right">
                       <button onClick={() => revokeAccess(a.id)}
                         className="text-red-400/60 hover:text-red-400 text-xs transition-colors">Revocar</button>
@@ -236,9 +236,9 @@ function CircuitsManager() {
 
   return (
     <div className="bg-surface rounded-xl p-4 border border-border">
-      <h3 className="text-[11px] text-neutral-500 mb-3 uppercase tracking-wider">Catalogo de Circuitos</h3>
+      <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">Catalogo de Circuitos</h3>
       <table className="w-full text-sm">
-        <thead className="text-[11px] text-neutral-600 uppercase tracking-wider">
+        <thead className="text-[11px] text-neutral-400 uppercase tracking-wider">
           <tr>
             <th className="text-left px-2 py-1">ID</th>
             <th className="text-left px-2 py-1">Nombre</th>
@@ -250,7 +250,7 @@ function CircuitsManager() {
         <tbody>
           {circuits.map((c) => (
             <tr key={c.id} className="border-t border-border">
-              <td className="px-2 py-1.5 text-neutral-600">{c.id}</td>
+              <td className="px-2 py-1.5 text-neutral-400">{c.id}</td>
               <td className="px-2 py-1.5 font-medium text-white">{c.name}</td>
               <td className="px-2 py-1.5 text-right text-neutral-400">{c.length_m ? `${c.length_m}m` : "-"}</td>
               <td className="px-2 py-1.5 text-right font-mono text-neutral-400">{c.ws_port}</td>

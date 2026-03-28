@@ -240,13 +240,13 @@ export function TeamEditor() {
 
   if (loading)
     return (
-      <p className="text-neutral-500 text-sm">Cargando equipos...</p>
+      <p className="text-neutral-200 text-sm">Cargando equipos...</p>
     );
 
   return (
     <div className="bg-surface rounded-xl p-4 border border-border">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-[11px] text-neutral-500 uppercase tracking-wider">
+        <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">
           Equipos y Pilotos
           <span className="text-neutral-700 ml-2 normal-case tracking-normal">
             (arrastra para reordenar)
@@ -308,7 +308,7 @@ export function TeamEditor() {
       </DndContext>
 
       {teams.length === 0 && (
-        <p className="text-neutral-600 text-sm text-center py-8">
+        <p className="text-neutral-400 text-sm text-center py-8">
           Sin equipos. Pulsa "Cargar del LiveTiming" para importar o "+
           Equipo" para crear manualmente.
         </p>
@@ -384,7 +384,7 @@ function SortableTeamRow({
           </svg>
         </button>
 
-        <span className="text-neutral-600 w-7 text-center text-xs font-mono">
+        <span className="text-neutral-400 w-7 text-center text-xs font-mono">
           {team.position}
         </span>
 
@@ -411,7 +411,7 @@ function SortableTeamRow({
         </div>
 
         <span
-          className="text-[11px] text-neutral-600 w-20 text-center cursor-pointer"
+          className="text-[11px] text-neutral-400 w-20 text-center cursor-pointer"
           onClick={onToggle}
         >
           {team.drivers.length === 0
@@ -437,7 +437,7 @@ function SortableTeamRow({
       {isExpanded && (
         <div className="border-t border-border px-3 py-3 bg-black/30">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] text-neutral-600 uppercase tracking-wider">
+            <span className="text-[10px] text-neutral-400 uppercase tracking-wider">
               Pilotos &mdash; Diferencial positivo = mas lento que la
               referencia
             </span>
@@ -487,7 +487,7 @@ function SortableTeamRow({
                       className="w-24 bg-surface border border-border rounded-md px-2 py-1 text-sm text-right font-mono"
                       placeholder="0"
                     />
-                    <span className="text-[11px] text-neutral-600 w-6">
+                    <span className="text-[11px] text-neutral-400 w-6">
                       ms
                     </span>
                   </div>
@@ -497,7 +497,7 @@ function SortableTeamRow({
                         ? "text-tier-1"
                         : driver.differential_ms < 0
                         ? "text-accent"
-                        : "text-neutral-600"
+                        : "text-neutral-400"
                     }`}
                   >
                     {formatDifferential(driver.differential_ms)}

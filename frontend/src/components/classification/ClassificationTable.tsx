@@ -8,7 +8,7 @@ export function ClassificationTable() {
 
   if (classification.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-neutral-600">
+      <div className="flex items-center justify-center h-64 text-neutral-400">
         <p>Sin datos de clasificacion</p>
       </div>
     );
@@ -17,7 +17,7 @@ export function ClassificationTable() {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="bg-surface text-neutral-500 sticky top-0 z-10 text-[11px] uppercase tracking-wider">
+        <thead className="bg-surface text-neutral-200 sticky top-0 z-10 text-[11px] uppercase tracking-wider">
           <tr>
             <th className="px-3 py-2.5 text-left w-12">Pos</th>
             <th className="px-3 py-2.5 text-left w-12">Kart</th>
@@ -52,7 +52,7 @@ export function ClassificationTable() {
                 <td className="px-3 py-2 text-right font-mono text-neutral-300">
                   {entry.gap || "-"}
                 </td>
-                <td className="px-3 py-2 text-right font-mono text-neutral-500">
+                <td className="px-3 py-2 text-right font-mono text-neutral-200">
                   {entry.interval || "-"}
                 </td>
                 <td className="px-3 py-2 text-right font-mono text-neutral-400">

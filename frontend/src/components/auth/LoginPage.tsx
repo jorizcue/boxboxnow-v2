@@ -78,7 +78,7 @@ export function LoginPage() {
           </div>
 
           <div className="space-y-2 mb-6">
-            <p className="text-[11px] text-neutral-500 uppercase tracking-wider">
+            <p className="text-[11px] text-neutral-200 uppercase tracking-wider">
               Sesiones activas ({deviceLimit.active_sessions.length}/{deviceLimit.max_devices})
             </p>
             {deviceLimit.active_sessions.map((session) => (
@@ -88,7 +88,7 @@ export function LoginPage() {
               >
                 <div className="flex-1">
                   <p className="text-sm font-medium text-white">{session.device_name}</p>
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-neutral-200">
                     IP: {session.ip_address}
                     {session.last_active && (
                       <> &middot; {new Date(session.last_active).toLocaleString()}</>
@@ -128,13 +128,13 @@ export function LoginPage() {
           <h1 className="text-2xl font-bold tracking-wider text-white">
             KARTING<span className="text-accent">NOW</span>
           </h1>
-          <p className="text-neutral-600 text-xs tracking-widest mt-1 uppercase">Race Strategy</p>
+          <p className="text-neutral-400 text-xs tracking-widest mt-1 uppercase">Race Strategy</p>
         </div>
 
         <div className="bg-surface rounded-2xl p-8 border border-border">
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-[11px] text-neutral-500 mb-1.5 uppercase tracking-wider">Usuario</label>
+              <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">Usuario</label>
               <input
                 type="text"
                 value={username}
@@ -146,7 +146,7 @@ export function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-[11px] text-neutral-500 mb-1.5 uppercase tracking-wider">Contrasena</label>
+              <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">Contrasena</label>
               <input
                 type="password"
                 value={password}

@@ -11,7 +11,7 @@ export function RaceTable() {
 
   if (sorted.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-neutral-600">
+      <div className="flex items-center justify-center h-64 text-neutral-400">
         <div className="text-center">
           <p className="text-lg">Sin datos de carrera</p>
           <p className="text-sm mt-1 text-neutral-700">Conecta al WebSocket de Apex o inicia un replay</p>
@@ -23,7 +23,7 @@ export function RaceTable() {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="bg-surface text-neutral-500 sticky top-0 z-10 text-[11px] uppercase tracking-wider">
+        <thead className="bg-surface text-neutral-200 sticky top-0 z-10 text-[11px] uppercase tracking-wider">
           <tr>
             <th className="px-2 py-2.5 text-left w-12">Pos</th>
             <th className="px-2 py-2.5 text-left w-12">Kart</th>
@@ -66,7 +66,7 @@ export function RaceTable() {
                 <td className="px-2 py-1.5 text-neutral-400 truncate max-w-[180px]">
                   {kart.driverName}
                   {kart.driverTime && (
-                    <span className="ml-1 text-xs text-neutral-600">[{kart.driverTime}]</span>
+                    <span className="ml-1 text-xs text-neutral-400">[{kart.driverTime}]</span>
                   )}
                   {kart.driverDifferentialMs !== undefined && kart.driverDifferentialMs !== 0 && (
                     <span
@@ -91,7 +91,7 @@ export function RaceTable() {
                 <td className="px-2 py-1.5 text-right font-mono text-neutral-300">
                   {kart.gap || "-"}
                 </td>
-                <td className="px-2 py-1.5 text-right font-mono text-neutral-500">
+                <td className="px-2 py-1.5 text-right font-mono text-neutral-200">
                   {kart.interval || "-"}
                 </td>
                 <td className="px-2 py-1.5 text-center text-neutral-300">{kart.totalLaps}</td>

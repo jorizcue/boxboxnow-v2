@@ -31,7 +31,7 @@ export function Navbar({ activeTab, onTabChange, isAdmin }: NavbarProps) {
               "px-5 py-2.5 text-sm font-medium tracking-wide transition-colors relative",
               activeTab === tab.id
                 ? "text-accent"
-                : "text-neutral-500 hover:text-neutral-300"
+                : "text-neutral-200 hover:text-neutral-300"
             )}
           >
             {tab.label}
