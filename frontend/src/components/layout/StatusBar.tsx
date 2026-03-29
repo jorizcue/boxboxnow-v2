@@ -101,7 +101,7 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
             <select
               value={lang}
               onChange={(e) => setLang(e.target.value as any)}
-              className="bg-black border border-border rounded px-1.5 py-0.5 text-[10px] sm:text-[11px] text-neutral-300 uppercase tracking-wider cursor-pointer"
+              className="bg-black border border-border rounded px-1 py-0.5 text-sm cursor-pointer appearance-none text-center w-10"
             >
               {LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>{l.flag}</option>
@@ -120,8 +120,9 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
               className="text-[10px] sm:text-[11px] text-neutral-400 hover:text-accent transition-colors"
               title={t("status.logout")}
             >
-              <svg className="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-              <span className="hidden sm:inline uppercase tracking-wider">{t("status.logout")}</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5.636 5.636a9 9 0 1 0 12.728 0M12 3v9" />
+              </svg>
             </button>
           </div>
         </div>

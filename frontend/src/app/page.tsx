@@ -13,8 +13,9 @@ import { ClassificationTable } from "@/components/classification/ClassificationT
 import { ConfigPanel } from "@/components/config/ConfigPanel";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { LiveTiming } from "@/components/live/LiveTiming";
+import { AdjustedClassification } from "@/components/classification/AdjustedClassification";
 
-type Tab = "race" | "pit" | "live" | "classification" | "config" | "admin";
+type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "config" | "admin";
 
 export default function Home() {
   const { token, user, _hydrated } = useAuth();
@@ -65,6 +66,7 @@ function Dashboard({
         {activeTab === "pit" && <FifoQueue />}
         {activeTab === "live" && <LiveTiming />}
         {activeTab === "classification" && <ClassificationTable />}
+        {activeTab === "adjusted" && <AdjustedClassification />}
         {activeTab === "config" && <ConfigPanel />}
         {activeTab === "admin" && user?.is_admin && <AdminPanel />}
       </main>

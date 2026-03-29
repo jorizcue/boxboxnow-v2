@@ -6,10 +6,10 @@ import { persist } from "zustand/middleware";
 export type Language = "es" | "en" | "it" | "de";
 
 export const LANGUAGES: { code: Language; label: string; flag: string }[] = [
-  { code: "es", label: "Espanol", flag: "ES" },
-  { code: "en", label: "English", flag: "EN" },
-  { code: "it", label: "Italiano", flag: "IT" },
-  { code: "de", label: "Deutsch", flag: "DE" },
+  { code: "es", label: "Espanol", flag: "🇪🇸" },
+  { code: "en", label: "English", flag: "🇬🇧" },
+  { code: "it", label: "Italiano", flag: "🇮🇹" },
+  { code: "de", label: "Deutsch", flag: "🇩🇪" },
 ];
 
 interface LangStore {
@@ -43,6 +43,8 @@ const translations: Record<string, Record<Language, string>> = {
   "nav.classification": { es: "Clasificacion", en: "Classification", it: "Classifica", de: "Klassifizierung" },
   "nav.config": { es: "Config", en: "Config", it: "Config", de: "Config" },
   "nav.admin": { es: "Admin", en: "Admin", it: "Admin", de: "Admin" },
+  "nav.adjusted": { es: "Clasif. Real", en: "Real Class.", it: "Class. Reale", de: "Echte Klass." },
+  "nav.adjustedShort": { es: "C.Real", en: "Real", it: "Reale", de: "Echt" },
 
   // === Login ===
   "login.username": { es: "Usuario", en: "Username", it: "Utente", de: "Benutzer" },
@@ -122,6 +124,16 @@ const translations: Record<string, Record<Language, string>> = {
   "class.gap": { es: "Gap", en: "Gap", it: "Gap", de: "Gap" },
   "class.interval": { es: "Int.", en: "Int.", it: "Int.", de: "Int." },
   "class.avg": { es: "Media", en: "Avg", it: "Media", de: "Schn." },
+
+  // === Adjusted Classification ===
+  "adjusted.title": { es: "Clasificacion Ajustada", en: "Adjusted Classification", it: "Classifica Corretta", de: "Bereinigte Klassifizierung" },
+  "adjusted.realLaps": { es: "Vueltas", en: "Laps", it: "Giri", de: "Runden" },
+  "adjusted.missingPits": { es: "Pits pend.", en: "Missing pits", it: "Pit manc.", de: "Fehl. Pits" },
+  "adjusted.penalty": { es: "Penaliz.", en: "Penalty", it: "Penalita", de: "Strafe" },
+  "adjusted.adjustedLaps": { es: "Vlt. Ajust.", en: "Adj. Laps", it: "Giri Corr.", de: "Ber. Runden" },
+  "adjusted.noData": { es: "Sin datos de carrera", en: "No race data", it: "Nessun dato di gara", de: "Keine Renndaten" },
+  "adjusted.explanation": { es: "Clasificacion ajustada igualando paradas a {maxPits} pits (equipo con mas paradas)", en: "Classification adjusted equalizing stops to {maxPits} pits (team with most stops)", it: "Classifica corretta equalizzando le soste a {maxPits} pit (squadra con piu soste)", de: "Klassifizierung bereinigt auf {maxPits} Pits (Team mit den meisten Stopps)" },
+  "adjusted.diffLaps": { es: "Dif.", en: "Diff.", it: "Diff.", de: "Diff." },
 
   // === Live Timing ===
   "live.loading": { es: "Cargando...", en: "Loading...", it: "Caricamento...", de: "Laden..." },

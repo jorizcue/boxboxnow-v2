@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import { useT } from "@/lib/i18n";
 
-type Tab = "race" | "pit" | "live" | "classification" | "config" | "admin";
+type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "config" | "admin";
 
 interface NavbarProps {
   activeTab: Tab;
@@ -18,6 +18,7 @@ export function Navbar({ activeTab, onTabChange, isAdmin }: NavbarProps) {
     { id: "pit", labelKey: "nav.box", shortLabelKey: "nav.box" },
     { id: "live", labelKey: "nav.live", shortLabelKey: "nav.live" },
     // { id: "classification", labelKey: "nav.classification", shortLabelKey: "nav.classification" },
+    { id: "adjusted", labelKey: "nav.adjusted", shortLabelKey: "nav.adjustedShort" },
     { id: "config", labelKey: "nav.config", shortLabelKey: "nav.config" },
     { id: "admin", labelKey: "nav.admin", shortLabelKey: "nav.admin", adminOnly: true },
   ];

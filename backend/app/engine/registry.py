@@ -30,6 +30,8 @@ class UserSession:
         self.api_client: ApexApiClient | None = None
         self._load_drivers_task: asyncio.Task | None = None
         self._analytics_task: asyncio.Task | None = None
+        self._race_log_id: int | None = None
+        self._saved_lap_count: int = 0  # Track how many laps we've already saved
 
         async def on_events(events):
             # Track which karts were NOT in pit before processing
@@ -83,6 +85,11 @@ class UserSession:
                 self.fifo.apply_to_state(self.state)
                 await self._broadcast_fifo()
 
+            # Real-time lap saving
+            lap_events = [e for e in events if e.type == EventType.LAP]
+            if lap_events:
+                asyncio.create_task(self._save_realtime_laps())
+
         self._on_events = on_events
 
     async def process_message(self, message: str):
@@ -120,14 +127,86 @@ class UserSession:
             await self.api_client.close()
         logger.info(f"User session stopped (user_id={self.user_id})")
 
+    async def _save_realtime_laps(self):
+        """Save newly arrived laps to DB in real-time."""
+        from app.models.database import async_session
+        from app.models.schemas import RaceLog, KartLap
+        from datetime import datetime, timezone
+
+        try:
+            async with async_session() as db:
+                # Create race_log on first save
+                if self._race_log_id is None:
+                    race_log = RaceLog(
+                        circuit_id=self.circuit_id,
+                        user_id=self.user_id,
+                        race_date=datetime.now(timezone.utc),
+                        session_name=f"Race {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                        duration_min=self.state.duration_min,
+                        total_karts=len(self.state.karts),
+                    )
+                    db.add(race_log)
+                    await db.flush()
+                    self._race_log_id = race_log.id
+                    logger.info(f"Created race_log #{race_log.id} for real-time saving (user={self.user_id})")
+
+                # Collect ALL laps across all karts, skip already-saved ones
+                all_laps_flat = []
+                for kart in self.state.karts.values():
+                    valid_set = {(vl["totalLap"], vl["lapTime"]) for vl in kart.valid_laps}
+                    for lap in kart.all_laps:
+                        all_laps_flat.append((kart, lap, (lap["totalLap"], lap["lapTime"]) in valid_set))
+
+                new_laps = all_laps_flat[self._saved_lap_count:]
+                if not new_laps:
+                    return
+
+                for kart, lap, is_valid in new_laps:
+                    kart_lap = KartLap(
+                        race_log_id=self._race_log_id,
+                        kart_number=kart.kart_number,
+                        team_name=kart.team_name,
+                        driver_name=lap.get("driverName", ""),
+                        lap_number=lap["totalLap"],
+                        lap_time_ms=lap["lapTime"],
+                        is_valid=is_valid,
+                    )
+                    db.add(kart_lap)
+
+                await db.commit()
+                self._saved_lap_count = len(all_laps_flat)
+        except Exception as e:
+            logger.error(f"Real-time lap save failed (user={self.user_id}): {e}")
+
     async def save_race_laps(self):
-        """Save all kart laps to the database for historical analytics."""
+        """Final save: persist any remaining unsaved laps and update race_log metadata."""
         from datetime import datetime, timezone
         from app.models.database import async_session
         from app.models.schemas import RaceLog, KartLap
+        from sqlalchemy import update
 
-        # Only save if we have meaningful data
         total_laps = sum(len(k.all_laps) for k in self.state.karts.values())
+
+        if self._race_log_id is not None:
+            # Already saving in real-time, just flush remaining laps and update metadata
+            try:
+                await self._save_realtime_laps()  # Flush any pending
+                async with async_session() as db:
+                    await db.execute(
+                        update(RaceLog)
+                        .where(RaceLog.id == self._race_log_id)
+                        .values(
+                            total_karts=len(self.state.karts),
+                            duration_min=self.state.duration_min,
+                        )
+                    )
+                    await db.commit()
+                logger.info(f"Updated race_log #{self._race_log_id} on stop: {total_laps} total laps")
+            except Exception as e:
+                logger.error(f"Failed to finalize race_log on stop: {e}")
+            return
+
+        # Fallback: bulk save if real-time wasn't active
         if total_laps < 10:
             logger.info(f"Skipping race save: only {total_laps} laps (user={self.user_id})")
             return
