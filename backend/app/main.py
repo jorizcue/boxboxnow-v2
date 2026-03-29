@@ -1,6 +1,7 @@
 """
 BoxboxNow v2 - FastAPI application.
-Multi-tenant: each user has their own race state and Apex connection.
+Multi-tenant: each user has their own race state.
+CircuitHub connects to all circuits permanently.
 """
 
 import asyncio
@@ -12,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.models.database import init_db
 from app.engine.registry import SessionRegistry, ReplayRegistry
+from app.apex.circuit_hub import CircuitHub
 from app.api.auth_routes import router as auth_router
 from app.api.admin_routes import router as admin_router
 from app.api.config_routes import router as config_router
@@ -33,21 +35,27 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized")
 
-    # Create session registries (multi-tenant)
+    # Create registries and hub
     registry = SessionRegistry()
     replay_registry = ReplayRegistry()
+    circuit_hub = CircuitHub()
 
     # Store on app state
     app.state.registry = registry
     app.state.replay_registry = replay_registry
+    app.state.circuit_hub = circuit_hub
 
-    logger.info("BoxboxNow v2 started (multi-tenant)")
+    # Start circuit hub (connects to all circuits)
+    await circuit_hub.start_all()
+
+    logger.info("BoxboxNow v2 started (multi-tenant + CircuitHub)")
 
     yield
 
     # Shutdown
     await registry.stop_all()
     await replay_registry.stop_all()
+    await circuit_hub.stop_all()
     logger.info("BoxboxNow v2 stopped")
 
 
@@ -80,8 +88,10 @@ app.include_router(ws_router)
 async def health():
     registry = app.state.registry
     replay_registry = app.state.replay_registry
+    circuit_hub = app.state.circuit_hub
     return {
         "status": "ok",
         "activeSessions": len(registry._sessions),
         "activeReplays": len(replay_registry._sessions),
+        "circuitHub": circuit_hub.get_status(),
     }

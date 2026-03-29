@@ -1,7 +1,7 @@
 """
 Multi-tenant state registry.
-Maps user_id -> (RaceStateManager, ApexClient, FifoManager, parser)
-so each user has their own isolated race state and Apex connection.
+Maps user_id -> UserSession with isolated race state.
+CircuitHub feeds messages to subscribed sessions.
 """
 
 import asyncio
@@ -12,9 +12,7 @@ from app.engine.fifo import FifoManager
 from app.engine.clustering import compute_clustering
 from app.engine.classification import compute_classification
 from app.apex.parser import ApexMessageParser, EventType
-from app.apex.client import ApexClient
 from app.apex.api_client import ApexApiClient, DEFAULT_PHP_API_URL
-from app.apex.recorder import RaceRecorder
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -23,14 +21,15 @@ logger = logging.getLogger(__name__)
 class UserSession:
     """All runtime state for a single user's active race."""
 
-    def __init__(self, user_id: int, ws_url: str):
+    def __init__(self, user_id: int, circuit_id: int):
         self.user_id = user_id
+        self.circuit_id = circuit_id
         self.parser = ApexMessageParser()
         self.state = RaceStateManager()
         self.fifo = FifoManager()
-        self.recorder = RaceRecorder(user_id=user_id)
         self.api_client: ApexApiClient | None = None
         self._load_drivers_task: asyncio.Task | None = None
+        self._analytics_task: asyncio.Task | None = None
 
         async def on_events(events):
             # Track which karts were NOT in pit before processing
@@ -40,7 +39,7 @@ class UserSession:
             }
             await self.state.handle_events(events)
 
-            # Detect init kart batch → trigger driver loading from PHP API
+            # Detect init kart batch -> trigger driver loading from PHP API
             init_kart_events = [e for e in events
                                 if e.type == EventType.INIT and e.value == "kart"]
             if init_kart_events and self.api_client and self.api_client.php_api_port:
@@ -84,21 +83,25 @@ class UserSession:
                 self.fifo.apply_to_state(self.state)
                 await self._broadcast_fifo()
 
-        self.on_events = on_events
-        self.apex_client = ApexClient(ws_url, self.parser, on_events, recorder=self.recorder)
-        self._analytics_task: asyncio.Task | None = None
+        self._on_events = on_events
+
+    async def process_message(self, message: str):
+        """Called by CircuitHub for each incoming message."""
+        try:
+            events = self.parser.parse(message)
+            if events:
+                await self._on_events(events)
+        except Exception as e:
+            logger.error(f"Error processing message (user={self.user_id}): {e}",
+                         exc_info=True)
 
     async def start(self):
-        """Start Apex connection and analytics loop."""
-        await self.apex_client.start()
+        """Start analytics loop."""
         self._analytics_task = asyncio.create_task(self._analytics_loop())
-        logger.info(f"User session started (user_id={self.user_id})")
+        logger.info(f"User session started (user_id={self.user_id}, circuit={self.circuit_id})")
 
     async def stop(self):
         """Stop all tasks."""
-        await self.apex_client.stop()
-        if self.recorder.is_recording:
-            self.recorder.stop()
         if self._analytics_task:
             self._analytics_task.cancel()
             try:
@@ -114,17 +117,19 @@ class UserSession:
     def configure(self, circuit_length_m: int, pit_time_s: int, laps_discard: int,
                   lap_differential: float, rain: bool, our_kart: int, min_pits: int,
                   max_stint_min: int, min_stint_min: int, box_lines: int,
-                  box_karts: int, duration_min: int, refresh_s: int):
+                  box_karts: int, duration_min: int, refresh_s: int,
+                  min_driver_time_min: int = 30):
         """Apply race session config to state and fifo."""
         self.state.circuit_length_m = circuit_length_m or 1100
         self.state.pit_time_s = pit_time_s or 120
         self.state.laps_discard = laps_discard
-        self.state.lap_differential = int(lap_differential)  # diferencial_vueltas in ms (absolute offset)
+        self.state.lap_differential = int(lap_differential)
         self.state.rain_mode = rain
         self.state.our_kart_number = our_kart
         self.state.min_pits = min_pits
         self.state.max_stint_min = max_stint_min
         self.state.min_stint_min = min_stint_min
+        self.state.min_driver_time_min = min_driver_time_min
         self.state.box_lines = box_lines
         self.state.box_karts = box_karts
         self.state.duration_min = duration_min
@@ -140,30 +145,20 @@ class UserSession:
 
     def set_driver_differentials(self, differentials: dict[int, dict[str, int]],
                                   team_positions: dict[int, int]):
-        """Set driver differentials and team positions for clustering.
-
-        Args:
-            differentials: {kart_number: {driver_name_lower: differential_ms}}
-            team_positions: {kart_number: theoretical_position}
-        """
         self._driver_differentials = differentials
         self._team_positions = team_positions
 
     async def _load_drivers_from_api(self):
-        """Fetch drivers from PHP API for all karts, save to DB, notify frontend.
-
-        Called when init kart events arrive (race starts / grid reload).
-        """
+        """Fetch drivers from PHP API for all karts, save to DB, notify frontend."""
         if not self.api_client:
             return
 
-        # Small delay to ensure all init events have been processed
         await asyncio.sleep(1.0)
 
         logger.info(f"Loading drivers from PHP API for {len(self.state.karts)} karts "
                      f"(user_id={self.user_id})")
 
-        teams_data = []  # List of {position, kart, team_name, drivers: [{driver_name, differential_ms}]}
+        teams_data = []
 
         for i, kart in enumerate(
             sorted(self.state.karts.values(), key=lambda k: k.position or 999)
@@ -183,7 +178,7 @@ class UserSession:
                     for d in drivers:
                         team_entry["drivers"].append({
                             "driver_name": d["name"],
-                            "differential_ms": 0,  # Will be merged with existing
+                            "differential_ms": 0,
                         })
                     if drivers:
                         logger.info(f"  Kart #{kart.kart_number} ({kart.team_name}): "
@@ -196,14 +191,12 @@ class UserSession:
         if not teams_data:
             return
 
-        # Save to DB, preserving existing differentials
         try:
             await self._save_teams_to_db(teams_data)
             logger.info(f"Saved {len(teams_data)} teams to DB (user_id={self.user_id})")
         except Exception as e:
             logger.error(f"Failed to save teams to DB: {e}", exc_info=True)
 
-        # Notify frontend to reload teams
         if self.state._ws_clients:
             msg = json.dumps({"type": "teams_updated", "data": {"teams": teams_data}})
             dead = set()
@@ -223,7 +216,6 @@ class UserSession:
         from sqlalchemy.orm import selectinload
 
         async with async_session() as db:
-            # Get active session
             result = await db.execute(
                 select(RaceSession)
                 .options(
@@ -240,7 +232,6 @@ class UserSession:
                 logger.warning(f"No active session for user {self.user_id}, skipping team save")
                 return
 
-            # Build map of existing differentials: {kart_number: {driver_name_lower: diff_ms}}
             existing_diffs: dict[int, dict[str, int]] = {}
             for tp in session.team_positions:
                 kart_diffs = {}
@@ -248,12 +239,10 @@ class UserSession:
                     kart_diffs[d.driver_name.strip().lower()] = d.differential_ms
                 existing_diffs[tp.kart] = kart_diffs
 
-            # Delete existing teams
             await db.execute(
                 delete(TeamPosition).where(TeamPosition.race_session_id == session.id)
             )
 
-            # Insert new teams with merged differentials
             for t in teams_data:
                 team = TeamPosition(
                     race_session_id=session.id,
@@ -263,7 +252,6 @@ class UserSession:
                 )
                 kart_diffs = existing_diffs.get(t["kart"], {})
                 for d in t["drivers"]:
-                    # Preserve existing differential if driver already had one
                     name = d["driver_name"]
                     diff = kart_diffs.get(name.strip().lower(), d.get("differential_ms", 0))
                     driver = TeamDriver(
@@ -275,7 +263,6 @@ class UserSession:
 
             await db.commit()
 
-            # Update in-memory differentials for clustering
             new_team_positions = {}
             new_driver_diffs = {}
             for t in teams_data:
@@ -315,8 +302,7 @@ class UserSession:
             self.state._ws_clients.discard(c)
 
     async def broadcast_snapshot(self):
-        """Broadcast a full snapshot to all connected WS clients.
-        Used when config changes so the frontend gets updated immediately."""
+        """Broadcast a full snapshot to all connected WS clients."""
         if self.state._ws_clients:
             snapshot = self.state.get_snapshot()
             data = json.dumps(snapshot)
@@ -454,13 +440,11 @@ class ReplaySession:
         self.engine = ReplayEngine(self.parser, on_events, logs_dir="data/logs")
 
     async def start_analytics(self):
-        """Start the analytics loop for this replay session."""
         if self._analytics_task and not self._analytics_task.done():
             return
         self._analytics_task = asyncio.create_task(self._analytics_loop())
 
     async def stop(self):
-        """Stop engine and analytics."""
         await self.engine.stop()
         if self._analytics_task:
             self._analytics_task.cancel()
@@ -468,13 +452,11 @@ class ReplaySession:
                 await self._analytics_task
             except asyncio.CancelledError:
                 pass
-        # Broadcast reset so clients see stopped state
         self.state.reset()
         await self.state._broadcast(self.state.get_snapshot())
         logger.info(f"Replay session stopped (user_id={self.user_id})")
 
     def apply_config(self, session, circuit=None):
-        """Apply race session config from DB model."""
         self.state.box_karts = session.box_karts or 30
         self.state.box_lines = session.box_lines or 2
         self.state.our_kart_number = session.our_kart_number or 0
@@ -490,7 +472,6 @@ class ReplaySession:
             self.state.lap_differential = circuit.lap_differential or 3000
 
     def update_config_fields(self, session, circuit=None):
-        """Update config fields without full reset (for live config changes)."""
         self.state.our_kart_number = session.our_kart_number
         self.state.min_pits = session.min_pits
         self.state.max_stint_min = session.max_stint_min
@@ -615,31 +596,34 @@ class SessionRegistry:
     def get(self, user_id: int) -> UserSession | None:
         return self._sessions.get(user_id)
 
-    async def start_session(self, user_id: int, ws_port: int,
-                            ws_port_data: int | None = None, **config) -> UserSession:
+    async def start_session(self, user_id: int, circuit_id: int,
+                            circuit_hub, **config) -> UserSession:
         """Start or restart a user's race session.
-        Uses ws_port_data (ws://) if available, otherwise falls back to ws_port (wss://)."""
+        Subscribes to CircuitHub for the given circuit."""
         # Stop existing session if any
         if user_id in self._sessions:
-            await self._sessions[user_id].stop()
+            old = self._sessions[user_id]
+            circuit_hub.unsubscribe(old.circuit_id, user_id)
+            await old.stop()
 
-        settings = get_settings()
-        if ws_port_data:
-            ws_url = f"ws://{settings.apex_ws_host}:{ws_port_data}"
-        else:
-            ws_url = f"wss://{settings.apex_ws_host}:{ws_port}"
-
-        session = UserSession(user_id, ws_url)
+        session = UserSession(user_id, circuit_id)
         session.configure(**config)
+
+        # Subscribe to circuit hub
+        circuit_hub.subscribe(circuit_id, user_id, session.process_message)
+
+        # Start analytics
         await session.start()
 
         self._sessions[user_id] = session
         return session
 
-    async def stop_session(self, user_id: int):
+    async def stop_session(self, user_id: int, circuit_hub=None):
         """Stop a user's race session."""
         session = self._sessions.pop(user_id, None)
         if session:
+            if circuit_hub:
+                circuit_hub.unsubscribe(session.circuit_id, user_id)
             await session.stop()
 
     async def stop_all(self):

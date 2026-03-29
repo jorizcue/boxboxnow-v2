@@ -1,4 +1,10 @@
-"""REST API routes for log replay control (per-user)."""
+"""REST API routes for log replay control (per-user).
+
+Supports:
+- Circuit recordings (auto-recorded by CircuitHub in data/recordings/{circuit}/)
+- Legacy user recordings (data/logs/{user_id}/)
+- Legacy root recordings (data/logs/)
+"""
 
 import logging
 import os
@@ -19,6 +25,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/replay", tags=["replay"])
 
 LOGS_BASE_DIR = "data/logs"
+RECORDINGS_BASE_DIR = "data/recordings"
 
 
 class ReplayStartRequest(BaseModel):
@@ -26,6 +33,7 @@ class ReplayStartRequest(BaseModel):
     speed: float = 1.0
     start_block: int = 0
     owner_id: int | None = None  # Admin can replay another user's log
+    circuit_dir: str | None = None  # Circuit recording subdirectory
 
 
 class ReplaySpeedRequest(BaseModel):
@@ -40,9 +48,15 @@ def _get_replay_registry(request: Request):
     return request.app.state.replay_registry
 
 
-def _resolve_logs_dir(user: User, owner_id: int | None = None) -> str:
-    """Resolve the logs directory for a given user.
-    Admin can specify owner_id to access another user's logs."""
+def _resolve_logs_dir(user: User, owner_id: int | None = None,
+                      circuit_dir: str | None = None) -> str:
+    """Resolve the logs directory for a given source.
+    - circuit_dir: circuit recording from data/recordings/{circuit_dir}/
+    - owner_id (admin): another user's logs from data/logs/{owner_id}/
+    - default: user's own logs from data/logs/{user.id}/
+    """
+    if circuit_dir:
+        return os.path.join(RECORDINGS_BASE_DIR, circuit_dir)
     if owner_id is not None and user.is_admin:
         return os.path.join(LOGS_BASE_DIR, str(owner_id))
     return os.path.join(LOGS_BASE_DIR, str(user.id))
@@ -79,19 +93,40 @@ def _list_root_logs() -> list[dict]:
     )
 
 
+def _list_circuit_recordings() -> list[dict]:
+    """List circuit recordings from data/recordings/{circuit}/."""
+    base = Path(RECORDINGS_BASE_DIR)
+    if not base.exists():
+        return []
+    recordings = []
+    for circuit_dir in sorted(base.iterdir()):
+        if circuit_dir.is_dir():
+            for f in sorted(circuit_dir.glob("*.log"), reverse=True):
+                recordings.append({
+                    "filename": f.name,
+                    "owner_id": None,
+                    "owner": circuit_dir.name,
+                    "circuit_dir": circuit_dir.name,
+                })
+    return recordings
+
+
 @router.get("/logs")
 async def list_logs(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List available log files.
+    Always includes circuit recordings (auto-recorded by CircuitHub).
     Admin sees all users' logs + legacy root logs.
     Non-admin sees only their own logs."""
+    all_logs = []
+
+    # Circuit recordings (available to all users)
+    all_logs.extend(_list_circuit_recordings())
+
     if user.is_admin:
         # Collect logs from all user subdirectories + root
-        all_logs = []
-
-        # Build user_id -> username map
         from app.models.schemas import User as UserModel
         result = await db.execute(select(UserModel))
         users_map = {u.id: u.username for u in result.scalars().all()}
@@ -119,9 +154,10 @@ async def list_logs(
 
         return {"logs": all_logs}
     else:
-        # Non-admin: only own logs
+        # Non-admin: circuit recordings + own logs
         user_logs = _list_user_logs(user.id)
-        return {"logs": [{"filename": l["filename"]} for l in user_logs]}
+        all_logs.extend([{"filename": l["filename"]} for l in user_logs])
+        return {"logs": all_logs}
 
 
 @router.get("/analyze/{filename}")
@@ -129,14 +165,14 @@ async def analyze_log(
     filename: str,
     user: User = Depends(get_current_user),
     owner_id: int | None = Query(None),
+    circuit_dir: str | None = Query(None),
 ):
-    """Analyze a log file: total blocks, race start positions, time range.
-    Admin can specify owner_id to analyze another user's log."""
+    """Analyze a log file: total blocks, race start positions, time range."""
     from app.apex.parser import ApexMessageParser
 
-    logs_dir = _resolve_logs_dir(user, owner_id)
+    logs_dir = _resolve_logs_dir(user, owner_id, circuit_dir)
 
-    # Also check legacy root dir as fallback
+    # Check file exists, fallback to legacy root dir
     filepath = os.path.join(logs_dir, filename)
     if not os.path.exists(filepath):
         # Try root dir for legacy logs
@@ -177,9 +213,13 @@ async def start_replay(
     """Start replaying a log file. Creates per-user replay session."""
     replay_reg = _get_replay_registry(request)
 
-    # Resolve which user's logs directory to read from
-    owner_id = data.owner_id if (data.owner_id is not None and user.is_admin) else user.id
-    logs_dir = os.path.join(LOGS_BASE_DIR, str(owner_id))
+    # Resolve which directory to read from
+    if data.circuit_dir:
+        logs_dir = os.path.join(RECORDINGS_BASE_DIR, data.circuit_dir)
+    elif data.owner_id is not None and user.is_admin:
+        logs_dir = os.path.join(LOGS_BASE_DIR, str(data.owner_id))
+    else:
+        logs_dir = os.path.join(LOGS_BASE_DIR, str(user.id))
 
     # Check file exists (also check root for legacy)
     filepath = os.path.join(logs_dir, data.filename)

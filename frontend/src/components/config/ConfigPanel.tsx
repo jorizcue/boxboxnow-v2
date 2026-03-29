@@ -36,6 +36,7 @@ interface RaceSession {
 // Module-level state for replay — survives tab changes (component re-mounts)
 let _replaySelectedLog = "";
 let _replaySelectedOwnerId: number | null = null;
+let _replaySelectedCircuitDir: string | null = null;
 let _replaySpeed = 10;
 
 export function ConfigPanel() {
@@ -44,7 +45,7 @@ export function ConfigPanel() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RaceSessionEditor />
         <div className="space-y-6">
-          <ApexConnection />
+          <CircuitHubStatus />
           <ReplayControls />
         </div>
       </div>
@@ -149,7 +150,6 @@ function RaceSessionEditor() {
       setSession(result);
 
       // Update zustand store config immediately so UI reflects changes
-      // (e.g. highlighted "our kart" row) without waiting for next WS broadcast
       useRaceStore.setState((state) => ({
         config: {
           ...state.config,
@@ -165,6 +165,9 @@ function RaceSessionEditor() {
           minDriverTimeMin: minDriverTime,
         },
       }));
+
+      // Session saved -> monitoring auto-starts, reconnect WS to pick up new state
+      useRaceStore.getState().requestWsReconnect();
     } catch (e: any) {
       alert("Error: " + e.message);
     }
@@ -278,149 +281,105 @@ function Field({
   );
 }
 
-// --- Apex Connection ---
+// --- Circuit Hub Status (replaces old ApexConnection) ---
 
-function ApexConnection() {
-  const { apexConnected, apexStatusMsg, setApexStatus, requestWsReconnect } = useRaceStore();
-  const [recording, setRecording] = useState(false);
-  const [recordingInfo, setRecordingInfo] = useState<string>("");
+interface HubCircuitStatus {
+  circuit_id: number;
+  circuit_name: string;
+  connected: boolean;
+  subscribers: number;
+  messages: number;
+}
 
-  // On mount, sync connection + recording status with backend
+function CircuitHubStatus() {
+  const { setApexStatus } = useRaceStore();
+  const [status, setStatus] = useState<{
+    monitoring: boolean;
+    circuit_name: string | null;
+    circuit_connected: boolean;
+    circuit_messages: number;
+  } | null>(null);
+  const [hubCircuits, setHubCircuits] = useState<HubCircuitStatus[]>([]);
+  const { user } = useAuth();
+  const isAdmin = user?.is_admin ?? false;
+
+  const refresh = async () => {
+    try {
+      const [connStatus, hubStatus] = await Promise.all([
+        api.getConnectionStatus(),
+        isAdmin ? api.getHubStatus() : Promise.resolve({ circuits: [] }),
+      ]);
+      setStatus(connStatus);
+      setHubCircuits(hubStatus.circuits || []);
+
+      // Sync apexConnected to zustand for other components
+      if (connStatus.monitoring) {
+        setApexStatus(true, `Monitorizando ${connStatus.circuit_name}`);
+      } else {
+        setApexStatus(false, "");
+      }
+    } catch {}
+  };
+
   useEffect(() => {
-    api.getConnectionStatus()
-      .then((res) => {
-        if (res.apex_connected) {
-          setApexStatus(true, `Conectado a ${res.circuit}`);
-        } else if (apexConnected) {
-          setApexStatus(false, "");
-        }
-      })
-      .catch(() => {});
-    api.getRecordingStatus()
-      .then((res) => {
-        setRecording(res.recording);
-        if (res.recording) {
-          setRecordingInfo(`${res.filename} (${res.messages} msgs)`);
-        }
-      })
-      .catch(() => {});
+    refresh();
+    const interval = setInterval(refresh, 10000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Poll recording message count while recording
-  useEffect(() => {
-    if (!recording) return;
-    const interval = setInterval(() => {
-      api.getRecordingStatus()
-        .then((res) => {
-          if (res.recording) {
-            setRecordingInfo(`${res.filename} (${res.messages} msgs)`);
-          } else {
-            setRecording(false);
-            setRecordingInfo("");
-          }
-        })
-        .catch(() => {});
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [recording]);
 
   return (
     <div className="bg-surface rounded-xl p-4 sm:p-6 border border-border">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-[11px] text-neutral-200 uppercase tracking-wider">Conexion Apex Timing</h2>
-        <div className="flex items-center gap-2">
-          {recording && (
-            <span className="flex items-center gap-1 text-[10px] text-red-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
-              REC
-            </span>
-          )}
-          {apexConnected && (
+        <h2 className="text-[11px] text-neutral-200 uppercase tracking-wider">CircuitHub</h2>
+        {status?.monitoring && (
+          <div className="flex items-center gap-2">
             <span className="flex items-center gap-1.5 text-[10px] text-accent">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent inline-block" />
-              Conectado
+              <span className={`w-1.5 h-1.5 rounded-full inline-block ${
+                status.circuit_connected ? "bg-accent" : "bg-yellow-500 animate-pulse"
+              }`} />
+              {status.circuit_connected ? "Conectado" : "Reconectando..."}
             </span>
-          )}
-        </div>
-      </div>
-      {apexStatusMsg && (
-        <p className={`text-xs mb-3 ${apexConnected ? "text-accent" : "text-neutral-400"}`}>
-          {apexStatusMsg}
-        </p>
-      )}
-      <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={async () => {
-            try {
-              setApexStatus(false, "Conectando...");
-              const res = await api.connectApex();
-              setApexStatus(true, `Conectado a ${res.circuit} (${res.teamsLoaded} equipos)`);
-              requestWsReconnect();
-            } catch (e: any) {
-              setApexStatus(false, "Error: " + e.message);
-            }
-          }}
-          disabled={apexConnected}
-          className="flex-1 min-w-[100px] bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-2.5 px-4 rounded-lg text-sm"
-        >
-          Conectar
-        </button>
-        <button
-          onClick={async () => {
-            try {
-              await api.disconnectApex();
-              setApexStatus(false, "Desconectado");
-              setRecording(false);
-              setRecordingInfo("");
-              requestWsReconnect();
-            } catch {}
-          }}
-          disabled={!apexConnected}
-          className="flex-1 min-w-[100px] bg-red-900/50 hover:bg-red-800 disabled:opacity-40 text-red-300 font-medium py-2.5 px-4 rounded-lg text-sm"
-        >
-          Desconectar
-        </button>
+          </div>
+        )}
       </div>
 
-      {/* Recording controls */}
-      {apexConnected && (
+      {status?.monitoring ? (
+        <div className="space-y-2">
+          <p className="text-xs text-accent">
+            Monitorizando <span className="font-semibold">{status.circuit_name}</span>
+          </p>
+          <div className="flex items-center gap-4 text-[10px] text-neutral-400">
+            <span>{status.circuit_messages.toLocaleString()} mensajes</span>
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+              Grabando auto
+            </span>
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-neutral-500">
+          Guarda una sesion de carrera para empezar a monitorizar
+        </p>
+      )}
+
+      {/* Admin: show all circuit connections */}
+      {isAdmin && hubCircuits.length > 0 && (
         <div className="mt-3 pt-3 border-t border-border">
-          <div className="flex items-center gap-2 flex-wrap">
-            {!recording ? (
-              <button
-                onClick={async () => {
-                  try {
-                    const res = await api.startRecording();
-                    setRecording(true);
-                    setRecordingInfo(res.filename);
-                  } catch (e: any) {
-                    alert("Error: " + e.message);
-                  }
-                }}
-                className="flex items-center gap-1.5 bg-red-900/30 hover:bg-red-900/50 text-red-300 text-xs font-medium px-3 py-2 rounded-lg border border-red-900/30 transition-colors"
-              >
-                <span className="w-2 h-2 rounded-full bg-red-500" />
-                Grabar carrera
-              </button>
-            ) : (
-              <button
-                onClick={async () => {
-                  try {
-                    await api.stopRecording();
-                    setRecording(false);
-                    setRecordingInfo("");
-                  } catch {}
-                }}
-                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3 py-2 rounded-lg transition-colors"
-              >
-                <span className="w-2 h-2 rounded-sm bg-white" />
-                Parar grabacion
-              </button>
-            )}
-            {recordingInfo && (
-              <span className="text-[10px] text-neutral-400">{recordingInfo}</span>
-            )}
+          <p className="text-[10px] text-neutral-400 mb-2 uppercase tracking-wider">Circuitos conectados</p>
+          <div className="space-y-1">
+            {hubCircuits.map((c) => (
+              <div key={c.circuit_id} className="flex items-center gap-2 text-[10px]">
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                  c.connected ? "bg-accent" : "bg-red-500"
+                }`} />
+                <span className="text-neutral-300 truncate flex-1">{c.circuit_name}</span>
+                <span className="text-neutral-500">{c.messages.toLocaleString()} msgs</span>
+                {c.subscribers > 0 && (
+                  <span className="text-accent">{c.subscribers} usr</span>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -448,6 +407,7 @@ interface LogEntry {
   filename: string;
   owner_id?: number | null;
   owner?: string;
+  circuit_dir?: string;
 }
 
 function ReplayControls() {
@@ -455,22 +415,25 @@ function ReplayControls() {
   // Use module-level vars to survive tab changes
   const [selectedLog, setSelectedLogState] = useState(_replaySelectedLog);
   const [selectedOwnerId, setSelectedOwnerIdState] = useState<number | null>(_replaySelectedOwnerId);
+  const [selectedCircuitDir, setSelectedCircuitDirState] = useState<string | null>(_replaySelectedCircuitDir);
   const [speed, setSpeedState] = useState(_replaySpeed);
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<LogAnalysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const {
-    apexConnected, setApexStatus, requestWsReconnect,
+    requestWsReconnect,
     replayActive, replayPaused, replayFilename, replayProgress, replayTime, setReplayStatus,
   } = useRaceStore();
   const { user } = useAuth();
   const isAdmin = user?.is_admin ?? false;
 
-  const setSelectedLog = (v: string, ownerId: number | null = null) => {
+  const setSelectedLog = (v: string, ownerId: number | null = null, circuitDir: string | null = null) => {
     _replaySelectedLog = v;
     _replaySelectedOwnerId = ownerId;
+    _replaySelectedCircuitDir = circuitDir;
     setSelectedLogState(v);
     setSelectedOwnerIdState(ownerId);
+    setSelectedCircuitDirState(circuitDir);
   };
   const setSpeed = (v: number) => {
     _replaySpeed = v;
@@ -494,11 +457,11 @@ function ReplayControls() {
   useEffect(() => {
     if (!selectedLog) { setAnalysis(null); return; }
     setAnalyzing(true);
-    api.analyzeLog(selectedLog, selectedOwnerId)
+    api.analyzeLog(selectedLog, selectedOwnerId, selectedCircuitDir)
       .then(setAnalysis)
       .catch(() => setAnalysis(null))
       .finally(() => setAnalyzing(false));
-  }, [selectedLog, selectedOwnerId]);
+  }, [selectedLog, selectedOwnerId, selectedCircuitDir]);
 
   // Poll status while replay is active
   useEffect(() => {
@@ -511,13 +474,9 @@ function ReplayControls() {
     if (!selectedLog) return;
     setLoading(true);
     try {
-      if (apexConnected) {
-        await api.disconnectApex();
-        setApexStatus(false, "Desconectado (replay)");
-        requestWsReconnect();
-        await new Promise((r) => setTimeout(r, 500));
-      }
-      await api.startReplay(selectedLog, speed, block, selectedOwnerId);
+      await api.startReplay(selectedLog, speed, block, selectedOwnerId, selectedCircuitDir);
+      // Switch WS to replay state
+      requestWsReconnect();
       await syncStatus();
     } catch (e: any) {
       alert("Error: " + e.message);
@@ -547,39 +506,72 @@ function ReplayControls() {
     }
   };
 
+  // Parse the select value to extract log info
+  const parseSelectValue = (val: string): { filename: string; ownerId: number | null; circuitDir: string | null } => {
+    if (!val) return { filename: "", ownerId: null, circuitDir: null };
+
+    // Format: "circuit:{dir}:{filename}" for circuit recordings
+    if (val.startsWith("circuit:")) {
+      const rest = val.substring(8);
+      const colonIdx = rest.indexOf(":");
+      if (colonIdx > 0) {
+        return {
+          filename: rest.substring(colonIdx + 1),
+          ownerId: null,
+          circuitDir: rest.substring(0, colonIdx),
+        };
+      }
+    }
+
+    // Format: "{ownerId}:{filename}" for admin user logs
+    const colonIdx = val.indexOf(":");
+    if (colonIdx > 0 && isAdmin) {
+      const oid = parseInt(val.substring(0, colonIdx), 10);
+      return {
+        filename: val.substring(colonIdx + 1),
+        ownerId: isNaN(oid) ? null : oid,
+        circuitDir: null,
+      };
+    }
+
+    // Plain filename
+    return { filename: val, ownerId: null, circuitDir: null };
+  };
+
+  const buildSelectValue = (log: LogEntry): string => {
+    if (log.circuit_dir) return `circuit:${log.circuit_dir}:${log.filename}`;
+    if (log.owner_id != null) return `${log.owner_id}:${log.filename}`;
+    return log.filename;
+  };
+
+  const currentSelectValue = selectedCircuitDir
+    ? `circuit:${selectedCircuitDir}:${selectedLog}`
+    : selectedOwnerId != null
+    ? `${selectedOwnerId}:${selectedLog}`
+    : selectedLog;
+
   return (
     <div className="bg-surface rounded-xl p-6 border border-border">
       <h2 className="text-[11px] text-neutral-200 mb-4 uppercase tracking-wider">Replay</h2>
 
-      {apexConnected && (
-        <p className="text-[11px] text-yellow-500/80 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2 mb-3">
-          Desconectate del Apex Timing para usar el replay
-        </p>
-      )}
-
       <div className="space-y-3">
         <select
-          value={selectedOwnerId != null ? `${selectedOwnerId}:${selectedLog}` : selectedLog}
+          value={currentSelectValue}
           onChange={(e) => {
-            const val = e.target.value;
-            if (!val) { setSelectedLog(""); return; }
-            // Format: "ownerId:filename" for admin logs, "filename" for own logs
-            const colonIdx = val.indexOf(":");
-            if (colonIdx > 0 && isAdmin) {
-              const oid = parseInt(val.substring(0, colonIdx), 10);
-              const fname = val.substring(colonIdx + 1);
-              setSelectedLog(fname, isNaN(oid) ? null : oid);
-            } else {
-              setSelectedLog(val);
-            }
+            const parsed = parseSelectValue(e.target.value);
+            setSelectedLog(parsed.filename, parsed.ownerId, parsed.circuitDir);
           }}
           disabled={replayActive}
           className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
         >
           <option value="">Seleccionar log...</option>
           {logs.map((log, idx) => {
-            const val = log.owner_id != null ? `${log.owner_id}:${log.filename}` : log.filename;
-            const label = log.owner ? `[${log.owner}] ${log.filename}` : log.filename;
+            const val = buildSelectValue(log);
+            const label = log.circuit_dir
+              ? `[${log.owner}] ${log.filename}`
+              : log.owner
+              ? `[${log.owner}] ${log.filename}`
+              : log.filename;
             return <option key={`${val}-${idx}`} value={val}>{label}</option>;
           })}
         </select>
@@ -700,6 +692,8 @@ function ReplayControls() {
             onClick={async () => {
               await api.stopReplay();
               await syncStatus();
+              // Switch WS back to live state
+              requestWsReconnect();
             }}
             disabled={!replayActive}
             className="w-10 h-10 flex items-center justify-center bg-red-900/50 hover:bg-red-800 disabled:opacity-40 text-red-300 rounded-lg transition-colors"

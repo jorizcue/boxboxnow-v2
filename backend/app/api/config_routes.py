@@ -82,6 +82,7 @@ async def get_active_session(user: User = Depends(get_current_user), db: AsyncSe
 @router.post("/session", response_model=RaceSessionOut)
 async def create_session(
     data: RaceSessionCreate,
+    request: Request,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -107,6 +108,14 @@ async def create_session(
     session = RaceSession(user_id=user.id, **session_data)
     db.add(session)
     await db.commit()
+
+    # Stop any existing monitoring and auto-start on new circuit
+    from app.api.race_routes import ensure_monitoring
+    registry = request.app.state.registry
+    circuit_hub = request.app.state.circuit_hub
+    if registry.get(user.id):
+        await registry.stop_session(user.id, circuit_hub)
+    await ensure_monitoring(request.app.state, user.id)
 
     return await _reload_session(user.id, db)
 
@@ -138,10 +147,18 @@ async def update_session(
     circuit = await db.execute(select(Circuit).where(Circuit.id == session.circuit_id))
     c = circuit.scalar_one_or_none()
 
-    # If there's an active UserSession (live Apex), reconfigure it
+    # If there's an active UserSession (live monitoring), reconfigure or restart it
     registry = request.app.state.registry
     user_session = registry.get(user.id)
-    if user_session:
+
+    if user_session and data.circuit_id and data.circuit_id != user_session.circuit_id:
+        # Circuit changed — restart monitoring on new circuit
+        circuit_hub = request.app.state.circuit_hub
+        await registry.stop_session(user.id, circuit_hub)
+        from app.api.race_routes import ensure_monitoring
+        user_session = await ensure_monitoring(request.app.state, user.id)
+        logger.info(f"Restarted monitoring for user {user.id} on new circuit")
+    elif user_session:
         user_session.configure(
             circuit_length_m=c.length_m if c else 1100,
             pit_time_s=session.pit_time_s,
@@ -156,10 +173,15 @@ async def update_session(
             box_karts=session.box_karts,
             duration_min=session.duration_min,
             refresh_s=session.refresh_interval_s,
+            min_driver_time_min=session.min_driver_time_min,
         )
         await user_session.broadcast_snapshot()
         logger.info(f"Live reconfigured session for user {user.id} "
                     f"(boxLines={session.box_lines}, boxKarts={session.box_karts})")
+    else:
+        # No live session yet — auto-start monitoring
+        from app.api.race_routes import ensure_monitoring
+        await ensure_monitoring(request.app.state, user.id)
 
     # Also update user's replay session if active
     replay_reg = getattr(request.app.state, "replay_registry", None)

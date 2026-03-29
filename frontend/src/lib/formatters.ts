@@ -13,13 +13,15 @@ export function msToLapTime(ms: number): string {
 }
 
 /**
- * Convert seconds to MM:SS display format.
+ * Convert seconds to MM:SS.dd display format (2 decimal places on seconds).
  */
 export function secondsToStint(seconds: number): string {
   if (seconds <= 0) return "0:00";
   const min = Math.floor(seconds / 60);
-  const sec = Math.floor(seconds % 60);
-  return `${min}:${sec.toString().padStart(2, "0")}`;
+  const sec = seconds % 60;
+  const secWhole = Math.floor(sec);
+  const secFrac = Math.floor((sec - secWhole) * 100);
+  return `${min}:${secWhole.toString().padStart(2, "0")}.${secFrac.toString().padStart(2, "0")}`;
 }
 
 /**

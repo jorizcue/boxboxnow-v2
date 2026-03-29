@@ -55,7 +55,7 @@ export function useRaceClock(): number {
       } else {
         setLocalMs(serverVal - elapsed);
       }
-    }, 1000);
+    }, 200);
 
     return () => clearInterval(interval);
   }, [serverCountdownMs, replayPaused]);

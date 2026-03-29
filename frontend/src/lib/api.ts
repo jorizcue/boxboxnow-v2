@@ -118,25 +118,42 @@ export const api = {
 
   // Race
   getSnapshot: () => fetchApi<any>("/api/race/snapshot"),
-  getConnectionStatus: () => fetchApi<{ apex_connected: boolean; circuit: string | null }>("/api/race/status"),
-  connectApex: () => fetchApi<any>("/api/race/connect", { method: "POST" }),
-  disconnectApex: () => fetchApi<any>("/api/race/disconnect", { method: "POST" }),
+  getConnectionStatus: () => fetchApi<{
+    monitoring: boolean;
+    circuit_id: number | null;
+    circuit_connected: boolean;
+    circuit_messages: number;
+    circuit_name: string | null;
+    apex_connected: boolean;
+    circuit: string | null;
+  }>("/api/race/status"),
+  getHubStatus: () => fetchApi<{ circuits: any[] }>("/api/race/hub-status"),
+  disconnectMonitoring: () => fetchApi<any>("/api/race/disconnect", { method: "POST" }),
   getLiveTeams: () => fetchApi<any>("/api/race/live-teams"),
 
-  // Recording
-  getRecordingStatus: () => fetchApi<any>("/api/race/recording/status"),
-  startRecording: () => fetchApi<any>("/api/race/recording/start", { method: "POST" }),
-  stopRecording: () => fetchApi<any>("/api/race/recording/stop", { method: "POST" }),
-
   // Replay
-  getReplayLogs: () => fetchApi<{ logs: Array<{ filename: string; owner_id?: number | null; owner?: string }> }>("/api/replay/logs"),
+  getReplayLogs: () => fetchApi<{ logs: Array<{ filename: string; owner_id?: number | null; owner?: string; circuit_dir?: string }> }>("/api/replay/logs"),
   getReplayStatus: () => fetchApi<any>("/api/replay/status"),
-  analyzeLog: (filename: string, ownerId?: number | null) =>
-    fetchApi<{ totalBlocks: number; raceStarts: { block: number; progress: number; timestamp: string; title: string }[]; startTime: string | null; endTime: string | null }>(
-      `/api/replay/analyze/${encodeURIComponent(filename)}${ownerId != null ? `?owner_id=${ownerId}` : ""}`
-    ),
-  startReplay: (filename: string, speed: number = 1, startBlock: number = 0, ownerId?: number | null) =>
-    fetchApi<any>("/api/replay/start", { method: "POST", body: JSON.stringify({ filename, speed, start_block: startBlock, ...(ownerId != null ? { owner_id: ownerId } : {}) }) }),
+  analyzeLog: (filename: string, ownerId?: number | null, circuitDir?: string | null) => {
+    const params = new URLSearchParams();
+    if (ownerId != null) params.set("owner_id", String(ownerId));
+    if (circuitDir) params.set("circuit_dir", circuitDir);
+    const qs = params.toString();
+    return fetchApi<{ totalBlocks: number; raceStarts: { block: number; progress: number; timestamp: string; title: string }[]; startTime: string | null; endTime: string | null }>(
+      `/api/replay/analyze/${encodeURIComponent(filename)}${qs ? `?${qs}` : ""}`
+    );
+  },
+  startReplay: (filename: string, speed: number = 1, startBlock: number = 0, ownerId?: number | null, circuitDir?: string | null) =>
+    fetchApi<any>("/api/replay/start", {
+      method: "POST",
+      body: JSON.stringify({
+        filename,
+        speed,
+        start_block: startBlock,
+        ...(ownerId != null ? { owner_id: ownerId } : {}),
+        ...(circuitDir ? { circuit_dir: circuitDir } : {}),
+      }),
+    }),
   stopReplay: () => fetchApi<any>("/api/replay/stop", { method: "POST" }),
   pauseReplay: () => fetchApi<any>("/api/replay/pause", { method: "POST" }),
   seekReplay: (block: number) =>
