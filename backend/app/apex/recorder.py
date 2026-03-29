@@ -20,14 +20,18 @@ logger = logging.getLogger(__name__)
 class RaceRecorder:
     """Records raw WS messages to a .log file for later replay."""
 
-    def __init__(self, logs_dir: str = "data/logs"):
-        self.logs_dir = logs_dir
+    def __init__(self, logs_dir: str = "data/logs", user_id: int | None = None):
+        # If user_id provided, store in per-user subdirectory
+        if user_id is not None:
+            self.logs_dir = os.path.join(logs_dir, str(user_id))
+        else:
+            self.logs_dir = logs_dir
         self._file = None
         self._filename: str | None = None
         self._recording = False
         self._message_count = 0
         self._started_at: datetime | None = None
-        Path(logs_dir).mkdir(parents=True, exist_ok=True)
+        Path(self.logs_dir).mkdir(parents=True, exist_ok=True)
 
     @property
     def is_recording(self) -> bool:

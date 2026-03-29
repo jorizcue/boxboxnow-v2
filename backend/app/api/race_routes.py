@@ -14,7 +14,14 @@ def _get_user_state(request: Request, user: User):
     session = registry.get(user.id)
     if session:
         return session.state
-    return request.app.state.replay_state
+    # Fall back to user's replay session
+    replay_registry = request.app.state.replay_registry
+    replay_session = replay_registry.get(user.id)
+    if replay_session:
+        return replay_session.state
+    # Create a blank replay session as fallback
+    replay_session = replay_registry.get_or_create(user.id)
+    return replay_session.state
 
 
 @router.get("/snapshot")

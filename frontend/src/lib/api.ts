@@ -129,14 +129,14 @@ export const api = {
   stopRecording: () => fetchApi<any>("/api/race/recording/stop", { method: "POST" }),
 
   // Replay
-  getReplayLogs: () => fetchApi<{ logs: string[] }>("/api/replay/logs"),
+  getReplayLogs: () => fetchApi<{ logs: Array<{ filename: string; owner_id?: number | null; owner?: string }> }>("/api/replay/logs"),
   getReplayStatus: () => fetchApi<any>("/api/replay/status"),
-  analyzeLog: (filename: string) =>
+  analyzeLog: (filename: string, ownerId?: number | null) =>
     fetchApi<{ totalBlocks: number; raceStarts: { block: number; progress: number; timestamp: string; title: string }[]; startTime: string | null; endTime: string | null }>(
-      `/api/replay/analyze/${encodeURIComponent(filename)}`
+      `/api/replay/analyze/${encodeURIComponent(filename)}${ownerId != null ? `?owner_id=${ownerId}` : ""}`
     ),
-  startReplay: (filename: string, speed: number = 1, startBlock: number = 0) =>
-    fetchApi<any>("/api/replay/start", { method: "POST", body: JSON.stringify({ filename, speed, start_block: startBlock }) }),
+  startReplay: (filename: string, speed: number = 1, startBlock: number = 0, ownerId?: number | null) =>
+    fetchApi<any>("/api/replay/start", { method: "POST", body: JSON.stringify({ filename, speed, start_block: startBlock, ...(ownerId != null ? { owner_id: ownerId } : {}) }) }),
   stopReplay: () => fetchApi<any>("/api/replay/stop", { method: "POST" }),
   pauseReplay: () => fetchApi<any>("/api/replay/pause", { method: "POST" }),
   seekReplay: (block: number) =>

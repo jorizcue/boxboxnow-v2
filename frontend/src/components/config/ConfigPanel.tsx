@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useRaceStore } from "@/hooks/useRaceState";
+import { useAuth } from "@/hooks/useAuth";
 import { TeamEditor } from "@/components/config/TeamEditor";
 
 interface Circuit {
@@ -34,6 +35,7 @@ interface RaceSession {
 
 // Module-level state for replay — survives tab changes (component re-mounts)
 let _replaySelectedLog = "";
+let _replaySelectedOwnerId: number | null = null;
 let _replaySpeed = 10;
 
 export function ConfigPanel() {
@@ -442,10 +444,17 @@ interface LogAnalysis {
   endTime: string | null;
 }
 
+interface LogEntry {
+  filename: string;
+  owner_id?: number | null;
+  owner?: string;
+}
+
 function ReplayControls() {
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   // Use module-level vars to survive tab changes
   const [selectedLog, setSelectedLogState] = useState(_replaySelectedLog);
+  const [selectedOwnerId, setSelectedOwnerIdState] = useState<number | null>(_replaySelectedOwnerId);
   const [speed, setSpeedState] = useState(_replaySpeed);
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<LogAnalysis | null>(null);
@@ -454,10 +463,14 @@ function ReplayControls() {
     apexConnected, setApexStatus, requestWsReconnect,
     replayActive, replayPaused, replayFilename, replayProgress, replayTime, setReplayStatus,
   } = useRaceStore();
+  const { user } = useAuth();
+  const isAdmin = user?.is_admin ?? false;
 
-  const setSelectedLog = (v: string) => {
+  const setSelectedLog = (v: string, ownerId: number | null = null) => {
     _replaySelectedLog = v;
+    _replaySelectedOwnerId = ownerId;
     setSelectedLogState(v);
+    setSelectedOwnerIdState(ownerId);
   };
   const setSpeed = (v: number) => {
     _replaySpeed = v;
@@ -473,7 +486,7 @@ function ReplayControls() {
   };
 
   useEffect(() => {
-    api.getReplayLogs().then((data) => setLogs(data.logs)).catch(() => {});
+    api.getReplayLogs().then((data) => setLogs(data.logs || [])).catch(() => {});
     syncStatus();
   }, []);
 
@@ -481,11 +494,11 @@ function ReplayControls() {
   useEffect(() => {
     if (!selectedLog) { setAnalysis(null); return; }
     setAnalyzing(true);
-    api.analyzeLog(selectedLog)
+    api.analyzeLog(selectedLog, selectedOwnerId)
       .then(setAnalysis)
       .catch(() => setAnalysis(null))
       .finally(() => setAnalyzing(false));
-  }, [selectedLog]);
+  }, [selectedLog, selectedOwnerId]);
 
   // Poll status while replay is active
   useEffect(() => {
@@ -504,7 +517,7 @@ function ReplayControls() {
         requestWsReconnect();
         await new Promise((r) => setTimeout(r, 500));
       }
-      await api.startReplay(selectedLog, speed, block);
+      await api.startReplay(selectedLog, speed, block, selectedOwnerId);
       await syncStatus();
     } catch (e: any) {
       alert("Error: " + e.message);
@@ -546,15 +559,29 @@ function ReplayControls() {
 
       <div className="space-y-3">
         <select
-          value={selectedLog}
-          onChange={(e) => setSelectedLog(e.target.value)}
+          value={selectedOwnerId != null ? `${selectedOwnerId}:${selectedLog}` : selectedLog}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (!val) { setSelectedLog(""); return; }
+            // Format: "ownerId:filename" for admin logs, "filename" for own logs
+            const colonIdx = val.indexOf(":");
+            if (colonIdx > 0 && isAdmin) {
+              const oid = parseInt(val.substring(0, colonIdx), 10);
+              const fname = val.substring(colonIdx + 1);
+              setSelectedLog(fname, isNaN(oid) ? null : oid);
+            } else {
+              setSelectedLog(val);
+            }
+          }}
           disabled={replayActive}
           className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
         >
           <option value="">Seleccionar log...</option>
-          {logs.map((log) => (
-            <option key={log} value={log}>{log}</option>
-          ))}
+          {logs.map((log, idx) => {
+            const val = log.owner_id != null ? `${log.owner_id}:${log.filename}` : log.filename;
+            const label = log.owner ? `[${log.owner}] ${log.filename}` : log.filename;
+            return <option key={`${val}-${idx}`} value={val}>{label}</option>;
+          })}
         </select>
 
         {/* Timeline bar */}

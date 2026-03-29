@@ -28,7 +28,7 @@ class UserSession:
         self.parser = ApexMessageParser()
         self.state = RaceStateManager()
         self.fifo = FifoManager()
-        self.recorder = RaceRecorder()
+        self.recorder = RaceRecorder(user_id=user_id)
         self.api_client: ApexApiClient | None = None
         self._load_drivers_task: asyncio.Task | None = None
 

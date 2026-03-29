@@ -1,27 +1,31 @@
 """REST API routes for log replay control (per-user)."""
 
 import logging
-from fastapi import APIRouter, Request, HTTPException, Depends
+import os
+from pathlib import Path
+from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sqlalchemy.orm import selectinload
 from app.models.database import get_db
-from app.models.schemas import RaceSession, Circuit, TeamPosition
+from app.models.schemas import RaceSession, Circuit, TeamPosition, User
 from app.api.auth_routes import get_current_user
-from app.models.schemas import User
 from app.apex.replay import ReplayEngine
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/replay", tags=["replay"])
 
+LOGS_BASE_DIR = "data/logs"
+
 
 class ReplayStartRequest(BaseModel):
     filename: str
     speed: float = 1.0
     start_block: int = 0
+    owner_id: int | None = None  # Admin can replay another user's log
 
 
 class ReplaySpeedRequest(BaseModel):
@@ -36,20 +40,113 @@ def _get_replay_registry(request: Request):
     return request.app.state.replay_registry
 
 
+def _resolve_logs_dir(user: User, owner_id: int | None = None) -> str:
+    """Resolve the logs directory for a given user.
+    Admin can specify owner_id to access another user's logs."""
+    if owner_id is not None and user.is_admin:
+        return os.path.join(LOGS_BASE_DIR, str(owner_id))
+    return os.path.join(LOGS_BASE_DIR, str(user.id))
+
+
+def _list_user_logs(user_id: int) -> list[dict]:
+    """List log files for a specific user."""
+    user_dir = os.path.join(LOGS_BASE_DIR, str(user_id))
+    if not os.path.isdir(user_dir):
+        return []
+    return sorted(
+        [
+            {"filename": f.name, "owner_id": user_id}
+            for f in Path(user_dir).glob("*.log")
+        ],
+        key=lambda x: x["filename"],
+        reverse=True,
+    )
+
+
+def _list_root_logs() -> list[dict]:
+    """List legacy log files in root data/logs/ (not in user subdirs)."""
+    base = Path(LOGS_BASE_DIR)
+    if not base.exists():
+        return []
+    return sorted(
+        [
+            {"filename": f.name, "owner_id": None}
+            for f in base.glob("*.log")
+            if f.is_file()
+        ],
+        key=lambda x: x["filename"],
+        reverse=True,
+    )
+
+
 @router.get("/logs")
-async def list_logs(request: Request):
-    """List available log files for replay."""
-    # Use a temporary engine just for listing (no user state needed)
-    from app.apex.parser import ApexMessageParser
-    engine = ReplayEngine(ApexMessageParser(), lambda e: None, logs_dir="data/logs")
-    return {"logs": engine.list_logs()}
+async def list_logs(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List available log files.
+    Admin sees all users' logs + legacy root logs.
+    Non-admin sees only their own logs."""
+    if user.is_admin:
+        # Collect logs from all user subdirectories + root
+        all_logs = []
+
+        # Build user_id -> username map
+        from app.models.schemas import User as UserModel
+        result = await db.execute(select(UserModel))
+        users_map = {u.id: u.username for u in result.scalars().all()}
+
+        base = Path(LOGS_BASE_DIR)
+        if base.exists():
+            for subdir in sorted(base.iterdir()):
+                if subdir.is_dir() and subdir.name.isdigit():
+                    uid = int(subdir.name)
+                    username = users_map.get(uid, f"user_{uid}")
+                    for f in sorted(subdir.glob("*.log"), reverse=True):
+                        all_logs.append({
+                            "filename": f.name,
+                            "owner_id": uid,
+                            "owner": username,
+                        })
+
+        # Legacy root-level logs
+        for entry in _list_root_logs():
+            all_logs.append({
+                "filename": entry["filename"],
+                "owner_id": None,
+                "owner": "sistema",
+            })
+
+        return {"logs": all_logs}
+    else:
+        # Non-admin: only own logs
+        user_logs = _list_user_logs(user.id)
+        return {"logs": [{"filename": l["filename"]} for l in user_logs]}
 
 
 @router.get("/analyze/{filename}")
-async def analyze_log(filename: str, request: Request):
-    """Analyze a log file: total blocks, race start positions, time range."""
+async def analyze_log(
+    filename: str,
+    user: User = Depends(get_current_user),
+    owner_id: int | None = Query(None),
+):
+    """Analyze a log file: total blocks, race start positions, time range.
+    Admin can specify owner_id to analyze another user's log."""
     from app.apex.parser import ApexMessageParser
-    engine = ReplayEngine(ApexMessageParser(), lambda e: None, logs_dir="data/logs")
+
+    logs_dir = _resolve_logs_dir(user, owner_id)
+
+    # Also check legacy root dir as fallback
+    filepath = os.path.join(logs_dir, filename)
+    if not os.path.exists(filepath):
+        # Try root dir for legacy logs
+        root_path = os.path.join(LOGS_BASE_DIR, filename)
+        if user.is_admin and os.path.exists(root_path):
+            logs_dir = LOGS_BASE_DIR
+        else:
+            raise HTTPException(404, f"Log file not found: {filename}")
+
+    engine = ReplayEngine(ApexMessageParser(), lambda e: None, logs_dir=logs_dir)
     try:
         return engine.analyze_log(filename)
     except FileNotFoundError as e:
@@ -80,11 +177,27 @@ async def start_replay(
     """Start replaying a log file. Creates per-user replay session."""
     replay_reg = _get_replay_registry(request)
 
+    # Resolve which user's logs directory to read from
+    owner_id = data.owner_id if (data.owner_id is not None and user.is_admin) else user.id
+    logs_dir = os.path.join(LOGS_BASE_DIR, str(owner_id))
+
+    # Check file exists (also check root for legacy)
+    filepath = os.path.join(logs_dir, data.filename)
+    if not os.path.exists(filepath):
+        root_path = os.path.join(LOGS_BASE_DIR, data.filename)
+        if user.is_admin and os.path.exists(root_path):
+            logs_dir = LOGS_BASE_DIR
+        else:
+            raise HTTPException(404, f"Log file not found: {data.filename}")
+
     # Stop any existing replay for this user
     await replay_reg.stop_session(user.id)
 
     # Create a new replay session for this user
     replay_session = replay_reg.get_or_create(user.id)
+
+    # Point engine to the correct logs directory
+    replay_session.engine.logs_dir = logs_dir
 
     # Load user's active session config (with teams and drivers for differentials)
     session = (await db.execute(
