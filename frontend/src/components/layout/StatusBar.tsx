@@ -8,6 +8,7 @@ import { useRaceStore } from "@/hooks/useRaceState";
 import { useRaceClock } from "@/hooks/useRaceClock";
 import { useReplayTime } from "@/hooks/useReplayTime";
 import { api } from "@/lib/api";
+import { StyledSelect } from "@/components/shared/StyledSelect";
 import { SessionManager } from "@/components/auth/SessionManager";
 
 interface StatusBarProps {
@@ -115,15 +116,13 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
                 </div>
 
                 {/* Speed selector */}
-                <select
+                <StyledSelect
+                  compact
                   value={replaySpeed}
-                  onChange={(e) => handleSpeedChange(Number(e.target.value))}
-                  className="bg-neutral-800 border border-border rounded px-1 py-0 text-[10px] sm:text-[11px] text-orange-300 font-mono cursor-pointer appearance-none text-center w-10"
-                >
-                  {[1, 2, 3, 5, 10, 20, 50, 100].map((s) => (
-                    <option key={s} value={s}>{s}x</option>
-                  ))}
-                </select>
+                  onChange={(v) => handleSpeedChange(Number(v))}
+                  options={[1, 2, 3, 5, 10, 20, 50, 100].map((s) => ({ value: s, label: `${s}x` }))}
+                  className="w-12 font-mono"
+                />
 
                 {/* Pause/Resume */}
                 <button
