@@ -30,6 +30,7 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   const replayProgress = useRaceStore((s) => s.replayProgress);
   const replaySpeed = useRaceStore((s) => s.replaySpeed);
   const requestWsReconnect = useRaceStore((s) => s.requestWsReconnect);
+  const setReplayStatus = useRaceStore((s) => s.setReplayStatus);
   const replayTime = useReplayTime();
 
   const handlePauseResume = useCallback(async () => {
@@ -38,10 +39,11 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
 
   const handleStop = useCallback(async () => {
     try {
+      setReplayStatus(false);
       await api.stopReplay();
       requestWsReconnect();
     } catch {}
-  }, [requestWsReconnect]);
+  }, [requestWsReconnect, setReplayStatus]);
 
   const handleSpeedChange = useCallback(async (speed: number) => {
     try { await api.setReplaySpeed(speed); } catch {}
