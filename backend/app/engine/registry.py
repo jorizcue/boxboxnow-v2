@@ -31,7 +31,8 @@ class UserSession:
         self._load_drivers_task: asyncio.Task | None = None
         self._analytics_task: asyncio.Task | None = None
         self._race_log_id: int | None = None
-        self._saved_lap_count: int = 0  # Track how many laps we've already saved
+        self._saved_laps_per_kart: dict[int, int] = {}  # kart_number -> count of saved laps
+        self._save_lock = asyncio.Lock()
 
         async def on_events(events):
             # Track which karts were NOT in pit before processing
@@ -134,47 +135,48 @@ class UserSession:
         from datetime import datetime, timezone
 
         try:
-            async with async_session() as db:
-                # Create race_log on first save
-                if self._race_log_id is None:
-                    race_log = RaceLog(
-                        circuit_id=self.circuit_id,
-                        user_id=self.user_id,
-                        race_date=datetime.now(timezone.utc),
-                        session_name=f"Race {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-                        duration_min=self.state.duration_min,
-                        total_karts=len(self.state.karts),
-                    )
-                    db.add(race_log)
-                    await db.flush()
-                    self._race_log_id = race_log.id
-                    logger.info(f"Created race_log #{race_log.id} for real-time saving (user={self.user_id})")
+            async with self._save_lock:
+                async with async_session() as db:
+                    # Create race_log on first save
+                    if self._race_log_id is None:
+                        race_log = RaceLog(
+                            circuit_id=self.circuit_id,
+                            user_id=self.user_id,
+                            race_date=datetime.now(timezone.utc),
+                            session_name=f"Race {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                            duration_min=self.state.duration_min,
+                            total_karts=len(self.state.karts),
+                        )
+                        db.add(race_log)
+                        await db.flush()
+                        self._race_log_id = race_log.id
+                        logger.info(f"Created race_log #{race_log.id} for real-time saving (user={self.user_id})")
 
-                # Collect ALL laps across all karts, skip already-saved ones
-                all_laps_flat = []
-                for kart in self.state.karts.values():
-                    valid_set = {(vl["totalLap"], vl["lapTime"]) for vl in kart.valid_laps}
-                    for lap in kart.all_laps:
-                        all_laps_flat.append((kart, lap, (lap["totalLap"], lap["lapTime"]) in valid_set))
+                    # Save only NEW laps per kart (track count per kart_number)
+                    new_count = 0
+                    for kart in self.state.karts.values():
+                        saved = self._saved_laps_per_kart.get(kart.kart_number, 0)
+                        if len(kart.all_laps) <= saved:
+                            continue
+                        valid_set = {(vl["totalLap"], vl["lapTime"]) for vl in kart.valid_laps}
+                        for lap in kart.all_laps[saved:]:
+                            kart_lap = KartLap(
+                                race_log_id=self._race_log_id,
+                                kart_number=kart.kart_number,
+                                team_name=kart.team_name,
+                                driver_name=lap.get("driverName", ""),
+                                lap_number=lap["totalLap"],
+                                lap_time_ms=lap["lapTime"],
+                                is_valid=(lap["totalLap"], lap["lapTime"]) in valid_set,
+                            )
+                            db.add(kart_lap)
+                            new_count += 1
+                        self._saved_laps_per_kart[kart.kart_number] = len(kart.all_laps)
 
-                new_laps = all_laps_flat[self._saved_lap_count:]
-                if not new_laps:
-                    return
+                    if new_count == 0:
+                        return
 
-                for kart, lap, is_valid in new_laps:
-                    kart_lap = KartLap(
-                        race_log_id=self._race_log_id,
-                        kart_number=kart.kart_number,
-                        team_name=kart.team_name,
-                        driver_name=lap.get("driverName", ""),
-                        lap_number=lap["totalLap"],
-                        lap_time_ms=lap["lapTime"],
-                        is_valid=is_valid,
-                    )
-                    db.add(kart_lap)
-
-                await db.commit()
-                self._saved_lap_count = len(all_laps_flat)
+                    await db.commit()
         except Exception as e:
             logger.error(f"Real-time lap save failed (user={self.user_id}): {e}")
 

@@ -217,10 +217,36 @@ async def revoke_access(access_id: int, admin: User = Depends(require_admin), db
 # --- CircuitHub Management ---
 
 @router.get("/hub/status")
-async def hub_status(request: Request, admin: User = Depends(require_admin)):
+async def hub_status(request: Request, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     """Get real-time status of all CircuitHub connections."""
+    from app.ws.server import get_connected_users, get_user_circuit_map
+
     circuit_hub = request.app.state.circuit_hub
-    return {"circuits": circuit_hub.get_status()}
+    statuses = circuit_hub.get_status()
+
+    # Get connected users per circuit from WS tracker
+    user_circuit_map = get_user_circuit_map()
+    circuit_users: dict[int, list[int]] = {}
+    for uid, cid in user_circuit_map.items():
+        circuit_users.setdefault(cid, []).append(uid)
+
+    # Resolve usernames
+    all_user_ids = set(user_circuit_map.keys())
+    if all_user_ids:
+        result = await db.execute(select(User.id, User.username).where(User.id.in_(all_user_ids)))
+        username_map = {row[0]: row[1] for row in result.all()}
+    else:
+        username_map = {}
+
+    # Enrich each circuit status with connected user info
+    for s in statuses:
+        cid = s["circuit_id"]
+        s["connected_users"] = [
+            {"id": uid, "username": username_map.get(uid, f"User {uid}")}
+            for uid in circuit_users.get(cid, [])
+        ]
+
+    return {"circuits": statuses}
 
 
 @router.post("/hub/{circuit_id}/start")

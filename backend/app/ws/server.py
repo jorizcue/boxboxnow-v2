@@ -15,11 +15,29 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy import select
 from app.api.auth_routes import decode_token
 from app.models.database import async_session
-from app.models.schemas import DeviceSession
+from app.models.schemas import DeviceSession, User
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Track active WebSocket connections per user
+# user_id -> set of WebSocket objects
+_ws_connections: dict[int, set] = {}
+
+# Track which circuit each user is connected to
+# user_id -> circuit_id
+_user_circuits: dict[int, int] = {}
+
+
+def get_connected_users() -> dict[int, int]:
+    """Return {user_id: connection_count} for all connected users."""
+    return {uid: len(conns) for uid, conns in _ws_connections.items() if conns}
+
+
+def get_user_circuit_map() -> dict[int, int]:
+    """Return {user_id: circuit_id} for connected users."""
+    return dict(_user_circuits)
 
 
 async def _validate_session_token(session_token: str) -> bool:
@@ -85,7 +103,21 @@ async def race_websocket(websocket: WebSocket, token: str = Query("")):
         await websocket.close(code=4001, reason="Session terminated")
         return
 
+    # Enforce max concurrent WS connections per user
+    async with async_session() as db:
+        result = await db.execute(select(User.max_devices).where(User.id == user_id))
+        max_devices = result.scalar_one_or_none() or 1
+    current_ws_count = len(_ws_connections.get(user_id, set()))
+    if current_ws_count >= max_devices:
+        await websocket.close(code=4003, reason="Max devices reached")
+        return
+
     await websocket.accept()
+
+    # Register connection
+    if user_id not in _ws_connections:
+        _ws_connections[user_id] = set()
+    _ws_connections[user_id].add(websocket)
 
     # Get registries
     registry = websocket.app.state.registry
@@ -98,6 +130,11 @@ async def race_websocket(websocket: WebSocket, token: str = Query("")):
             await ensure_monitoring(websocket.app.state, user_id)
         except Exception as e:
             logger.warning(f"Auto-start monitoring failed for user {user_id}: {e}")
+
+    # Track user's circuit for hub display
+    session = registry.get(user_id)
+    if session:
+        _user_circuits[user_id] = session.circuit_id
 
     # Resolve initial state
     current_state = _resolve_state(registry, replay_registry, user_id)
@@ -131,3 +168,8 @@ async def race_websocket(websocket: WebSocket, token: str = Query("")):
         logger.error(f"WebSocket error (user={user_id}): {e}")
     finally:
         current_state.remove_client(websocket)
+        # Unregister WS connection
+        _ws_connections.get(user_id, set()).discard(websocket)
+        if user_id in _ws_connections and not _ws_connections[user_id]:
+            del _ws_connections[user_id]
+        _user_circuits.pop(user_id, None)

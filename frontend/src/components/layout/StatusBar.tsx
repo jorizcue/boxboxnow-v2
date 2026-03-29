@@ -49,7 +49,7 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
           {/* Left: logo + status */}
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <span className="text-sm font-bold tracking-wider text-white shrink-0">
-              K<span className="text-accent">N</span>
+              BB<span className="text-accent">N</span>
             </span>
             <div className="flex items-center gap-1.5">
               <div

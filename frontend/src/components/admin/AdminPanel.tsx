@@ -486,6 +486,7 @@ interface HubCircuit {
   subscribers: number;
   messages: number;
   ws_url: string;
+  connected_users?: { id: number; username: string }[];
 }
 
 function CircuitHubManager() {
@@ -532,7 +533,7 @@ function CircuitHubManager() {
 
   const connectedCount = circuits.filter((c) => c.connected).length;
   const totalMessages = circuits.reduce((acc, c) => acc + c.messages, 0);
-  const totalSubscribers = circuits.reduce((acc, c) => acc + c.subscribers, 0);
+  const totalSubscribers = circuits.reduce((acc, c) => acc + (c.connected_users?.length || 0), 0);
 
   return (
     <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
@@ -583,8 +584,10 @@ function CircuitHubManager() {
                     {c.messages.toLocaleString()}
                   </td>
                   <td className="px-2 py-2 text-right">
-                    {c.subscribers > 0 ? (
-                      <span className="text-accent font-medium">{c.subscribers}</span>
+                    {c.connected_users && c.connected_users.length > 0 ? (
+                      <span className="text-accent font-medium" title={c.connected_users.map(u => u.username).join(", ")}>
+                        {c.connected_users.map(u => u.username).join(", ")}
+                      </span>
                     ) : (
                       <span className="text-neutral-700">0</span>
                     )}
