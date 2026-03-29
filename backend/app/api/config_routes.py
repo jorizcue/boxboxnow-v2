@@ -45,6 +45,20 @@ async def list_my_circuits(user: User = Depends(get_current_user), db: AsyncSess
     return result.scalars().all()
 
 
+@router.get("/live-timing-url")
+async def get_live_timing_url(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Get the live timing URL for the user's active session circuit."""
+    result = await db.execute(
+        select(RaceSession)
+        .options(selectinload(RaceSession.circuit))
+        .where(RaceSession.user_id == user.id, RaceSession.is_active == True)
+    )
+    session = result.scalar_one_or_none()
+    if not session or not session.circuit:
+        return {"url": None}
+    return {"url": session.circuit.live_timing_url or None}
+
+
 # --- Race Sessions ---
 
 @router.get("/session", response_model=RaceSessionOut | None)

@@ -31,6 +31,7 @@ class Circuit(Base):
     laps_discard = Column(Integer, default=2)
     lap_differential = Column(Integer, default=3000)
     php_api_url = Column(String(255), default="")
+    live_timing_url = Column(String(255), default="")
 
     user_access = relationship("UserCircuitAccess", back_populates="circuit", cascade="all, delete-orphan")
 

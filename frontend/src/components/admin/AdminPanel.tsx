@@ -20,6 +20,7 @@ interface CircuitRow {
   laps_discard: number;
   lap_differential: number;
   php_api_url: string | null;
+  live_timing_url: string | null;
 }
 
 interface AccessRow {
@@ -240,6 +241,7 @@ interface CircuitForm {
   laps_discard: string;
   lap_differential: string;
   php_api_url: string;
+  live_timing_url: string;
 }
 
 const emptyForm: CircuitForm = {
@@ -251,6 +253,7 @@ const emptyForm: CircuitForm = {
   laps_discard: "2",
   lap_differential: "3000",
   php_api_url: "",
+  live_timing_url: "",
 };
 
 function circuitToForm(c: CircuitRow): CircuitForm {
@@ -263,6 +266,7 @@ function circuitToForm(c: CircuitRow): CircuitForm {
     laps_discard: c.laps_discard.toString(),
     lap_differential: c.lap_differential.toString(),
     php_api_url: c.php_api_url ?? "",
+    live_timing_url: c.live_timing_url ?? "",
   };
 }
 
@@ -276,6 +280,7 @@ function formToPayload(f: CircuitForm) {
     laps_discard: Number(f.laps_discard) || 2,
     lap_differential: Number(f.lap_differential) || 3000,
     php_api_url: f.php_api_url || null,
+    live_timing_url: f.live_timing_url || null,
   };
 }
 
@@ -375,6 +380,7 @@ function CircuitsManager() {
             {fieldInput("Pit Time (s)", "pit_time_s", "number", "Segundos")}
             {fieldInput("Vueltas descarte", "laps_discard", "number", "2")}
             {fieldInput("Diferencial (ms)", "lap_differential", "number", "3000")}
+            {fieldInput("Live Timing URL", "live_timing_url", "text", "https://...")}
           </div>
           <div className="flex gap-2 pt-1">
             <button onClick={saveCircuit} className="bg-accent text-black font-semibold px-4 py-1.5 rounded-lg text-sm">

@@ -114,6 +114,8 @@ export const api = {
   replaceTeams: (teams: any[]) =>
     fetchApi<any[]>("/api/config/teams", { method: "PUT", body: JSON.stringify(teams) }),
 
+  getLiveTimingUrl: () => fetchApi<{ url: string | null }>("/api/config/live-timing-url"),
+
   // Race
   getSnapshot: () => fetchApi<any>("/api/race/snapshot"),
   getConnectionStatus: () => fetchApi<{ apex_connected: boolean; circuit: string | null }>("/api/race/status"),

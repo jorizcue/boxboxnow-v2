@@ -72,6 +72,7 @@ class CircuitOut(BaseModel):
     laps_discard: int
     lap_differential: int
     php_api_url: str | None = None
+    live_timing_url: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -85,6 +86,7 @@ class CircuitCreate(BaseModel):
     laps_discard: int = 2
     lap_differential: int = 3000
     php_api_url: str | None = None
+    live_timing_url: str | None = None
 
 
 class CircuitUpdate(BaseModel):
@@ -96,6 +98,7 @@ class CircuitUpdate(BaseModel):
     laps_discard: int | None = None
     lap_differential: int | None = None
     php_api_url: str | None = None
+    live_timing_url: str | None = None
 
 
 # --- User Circuit Access ---

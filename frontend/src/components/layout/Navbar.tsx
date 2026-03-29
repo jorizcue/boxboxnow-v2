@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 
-type Tab = "race" | "pit" | "classification" | "config" | "admin";
+type Tab = "race" | "pit" | "live" | "classification" | "config" | "admin";
 
 interface NavbarProps {
   activeTab: Tab;
@@ -14,6 +14,7 @@ export function Navbar({ activeTab, onTabChange, isAdmin }: NavbarProps) {
   const tabs: { id: Tab; label: string; shortLabel: string; adminOnly?: boolean }[] = [
     { id: "race", label: "Carrera", shortLabel: "Race" },
     { id: "pit", label: "Box", shortLabel: "Box" },
+    { id: "live", label: "Live", shortLabel: "Live" },
     // { id: "classification", label: "Clasificacion", shortLabel: "Clasif." },
     { id: "config", label: "Config", shortLabel: "Config" },
     { id: "admin", label: "Admin", shortLabel: "Admin", adminOnly: true },

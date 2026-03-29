@@ -12,8 +12,9 @@ import { FifoQueue } from "@/components/pit/FifoQueue";
 import { ClassificationTable } from "@/components/classification/ClassificationTable";
 import { ConfigPanel } from "@/components/config/ConfigPanel";
 import { AdminPanel } from "@/components/admin/AdminPanel";
+import { LiveTiming } from "@/components/live/LiveTiming";
 
-type Tab = "race" | "pit" | "classification" | "config" | "admin";
+type Tab = "race" | "pit" | "live" | "classification" | "config" | "admin";
 
 export default function Home() {
   const { token, user, _hydrated } = useAuth();
@@ -62,6 +63,7 @@ function Dashboard({
       <main className="flex-1 overflow-auto p-2 sm:p-3">
         {activeTab === "race" && <RaceTable />}
         {activeTab === "pit" && <FifoQueue />}
+        {activeTab === "live" && <LiveTiming />}
         {activeTab === "classification" && <ClassificationTable />}
         {activeTab === "config" && <ConfigPanel />}
         {activeTab === "admin" && user?.is_admin && <AdminPanel />}
