@@ -59,10 +59,12 @@ async def main():
             continue
 
         circuit_name = circuit_dir.name
-        # Try to find circuit in DB
+        # Try to find circuit in DB (normalize underscores to spaces for matching)
         circuit = None
+        dir_normalized = circuit_name.lower().replace("_", " ")
         for name, c in circuits.items():
-            if name == circuit_name.lower() or circuit_name.lower() in name:
+            db_normalized = name.lower().replace("_", " ")
+            if db_normalized == dir_normalized or dir_normalized in db_normalized or db_normalized in dir_normalized:
                 circuit = c
                 break
 
@@ -145,7 +147,8 @@ async def main():
                     self.all_laps = []
                     self.valid_laps = set()  # (totalLap, lapTime) tuples
 
-            karts = {}  # row_id -> SimpleKart
+            row_to_kart = {}  # row_id -> SimpleKart
+            kart_by_number = {}  # kart_number -> SimpleKart (persistent across inits)
 
             for ts, message in blocks:
                 events = parser.parse(message)
@@ -153,22 +156,36 @@ async def main():
                     row_id = event.row_id
 
                     if event.type == EventType.INIT and event.value == "init":
-                        karts.clear()
+                        # Don't clear kart_by_number — just reset row mapping
+                        row_to_kart.clear()
                         continue
 
                     if event.type == EventType.INIT and event.value == "kart":
-                        k = SimpleKart()
-                        k.kart_number = event.extra.get("kart_number", 0)
-                        k.team_name = event.extra.get("team_name", "")
-                        k.total_laps = int(event.extra.get("total_laps", "0") or "0")
-                        k.pit_count = int(event.extra.get("pit_count", "0") or "0")
+                        kart_num = event.extra.get("kart_number", 0)
+                        if not kart_num:
+                            continue
+                        # Reuse existing kart or create new
+                        if kart_num in kart_by_number:
+                            k = kart_by_number[kart_num]
+                        else:
+                            k = SimpleKart()
+                            k.kart_number = kart_num
+                            kart_by_number[kart_num] = k
+                        k.team_name = event.extra.get("team_name", "") or k.team_name
+                        # Update from init state (use init values only if higher)
+                        init_laps = int(event.extra.get("total_laps", "0") or "0")
+                        if init_laps > k.total_laps:
+                            k.total_laps = init_laps
+                        init_pits = int(event.extra.get("pit_count", "0") or "0")
+                        if init_pits > k.pit_count:
+                            k.pit_count = init_pits
                         last_str = event.extra.get("last_lap", "")
                         if last_str:
                             k.last_lap_ms = time_to_ms(last_str)
-                        karts[row_id] = k
+                        row_to_kart[row_id] = k
                         continue
 
-                    kart = karts.get(row_id)
+                    kart = row_to_kart.get(row_id)
                     if not kart:
                         continue
 
@@ -209,6 +226,9 @@ async def main():
 
                     elif event.type == EventType.TEAM:
                         kart.team_name = event.value
+
+            # Use kart_by_number for final collection (persistent across inits)
+            karts = kart_by_number
 
             # Collect all laps across all karts
             total_race_laps = sum(len(k.all_laps) for k in karts.values())
