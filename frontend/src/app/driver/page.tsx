@@ -1,44 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useRaceStore } from "@/hooks/useRaceState";
+import { useRaceWebSocket } from "@/hooks/useRaceWebSocket";
 import { DriverView } from "@/components/driver/DriverView";
-import type { RaceSnapshot } from "@/types/race";
 
 /**
- * Driver page — receives race state via BroadcastChannel from the main tab.
- * Does NOT open its own WebSocket (avoids consuming a max_devices slot).
+ * Driver page — standalone page with its own WebSocket connection.
+ * Works on any device (same browser tab, separate phone, etc).
+ * Requires max_devices >= 2 if opened from same user account.
  */
 export default function DriverPage() {
   const { _hydrated, token } = useAuth();
-  const [receiving, setReceiving] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const channel = new BroadcastChannel("bbn-driver");
-
-    channel.onmessage = (event) => {
-      const msg = event.data;
-      if (msg.type === "snapshot") {
-        useRaceStore.getState().applySnapshot(msg.data as RaceSnapshot);
-        useRaceStore.getState().setConnected(true);
-        setReceiving(true);
-      } else if (msg.type === "update") {
-        useRaceStore.getState().applyUpdates(msg.events);
-      } else if (msg.type === "fifo_update") {
-        useRaceStore.getState().applyFifoUpdate(msg.data);
-      } else if (msg.type === "analytics") {
-        useRaceStore.getState().applyAnalytics(msg.data);
-      }
-    };
-
-    // Request a fresh snapshot from the main tab
-    channel.postMessage({ type: "requestSnapshot" });
-
-    return () => channel.close();
-  }, []);
 
   if (!_hydrated) {
     return (
@@ -56,5 +28,10 @@ export default function DriverPage() {
     );
   }
 
+  return <DriverDashboard />;
+}
+
+function DriverDashboard() {
+  useRaceWebSocket({ view: "driver" });
   return <DriverView />;
 }

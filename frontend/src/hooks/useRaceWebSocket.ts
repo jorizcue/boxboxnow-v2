@@ -25,10 +25,16 @@ function getDriverChannel(): BroadcastChannel | null {
   return driverChannel;
 }
 
-export function useRaceWebSocket() {
+interface WsOptions {
+  /** Pass "driver" to append &view=driver to the WS URL (extra slot). */
+  view?: "driver";
+}
+
+export function useRaceWebSocket(options?: WsOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout>>();
   const reconnectDelay = useRef(1000);
+  const viewParam = options?.view;
 
   const { token } = useAuth();
   const { setConnected, applySnapshot, applyUpdates, applyFifoUpdate, applyAnalytics, notifyTeamsUpdated, setReplayStatus } =
@@ -69,7 +75,8 @@ export function useRaceWebSocket() {
     const ch = getDriverChannel();
 
     function connect() {
-      const ws = new WebSocket(`${WS_BASE}?token=${token}`);
+      const viewSuffix = viewParam ? `&view=${viewParam}` : "";
+      const ws = new WebSocket(`${WS_BASE}?token=${token}${viewSuffix}`);
       wsRef.current = ws;
 
       ws.onopen = () => {

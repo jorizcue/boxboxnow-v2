@@ -74,13 +74,23 @@ def _resolve_state(registry, replay_registry, user_id):
 
 
 @router.websocket("/ws/race")
-async def race_websocket(websocket: WebSocket, token: str = Query("")):
+async def race_websocket(
+    websocket: WebSocket,
+    token: str = Query(""),
+    view: str = Query(""),
+):
     """WebSocket endpoint for real-time race updates.
     Connect with: ws://host/ws/race?token=<jwt>
+    Driver view:  ws://host/ws/race?token=<jwt>&view=driver
 
     Auto-starts monitoring if user has an active session but no
     in-memory UserSession (e.g. after server restart).
+
+    The `view=driver` parameter allows one extra connection beyond
+    max_devices for the driver steering-wheel display.
     """
+    is_driver_view = view == "driver"
+
     # Authenticate
     if not token:
         await websocket.close(code=4001, reason="Missing token")
@@ -104,11 +114,13 @@ async def race_websocket(websocket: WebSocket, token: str = Query("")):
         return
 
     # Enforce max concurrent WS connections per user
+    # Driver view gets +1 extra slot on top of max_devices
     async with async_session() as db:
         result = await db.execute(select(User.max_devices).where(User.id == user_id))
         max_devices = result.scalar_one_or_none() or 1
+    effective_max = max_devices + 1 if is_driver_view else max_devices
     current_ws_count = len(_ws_connections.get(user_id, set()))
-    if current_ws_count >= max_devices:
+    if current_ws_count >= effective_max:
         await websocket.close(code=4003, reason="Max devices reached")
         return
 
