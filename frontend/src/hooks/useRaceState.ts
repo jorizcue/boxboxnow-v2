@@ -31,7 +31,8 @@ interface RaceStore {
   replayPaused: boolean;
   replayFilename: string;
   replayProgress: number;
-  setReplayStatus: (active: boolean, paused?: boolean, filename?: string, progress?: number) => void;
+  replayTime: string;
+  setReplayStatus: (active: boolean, paused?: boolean, filename?: string, progress?: number, currentTime?: string) => void;
 
   // WS reconnect trigger - increment to force WS to close and reconnect
   wsReconnectTrigger: number;
@@ -81,8 +82,9 @@ export const useRaceStore = create<RaceStore>((set) => ({
   replayPaused: false,
   replayFilename: "",
   replayProgress: 0,
+  replayTime: "",
   setReplayStatus: (active, paused = false, filename = "", progress = 0) =>
-    set({ replayActive: active, replayPaused: paused, replayFilename: filename, replayProgress: progress }),
+    set({ replayActive: active, replayPaused: paused, replayFilename: filename, replayProgress: progress, replayTime: currentTime || "" }),
 
   wsReconnectTrigger: 0,
   requestWsReconnect: () => set((s) => ({ wsReconnectTrigger: s.wsReconnectTrigger + 1 })),

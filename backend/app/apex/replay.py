@@ -41,6 +41,10 @@ class ReplayEngine:
 
     @property
     def status(self) -> dict:
+        # Current replay timestamp
+        current_time = None
+        if self._blocks and 0 < self._current_block <= len(self._blocks):
+            current_time = self._blocks[self._current_block - 1][0].strftime("%H:%M:%S")
         return {
             "active": self._active,
             "filename": self._filename,
@@ -49,6 +53,7 @@ class ReplayEngine:
             "paused": self._paused,
             "currentBlock": self._current_block,
             "totalBlocks": self._total_blocks,
+            "currentTime": current_time,
         }
 
     def list_logs(self) -> list[str]:
@@ -73,10 +78,17 @@ class ReplayEngine:
         for i, (timestamp, message) in enumerate(blocks):
             # Detect race init: block contains "grid||" which is the full grid HTML
             if "grid||" in message and "init|" in message:
+                # Extract title from title1|| line
+                title = ""
+                for line in message.split("\n"):
+                    if line.startswith("title1||"):
+                        title = line[8:].strip()
+                        break
                 race_starts.append({
                     "block": i,
                     "progress": i / total,
                     "timestamp": timestamp.strftime("%H:%M:%S"),
+                    "title": title,
                 })
 
         return {

@@ -132,7 +132,7 @@ export const api = {
   getReplayLogs: () => fetchApi<{ logs: string[] }>("/api/replay/logs"),
   getReplayStatus: () => fetchApi<any>("/api/replay/status"),
   analyzeLog: (filename: string) =>
-    fetchApi<{ totalBlocks: number; raceStarts: { block: number; progress: number; timestamp: string }[]; startTime: string | null; endTime: string | null }>(
+    fetchApi<{ totalBlocks: number; raceStarts: { block: number; progress: number; timestamp: string; title: string }[]; startTime: string | null; endTime: string | null }>(
       `/api/replay/analyze/${encodeURIComponent(filename)}`
     ),
   startReplay: (filename: string, speed: number = 1, startBlock: number = 0) =>

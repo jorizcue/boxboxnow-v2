@@ -432,6 +432,7 @@ interface RaceStartMarker {
   block: number;
   progress: number;
   timestamp: string;
+  title: string;
 }
 
 interface LogAnalysis {
@@ -451,7 +452,7 @@ function ReplayControls() {
   const [analyzing, setAnalyzing] = useState(false);
   const {
     apexConnected, setApexStatus, requestWsReconnect,
-    replayActive, replayPaused, replayFilename, replayProgress, setReplayStatus,
+    replayActive, replayPaused, replayFilename, replayProgress, replayTime, setReplayStatus,
   } = useRaceStore();
 
   const setSelectedLog = (v: string) => {
@@ -467,7 +468,7 @@ function ReplayControls() {
   const syncStatus = async () => {
     try {
       const st = await api.getReplayStatus();
-      setReplayStatus(st.active, st.paused, st.filename || "", st.progress || 0);
+      setReplayStatus(st.active, st.paused, st.filename || "", st.progress || 0, st.currentTime || "");
     } catch {}
   };
 
@@ -592,7 +593,7 @@ function ReplayControls() {
                 >
                   <div className="w-0.5 h-full bg-green-500" />
                   <div className="absolute -top-5 text-[9px] text-green-400 font-mono whitespace-nowrap opacity-0 group-hover/marker:opacity-100 transition-opacity pointer-events-none">
-                    {rs.timestamp}
+                    {rs.title ? `${rs.title} ${rs.timestamp}` : rs.timestamp}
                   </div>
                 </div>
               ))}
@@ -606,10 +607,11 @@ function ReplayControls() {
                     key={idx}
                     onClick={() => replayActive ? handleSeek(rs.block) : startFromBlock(rs.block)}
                     disabled={loading}
-                    className="flex items-center gap-1 bg-green-900/30 hover:bg-green-900/50 disabled:opacity-40 text-green-400 text-[10px] font-medium px-2 py-1 rounded border border-green-900/30 transition-colors"
+                    className="flex items-center gap-1.5 bg-green-900/30 hover:bg-green-900/50 disabled:opacity-40 text-green-400 text-[10px] font-medium px-2 py-1 rounded border border-green-900/30 transition-colors"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                    Carrera {idx + 1} — {rs.timestamp}
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                    <span className="truncate">{rs.title || `Carrera ${idx + 1}`}</span>
+                    <span className="text-green-600 flex-shrink-0">{rs.timestamp}</span>
                   </button>
                 ))}
               </div>
@@ -636,42 +638,59 @@ function ReplayControls() {
           />
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {/* Play button */}
           <button
             onClick={() => startFromBlock(0)}
             disabled={!selectedLog || loading || replayActive}
-            className="flex-1 bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-2 rounded-lg text-sm"
+            className="w-10 h-10 flex items-center justify-center bg-accent hover:bg-accent-hover disabled:opacity-40 text-black rounded-lg transition-colors"
+            title="Iniciar"
           >
-            {loading ? "..." : "Iniciar"}
+            {loading ? (
+              <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeLinecap="round"/></svg>
+            ) : (
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            )}
           </button>
+          {/* Pause / Resume button */}
           <button
             onClick={async () => {
               await api.pauseReplay();
               await syncStatus();
             }}
             disabled={!replayActive}
-            className="flex-1 bg-black hover:bg-surface disabled:opacity-40 text-neutral-300 py-2 rounded-lg border border-border text-sm"
+            className="w-10 h-10 flex items-center justify-center bg-black hover:bg-surface disabled:opacity-40 text-neutral-300 rounded-lg border border-border transition-colors"
+            title={replayPaused ? "Reanudar" : "Pausar"}
           >
-            {replayPaused ? "Reanudar" : "Pausar"}
+            {replayPaused ? (
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            ) : (
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            )}
           </button>
+          {/* Stop button */}
           <button
             onClick={async () => {
               await api.stopReplay();
               await syncStatus();
             }}
             disabled={!replayActive}
-            className="flex-1 bg-red-900/50 hover:bg-red-800 disabled:opacity-40 text-red-300 py-2 rounded-lg text-sm"
+            className="w-10 h-10 flex items-center justify-center bg-red-900/50 hover:bg-red-800 disabled:opacity-40 text-red-300 rounded-lg transition-colors"
+            title="Parar"
           >
-            Parar
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
           </button>
-        </div>
 
-        {replayActive && (
-          <div className="flex justify-between text-[10px] text-neutral-200">
-            <span>{replayFilename}</span>
-            <span>{(replayProgress * 100).toFixed(1)}%</span>
-          </div>
-        )}
+          {/* Status info */}
+          {replayActive && (
+            <div className="flex-1 flex items-center justify-end gap-3 text-[11px] font-mono">
+              {replayTime && (
+                <span className="text-accent font-semibold">{replayTime}</span>
+              )}
+              <span className="text-neutral-400">{(replayProgress * 100).toFixed(1)}%</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
