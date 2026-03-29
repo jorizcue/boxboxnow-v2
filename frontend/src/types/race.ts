@@ -103,8 +103,8 @@ export interface WsUpdateEvent {
 }
 
 export interface WsMessage {
-  type: "snapshot" | "update" | "analytics" | "teams_updated";
-  data?: RaceSnapshot & { teams?: any[] };
+  type: "snapshot" | "update" | "analytics" | "fifo_update" | "teams_updated";
+  data?: RaceSnapshot & { teams?: any[]; fifo?: FifoState };
   events?: WsUpdateEvent[];
 }
 

@@ -80,6 +80,10 @@ class UserSession:
                         driver_name=kart.driver_name,
                     )
 
+                # Broadcast FIFO immediately so the box tab updates in real-time
+                self.fifo.apply_to_state(self.state)
+                await self._broadcast_fifo()
+
         self.on_events = on_events
         self.apex_client = ApexClient(ws_url, self.parser, on_events, recorder=self.recorder)
         self._analytics_task: asyncio.Task | None = None
@@ -286,6 +290,29 @@ class UserSession:
 
             self._driver_differentials = new_driver_diffs
             self._team_positions = new_team_positions
+
+    async def _broadcast_fifo(self):
+        """Broadcast only FIFO data immediately after a pit entry."""
+        if not self.state._ws_clients:
+            return
+        msg = json.dumps({
+            "type": "fifo_update",
+            "data": {
+                "fifo": {
+                    "queue": self.state.fifo_queue,
+                    "score": self.state.fifo_score,
+                    "history": self.state.fifo_history[-10:],
+                },
+            },
+        })
+        dead = set()
+        for client in self.state._ws_clients:
+            try:
+                await client.send_text(msg)
+            except Exception:
+                dead.add(client)
+        for c in dead:
+            self.state._ws_clients.discard(c)
 
     async def broadcast_snapshot(self):
         """Broadcast a full snapshot to all connected WS clients.

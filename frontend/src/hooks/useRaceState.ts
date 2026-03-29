@@ -44,6 +44,7 @@ interface RaceStore {
   setConnected: (v: boolean) => void;
   applySnapshot: (snapshot: RaceSnapshot) => void;
   applyUpdates: (events: WsUpdateEvent[]) => void;
+  applyFifoUpdate: (data: any) => void;
   applyAnalytics: (data: any) => void;
 }
 
@@ -182,6 +183,11 @@ export const useRaceStore = create<RaceStore>((set) => ({
       }
 
       return { karts, countdownMs, trackName };
+    }),
+
+  applyFifoUpdate: (data) =>
+    set({
+      fifo: data.fifo || { queue: [], score: 0, history: [] },
     }),
 
   applyAnalytics: (data) =>

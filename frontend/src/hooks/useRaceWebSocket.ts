@@ -13,7 +13,7 @@ export function useRaceWebSocket() {
   const reconnectDelay = useRef(1000);
 
   const { token } = useAuth();
-  const { setConnected, applySnapshot, applyUpdates, applyAnalytics, notifyTeamsUpdated } =
+  const { setConnected, applySnapshot, applyUpdates, applyFifoUpdate, applyAnalytics, notifyTeamsUpdated } =
     useRaceStore();
   const wsReconnectTrigger = useRaceStore((s) => s.wsReconnectTrigger);
 
@@ -47,6 +47,8 @@ export function useRaceWebSocket() {
             applySnapshot(msg.data);
           } else if (msg.type === "update" && msg.events) {
             applyUpdates(msg.events);
+          } else if (msg.type === "fifo_update" && msg.data) {
+            applyFifoUpdate(msg.data);
           } else if (msg.type === "analytics" && msg.data) {
             applyAnalytics(msg.data);
           } else if (msg.type === "teams_updated") {
@@ -78,7 +80,7 @@ export function useRaceWebSocket() {
       }
     };
     // wsReconnectTrigger in deps => entire effect re-runs (close old WS, open new)
-  }, [token, wsReconnectTrigger, setConnected, applySnapshot, applyUpdates, applyAnalytics, notifyTeamsUpdated]);
+  }, [token, wsReconnectTrigger, setConnected, applySnapshot, applyUpdates, applyFifoUpdate, applyAnalytics, notifyTeamsUpdated]);
 
   return wsRef;
 }

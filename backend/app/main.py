@@ -79,6 +79,29 @@ async def lifespan(app: FastAPI):
                     driver_name=kart.driver_name,
                 )
 
+            # Broadcast FIFO immediately so the box tab updates in real-time
+            replay_fifo.apply_to_state(replay_state)
+            if replay_state._ws_clients:
+                import json as _json_fifo
+                fifo_msg = _json_fifo.dumps({
+                    "type": "fifo_update",
+                    "data": {
+                        "fifo": {
+                            "queue": replay_state.fifo_queue,
+                            "score": replay_state.fifo_score,
+                            "history": replay_state.fifo_history[-10:],
+                        },
+                    },
+                })
+                dead = set()
+                for client in replay_state._ws_clients:
+                    try:
+                        await client.send_text(fifo_msg)
+                    except Exception:
+                        dead.add(client)
+                for c in dead:
+                    replay_state._ws_clients.discard(c)
+
     replay_engine = ReplayEngine(replay_parser, replay_on_events, logs_dir="data/logs")
 
     # Analytics loop for replay state (same as UserSession._analytics_loop)
