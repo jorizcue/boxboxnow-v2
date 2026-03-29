@@ -458,11 +458,6 @@ class RaceStateManager:
         elif event.type == EventType.FLAG:
             flag = event.value  # "green", "chequered", "penalty"
             logger.info(f"Flag received: {flag}")
-            if flag == "green" and not self.race_started:
-                self.race_started = True
-                self.start_time = time.time()
-                self._needs_snapshot = True
-                logger.info(f"Race started via green flag, karts: {len(self.karts)}")
             return {"event": "flag", "flag": flag}
 
         elif event.type == EventType.MESSAGE:

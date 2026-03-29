@@ -75,23 +75,45 @@ class ReplayEngine:
             return {"totalBlocks": 0, "raceStarts": [], "startTime": None, "endTime": None}
 
         race_starts = []
-        # Track the latest title1 seen so we can label each race start
-        current_title = ""
         for i, (timestamp, message) in enumerate(blocks):
-            # Update title from title1|| lines (appear in init blocks before the race)
-            for line in message.split("\n"):
-                if line.startswith("title1||"):
-                    t = line[8:].strip()
-                    if t:
-                        current_title = t
-            # Detect race start via green flag in com|| messages
-            if 'data-flag="green"' in message:
-                race_starts.append({
-                    "block": i,
-                    "progress": i / total,
-                    "timestamp": timestamp.strftime("%H:%M:%S"),
-                    "title": current_title,
-                })
+            # Detect init blocks (new race session)
+            if "grid||" in message and "init|" in message:
+                # Extract title1 and title2
+                title1 = ""
+                title2 = ""
+                has_countdown = False
+                for line in message.split("\n"):
+                    if line.startswith("title1||"):
+                        title1 = line[8:].strip()
+                    elif line.startswith("title2||"):
+                        title2 = line[8:].strip()
+                    elif line.startswith("dyn1|countdown|") or line.startswith("dyn1|count|"):
+                        has_countdown = True
+
+                # Build combined title
+                parts = [p for p in (title1, title2) if p]
+                title = " - ".join(parts) if parts else ""
+
+                if has_countdown:
+                    # Init with countdown = race already running
+                    race_starts.append({
+                        "block": i,
+                        "progress": i / total,
+                        "timestamp": timestamp.strftime("%H:%M:%S"),
+                        "title": title,
+                    })
+                else:
+                    # Init without countdown = find the first countdown after
+                    for j in range(i + 1, min(i + 200, len(blocks))):
+                        block_msg = blocks[j][1]
+                        if "dyn1|countdown|" in block_msg or "dyn1|count|" in block_msg:
+                            race_starts.append({
+                                "block": j,
+                                "progress": j / total,
+                                "timestamp": blocks[j][0].strftime("%H:%M:%S"),
+                                "title": title,
+                            })
+                            break
 
         return {
             "totalBlocks": total,
