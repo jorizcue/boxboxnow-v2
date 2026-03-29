@@ -107,3 +107,9 @@ button {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* Driver view: edit mode wiggle */
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-0.5deg); }
+  50% { transform: rotate(0.5deg); }
+}

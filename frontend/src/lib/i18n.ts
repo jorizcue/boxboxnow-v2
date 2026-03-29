@@ -294,6 +294,21 @@ const translations: Record<string, Record<Language, string>> = {
   "analytics.noData": { es: "No hay datos de carreras para este circuito en el rango seleccionado.", en: "No race data for this circuit in the selected range.", it: "Nessun dato di gara per questo circuito nell'intervallo selezionato.", de: "Keine Renndaten fur diese Strecke im ausgewahlten Zeitraum." },
   "analytics.autoSaveHint": { es: "Los datos se guardan automaticamente al finalizar cada sesion de monitoreo.", en: "Data is saved automatically when each monitoring session ends.", it: "I dati vengono salvati automaticamente al termine di ogni sessione di monitoraggio.", de: "Daten werden automatisch gespeichert, wenn jede Uberwachungssitzung endet." },
 
+  // === Driver View ===
+  "driver.title": { es: "Vista Piloto", en: "Driver View", it: "Vista Pilota", de: "Fahreransicht" },
+  "driver.noKart": { es: "No hay kart seleccionado", en: "No kart selected", it: "Nessun kart selezionato", de: "Kein Kart ausgewahlt" },
+  "driver.noKartHint": { es: "Selecciona tu kart en Configuracion", en: "Select your kart in Config", it: "Seleziona il tuo kart in Configurazione", de: "Wahle dein Kart in Einstellungen" },
+  "driver.pace": { es: "Ritmo", en: "Pace", it: "Ritmo", de: "Tempo" },
+  "driver.lastLap": { es: "Ultima", en: "Last", it: "Ultima", de: "Letzte" },
+  "driver.pacePosition": { es: "Pos. Ritmo", en: "Pace Pos.", it: "Pos. Ritmo", de: "Tempo Pos." },
+  "driver.gapAhead": { es: "Delante", en: "Ahead", it: "Davanti", de: "Vorne" },
+  "driver.gapBehind": { es: "Detras", en: "Behind", it: "Dietro", de: "Hinten" },
+  "driver.last": { es: "Ultimo", en: "Last", it: "Ultimo", de: "Letzter" },
+  "driver.realPosition": { es: "Pos. Real", en: "Real Pos.", it: "Pos. Reale", de: "Echte Pos." },
+  "driver.boxScore": { es: "Punt. Box", en: "Box Score", it: "Punt. Box", de: "Box Punkt." },
+  "driver.dragHint": { es: "Arrastra para reordenar", en: "Drag to reorder", it: "Trascina per riordinare", de: "Ziehen zum Umsortieren" },
+  "driver.open": { es: "Piloto", en: "Driver", it: "Pilota", de: "Fahrer" },
+
   // === Common ===
   "common.loading": { es: "Cargando...", en: "Loading...", it: "Caricamento...", de: "Laden..." },
   "common.error": { es: "Error", en: "Error", it: "Errore", de: "Fehler" },
