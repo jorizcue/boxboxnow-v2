@@ -6,8 +6,9 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy.orm import selectinload
 from app.models.database import get_db
-from app.models.schemas import RaceSession, Circuit
+from app.models.schemas import RaceSession, Circuit, TeamPosition
 from app.api.auth_routes import get_current_user
 from app.models.schemas import User
 
@@ -51,9 +52,13 @@ async def start_replay(
     replay_state = request.app.state.replay_state
     replay_fifo = request.app.state.replay_fifo
 
-    # Load user's active session config
+    # Load user's active session config (with teams and drivers for differentials)
     session = (await db.execute(
-        select(RaceSession).where(
+        select(RaceSession)
+        .options(
+            selectinload(RaceSession.team_positions).selectinload(TeamPosition.drivers),
+        )
+        .where(
             RaceSession.user_id == user.id,
             RaceSession.is_active == True,
         )
@@ -80,8 +85,28 @@ async def start_replay(
                 replay_state.circuit_length_m = circuit.length_m or 1100
                 replay_state.laps_discard = circuit.laps_discard or 2
                 replay_state.lap_differential = circuit.lap_differential or 3000
+        # Load team positions and driver differentials for clustering
+        replay_diffs = request.app.state.replay_differentials
+        team_positions = {}
+        driver_differentials = {}
+        for tp in session.team_positions:
+            team_positions[tp.kart] = tp.position
+            if tp.drivers:
+                driver_differentials[tp.kart] = {
+                    d.driver_name.strip().lower(): d.differential_ms
+                    for d in tp.drivers
+                }
+        replay_diffs["team_positions"] = team_positions
+        replay_diffs["driver_differentials"] = driver_differentials
         logger.info(f"Replay config from session: box_karts={replay_state.box_karts}, "
-                    f"box_lines={replay_state.box_lines}, our_kart={replay_state.our_kart_number}")
+                    f"box_lines={replay_state.box_lines}, our_kart={replay_state.our_kart_number}, "
+                    f"teams={len(team_positions)}, "
+                    f"drivers_with_diff={sum(1 for d in driver_differentials.values() for v in d.values() if v != 0)}")
+    else:
+        # No session — clear differentials
+        replay_diffs = request.app.state.replay_differentials
+        replay_diffs["team_positions"] = {}
+        replay_diffs["driver_differentials"] = {}
 
     replay_fifo.update_config(replay_state.box_karts, replay_state.box_lines)
     replay_fifo._history.clear()

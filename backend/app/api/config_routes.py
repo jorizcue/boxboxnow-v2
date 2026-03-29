@@ -237,23 +237,31 @@ async def replace_teams(
 
     await db.commit()
 
-    # Update in-memory differentials on the active UserSession so clustering
-    # picks up changes immediately without requiring an Apex reconnect.
+    # Build in-memory differentials from the saved teams
+    team_positions = {}
+    driver_differentials = {}
+    for t in teams:
+        team_positions[t.kart] = t.position
+        if t.drivers:
+            driver_differentials[t.kart] = {
+                d.driver_name.strip().lower(): d.differential_ms
+                for d in t.drivers
+            }
+
+    # Update live session differentials
     registry = request.app.state.registry
     user_session = registry.get(user.id)
     if user_session:
-        team_positions = {}
-        driver_differentials = {}
-        for t in teams:
-            team_positions[t.kart] = t.position
-            if t.drivers:
-                driver_differentials[t.kart] = {
-                    d.driver_name.strip().lower(): d.differential_ms
-                    for d in t.drivers
-                }
         user_session.set_driver_differentials(driver_differentials, team_positions)
-        logger.info(f"Updated in-memory differentials for user {user.id}: "
-                    f"{sum(len(d) for d in driver_differentials.values())} drivers")
+
+    # Update replay differentials too
+    replay_diffs = getattr(request.app.state, "replay_differentials", None)
+    if replay_diffs is not None:
+        replay_diffs["team_positions"] = team_positions
+        replay_diffs["driver_differentials"] = driver_differentials
+
+    logger.info(f"Updated in-memory differentials for user {user.id}: "
+                f"{sum(len(d) for d in driver_differentials.values())} drivers")
 
     # Re-query with eager loading to avoid lazy load errors on serialization
     result = await db.execute(

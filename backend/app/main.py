@@ -45,6 +45,10 @@ async def lifespan(app: FastAPI):
     replay_state = RaceStateManager()
     replay_fifo = FifoManager()
 
+    # Replay differentials — loaded from user's active session when replay starts
+    # Stored as dicts so they can be updated from config_routes without restart
+    replay_differentials: dict = {"team_positions": {}, "driver_differentials": {}}
+
     async def replay_on_events(events):
         # Track which karts were NOT in pit before processing
         pre_pit_status = {
@@ -63,7 +67,11 @@ async def lifespan(app: FastAPI):
             # Re-compute clustering BEFORE adding to FIFO so tier_score is fresh
             try:
                 from app.engine.clustering import compute_clustering
-                compute_clustering(replay_state, {}, {})
+                compute_clustering(
+                    replay_state,
+                    replay_differentials["team_positions"],
+                    replay_differentials["driver_differentials"],
+                )
             except Exception as e:
                 logger.warning(f"Replay clustering before FIFO entry failed: {e}")
 
@@ -113,7 +121,11 @@ async def lifespan(app: FastAPI):
             await asyncio.sleep(10)
             try:
                 if len(replay_state.karts) > 0:
-                    compute_clustering(replay_state, {}, {})
+                    compute_clustering(
+                        replay_state,
+                        replay_differentials["team_positions"],
+                        replay_differentials["driver_differentials"],
+                    )
                     replay_fifo.apply_to_state(replay_state)
                     compute_classification(replay_state)
 
@@ -163,6 +175,7 @@ async def lifespan(app: FastAPI):
     app.state.replay_engine = replay_engine
     app.state.replay_state = replay_state
     app.state.replay_fifo = replay_fifo
+    app.state.replay_differentials = replay_differentials
 
     logger.info("BoxboxNow v2 started (multi-tenant)")
 
