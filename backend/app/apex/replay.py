@@ -75,6 +75,7 @@ class ReplayEngine:
             return {"totalBlocks": 0, "raceStarts": [], "startTime": None, "endTime": None}
 
         race_starts = []
+        seen_titles = set()  # Deduplicate init blocks from reconnections
         for i, (timestamp, message) in enumerate(blocks):
             # Detect init blocks (new race session)
             if "grid||" in message and "init|" in message:
@@ -97,6 +98,12 @@ class ReplayEngine:
 
                 # If init block itself has a chequered flag, race already ended — skip
                 if has_chequered and not has_countdown:
+                    # New race ended => clear seen titles so next race with same name is detected
+                    seen_titles.discard(title)
+                    continue
+
+                # Skip duplicate init blocks (reconnections during same race)
+                if title in seen_titles:
                     continue
 
                 if has_countdown:
@@ -107,6 +114,7 @@ class ReplayEngine:
                         "timestamp": timestamp.strftime("%H:%M:%S"),
                         "title": title,
                     })
+                    seen_titles.add(title)
                 else:
                     # Init without countdown = find the first countdown after
                     # But if a chequered flag appears first, race ended — skip
@@ -121,7 +129,15 @@ class ReplayEngine:
                                 "timestamp": blocks[j][0].strftime("%H:%M:%S"),
                                 "title": title,
                             })
+                            seen_titles.add(title)
                             break
+
+                # If a chequered flag comes later, clear this title so it can appear again
+                # (handled by checking chequered blocks separately)
+
+            elif 'data-flag="chequered"' in message:
+                # Race finished — allow same title to appear again for a new race
+                seen_titles.clear()
 
         return {
             "totalBlocks": total,
