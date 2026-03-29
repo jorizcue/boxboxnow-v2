@@ -14,7 +14,7 @@ export function Navbar({ activeTab, onTabChange, isAdmin }: NavbarProps) {
   const tabs: { id: Tab; label: string; shortLabel: string; adminOnly?: boolean }[] = [
     { id: "race", label: "Carrera", shortLabel: "Race" },
     { id: "pit", label: "Box", shortLabel: "Box" },
-    { id: "classification", label: "Clasificacion", shortLabel: "Clasif." },
+    // { id: "classification", label: "Clasificacion", shortLabel: "Clasif." },
     { id: "config", label: "Config", shortLabel: "Config" },
     { id: "admin", label: "Admin", shortLabel: "Admin", adminOnly: true },
   ];
