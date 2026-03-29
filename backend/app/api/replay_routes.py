@@ -20,10 +20,15 @@ router = APIRouter(prefix="/api/replay", tags=["replay"])
 class ReplayStartRequest(BaseModel):
     filename: str
     speed: float = 1.0
+    start_block: int = 0
 
 
 class ReplaySpeedRequest(BaseModel):
     speed: float
+
+
+class ReplaySeekRequest(BaseModel):
+    block: int
 
 
 @router.get("/logs")
@@ -31,6 +36,16 @@ async def list_logs(request: Request):
     """List available log files for replay."""
     replay = request.app.state.replay_engine
     return {"logs": replay.list_logs()}
+
+
+@router.get("/analyze/{filename}")
+async def analyze_log(filename: str, request: Request):
+    """Analyze a log file: total blocks, race start positions, time range."""
+    replay = request.app.state.replay_engine
+    try:
+        return replay.analyze_log(filename)
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
 
 
 @router.get("/status")
@@ -113,7 +128,7 @@ async def start_replay(
     replay_fifo.apply_to_state(replay_state)  # Populate initial FIFO (all 25s) in state
 
     try:
-        await replay.start(data.filename, data.speed)
+        await replay.start(data.filename, data.speed, start_block=data.start_block)
         await replay_state._broadcast(replay_state.get_snapshot())
         return {"status": "started", "filename": data.filename, "speed": data.speed}
     except FileNotFoundError as e:
@@ -143,6 +158,25 @@ async def pause_replay(request: Request):
     """Toggle pause/resume on the current replay."""
     replay = request.app.state.replay_engine
     await replay.pause()
+    return replay.status
+
+
+@router.post("/seek")
+async def seek_replay(data: ReplaySeekRequest, request: Request):
+    """Seek to a specific block in the replay."""
+    replay = request.app.state.replay_engine
+    replay_state = request.app.state.replay_state
+    replay_fifo = request.app.state.replay_fifo
+
+    if not replay._filename or not replay._blocks:
+        raise HTTPException(400, "No replay loaded")
+
+    # Reset state and FIFO before seeking
+    replay_state.reset()
+    replay_fifo.update_config(replay_fifo.queue_size, replay_fifo.box_lines)
+    replay_fifo._history.clear()
+
+    await replay.seek(data.block)
     return replay.status
 
 

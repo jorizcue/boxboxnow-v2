@@ -131,10 +131,16 @@ export const api = {
   // Replay
   getReplayLogs: () => fetchApi<{ logs: string[] }>("/api/replay/logs"),
   getReplayStatus: () => fetchApi<any>("/api/replay/status"),
-  startReplay: (filename: string, speed: number = 1) =>
-    fetchApi<any>("/api/replay/start", { method: "POST", body: JSON.stringify({ filename, speed }) }),
+  analyzeLog: (filename: string) =>
+    fetchApi<{ totalBlocks: number; raceStarts: { block: number; progress: number; timestamp: string }[]; startTime: string | null; endTime: string | null }>(
+      `/api/replay/analyze/${encodeURIComponent(filename)}`
+    ),
+  startReplay: (filename: string, speed: number = 1, startBlock: number = 0) =>
+    fetchApi<any>("/api/replay/start", { method: "POST", body: JSON.stringify({ filename, speed, start_block: startBlock }) }),
   stopReplay: () => fetchApi<any>("/api/replay/stop", { method: "POST" }),
   pauseReplay: () => fetchApi<any>("/api/replay/pause", { method: "POST" }),
+  seekReplay: (block: number) =>
+    fetchApi<any>("/api/replay/seek", { method: "POST", body: JSON.stringify({ block }) }),
   setReplaySpeed: (speed: number) =>
     fetchApi<any>("/api/replay/speed", { method: "POST", body: JSON.stringify({ speed }) }),
 };

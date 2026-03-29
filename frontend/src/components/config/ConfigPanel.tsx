@@ -428,12 +428,27 @@ function ApexConnection() {
 
 // --- Replay Controls ---
 
+interface RaceStartMarker {
+  block: number;
+  progress: number;
+  timestamp: string;
+}
+
+interface LogAnalysis {
+  totalBlocks: number;
+  raceStarts: RaceStartMarker[];
+  startTime: string | null;
+  endTime: string | null;
+}
+
 function ReplayControls() {
   const [logs, setLogs] = useState<string[]>([]);
   // Use module-level vars to survive tab changes
   const [selectedLog, setSelectedLogState] = useState(_replaySelectedLog);
   const [speed, setSpeedState] = useState(_replaySpeed);
   const [loading, setLoading] = useState(false);
+  const [analysis, setAnalysis] = useState<LogAnalysis | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const {
     apexConnected, setApexStatus, requestWsReconnect,
     replayActive, replayPaused, replayFilename, replayProgress, setReplayStatus,
@@ -461,6 +476,16 @@ function ReplayControls() {
     syncStatus();
   }, []);
 
+  // Analyze log when selected
+  useEffect(() => {
+    if (!selectedLog) { setAnalysis(null); return; }
+    setAnalyzing(true);
+    api.analyzeLog(selectedLog)
+      .then(setAnalysis)
+      .catch(() => setAnalysis(null))
+      .finally(() => setAnalyzing(false));
+  }, [selectedLog]);
+
   // Poll status while replay is active
   useEffect(() => {
     if (!replayActive) return;
@@ -468,13 +493,53 @@ function ReplayControls() {
     return () => clearInterval(interval);
   }, [replayActive]);
 
+  const startFromBlock = async (block: number = 0) => {
+    if (!selectedLog) return;
+    setLoading(true);
+    try {
+      if (apexConnected) {
+        await api.disconnectApex();
+        setApexStatus(false, "Desconectado (replay)");
+        requestWsReconnect();
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      await api.startReplay(selectedLog, speed, block);
+      await syncStatus();
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    }
+    setLoading(false);
+  };
+
+  const handleSeek = async (block: number) => {
+    if (!replayActive) return;
+    try {
+      await api.seekReplay(block);
+      await syncStatus();
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    }
+  };
+
+  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!analysis || analysis.totalBlocks === 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const block = Math.round(pct * analysis.totalBlocks);
+    if (replayActive) {
+      handleSeek(block);
+    } else {
+      startFromBlock(block);
+    }
+  };
+
   return (
     <div className="bg-surface rounded-xl p-6 border border-border">
       <h2 className="text-[11px] text-neutral-200 mb-4 uppercase tracking-wider">Replay</h2>
 
       {apexConnected && (
         <p className="text-[11px] text-yellow-500/80 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2 mb-3">
-          Desconéctate del Apex Timing para usar el replay
+          Desconectate del Apex Timing para usar el replay
         </p>
       )}
 
@@ -490,6 +555,71 @@ function ReplayControls() {
             <option key={log} value={log}>{log}</option>
           ))}
         </select>
+
+        {/* Timeline bar */}
+        {analysis && analysis.totalBlocks > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[10px] text-neutral-500">
+              <span>{analysis.startTime}</span>
+              <span>{analysis.totalBlocks} bloques</span>
+              <span>{analysis.endTime}</span>
+            </div>
+            <div
+              className="relative w-full h-6 bg-black rounded-lg cursor-pointer border border-border group"
+              onClick={handleTimelineClick}
+              title="Click para posicionarte"
+            >
+              {/* Progress fill */}
+              {replayActive && (
+                <div
+                  className="absolute top-0 left-0 h-full bg-accent/20 rounded-lg transition-all"
+                  style={{ width: `${replayProgress * 100}%` }}
+                />
+              )}
+              {/* Progress head */}
+              {replayActive && (
+                <div
+                  className="absolute top-0 h-full w-0.5 bg-accent transition-all"
+                  style={{ left: `${replayProgress * 100}%` }}
+                />
+              )}
+              {/* Race start markers */}
+              {analysis.raceStarts.map((rs, idx) => (
+                <div
+                  key={idx}
+                  className="absolute top-0 h-full flex flex-col items-center group/marker"
+                  style={{ left: `${rs.progress * 100}%` }}
+                >
+                  <div className="w-0.5 h-full bg-green-500" />
+                  <div className="absolute -top-5 text-[9px] text-green-400 font-mono whitespace-nowrap opacity-0 group-hover/marker:opacity-100 transition-opacity pointer-events-none">
+                    {rs.timestamp}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Race start buttons */}
+            {analysis.raceStarts.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {analysis.raceStarts.map((rs, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => replayActive ? handleSeek(rs.block) : startFromBlock(rs.block)}
+                    disabled={loading}
+                    className="flex items-center gap-1 bg-green-900/30 hover:bg-green-900/50 disabled:opacity-40 text-green-400 text-[10px] font-medium px-2 py-1 rounded border border-green-900/30 transition-colors"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                    Carrera {idx + 1} — {rs.timestamp}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {analyzing && (
+          <p className="text-[10px] text-neutral-500">Analizando fichero...</p>
+        )}
 
         <div>
           <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">
@@ -507,33 +637,13 @@ function ReplayControls() {
         </div>
 
         <div className="flex gap-2">
-          {/* Iniciar: disabled when replay already active, no log selected, or loading */}
           <button
-            onClick={async () => {
-              if (!selectedLog) return;
-              setLoading(true);
-              try {
-                // Disconnect Apex if connected, so WS falls back to replay_state
-                if (apexConnected) {
-                  await api.disconnectApex();
-                  setApexStatus(false, "Desconectado (replay)");
-                  requestWsReconnect();
-                  // Small delay so WS reconnects before replay starts
-                  await new Promise((r) => setTimeout(r, 500));
-                }
-                await api.startReplay(selectedLog, speed);
-                await syncStatus();
-              } catch (e: any) {
-                alert("Error: " + e.message);
-              }
-              setLoading(false);
-            }}
+            onClick={() => startFromBlock(0)}
             disabled={!selectedLog || loading || replayActive}
             className="flex-1 bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-2 rounded-lg text-sm"
           >
             {loading ? "..." : "Iniciar"}
           </button>
-          {/* Pausar/Reanudar: only when replay is active */}
           <button
             onClick={async () => {
               await api.pauseReplay();
@@ -544,7 +654,6 @@ function ReplayControls() {
           >
             {replayPaused ? "Reanudar" : "Pausar"}
           </button>
-          {/* Parar: only when replay is active */}
           <button
             onClick={async () => {
               await api.stopReplay();
@@ -558,15 +667,9 @@ function ReplayControls() {
         </div>
 
         {replayActive && (
-          <div>
-            <div className="flex justify-between text-[10px] text-neutral-200 mb-1">
-              <span>{replayFilename}</span>
-              <span>{(replayProgress * 100).toFixed(1)}%</span>
-            </div>
-            <div className="w-full bg-black rounded-full h-1.5">
-              <div className="bg-orange-400 rounded-full h-1.5 transition-all"
-                style={{ width: `${replayProgress * 100}%` }} />
-            </div>
+          <div className="flex justify-between text-[10px] text-neutral-200">
+            <span>{replayFilename}</span>
+            <span>{(replayProgress * 100).toFixed(1)}%</span>
           </div>
         )}
       </div>

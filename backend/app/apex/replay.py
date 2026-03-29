@@ -14,6 +14,7 @@ Log format:
 import asyncio
 import logging
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from app.apex.parser import ApexMessageParser
@@ -36,6 +37,7 @@ class ReplayEngine:
         self._progress = 0.0
         self._total_blocks = 0
         self._current_block = 0
+        self._blocks: list[tuple[datetime, str]] = []
 
     @property
     def status(self) -> dict:
@@ -45,6 +47,8 @@ class ReplayEngine:
             "progress": self._progress,
             "speed": self._speed,
             "paused": self._paused,
+            "currentBlock": self._current_block,
+            "totalBlocks": self._total_blocks,
         }
 
     def list_logs(self) -> list[str]:
@@ -54,8 +58,36 @@ class ReplayEngine:
             return []
         return sorted([f.name for f in log_path.glob("*.log")])
 
-    async def start(self, filename: str, speed: float = 1.0):
-        """Start replaying a log file."""
+    def analyze_log(self, filename: str) -> dict:
+        """Analyze a log file and return metadata: total blocks, race starts, timestamps."""
+        filepath = os.path.join(self.logs_dir, filename)
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"Log file not found: {filepath}")
+
+        blocks = self._parse_log_file(filepath)
+        total = len(blocks)
+        if total == 0:
+            return {"totalBlocks": 0, "raceStarts": [], "startTime": None, "endTime": None}
+
+        race_starts = []
+        for i, (timestamp, message) in enumerate(blocks):
+            # Detect race init: block contains "grid||" which is the full grid HTML
+            if "grid||" in message and "init|" in message:
+                race_starts.append({
+                    "block": i,
+                    "progress": i / total,
+                    "timestamp": timestamp.strftime("%H:%M:%S"),
+                })
+
+        return {
+            "totalBlocks": total,
+            "raceStarts": race_starts,
+            "startTime": blocks[0][0].strftime("%H:%M:%S"),
+            "endTime": blocks[-1][0].strftime("%H:%M:%S"),
+        }
+
+    async def start(self, filename: str, speed: float = 1.0, start_block: int = 0):
+        """Start replaying a log file, optionally from a specific block."""
         if self._active:
             await self.stop()
 
@@ -74,8 +106,42 @@ class ReplayEngine:
         self.parser.row_to_kart = {}
         self.parser._initialized = False
 
-        self._task = asyncio.create_task(self._replay(filepath))
-        logger.info(f"Replay started: {filename} at {speed}x")
+        self._blocks = self._parse_log_file(filepath)
+        self._total_blocks = len(self._blocks)
+        self._current_block = 0
+
+        self._task = asyncio.create_task(self._replay_from(start_block))
+        logger.info(f"Replay started: {filename} at {speed}x from block {start_block}")
+
+    async def seek(self, block: int):
+        """Seek to a specific block. Stops current replay, replays init blocks silently, resumes."""
+        if not self._filename or not self._blocks:
+            return
+
+        filename = self._filename
+        speed = self._speed
+
+        # Stop current task
+        self._active = False
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+
+        # Reset parser state
+        self.parser.column_map = {}
+        self.parser.row_to_kart = {}
+        self.parser._initialized = False
+
+        self._filename = filename
+        self._speed = speed
+        self._active = True
+        self._paused = False
+
+        self._task = asyncio.create_task(self._replay_from(block))
+        logger.info(f"Replay seeked to block {block}/{self._total_blocks}")
 
     async def stop(self):
         """Stop the current replay."""
@@ -88,6 +154,7 @@ class ReplayEngine:
                 pass
         self._filename = None
         self._progress = 0.0
+        self._blocks = []
         logger.info("Replay stopped")
 
     async def pause(self):
@@ -100,34 +167,57 @@ class ReplayEngine:
         self._speed = max(0.1, min(100.0, speed))
         logger.info(f"Replay speed set to {self._speed}x")
 
-    async def _replay(self, filepath: str):
-        """Parse and replay a log file."""
-        blocks = self._parse_log_file(filepath)
-        self._total_blocks = len(blocks)
-        self._current_block = 0
+    async def _replay_from(self, start_block: int = 0):
+        """Replay from a specific block. If start_block > 0, find the nearest
+        preceding init block and replay init blocks silently (no delays) to
+        rebuild state, then continue normally from start_block."""
+        blocks = self._blocks
 
         if not blocks:
-            logger.warning(f"No message blocks found in {filepath}")
+            logger.warning("No message blocks to replay")
             self._active = False
             return
 
-        logger.info(f"Parsed {len(blocks)} message blocks from {filepath}")
+        logger.info(f"Replaying {len(blocks)} blocks starting from {start_block}")
 
-        prev_time = blocks[0][0]
+        # Find the nearest init block at or before start_block for state rebuild
+        init_block = 0
+        if start_block > 0:
+            for i in range(start_block, -1, -1):
+                if "grid||" in blocks[i][1] and "init|" in blocks[i][1]:
+                    init_block = i
+                    break
 
-        for i, (timestamp, message) in enumerate(blocks):
+            # Silently replay init_block → start_block to rebuild state (no delays)
+            logger.info(f"Rebuilding state from block {init_block} to {start_block}")
+            for i in range(init_block, min(start_block, len(blocks))):
+                if not self._active:
+                    return
+                try:
+                    events = self.parser.parse(blocks[i][1])
+                    if events:
+                        await self.on_events(events)
+                except Exception as e:
+                    logger.error(f"Error rebuilding block {i}: {e}")
+
+        # Now replay from start_block with normal timing
+        actual_start = max(start_block, 0)
+        prev_time = blocks[actual_start][0] if actual_start < len(blocks) else None
+
+        for i in range(actual_start, len(blocks)):
             if not self._active:
                 break
 
-            # Wait while paused
             while self._paused and self._active:
                 await asyncio.sleep(0.1)
 
             if not self._active:
                 break
 
+            timestamp, message = blocks[i]
+
             # Calculate delay based on timestamp difference
-            if i > 0:
+            if prev_time and i > actual_start:
                 delta = (timestamp - prev_time).total_seconds()
                 if delta > 0:
                     await asyncio.sleep(delta / self._speed)
@@ -136,7 +226,6 @@ class ReplayEngine:
             self._current_block = i + 1
             self._progress = (i + 1) / self._total_blocks
 
-            # Parse and dispatch events
             try:
                 events = self.parser.parse(message)
                 if events:
