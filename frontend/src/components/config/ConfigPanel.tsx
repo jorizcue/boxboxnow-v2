@@ -145,6 +145,24 @@ function RaceSessionEditor() {
         result = await api.createSession(data);
       }
       setSession(result);
+
+      // Update zustand store config immediately so UI reflects changes
+      // (e.g. highlighted "our kart" row) without waiting for next WS broadcast
+      useRaceStore.setState((state) => ({
+        config: {
+          ...state.config,
+          circuitLengthM: selectedCircuit?.length_m ?? state.config.circuitLengthM,
+          pitTimeS: pitTime,
+          ourKartNumber: ourKart,
+          minPits,
+          maxStintMin: maxStint,
+          minStintMin: minStint,
+          durationMin: durationMin,
+          boxLines: boxLines,
+          boxKarts: boxKarts,
+          minDriverTimeMin: minDriverTime,
+        },
+      }));
     } catch (e: any) {
       alert("Error: " + e.message);
     }
