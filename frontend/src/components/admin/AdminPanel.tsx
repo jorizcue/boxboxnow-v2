@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useT } from "@/lib/i18n";
+import { StyledSelect } from "@/components/shared/StyledSelect";
+import { CalendarPicker } from "@/components/shared/CalendarPicker";
 
 interface UserRow {
   id: number;
@@ -206,11 +208,12 @@ function UsersManager() {
         {selectedUser ? (
           <>
             <div className="flex gap-2 mb-4 flex-wrap">
-              <select value={newCircuitId} onChange={(e) => setNewCircuitId(Number(e.target.value))}
-                className="bg-black border border-border rounded-lg px-2 py-1.5 text-sm">
-                <option value={0}>{t("admin.selectCircuitPlaceholder")}</option>
-                {circuits.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <StyledSelect
+                value={newCircuitId}
+                onChange={(v) => setNewCircuitId(Number(v))}
+                options={circuits.map((c) => ({ value: c.id, label: c.name }))}
+                placeholder={t("admin.selectCircuitPlaceholder")}
+              />
               <input type="date" value={newValidFrom} onChange={(e) => setNewValidFrom(e.target.value)}
                 className="bg-black border border-border rounded-lg px-2 py-1.5 text-sm" />
               <input type="date" value={newValidUntil} onChange={(e) => setNewValidUntil(e.target.value)}
@@ -823,37 +826,30 @@ function ReplayControls() {
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("replay.circuit")}</label>
-            <select
+            <StyledSelect
               value={selectedRecCircuit}
-              onChange={(e) => {
-                setSelectedRecCircuit(e.target.value);
+              onChange={(v) => {
+                setSelectedRecCircuit(v);
                 setSelectedDateState("");
-                if (!e.target.value) setSelectedLog("", null, null);
+                if (!v) setSelectedLog("", null, null);
               }}
+              options={recordingCircuits.map((c) => ({
+                value: c.circuit_dir,
+                label: `${c.circuit_name} (${c.dates.length}d)`,
+              }))}
+              placeholder={t("replay.select")}
               disabled={replayActive}
-              className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
-            >
-              <option value="">{t("replay.select")}</option>
-              {recordingCircuits.map((c) => (
-                <option key={c.circuit_dir} value={c.circuit_dir}>
-                  {c.circuit_name} ({c.dates.length}d)
-                </option>
-              ))}
-            </select>
+            />
           </div>
           <div>
             <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("replay.date")}</label>
-            <select
+            <CalendarPicker
               value={selectedDate}
-              onChange={(e) => setSelectedDateState(e.target.value)}
+              onChange={(d) => setSelectedDateState(d)}
+              availableDates={availableDates}
               disabled={replayActive || !selectedRecCircuit}
-              className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
-            >
-              <option value="">{t("replay.select")}</option>
-              {availableDates.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
+              placeholder={t("replay.select")}
+            />
           </div>
         </div>
 
@@ -867,19 +863,19 @@ function ReplayControls() {
               {showLegacy ? t("replay.hideLegacy") : t("replay.showLegacy")} {t("replay.oldRecordings")} ({legacyLogs.length})
             </button>
             {showLegacy && (
-              <select
-                value={selectedOwnerId != null ? `${selectedOwnerId}:${selectedLog}` : selectedLog}
-                onChange={(e) => handleLegacySelect(e.target.value)}
-                disabled={replayActive}
-                className="w-full mt-1 bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
-              >
-                <option value="">{t("replay.selectOldLog")}</option>
-                {legacyLogs.map((log, idx) => {
-                  const val = log.owner_id != null ? `${log.owner_id}:${log.filename}` : log.filename;
-                  const label = log.owner ? `[${log.owner}] ${log.filename}` : log.filename;
-                  return <option key={`${val}-${idx}`} value={val}>{label}</option>;
-                })}
-              </select>
+              <div className="mt-1">
+                <StyledSelect
+                  value={selectedOwnerId != null ? `${selectedOwnerId}:${selectedLog}` : selectedLog}
+                  onChange={handleLegacySelect}
+                  options={legacyLogs.map((log, idx) => {
+                    const val = log.owner_id != null ? `${log.owner_id}:${log.filename}` : log.filename;
+                    const label = log.owner ? `[${log.owner}] ${log.filename}` : log.filename;
+                    return { value: val, label };
+                  })}
+                  placeholder={t("replay.selectOldLog")}
+                  disabled={replayActive}
+                />
+              </div>
             )}
           </div>
         )}
@@ -1103,16 +1099,12 @@ function KartAnalytics() {
         <div className="flex gap-3 items-end flex-wrap">
           <div>
             <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("analytics.circuit")}</label>
-            <select
+            <StyledSelect
               value={selectedCircuit}
-              onChange={(e) => setSelectedCircuit(Number(e.target.value))}
-              className="bg-black border border-border rounded-lg px-3 py-2 text-sm"
-            >
-              <option value={0}>{t("analytics.select")}</option>
-              {circuits.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+              onChange={(v) => setSelectedCircuit(Number(v))}
+              options={circuits.map((c) => ({ value: c.id, label: c.name }))}
+              placeholder={t("analytics.select")}
+            />
           </div>
           <div>
             <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("analytics.from")}</label>

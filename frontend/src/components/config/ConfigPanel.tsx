@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { TeamEditor } from "@/components/config/TeamEditor";
 import { useT } from "@/lib/i18n";
+import { StyledSelect } from "@/components/shared/StyledSelect";
 
 interface Circuit {
   id: number;
@@ -190,18 +191,15 @@ function RaceSessionEditor() {
         {/* Circuit selector */}
         <div>
           <label className="block text-[11px] text-neutral-400 mb-1.5 uppercase tracking-wider">{t("config.circuit")}</label>
-          <select
+          <StyledSelect
             value={circuitId}
-            onChange={(e) => handleCircuitChange(Number(e.target.value))}
-            className="w-full bg-black border border-border rounded-lg px-3 py-2.5 text-sm"
-          >
-            <option value={0}>{t("config.selectCircuit")}</option>
-            {circuits.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} {c.length_m ? `(${c.length_m}m)` : ""}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => handleCircuitChange(Number(v))}
+            options={circuits.map((c) => ({
+              value: c.id,
+              label: `${c.name}${c.length_m ? ` (${c.length_m}m)` : ""}`,
+            }))}
+            placeholder={t("config.selectCircuit")}
+          />
           {selectedCircuit && (
             <p className="text-[10px] text-neutral-400 mt-1">
               {t("config.wsPort")}: {selectedCircuit.ws_port}
