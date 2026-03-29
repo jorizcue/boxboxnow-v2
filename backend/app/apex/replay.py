@@ -104,8 +104,11 @@ class ReplayEngine:
                     })
                 else:
                     # Init without countdown = find the first countdown after
+                    # But if a chequered flag appears first, race ended — skip
                     for j in range(i + 1, min(i + 200, len(blocks))):
                         block_msg = blocks[j][1]
+                        if 'data-flag="chequered"' in block_msg:
+                            break  # Race ended, no start to mark
                         if "dyn1|countdown|" in block_msg or "dyn1|count|" in block_msg:
                             race_starts.append({
                                 "block": j,
