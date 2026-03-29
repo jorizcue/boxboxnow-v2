@@ -363,94 +363,111 @@ function CircuitsManager() {
     </div>
   );
 
+  const panelOpen = showCreate || editingId !== null;
+
   return (
-    <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">Catalogo de Circuitos</h3>
-        {!showCreate && !editingId && (
+    <div className="flex gap-4">
+      {/* Left: circuit list */}
+      <div className={`bg-white/[0.03] rounded-xl p-4 border border-border transition-all ${panelOpen ? "flex-1 min-w-0" : "w-full"}`}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">Catalogo de Circuitos</h3>
           <button onClick={startCreate} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-sm">
-            Nuevo circuito
+            Nuevo
           </button>
-        )}
+        </div>
+
+        <div className="space-y-1">
+          {circuits.map((c) => (
+            <div
+              key={c.id}
+              onClick={() => startEdit(c)}
+              className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                editingId === c.id
+                  ? "bg-accent/10 border border-accent/30"
+                  : "hover:bg-black/50 border border-transparent"
+              }`}
+            >
+              <div className="min-w-0">
+                <div className={`text-sm font-medium truncate ${editingId === c.id ? "text-accent" : "text-white"}`}>
+                  {c.name}
+                </div>
+                <div className="flex gap-3 text-[10px] text-neutral-500 mt-0.5">
+                  {c.length_m && <span>{c.length_m}m</span>}
+                  <span>WSS:{c.ws_port}</span>
+                  {c.pit_time_s && <span>Pit:{c.pit_time_s}s</span>}
+                </div>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteCircuit(c.id); }}
+                className="text-red-400/40 hover:text-red-400 text-xs transition-colors ml-2 flex-shrink-0"
+              >
+                Eliminar
+              </button>
+            </div>
+          ))}
+          {circuits.length === 0 && (
+            <p className="text-neutral-500 text-sm py-4 text-center">No hay circuitos</p>
+          )}
+        </div>
       </div>
 
-      {/* Create / Edit form */}
-      {(showCreate || editingId) && (
-        <div className="mb-4 p-3 bg-black rounded-lg border border-border space-y-3">
-          <h4 className="text-xs text-neutral-300 font-medium">
-            {editingId ? "Editar circuito" : "Nuevo circuito"}
-          </h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Right: slide-in edit/create panel */}
+      {panelOpen && (
+        <div className="w-80 flex-shrink-0 bg-white/[0.03] rounded-xl border border-border p-4 space-y-3 animate-in slide-in-from-right-4 duration-200">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs text-neutral-200 font-medium uppercase tracking-wider">
+              {editingId ? "Editar circuito" : "Nuevo circuito"}
+            </h4>
+            <button
+              onClick={cancelEdit}
+              className="text-neutral-500 hover:text-white text-lg leading-none transition-colors"
+            >
+              &times;
+            </button>
+          </div>
+
+          <div className="space-y-2.5">
             {fieldInput("Nombre", "name", "text", "Nombre del circuito")}
-            {fieldInput("WS Port (wss)", "ws_port", "number", "Puerto WSS")}
-            {fieldInput("WS Data Port (ws)", "ws_port_data", "number", "Puerto WS datos")}
-            {fieldInput("PHP API Port", "php_api_port", "number", "Puerto PHP API")}
-            {fieldInput("PHP API URL", "php_api_url", "text", "http://...")}
-            {fieldInput("Longitud (m)", "length_m", "number", "Metros")}
-            {fieldInput("Pit Time (s)", "pit_time_s", "number", "Segundos")}
-            {fieldInput("Vueltas descarte", "laps_discard", "number", "2")}
+
+            <div className="grid grid-cols-2 gap-2">
+              {fieldInput("WS Port (wss)", "ws_port", "number", "Puerto WSS")}
+              {fieldInput("WS Data (ws)", "ws_port_data", "number", "Puerto WS")}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {fieldInput("Longitud (m)", "length_m", "number", "Metros")}
+              {fieldInput("Pit Time (s)", "pit_time_s", "number", "Segundos")}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {fieldInput("PHP API Port", "php_api_port", "number", "Puerto")}
+              {fieldInput("Vtas. descarte", "laps_discard", "number", "2")}
+            </div>
+
             {fieldInput("Diferencial (ms)", "lap_differential", "number", "3000")}
+            {fieldInput("PHP API URL", "php_api_url", "text", "http://...")}
             {fieldInput("Live Timing URL", "live_timing_url", "text", "https://...")}
           </div>
+
           <div className="flex gap-2 pt-1">
-            <button onClick={saveCircuit} className="bg-accent text-black font-semibold px-4 py-1.5 rounded-lg text-sm">
+            <button onClick={saveCircuit} className="flex-1 bg-accent hover:bg-accent-hover text-black font-semibold py-2 rounded-lg text-sm transition-colors">
               {editingId ? "Guardar" : "Crear"}
             </button>
-            <button onClick={cancelEdit} className="bg-surface text-neutral-200 px-4 py-1.5 rounded-lg text-sm border border-border hover:text-white transition-colors">
+            <button onClick={cancelEdit} className="bg-surface text-neutral-300 px-4 py-2 rounded-lg text-sm border border-border hover:text-white transition-colors">
               Cancelar
             </button>
           </div>
+
+          {editingId && (
+            <button
+              onClick={() => deleteCircuit(editingId)}
+              className="w-full text-red-400/60 hover:text-red-400 text-xs py-1.5 transition-colors"
+            >
+              Eliminar este circuito
+            </button>
+          )}
         </div>
       )}
-
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="text-[11px] text-neutral-400 uppercase tracking-wider">
-            <tr>
-              <th className="text-left px-2 py-1">Nombre</th>
-              <th className="text-right px-2 py-1">Longitud</th>
-              <th className="text-right px-2 py-1">Pit (s)</th>
-              <th className="text-right px-2 py-1">WSS</th>
-              <th className="text-right px-2 py-1">WS Data</th>
-              <th className="text-right px-2 py-1">PHP</th>
-              <th className="text-right px-2 py-1">Desc.</th>
-              <th className="text-right px-2 py-1">Dif.</th>
-              <th className="text-left px-2 py-1">API URL</th>
-              <th className="text-right px-2 py-1"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {circuits.map((c) => (
-              <tr
-                key={c.id}
-                className={`border-t border-border cursor-pointer hover:bg-black/50 transition-colors ${editingId === c.id ? "bg-black" : ""}`}
-                onClick={() => startEdit(c)}
-              >
-                <td className="px-2 py-1.5 font-medium text-white">{c.name}</td>
-                <td className="px-2 py-1.5 text-right text-neutral-400">{c.length_m ? `${c.length_m}m` : "-"}</td>
-                <td className="px-2 py-1.5 text-right text-neutral-400">{c.pit_time_s ?? "-"}</td>
-                <td className="px-2 py-1.5 text-right font-mono text-neutral-400">{c.ws_port}</td>
-                <td className="px-2 py-1.5 text-right font-mono text-accent">{c.ws_port_data ?? "-"}</td>
-                <td className="px-2 py-1.5 text-right font-mono text-neutral-400">{c.php_api_port || "-"}</td>
-                <td className="px-2 py-1.5 text-right text-neutral-400">{c.laps_discard}</td>
-                <td className="px-2 py-1.5 text-right font-mono text-neutral-400">{c.lap_differential}</td>
-                <td className="px-2 py-1.5 text-neutral-500 text-xs truncate max-w-[200px]">{c.php_api_url || "-"}</td>
-                <td className="px-2 py-1.5 text-right">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteCircuit(c.id); }}
-                    className="text-red-400/60 hover:text-red-400 text-xs transition-colors"
-                  >
-                    Eliminar
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {circuits.length === 0 && (
-              <tr><td colSpan={9} className="px-2 py-4 text-center text-neutral-500">No hay circuitos</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }
