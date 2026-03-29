@@ -83,8 +83,8 @@ export const useRaceStore = create<RaceStore>((set) => ({
   replayFilename: "",
   replayProgress: 0,
   replayTime: "",
-  setReplayStatus: (active, paused = false, filename = "", progress = 0) =>
-    set({ replayActive: active, replayPaused: paused, replayFilename: filename, replayProgress: progress, replayTime: currentTime || "" }),
+  setReplayStatus: (active, paused = false, filename = "", progress = 0, currentTime = "") =>
+    set({ replayActive: active, replayPaused: paused, replayFilename: filename, replayProgress: progress, replayTime: currentTime }),
 
   wsReconnectTrigger: 0,
   requestWsReconnect: () => set((s) => ({ wsReconnectTrigger: s.wsReconnectTrigger + 1 })),
