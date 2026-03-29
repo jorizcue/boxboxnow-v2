@@ -3,11 +3,13 @@
 import { useState, useCallback, Fragment } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { msToLapTime, tierHex } from "@/lib/formatters";
+import { useT } from "@/lib/i18n";
 import { getDriverInfoForKart, DriverDetailsRow } from "@/components/shared/DriverDetails";
 
 const COL_COUNT = 10; // number of <th> columns
 
 export function ClassificationTable() {
+  const t = useT();
   const { classification, config, karts } = useRaceStore();
   const [expandedKart, setExpandedKart] = useState<number | null>(null);
 
@@ -18,7 +20,7 @@ export function ClassificationTable() {
   if (classification.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-neutral-400">
-        <p>Sin datos de clasificacion</p>
+        <p>{t("class.noData")}</p>
       </div>
     );
   }
@@ -28,15 +30,15 @@ export function ClassificationTable() {
       <table className="w-full text-xs sm:text-sm">
         <thead className="bg-surface text-neutral-200 sticky top-0 z-10 text-[10px] sm:text-[11px] uppercase tracking-wider">
           <tr>
-            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-left w-8 sm:w-12">Pos</th>
-            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-left w-8 sm:w-12">Kart</th>
-            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-left">Equipo</th>
-            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-left">Piloto</th>
-            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-center">Vlt</th>
-            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-center">Pit</th>
-            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-right">Gap</th>
-            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-right">Int.</th>
-            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-right">Media</th>
+            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-left w-8 sm:w-12">{t("class.pos")}</th>
+            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-left w-8 sm:w-12">{t("race.kart")}</th>
+            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-left">{t("race.team")}</th>
+            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-left">{t("race.driver")}</th>
+            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-center">{t("race.laps")}</th>
+            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-center">{t("race.pit")}</th>
+            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-right">{t("class.gap")}</th>
+            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-right">{t("class.interval")}</th>
+            <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-right">{t("class.avg")}</th>
             <th className="px-1.5 sm:px-3 py-2 sm:py-2.5 text-center w-8 sm:w-12">Tier</th>
           </tr>
         </thead>

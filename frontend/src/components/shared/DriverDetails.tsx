@@ -2,6 +2,7 @@
 
 import { useRaceStore } from "@/hooks/useRaceState";
 import { secondsToHMS } from "@/lib/formatters";
+import { useT } from "@/lib/i18n";
 import type { KartState } from "@/types/race";
 
 export interface DriverInfo {
@@ -55,6 +56,7 @@ export function DriverDetailsRow({
   minDriverTimeMin: number;
   colSpan: number;
 }) {
+  const t = useT();
   if (drivers.length === 0) return null;
 
   return (
@@ -63,9 +65,9 @@ export function DriverDetailsRow({
         <table className="w-full text-xs">
           <thead>
             <tr className="text-neutral-500 text-[10px] uppercase tracking-wider">
-              <th className="px-3 py-1.5 text-left">Piloto</th>
-              <th className="px-3 py-1.5 text-right">Tiempo total</th>
-              <th className="px-3 py-1.5 text-right">Restante min.</th>
+              <th className="px-3 py-1.5 text-left">{t("driver.driver")}</th>
+              <th className="px-3 py-1.5 text-right">{t("driver.totalTime")}</th>
+              <th className="px-3 py-1.5 text-right">{t("driver.remainingMin")}</th>
             </tr>
           </thead>
           <tbody>
@@ -89,7 +91,7 @@ export function DriverDetailsRow({
           </tbody>
         </table>
         <div className="px-3 py-1 text-[10px] text-neutral-600 border-t border-neutral-800">
-          Min. por piloto: {secondsToHMS((minDriverTimeMin || 30) * 60)}
+          {t("driver.minPerDriver")}: {secondsToHMS((minDriverTimeMin || 30) * 60)}
         </div>
       </div>
     </td>

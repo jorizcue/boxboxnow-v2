@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { formatDifferential } from "@/lib/formatters";
 import {
@@ -41,6 +42,7 @@ function newId() {
 }
 
 export function TeamEditor() {
+  const t = useT();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -98,7 +100,7 @@ export function TeamEditor() {
       }));
       await api.replaceTeams(toSave);
     } catch (e: any) {
-      alert("Error guardando: " + e.message);
+      alert(t("teams.errorSaving") + ": " + e.message);
     }
     setSaving(false);
   };
@@ -108,9 +110,7 @@ export function TeamEditor() {
     try {
       const data = await api.getLiveTeams();
       if (!data.teams || data.teams.length === 0) {
-        alert(
-          "No hay equipos en el live timing. Asegurate de estar conectado a Apex."
-        );
+        alert(t("teams.noLiveTeams"));
         setImporting(false);
         return;
       }
@@ -154,11 +154,11 @@ export function TeamEditor() {
       setTeams(merged);
       alert(
         data.hasDrivers
-          ? `Importados ${data.kartCount} equipos con pilotos.`
-          : `Importados ${data.kartCount} equipos. Sin desglose de pilotos en esta carrera.`
+          ? t("teams.importedWithDrivers", { count: data.kartCount })
+          : t("teams.importedNoDrivers", { count: data.kartCount })
       );
     } catch (e: any) {
-      alert("Error importando: " + e.message);
+      alert(t("teams.errorImporting") + ": " + e.message);
     }
     setImporting(false);
   };
@@ -251,16 +251,16 @@ export function TeamEditor() {
 
   if (loading)
     return (
-      <p className="text-neutral-200 text-sm">Cargando equipos...</p>
+      <p className="text-neutral-200 text-sm">{t("teams.loadingTeams")}</p>
     );
 
   return (
     <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
         <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">
-          Equipos y Pilotos
+          {t("teams.title")}
           <span className="text-neutral-500 ml-2 normal-case tracking-normal hidden sm:inline">
-            (arrastra para reordenar)
+            {t("teams.dragHint")}
           </span>
         </h3>
         <div className="flex gap-2 flex-wrap">
@@ -269,20 +269,20 @@ export function TeamEditor() {
             disabled={importing}
             className="bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-40 text-xs font-medium px-3 py-2 rounded-lg border border-accent/20 transition-colors"
           >
-            {importing ? "Importando..." : "Cargar Live"}
+            {importing ? t("teams.importing") : t("teams.loadLive")}
           </button>
           <button
             onClick={addTeam}
             className="bg-black text-neutral-400 hover:text-white text-xs px-3 py-2 rounded-lg border border-border transition-colors"
           >
-            + Equipo
+            {t("teams.addTeam")}
           </button>
           <button
             onClick={saveTeams}
             disabled={saving}
             className="bg-accent hover:bg-accent-hover disabled:opacity-40 text-black text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
           >
-            {saving ? "Guardando..." : "Guardar"}
+            {saving ? t("teams.saving") : t("teams.save")}
           </button>
         </div>
       </div>
@@ -320,8 +320,7 @@ export function TeamEditor() {
 
       {teams.length === 0 && (
         <p className="text-neutral-400 text-sm text-center py-8">
-          Sin equipos. Pulsa "Cargar del LiveTiming" para importar o "+
-          Equipo" para crear manualmente.
+          {t("teams.noTeams")}
         </p>
       )}
     </div>
@@ -354,6 +353,7 @@ function SortableTeamRow({
     value: any
   ) => void;
 }) {
+  const t = useT();
   const {
     attributes,
     listeners,
@@ -383,7 +383,7 @@ function SortableTeamRow({
           {...attributes}
           {...listeners}
           className="cursor-grab active:cursor-grabbing text-neutral-700 hover:text-neutral-400 px-0.5 sm:px-1 touch-none shrink-0"
-          title="Arrastrar para reordenar"
+          title={t("teams.dragReorder")}
         >
           <svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor">
             <circle cx="3" cy="3" r="1.5" />
@@ -417,7 +417,7 @@ function SortableTeamRow({
             }
             onClick={(e) => e.stopPropagation()}
             className="w-full bg-black border border-border rounded-md px-2 py-1 text-sm"
-            placeholder="Equipo"
+            placeholder={t("teams.teamPlaceholder")}
           />
         </div>
 
@@ -427,8 +427,8 @@ function SortableTeamRow({
         >
           <span className="hidden sm:inline">
             {team.drivers.length === 0
-              ? "sin pilotos"
-              : `${team.drivers.length} piloto(s)`}
+              ? t("teams.noPilots")
+              : `${team.drivers.length} ${t("teams.pilots")}`}
           </span>
           <span className="sm:hidden">{team.drivers.length}p</span>
         </span>
@@ -452,21 +452,19 @@ function SortableTeamRow({
         <div className="border-t border-border px-3 py-3 bg-black/30">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] text-neutral-400 uppercase tracking-wider">
-              Pilotos &mdash; Diferencial positivo = mas lento que la
-              referencia
+              {t("teams.driversHint")}
             </span>
             <button
               onClick={() => onAddDriver(team.id)}
               className="text-[11px] text-accent hover:text-accent-hover transition-colors"
             >
-              + Piloto
+              {t("teams.addDriver")}
             </button>
           </div>
 
           {team.drivers.length === 0 ? (
             <p className="text-[11px] text-neutral-700 py-2">
-              Sin pilotos. Pulsa "Cargar del LiveTiming" o anade
-              manualmente.
+              {t("teams.noPilotsHint")}
             </p>
           ) : (
             <div className="space-y-2">
@@ -483,7 +481,7 @@ function SortableTeamRow({
                       )
                     }
                     className="flex-1 min-w-[120px] bg-surface border border-border rounded-md px-2 py-1.5 text-sm"
-                    placeholder="Piloto"
+                    placeholder={t("teams.driverPlaceholder")}
                   />
                   <div className="flex items-center gap-1">
                     <input

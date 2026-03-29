@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
+import { useT } from "@/lib/i18n";
 
 interface DeviceSession {
   id: number;
@@ -18,6 +19,7 @@ export function SessionManager({ onClose }: { onClose: () => void }) {
   const [sessions, setSessions] = useState<DeviceSession[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const t = useT();
 
   useEffect(() => {
     loadSessions();
@@ -49,18 +51,18 @@ export function SessionManager({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <div className="bg-surface rounded-2xl p-6 w-full max-w-lg border border-border">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">Dispositivos conectados</h2>
+          <h2 className="text-lg font-semibold text-white">{t("sessions.connectedDevices")}</h2>
           <button onClick={onClose} className="text-neutral-400 hover:text-neutral-300 text-xl transition-colors">
             &times;
           </button>
         </div>
 
         <p className="text-[11px] text-neutral-200 mb-4 uppercase tracking-wider">
-          Maximo {user?.max_devices} dispositivo(s) &middot; {sessions.length} activo(s)
+          {t("sessions.maxDevices")} {user?.max_devices} {t("sessions.devices")} &middot; {sessions.length} {t("sessions.active")}
         </p>
 
         {loading ? (
-          <p className="text-neutral-400 text-sm py-4 text-center">Cargando...</p>
+          <p className="text-neutral-400 text-sm py-4 text-center">{t("sessions.loading")}</p>
         ) : (
           <div className="space-y-2 mb-4">
             {sessions.map((s) => (
@@ -77,7 +79,7 @@ export function SessionManager({ onClose }: { onClose: () => void }) {
                     <p className="text-sm font-medium text-white">{s.device_name}</p>
                     {s.is_current && (
                       <span className="text-[10px] bg-accent/15 text-accent px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">
-                        Este dispositivo
+                        {t("sessions.thisDevice")}
                       </span>
                     )}
                   </div>
@@ -90,7 +92,7 @@ export function SessionManager({ onClose }: { onClose: () => void }) {
                     onClick={() => killSession(s.id)}
                     className="ml-3 bg-red-900/50 hover:bg-red-800 text-red-300 text-xs px-3 py-1.5 rounded-lg transition-colors"
                   >
-                    Cerrar
+                    {t("sessions.close")}
                   </button>
                 )}
               </div>
@@ -103,7 +105,7 @@ export function SessionManager({ onClose }: { onClose: () => void }) {
             onClick={killAllOthers}
             className="w-full bg-red-900/50 hover:bg-red-800 text-red-300 text-sm font-medium py-2 rounded-lg mb-2 transition-colors"
           >
-            Cerrar todas las demas sesiones
+            {t("sessions.closeAllOthers")}
           </button>
         )}
 
@@ -111,7 +113,7 @@ export function SessionManager({ onClose }: { onClose: () => void }) {
           onClick={onClose}
           className="w-full text-neutral-200 hover:text-white text-sm py-2 transition-colors"
         >
-          Cerrar
+          {t("common.close")}
         </button>
       </div>
     </div>

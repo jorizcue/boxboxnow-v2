@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 export function LiveTiming() {
+  const t = useT();
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -18,7 +20,7 @@ export function LiveTiming() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-120px)]">
-        <p className="text-neutral-500 text-sm">Cargando...</p>
+        <p className="text-neutral-500 text-sm">{t("live.loading")}</p>
       </div>
     );
   }
@@ -27,10 +29,10 @@ export function LiveTiming() {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-120px)]">
         <p className="text-neutral-500 text-sm">
-          No hay URL de live timing configurada para este circuito.
+          {t("live.noUrl")}
           <br />
           <span className="text-neutral-600 text-xs">
-            Configura el campo &quot;Live Timing URL&quot; en Admin &gt; Circuitos.
+            {t("live.configHint")}
           </span>
         </p>
       </div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 interface ActiveSession {
   id: number;
@@ -25,6 +26,7 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [deviceLimit, setDeviceLimit] = useState<DeviceLimitError | null>(null);
   const { setAuth } = useAuth();
+  const t = useT();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,10 +43,10 @@ export function LoginPage() {
         if (body.detail?.active_sessions) {
           setDeviceLimit(body.detail);
         } else {
-          setError("Usuario o contrasena incorrectos");
+          setError(t("login.wrongCredentials"));
         }
       } catch {
-        setError("Usuario o contrasena incorrectos");
+        setError(t("login.wrongCredentials"));
       }
     }
     setLoading(false);
@@ -63,7 +65,7 @@ export function LoginPage() {
         }
       }
     } catch {
-      setError("Error al cerrar la sesion");
+      setError(t("login.errorClosingSession"));
     }
   };
 
@@ -73,13 +75,13 @@ export function LoginPage() {
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="bg-surface rounded-2xl p-5 sm:p-8 w-full max-w-lg border border-border">
           <div className="text-center mb-6">
-            <h1 className="text-xl font-bold text-white">LIMITE DE DISPOSITIVOS</h1>
+            <h1 className="text-xl font-bold text-white">{t("login.deviceLimit")}</h1>
             <p className="text-neutral-400 text-sm mt-2">{deviceLimit.message}</p>
           </div>
 
           <div className="space-y-2 mb-6">
             <p className="text-[11px] text-neutral-200 uppercase tracking-wider">
-              Sesiones activas ({deviceLimit.active_sessions.length}/{deviceLimit.max_devices})
+              {t("login.activeSessions")} ({deviceLimit.active_sessions.length}/{deviceLimit.max_devices})
             </p>
             {deviceLimit.active_sessions.map((session) => (
               <div
@@ -99,7 +101,7 @@ export function LoginPage() {
                   onClick={() => killSession(session.id)}
                   className="ml-3 bg-red-900/50 hover:bg-red-800 text-red-300 text-xs font-medium px-3 py-2 rounded min-h-[44px]"
                 >
-                  Cerrar
+                  {t("login.close")}
                 </button>
               </div>
             ))}
@@ -109,7 +111,7 @@ export function LoginPage() {
             onClick={() => setDeviceLimit(null)}
             className="w-full text-neutral-400 hover:text-white text-sm py-2 transition-colors"
           >
-            Volver al login
+            {t("login.backToLogin")}
           </button>
         </div>
       </div>
@@ -134,25 +136,25 @@ export function LoginPage() {
         <div className="bg-surface rounded-2xl p-5 sm:p-8 border border-border">
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">Usuario</label>
+              <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">{t("login.username")}</label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700"
-                placeholder="usuario"
+                placeholder={t("login.username").toLowerCase()}
                 autoFocus
               />
             </div>
 
             <div>
-              <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">Contrasena</label>
+              <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">{t("login.password")}</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700"
-                placeholder="contrasena"
+                placeholder={t("login.password").toLowerCase()}
               />
             </div>
 
@@ -163,7 +165,7 @@ export function LoginPage() {
               disabled={loading || !username || !password}
               className="w-full bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-3 rounded-lg transition-colors tracking-wide"
             >
-              {loading ? "ENTRANDO..." : "ENTRAR"}
+              {loading ? t("login.entering") : t("login.enter")}
             </button>
           </form>
         </div>

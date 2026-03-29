@@ -1,6 +1,7 @@
 "use client";
 
 import clsx from "clsx";
+import { useT } from "@/lib/i18n";
 
 type Tab = "race" | "pit" | "live" | "classification" | "config" | "admin";
 
@@ -11,13 +12,14 @@ interface NavbarProps {
 }
 
 export function Navbar({ activeTab, onTabChange, isAdmin }: NavbarProps) {
-  const tabs: { id: Tab; label: string; shortLabel: string; adminOnly?: boolean }[] = [
-    { id: "race", label: "Carrera", shortLabel: "Race" },
-    { id: "pit", label: "Box", shortLabel: "Box" },
-    { id: "live", label: "Live", shortLabel: "Live" },
-    // { id: "classification", label: "Clasificacion", shortLabel: "Clasif." },
-    { id: "config", label: "Config", shortLabel: "Config" },
-    { id: "admin", label: "Admin", shortLabel: "Admin", adminOnly: true },
+  const t = useT();
+  const tabs: { id: Tab; labelKey: string; shortLabelKey: string; adminOnly?: boolean }[] = [
+    { id: "race", labelKey: "nav.race", shortLabelKey: "nav.race" },
+    { id: "pit", labelKey: "nav.box", shortLabelKey: "nav.box" },
+    { id: "live", labelKey: "nav.live", shortLabelKey: "nav.live" },
+    // { id: "classification", labelKey: "nav.classification", shortLabelKey: "nav.classification" },
+    { id: "config", labelKey: "nav.config", shortLabelKey: "nav.config" },
+    { id: "admin", labelKey: "nav.admin", shortLabelKey: "nav.admin", adminOnly: true },
   ];
 
   return (
@@ -35,8 +37,8 @@ export function Navbar({ activeTab, onTabChange, isAdmin }: NavbarProps) {
                 : "text-neutral-200 hover:text-neutral-300"
             )}
           >
-            <span className="sm:hidden">{tab.shortLabel}</span>
-            <span className="hidden sm:inline">{tab.label}</span>
+            <span className="sm:hidden">{t(tab.shortLabelKey)}</span>
+            <span className="hidden sm:inline">{t(tab.labelKey)}</span>
             {activeTab === tab.id && (
               <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-accent" />
             )}

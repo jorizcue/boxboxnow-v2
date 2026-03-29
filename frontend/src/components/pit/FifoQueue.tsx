@@ -5,9 +5,11 @@ import { useRaceStore } from "@/hooks/useRaceState";
 import { tierHex, secondsToHMS, msToLapTime } from "@/lib/formatters";
 import type { FifoEntry } from "@/types/race";
 import clsx from "clsx";
+import { useT } from "@/lib/i18n";
 
 export function FifoQueue() {
   const { fifo, config, karts } = useRaceStore();
+  const t = useT();
   const [now, setNow] = useState(() => Date.now() / 1000);
 
   useEffect(() => {
@@ -140,44 +142,44 @@ export function FifoQueue() {
         {/* Left: Stint metrics */}
         <div className="bg-surface rounded-xl border border-border overflow-hidden">
           <div className="bg-neutral-800/50 px-4 py-2 flex justify-between">
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">Metrica</span>
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">Valor</span>
+            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("metric.metric")}</span>
+            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("metric.value")}</span>
           </div>
           <div className="divide-y divide-border">
             <InfoRow
-              label="Stint en curso"
+              label={t("metric.currentStint")}
               value={secondsToHMS(ourStintSec)}
               highlight={ourStintSec / 60 >= config.maxStintMin}
             />
-            <InfoRow label="Tiempo hasta stint maximo" value={secondsToHMS(timeToMaxStint)} />
-            <InfoRow label="Vueltas hasta stint maximo" value={String(lapsToMaxStint)} />
-            <InfoRow label="Karts cerca de PIT" value={String(kartsNearPit)} />
-            <InfoRow label="Stint maximo" value={secondsToHMS(config.maxStintMin * 60)} />
-            <InfoRow label="Stint minimo" value={secondsToHMS(config.minStintMin * 60)} />
+            <InfoRow label={t("metric.timeToMaxStint")} value={secondsToHMS(timeToMaxStint)} />
+            <InfoRow label={t("metric.lapsToMaxStint")} value={String(lapsToMaxStint)} />
+            <InfoRow label={t("metric.kartsNearPit")} value={String(kartsNearPit)} />
+            <InfoRow label={t("metric.maxStint")} value={secondsToHMS(config.maxStintMin * 60)} />
+            <InfoRow label={t("metric.minStint")} value={secondsToHMS(config.minStintMin * 60)} />
           </div>
         </div>
 
         {/* Right: Pit info */}
         <div className="bg-surface rounded-xl border border-border overflow-hidden">
           <div className="bg-neutral-800/50 px-4 py-2 flex justify-between">
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">Pits</span>
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">Valor</span>
+            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("pit.pits")}</span>
+            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("metric.value")}</span>
           </div>
           <div className="divide-y divide-border">
             <InfoRow
-              label="Pit en curso"
+              label={t("pit.currentPit")}
               value={ourKart?.pitStatus === "in_pit" ? secondsToHMS(ourStintSec) : secondsToHMS(0)}
             />
             <InfoRow
-              label="Tiempo minimo de pit"
+              label={t("pit.minPitTime")}
               value={secondsToHMS(config.pitTimeS)}
             />
             <InfoRow
-              label="Numero de pits"
+              label={t("pit.pitCount")}
               value={ourKart ? String(ourKart.pitCount) : "0"}
             />
             <InfoRow
-              label="Numero minimo de pits"
+              label={t("pit.minPitCount")}
               value={String(config.minPits)}
             />
           </div>
@@ -188,7 +190,7 @@ export function FifoQueue() {
       {fifo.history.length > 0 && (
         <div className="bg-surface rounded-xl p-4 border border-border">
           <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">
-            Historial de entradas en box ({fifo.history.length})
+            {t("pit.history")} ({fifo.history.length})
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -196,7 +198,7 @@ export function FifoQueue() {
                 <tr>
                   <th className="px-2 py-1 text-left">#</th>
                   <th className="px-2 py-1 text-right">Score</th>
-                  <th className="px-2 py-1 text-left">Cola</th>
+                  <th className="px-2 py-1 text-left">{t("pit.queue")}</th>
                 </tr>
               </thead>
               <tbody>

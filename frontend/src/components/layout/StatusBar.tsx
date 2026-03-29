@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { msToCountdown } from "@/lib/formatters";
 import { useAuth } from "@/hooks/useAuth";
+import { useT, useLangStore, LANGUAGES } from "@/lib/i18n";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useRaceClock } from "@/hooks/useRaceClock";
 import { api } from "@/lib/api";
@@ -16,6 +17,8 @@ interface StatusBarProps {
 }
 
 export function StatusBar({ connected, trackName, countdownMs, username }: StatusBarProps) {
+  const t = useT();
+  const { lang, setLang } = useLangStore();
   const { logout } = useAuth();
   const [showSessions, setShowSessions] = useState(false);
   const apexConnected = useRaceStore((s) => s.apexConnected);
@@ -70,7 +73,7 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
               <div className="flex items-center gap-1 border-l border-border pl-2 min-w-0">
                 <div className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse shrink-0" />
                 <span className="text-[10px] sm:text-[11px] text-orange-400 font-medium truncate">
-                  {replayPaused ? "Replay (pausa)" : "Replay"}
+                  {replayPaused ? t("status.replayPaused") : "Replay"}
                 </span>
                 <span className="text-[10px] text-neutral-500 hidden sm:inline">
                   {(replayProgress * 100).toFixed(0)}%
@@ -86,7 +89,7 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
 
           {/* Center: countdown (hidden on very small, visible on sm+) */}
           <div className="hidden sm:flex items-center gap-2">
-            <span className="text-[11px] text-neutral-400 uppercase tracking-wider">Carrera</span>
+            <span className="text-[11px] text-neutral-400 uppercase tracking-wider">{t("status.race")}</span>
             <span className="text-base font-bold tabular-nums text-white">
               {timerDisplay}
             </span>
@@ -95,21 +98,30 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
           {/* Right: user + actions */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <span className="text-[10px] sm:text-xs text-neutral-200 hidden sm:inline">{username}</span>
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value as any)}
+              className="bg-black border border-border rounded px-1.5 py-0.5 text-[10px] sm:text-[11px] text-neutral-300 uppercase tracking-wider cursor-pointer"
+            >
+              {LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>{l.flag}</option>
+              ))}
+            </select>
             <button
               onClick={() => setShowSessions(true)}
               className="text-[10px] sm:text-[11px] text-neutral-400 hover:text-accent transition-colors"
-              title="Dispositivos"
+              title={t("status.devices")}
             >
               <svg className="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-              <span className="hidden sm:inline uppercase tracking-wider">Dispositivos</span>
+              <span className="hidden sm:inline uppercase tracking-wider">{t("status.devices")}</span>
             </button>
             <button
               onClick={handleLogout}
               className="text-[10px] sm:text-[11px] text-neutral-400 hover:text-accent transition-colors"
-              title="Salir"
+              title={t("status.logout")}
             >
               <svg className="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-              <span className="hidden sm:inline uppercase tracking-wider">Salir</span>
+              <span className="hidden sm:inline uppercase tracking-wider">{t("status.logout")}</span>
             </button>
           </div>
         </div>
@@ -117,7 +129,7 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
         {/* Mobile-only: second row with track + countdown */}
         <div className="flex items-center justify-between px-3 py-1 border-t border-border/50 sm:hidden">
           <span className="text-xs text-neutral-300 truncate">
-            {trackName || "Sin circuito"}
+            {trackName || t("status.noCircuit")}
           </span>
           <span className="text-sm font-bold tabular-nums text-white shrink-0">
             {timerDisplay}

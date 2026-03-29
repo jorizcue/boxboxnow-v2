@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useState } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useRaceClock } from "@/hooks/useRaceClock";
+import { useT } from "@/lib/i18n";
 import { msToLapTime, secondsToStint, secondsToHMS, tierHex, formatDifferential } from "@/lib/formatters";
 import { getDriverInfoForKart, DriverDetailsRow } from "@/components/shared/DriverDetails";
 import clsx from "clsx";
@@ -10,6 +11,7 @@ import clsx from "clsx";
 const COL_COUNT = 13; // number of <th> columns
 
 export function RaceTable() {
+  const t = useT();
   const { karts, config } = useRaceStore();
   const raceClockMs = useRaceClock();
   const [expandedKart, setExpandedKart] = useState<number | null>(null);
@@ -54,8 +56,8 @@ export function RaceTable() {
     return (
       <div className="flex items-center justify-center h-64 text-neutral-400">
         <div className="text-center">
-          <p className="text-lg">Sin datos de carrera</p>
-          <p className="text-sm mt-1 text-neutral-700">Conecta al WebSocket de Apex o inicia un replay</p>
+          <p className="text-lg">{t("race.noData")}</p>
+          <p className="text-sm mt-1 text-neutral-700">{t("race.connectHint")}</p>
         </div>
       </div>
     );
@@ -69,17 +71,17 @@ export function RaceTable() {
           <thead className="bg-surface text-neutral-200 sticky top-0 z-10 text-[10px] sm:text-[11px] uppercase tracking-wider">
             <tr>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-6 sm:w-8">#</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left w-8 sm:w-12">Kart</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">Equipo</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">Piloto</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right" title="Media ultimas 20 vueltas">Med.20</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right" title="Media 3 mejores vueltas">Mej.3</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Ult.</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Mejor</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">Vlt</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">Pit</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left w-8 sm:w-12">{t("race.kart")}</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">{t("race.team")}</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">{t("race.driver")}</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right" title={t("race.avg20Title")}>{t("race.avg20")}</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right" title={t("race.best3Title")}>{t("race.best3")}</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("race.last")}</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("race.best")}</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">{t("race.laps")}</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">{t("race.pit")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-8 sm:w-12">Tier</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">Stint</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">{t("race.stint")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-6 sm:w-8"></th>
             </tr>
           </thead>
@@ -165,7 +167,7 @@ export function RaceTable() {
                     <td className="px-2 py-1.5 text-center">
                       <span
                         className={`pit-indicator ${kart.pitStatus}`}
-                        title={kart.pitStatus === "in_pit" ? "En boxes" : "En pista"}
+                        title={kart.pitStatus === "in_pit" ? t("race.inPit") : t("race.onTrack")}
                       />
                     </td>
                   </tr>
@@ -192,52 +194,52 @@ export function RaceTable() {
         {/* Left: Stint metrics for our kart */}
         <div className="bg-surface rounded-xl border border-border overflow-hidden">
           <div className="bg-neutral-800/50 px-4 py-2 flex justify-between">
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">Metrica</span>
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">Valor</span>
+            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("metric.metric")}</span>
+            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("metric.value")}</span>
           </div>
           <div className="divide-y divide-border">
             <InfoRow
-              label="Stint en curso"
+              label={t("metric.currentStint")}
               value={secondsToHMS(ourStintSec)}
               highlight={ourStintSec / 60 >= config.maxStintMin}
             />
-            <InfoRow label="Tiempo hasta stint maximo" value={secondsToHMS(timeToMaxStint)} />
-            <InfoRow label="Vueltas hasta stint maximo" value={String(lapsToMaxStint)} />
-            <InfoRow label="Karts cerca de PIT" value={String(kartsNearPit)} />
-            <InfoRow label="Stint maximo" value={secondsToHMS(config.maxStintMin * 60)} />
-            <InfoRow label="Stint minimo" value={secondsToHMS(config.minStintMin * 60)} />
+            <InfoRow label={t("metric.timeToMaxStint")} value={secondsToHMS(timeToMaxStint)} />
+            <InfoRow label={t("metric.lapsToMaxStint")} value={String(lapsToMaxStint)} />
+            <InfoRow label={t("metric.kartsNearPit")} value={String(kartsNearPit)} />
+            <InfoRow label={t("metric.maxStint")} value={secondsToHMS(config.maxStintMin * 60)} />
+            <InfoRow label={t("metric.minStint")} value={secondsToHMS(config.minStintMin * 60)} />
           </div>
         </div>
 
         {/* Right: Driver info for our kart */}
         <div className="bg-surface rounded-xl border border-border overflow-hidden">
           <div className="bg-neutral-800/50 px-4 py-2 flex justify-between">
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">Piloto</span>
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">Info</span>
+            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("driver.driver")}</span>
+            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("driver.info")}</span>
           </div>
           <div className="divide-y divide-border">
             <InfoRow
-              label="Piloto actual"
+              label={t("driver.currentDriver")}
               value={ourKart?.driverName || "-"}
             />
             <InfoRow
-              label="Tiempo piloto"
+              label={t("driver.driverTime")}
               value={ourKart?.driverTime || "-"}
             />
             <InfoRow
-              label="Dif. Tiempo piloto"
+              label={t("driver.driverDiffTime")}
               value={ourKart ? formatDifferential(ourKart.driverDifferentialMs) : "-"}
             />
             <InfoRow
-              label="Vueltas en stint"
+              label={t("driver.stintLaps")}
               value={ourKart ? String(ourKart.stintLapsCount) : "0"}
             />
             <InfoRow
-              label="Ritmo medio"
+              label={t("driver.avgPace")}
               value={ourKart && ourKart.avgLapMs > 0 ? msToLapTime(Math.round(ourKart.avgLapMs)) : "-"}
             />
             <InfoRow
-              label="Mejor media (3 mejores)"
+              label={t("driver.bestAvg3")}
               value={ourKart && ourKart.bestAvgMs > 0 ? msToLapTime(Math.round(ourKart.bestAvgMs)) : "-"}
             />
           </div>

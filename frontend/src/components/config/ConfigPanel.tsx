@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { TeamEditor } from "@/components/config/TeamEditor";
+import { useT } from "@/lib/i18n";
 
 interface Circuit {
   id: number;
@@ -46,6 +47,7 @@ export function ConfigPanel() {
 // --- Race Session (circuit + params) ---
 
 function RaceSessionEditor() {
+  const t = useT();
   const [circuits, setCircuits] = useState<Circuit[]>([]);
   const [session, setSession] = useState<RaceSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -166,7 +168,7 @@ function RaceSessionEditor() {
   if (loading) {
     return (
       <div className="bg-surface rounded-xl p-6 border border-border">
-        <p className="text-neutral-400 text-sm">Cargando...</p>
+        <p className="text-neutral-400 text-sm">{t("config.loading")}</p>
       </div>
     );
   }
@@ -176,10 +178,10 @@ function RaceSessionEditor() {
   return (
     <div className="bg-white/[0.03] rounded-xl p-6 border border-border">
       <div className="flex items-center justify-between mb-5">
-        <h2 className="text-[11px] text-neutral-200 uppercase tracking-wider">Sesion de Carrera</h2>
+        <h2 className="text-[11px] text-neutral-200 uppercase tracking-wider">{t("config.raceSession")}</h2>
         {session && (
           <span className="text-[10px] bg-accent/15 text-accent px-2 py-0.5 rounded uppercase tracking-wider font-medium">
-            Activa
+            {t("config.active")}
           </span>
         )}
       </div>
@@ -187,13 +189,13 @@ function RaceSessionEditor() {
       <div className="space-y-4">
         {/* Circuit selector */}
         <div>
-          <label className="block text-[11px] text-neutral-400 mb-1.5 uppercase tracking-wider">Circuito</label>
+          <label className="block text-[11px] text-neutral-400 mb-1.5 uppercase tracking-wider">{t("config.circuit")}</label>
           <select
             value={circuitId}
             onChange={(e) => handleCircuitChange(Number(e.target.value))}
             className="w-full bg-black border border-border rounded-lg px-3 py-2.5 text-sm"
           >
-            <option value={0}>Seleccionar circuito...</option>
+            <option value={0}>{t("config.selectCircuit")}</option>
             {circuits.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name} {c.length_m ? `(${c.length_m}m)` : ""}
@@ -202,7 +204,7 @@ function RaceSessionEditor() {
           </select>
           {selectedCircuit && (
             <p className="text-[10px] text-neutral-400 mt-1">
-              Puerto WS: {selectedCircuit.ws_port}
+              {t("config.wsPort")}: {selectedCircuit.ws_port}
               {selectedCircuit.pit_time_s && ` · Pit: ${selectedCircuit.pit_time_s}s`}
               {selectedCircuit.length_m && ` · ${selectedCircuit.length_m}m`}
             </p>
@@ -211,16 +213,16 @@ function RaceSessionEditor() {
 
         {/* Two column grid for params */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Duracion (min)" value={durationMin} onChange={setDurationMin} />
-          <Field label="Nuestro kart" value={ourKart} onChange={setOurKart} />
-          <Field label="Stint min (min)" value={minStint} onChange={setMinStint} />
-          <Field label="Stint max (min)" value={maxStint} onChange={setMaxStint} />
-          <Field label="Pits minimos" value={minPits} onChange={setMinPits} />
-          <Field label="Tiempo pit (s)" value={pitTime} onChange={setPitTime} />
-          <Field label="Tiempo min piloto (min)" value={minDriverTime} onChange={setMinDriverTime} />
-          <Field label="Refresh (s)" value={refreshInterval} onChange={setRefreshInterval} />
-          <Field label="Lineas box" value={boxLines} onChange={setBoxLines} />
-          <Field label="Karts en box" value={boxKarts} onChange={setBoxKarts} />
+          <Field label={t("config.duration")} value={durationMin} onChange={setDurationMin} />
+          <Field label={t("config.ourKart")} value={ourKart} onChange={setOurKart} />
+          <Field label={t("config.minStint")} value={minStint} onChange={setMinStint} />
+          <Field label={t("config.maxStint")} value={maxStint} onChange={setMaxStint} />
+          <Field label={t("config.minPits")} value={minPits} onChange={setMinPits} />
+          <Field label={t("config.pitTime")} value={pitTime} onChange={setPitTime} />
+          <Field label={t("config.minDriverTime")} value={minDriverTime} onChange={setMinDriverTime} />
+          <Field label={t("config.refresh")} value={refreshInterval} onChange={setRefreshInterval} />
+          <Field label={t("config.boxLines")} value={boxLines} onChange={setBoxLines} />
+          <Field label={t("config.boxKarts")} value={boxKarts} onChange={setBoxKarts} />
         </div>
 
         {/* Rain toggle */}
@@ -231,8 +233,8 @@ function RaceSessionEditor() {
             onChange={(e) => setRain(e.target.checked)}
             className="accent-accent w-4 h-4"
           />
-          <span className="text-sm text-neutral-300">Modo lluvia</span>
-          <span className="text-[10px] text-neutral-400">(desactiva filtro de outliers)</span>
+          <span className="text-sm text-neutral-300">{t("config.rainMode")}</span>
+          <span className="text-[10px] text-neutral-400">{t("config.rainHint")}</span>
         </label>
 
         {/* Save button */}
@@ -241,7 +243,7 @@ function RaceSessionEditor() {
           disabled={!circuitId || saving}
           className="w-full bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-2.5 rounded-lg"
         >
-          {saving ? "Guardando..." : session ? "Actualizar sesion" : "Crear sesion"}
+          {saving ? t("config.saving") : session ? t("config.updateSession") : t("config.createSession")}
         </button>
       </div>
     </div>

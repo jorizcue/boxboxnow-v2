@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useRaceStore } from "@/hooks/useRaceState";
+import { useT } from "@/lib/i18n";
 
 interface UserRow {
   id: number;
@@ -35,6 +36,7 @@ interface AccessRow {
 }
 
 export function AdminPanel() {
+  const t = useT();
   const [tab, setTab] = useState<"users" | "circuits" | "hub" | "replay" | "analytics">("users");
 
   const tabBtn = (key: typeof tab, label: string) => (
@@ -51,11 +53,11 @@ export function AdminPanel() {
   return (
     <div className="space-y-4">
       <div className="flex gap-0.5">
-        {tabBtn("users", "Usuarios")}
-        {tabBtn("circuits", "Circuitos")}
-        {tabBtn("hub", "CircuitHub")}
-        {tabBtn("replay", "Replay")}
-        {tabBtn("analytics", "Kart Analytics")}
+        {tabBtn("users", t("admin.users"))}
+        {tabBtn("circuits", t("admin.circuits"))}
+        {tabBtn("hub", t("admin.hub"))}
+        {tabBtn("replay", t("admin.replay"))}
+        {tabBtn("analytics", t("admin.analytics"))}
       </div>
 
       {tab === "users" && <UsersManager />}
@@ -68,6 +70,7 @@ export function AdminPanel() {
 }
 
 function UsersManager() {
+  const t = useT();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -99,7 +102,7 @@ function UsersManager() {
   };
 
   const deleteUser = async (id: number) => {
-    if (!confirm("Eliminar usuario?")) return;
+    if (!confirm(t("admin.deleteUser"))) return;
     try {
       await api.deleteUser(id);
       loadUsers();
@@ -132,30 +135,30 @@ function UsersManager() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
-        <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">Usuarios</h3>
+        <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">{t("admin.usersTitle")}</h3>
 
         <div className="flex gap-2 mb-4">
-          <input placeholder="Usuario" value={newUsername} onChange={(e) => setNewUsername(e.target.value)}
+          <input placeholder={t("admin.userPlaceholder")} value={newUsername} onChange={(e) => setNewUsername(e.target.value)}
             className="flex-1 bg-black border border-border rounded-lg px-2 py-1.5 text-sm" />
           <input placeholder="Password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
             className="flex-1 bg-black border border-border rounded-lg px-2 py-1.5 text-sm" />
-          <input placeholder="Disp." type="number" min="1" max="10" value={newMaxDevices}
+          <input placeholder={t("admin.devicesShort")} type="number" min="1" max="10" value={newMaxDevices}
             onChange={(e) => setNewMaxDevices(Number(e.target.value))}
-            className="w-16 bg-black border border-border rounded-lg px-2 py-1.5 text-sm" title="Max dispositivos" />
+            className="w-16 bg-black border border-border rounded-lg px-2 py-1.5 text-sm" title={t("admin.devicesTitle")} />
           <label className="flex items-center gap-1 text-xs text-neutral-200">
             <input type="checkbox" checked={newIsAdmin} onChange={(e) => setNewIsAdmin(e.target.checked)} className="accent-accent" />
             Admin
           </label>
           <button onClick={createUser} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-sm">
-            Crear
+            {t("admin.create")}
           </button>
         </div>
 
         <table className="w-full text-sm">
           <thead className="text-[11px] text-neutral-400 uppercase tracking-wider">
             <tr>
-              <th className="text-left px-2 py-1">Usuario</th>
-              <th className="text-center px-2 py-1">Disp.</th>
+              <th className="text-left px-2 py-1">{t("admin.userPlaceholder")}</th>
+              <th className="text-center px-2 py-1">{t("admin.devicesShort")}</th>
               <th className="text-center px-2 py-1">Admin</th>
               <th className="text-right px-2 py-1"></th>
             </tr>
@@ -168,11 +171,11 @@ function UsersManager() {
                 <td className="px-2 py-1.5 text-white">{u.username}</td>
                 <td className="px-2 py-1.5 text-center font-mono text-neutral-400">{u.max_devices}</td>
                 <td className="px-2 py-1.5 text-center">
-                  {u.is_admin ? <span className="text-accent text-xs font-medium">SI</span> : <span className="text-neutral-700">-</span>}
+                  {u.is_admin ? <span className="text-accent text-xs font-medium">{t("common.yes")}</span> : <span className="text-neutral-700">-</span>}
                 </td>
                 <td className="px-2 py-1.5 text-right">
                   <button onClick={(e) => { e.stopPropagation(); deleteUser(u.id); }}
-                    className="text-red-400/60 hover:text-red-400 text-xs transition-colors">Eliminar</button>
+                    className="text-red-400/60 hover:text-red-400 text-xs transition-colors">{t("admin.delete")}</button>
                 </td>
               </tr>
             ))}
@@ -182,7 +185,7 @@ function UsersManager() {
 
       <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
         <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">
-          Acceso a Circuitos{selectedUser && ` — ${users.find((u) => u.id === selectedUser)?.username}`}
+          {t("admin.circuitAccess")}{selectedUser && ` — ${users.find((u) => u.id === selectedUser)?.username}`}
         </h3>
 
         {selectedUser ? (
@@ -190,7 +193,7 @@ function UsersManager() {
             <div className="flex gap-2 mb-4 flex-wrap">
               <select value={newCircuitId} onChange={(e) => setNewCircuitId(Number(e.target.value))}
                 className="bg-black border border-border rounded-lg px-2 py-1.5 text-sm">
-                <option value={0}>Circuito...</option>
+                <option value={0}>{t("admin.selectCircuitPlaceholder")}</option>
                 {circuits.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               <input type="date" value={newValidFrom} onChange={(e) => setNewValidFrom(e.target.value)}
@@ -198,16 +201,16 @@ function UsersManager() {
               <input type="date" value={newValidUntil} onChange={(e) => setNewValidUntil(e.target.value)}
                 className="bg-black border border-border rounded-lg px-2 py-1.5 text-sm" />
               <button onClick={grantAccess} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-sm">
-                Dar acceso
+                {t("admin.grantAccess")}
               </button>
             </div>
 
             <table className="w-full text-sm">
               <thead className="text-[11px] text-neutral-400 uppercase tracking-wider">
                 <tr>
-                  <th className="text-left px-2 py-1">Circuito</th>
-                  <th className="text-left px-2 py-1">Desde</th>
-                  <th className="text-left px-2 py-1">Hasta</th>
+                  <th className="text-left px-2 py-1">{t("config.circuit")}</th>
+                  <th className="text-left px-2 py-1">{t("admin.from")}</th>
+                  <th className="text-left px-2 py-1">{t("admin.until")}</th>
                   <th className="text-right px-2 py-1"></th>
                 </tr>
               </thead>
@@ -219,18 +222,18 @@ function UsersManager() {
                     <td className="px-2 py-1.5 text-neutral-200">{new Date(a.valid_until).toLocaleDateString()}</td>
                     <td className="px-2 py-1.5 text-right">
                       <button onClick={() => revokeAccess(a.id)}
-                        className="text-red-400/60 hover:text-red-400 text-xs transition-colors">Revocar</button>
+                        className="text-red-400/60 hover:text-red-400 text-xs transition-colors">{t("admin.revoke")}</button>
                     </td>
                   </tr>
                 ))}
                 {access.length === 0 && (
-                  <tr><td colSpan={4} className="px-2 py-4 text-center text-neutral-500">Sin acceso a circuitos</td></tr>
+                  <tr><td colSpan={4} className="px-2 py-4 text-center text-neutral-500">{t("admin.noAccess")}</td></tr>
                 )}
               </tbody>
             </table>
           </>
         ) : (
-          <p className="text-neutral-500 text-sm">Selecciona un usuario para gestionar su acceso</p>
+          <p className="text-neutral-500 text-sm">{t("admin.selectUserHint")}</p>
         )}
       </div>
     </div>
@@ -294,6 +297,7 @@ function formToPayload(f: CircuitForm) {
 }
 
 function CircuitsManager() {
+  const t = useT();
   const [circuits, setCircuits] = useState<CircuitRow[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -339,7 +343,7 @@ function CircuitsManager() {
   };
 
   const deleteCircuit = async (id: number) => {
-    if (!confirm("Eliminar circuito? Se perderan los accesos asociados.")) return;
+    if (!confirm(t("admin.confirmDeleteCircuit"))) return;
     try {
       await api.deleteCircuit(id);
       loadCircuits();
@@ -370,9 +374,9 @@ function CircuitsManager() {
       {/* Left: circuit list */}
       <div className={`bg-white/[0.03] rounded-xl p-4 border border-border transition-all ${panelOpen ? "flex-1 min-w-0" : "w-full"}`}>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">Catalogo de Circuitos</h3>
+          <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">{t("admin.circuitCatalog")}</h3>
           <button onClick={startCreate} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-sm">
-            Nuevo
+            {t("admin.new")}
           </button>
         </div>
 
@@ -401,12 +405,12 @@ function CircuitsManager() {
                 onClick={(e) => { e.stopPropagation(); deleteCircuit(c.id); }}
                 className="text-red-400/40 hover:text-red-400 text-xs transition-colors ml-2 flex-shrink-0"
               >
-                Eliminar
+                {t("admin.delete")}
               </button>
             </div>
           ))}
           {circuits.length === 0 && (
-            <p className="text-neutral-500 text-sm py-4 text-center">No hay circuitos</p>
+            <p className="text-neutral-500 text-sm py-4 text-center">{t("admin.noCircuits")}</p>
           )}
         </div>
       </div>
@@ -416,7 +420,7 @@ function CircuitsManager() {
         <div className="w-80 flex-shrink-0 bg-white/[0.03] rounded-xl border border-border p-4 space-y-3 animate-in slide-in-from-right-4 duration-200">
           <div className="flex items-center justify-between">
             <h4 className="text-xs text-neutral-200 font-medium uppercase tracking-wider">
-              {editingId ? "Editar circuito" : "Nuevo circuito"}
+              {editingId ? t("admin.editCircuit") : t("admin.newCircuit")}
             </h4>
             <button
               onClick={cancelEdit}
@@ -427,34 +431,34 @@ function CircuitsManager() {
           </div>
 
           <div className="space-y-2.5">
-            {fieldInput("Nombre", "name", "text", "Nombre del circuito")}
+            {fieldInput(t("admin.name"), "name", "text", t("admin.namePlaceholder"))}
 
             <div className="grid grid-cols-2 gap-2">
-              {fieldInput("WS Port (wss)", "ws_port", "number", "Puerto WSS")}
-              {fieldInput("WS Data (ws)", "ws_port_data", "number", "Puerto WS")}
+              {fieldInput(t("admin.wsPort"), "ws_port", "number", "Puerto WSS")}
+              {fieldInput(t("admin.wsPortData"), "ws_port_data", "number", "Puerto WS")}
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              {fieldInput("Longitud (m)", "length_m", "number", "Metros")}
-              {fieldInput("Pit Time (s)", "pit_time_s", "number", "Segundos")}
+              {fieldInput(t("admin.length"), "length_m", "number", "Metros")}
+              {fieldInput(t("admin.pitTime"), "pit_time_s", "number", "Segundos")}
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              {fieldInput("PHP API Port", "php_api_port", "number", "Puerto")}
-              {fieldInput("Vtas. descarte", "laps_discard", "number", "2")}
+              {fieldInput(t("admin.phpApiPort"), "php_api_port", "number", "Puerto")}
+              {fieldInput(t("admin.lapsDiscard"), "laps_discard", "number", "2")}
             </div>
 
-            {fieldInput("Diferencial (ms)", "lap_differential", "number", "3000")}
+            {fieldInput(t("admin.lapDifferential"), "lap_differential", "number", "3000")}
             {fieldInput("PHP API URL", "php_api_url", "text", "http://...")}
             {fieldInput("Live Timing URL", "live_timing_url", "text", "https://...")}
           </div>
 
           <div className="flex gap-2 pt-1">
             <button onClick={saveCircuit} className="flex-1 bg-accent hover:bg-accent-hover text-black font-semibold py-2 rounded-lg text-sm transition-colors">
-              {editingId ? "Guardar" : "Crear"}
+              {editingId ? t("admin.save") : t("admin.create")}
             </button>
             <button onClick={cancelEdit} className="bg-surface text-neutral-300 px-4 py-2 rounded-lg text-sm border border-border hover:text-white transition-colors">
-              Cancelar
+              {t("admin.cancel")}
             </button>
           </div>
 
@@ -463,7 +467,7 @@ function CircuitsManager() {
               onClick={() => deleteCircuit(editingId)}
               className="w-full text-red-400/60 hover:text-red-400 text-xs py-1.5 transition-colors"
             >
-              Eliminar este circuito
+              {t("admin.deleteCircuit")}
             </button>
           )}
         </div>
@@ -485,6 +489,7 @@ interface HubCircuit {
 }
 
 function CircuitHubManager() {
+  const t = useT();
   const [circuits, setCircuits] = useState<HubCircuit[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<number | null>(null);
@@ -532,29 +537,29 @@ function CircuitHubManager() {
   return (
     <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">CircuitHub — Estado en tiempo real</h3>
+        <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">{t("hub.title")}</h3>
         <div className="flex items-center gap-4 text-[10px] text-neutral-400">
           <span>
-            <span className="text-accent font-semibold">{connectedCount}</span>/{circuits.length} conectados
+            <span className="text-accent font-semibold">{connectedCount}</span>/{circuits.length} {t("hub.connected")}
           </span>
           <span>{totalMessages.toLocaleString()} msgs</span>
-          <span>{totalSubscribers} suscriptores</span>
+          <span>{totalSubscribers} {t("hub.subscribers")}</span>
         </div>
       </div>
 
       {loading ? (
-        <p className="text-neutral-500 text-sm py-4 text-center">Cargando...</p>
+        <p className="text-neutral-500 text-sm py-4 text-center">{t("hub.loading")}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-[10px] text-neutral-400 uppercase tracking-wider">
               <tr>
-                <th className="text-left px-2 py-1.5">Estado</th>
-                <th className="text-left px-2 py-1.5">Circuito</th>
+                <th className="text-left px-2 py-1.5">{t("hub.status")}</th>
+                <th className="text-left px-2 py-1.5">{t("hub.circuit")}</th>
                 <th className="text-left px-2 py-1.5">URL</th>
-                <th className="text-right px-2 py-1.5">Mensajes</th>
-                <th className="text-right px-2 py-1.5">Usuarios</th>
-                <th className="text-right px-2 py-1.5">Accion</th>
+                <th className="text-right px-2 py-1.5">{t("hub.messages")}</th>
+                <th className="text-right px-2 py-1.5">{t("hub.usersCol")}</th>
+                <th className="text-right px-2 py-1.5">{t("hub.action")}</th>
               </tr>
             </thead>
             <tbody>
@@ -591,7 +596,7 @@ function CircuitHubManager() {
                         disabled={actionId === c.circuit_id}
                         className="text-red-400/70 hover:text-red-400 disabled:opacity-40 text-xs font-medium transition-colors"
                       >
-                        {actionId === c.circuit_id ? "..." : "Parar"}
+                        {actionId === c.circuit_id ? "..." : t("hub.stop")}
                       </button>
                     ) : (
                       <button
@@ -599,7 +604,7 @@ function CircuitHubManager() {
                         disabled={actionId === c.circuit_id}
                         className="text-accent/70 hover:text-accent disabled:opacity-40 text-xs font-medium transition-colors"
                       >
-                        {actionId === c.circuit_id ? "..." : "Arrancar"}
+                        {actionId === c.circuit_id ? "..." : t("hub.start")}
                       </button>
                     )}
                   </td>
@@ -651,6 +656,7 @@ interface LogEntry {
 }
 
 function ReplayControls() {
+  const t = useT();
   // Recording circuits (circuit+date selector)
   const [recordingCircuits, setRecordingCircuits] = useState<RecordingCircuit[]>([]);
   const [selectedRecCircuit, setSelectedRecCircuitState] = useState(_replaySelectedCircuitDir || "");
@@ -792,13 +798,13 @@ function ReplayControls() {
 
   return (
     <div className="bg-white/[0.03] rounded-xl p-6 border border-border">
-      <h2 className="text-[11px] text-neutral-200 mb-4 uppercase tracking-wider">Replay de Carreras</h2>
+      <h2 className="text-[11px] text-neutral-200 mb-4 uppercase tracking-wider">{t("replay.title")}</h2>
 
       <div className="space-y-3">
         {/* Circuit + Date selectors */}
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">Circuito</label>
+            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("replay.circuit")}</label>
             <select
               value={selectedRecCircuit}
               onChange={(e) => {
@@ -809,7 +815,7 @@ function ReplayControls() {
               disabled={replayActive}
               className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
             >
-              <option value="">Seleccionar...</option>
+              <option value="">{t("replay.select")}</option>
               {recordingCircuits.map((c) => (
                 <option key={c.circuit_dir} value={c.circuit_dir}>
                   {c.circuit_name} ({c.dates.length}d)
@@ -818,14 +824,14 @@ function ReplayControls() {
             </select>
           </div>
           <div>
-            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">Fecha</label>
+            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("replay.date")}</label>
             <select
               value={selectedDate}
               onChange={(e) => setSelectedDateState(e.target.value)}
               disabled={replayActive || !selectedRecCircuit}
               className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
             >
-              <option value="">Seleccionar...</option>
+              <option value="">{t("replay.select")}</option>
               {availableDates.map((d) => (
                 <option key={d} value={d}>{d}</option>
               ))}
@@ -840,7 +846,7 @@ function ReplayControls() {
               onClick={() => setShowLegacy(!showLegacy)}
               className="text-[10px] text-neutral-500 hover:text-neutral-300 transition-colors"
             >
-              {showLegacy ? "Ocultar" : "Mostrar"} grabaciones antiguas ({legacyLogs.length})
+              {showLegacy ? t("replay.hideLegacy") : t("replay.showLegacy")} {t("replay.oldRecordings")} ({legacyLogs.length})
             </button>
             {showLegacy && (
               <select
@@ -849,7 +855,7 @@ function ReplayControls() {
                 disabled={replayActive}
                 className="w-full mt-1 bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
               >
-                <option value="">Seleccionar log antiguo...</option>
+                <option value="">{t("replay.selectOldLog")}</option>
                 {legacyLogs.map((log, idx) => {
                   const val = log.owner_id != null ? `${log.owner_id}:${log.filename}` : log.filename;
                   const label = log.owner ? `[${log.owner}] ${log.filename}` : log.filename;
@@ -865,13 +871,13 @@ function ReplayControls() {
           <div className="space-y-1.5">
             <div className="flex justify-between text-[10px] text-neutral-500">
               <span>{analysis.startTime}</span>
-              <span>{analysis.totalBlocks} bloques</span>
+              <span>{analysis.totalBlocks} {t("replay.blocks")}</span>
               <span>{analysis.endTime}</span>
             </div>
             <div
               className="relative w-full h-6 bg-black rounded-lg cursor-pointer border border-border group"
               onClick={handleTimelineClick}
-              title="Click para posicionarte"
+              title={t("replay.clickToSeek")}
             >
               {replayActive && (
                 <div
@@ -909,7 +915,7 @@ function ReplayControls() {
                     className="flex items-center gap-1.5 bg-green-900/30 hover:bg-green-900/50 disabled:opacity-40 text-green-400 text-[10px] font-medium px-2 py-1 rounded border border-green-900/30 transition-colors"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
-                    <span className="truncate">{rs.title || `Carrera ${idx + 1}`}</span>
+                    <span className="truncate">{rs.title || `${t("replay.raceN")} ${idx + 1}`}</span>
                     <span className="text-green-600 flex-shrink-0">{rs.timestamp}</span>
                   </button>
                 ))}
@@ -919,12 +925,12 @@ function ReplayControls() {
         )}
 
         {analyzing && (
-          <p className="text-[10px] text-neutral-500">Analizando fichero...</p>
+          <p className="text-[10px] text-neutral-500">{t("replay.analyzing")}</p>
         )}
 
         <div>
           <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">
-            Velocidad: {speed}x
+            {t("replay.speed")}: {speed}x
           </label>
           <input
             type="range" min="1" max="100" value={speed}
@@ -942,7 +948,7 @@ function ReplayControls() {
             onClick={() => startFromBlock(0)}
             disabled={!selectedLog || loading || replayActive}
             className="w-10 h-10 flex items-center justify-center bg-accent hover:bg-accent-hover disabled:opacity-40 text-black rounded-lg transition-colors"
-            title="Iniciar"
+            title={t("replay.start")}
           >
             {loading ? (
               <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeLinecap="round"/></svg>
@@ -957,7 +963,7 @@ function ReplayControls() {
             }}
             disabled={!replayActive}
             className="w-10 h-10 flex items-center justify-center bg-black hover:bg-surface disabled:opacity-40 text-neutral-300 rounded-lg border border-border transition-colors"
-            title={replayPaused ? "Reanudar" : "Pausar"}
+            title={replayPaused ? t("replay.resume") : t("replay.pause")}
           >
             {replayPaused ? (
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -973,7 +979,7 @@ function ReplayControls() {
             }}
             disabled={!replayActive}
             className="w-10 h-10 flex items-center justify-center bg-red-900/50 hover:bg-red-800 disabled:opacity-40 text-red-300 rounded-lg transition-colors"
-            title="Parar"
+            title={t("replay.stopBtn")}
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
           </button>
@@ -1018,6 +1024,7 @@ function msToLapTime(ms: number): string {
 }
 
 function KartAnalytics() {
+  const t = useT();
   const [circuits, setCircuits] = useState<CircuitRow[]>([]);
   const [selectedCircuit, setSelectedCircuit] = useState<number>(0);
   const [dateFrom, setDateFrom] = useState(() => {
@@ -1073,24 +1080,24 @@ function KartAnalytics() {
   return (
     <div className="space-y-4">
       <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
-        <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">Analisis de Karts por Circuito</h3>
+        <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">{t("analytics.title")}</h3>
 
         <div className="flex gap-3 items-end flex-wrap">
           <div>
-            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">Circuito</label>
+            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("analytics.circuit")}</label>
             <select
               value={selectedCircuit}
               onChange={(e) => setSelectedCircuit(Number(e.target.value))}
               className="bg-black border border-border rounded-lg px-3 py-2 text-sm"
             >
-              <option value={0}>Seleccionar...</option>
+              <option value={0}>{t("analytics.select")}</option>
               {circuits.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">Desde</label>
+            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("analytics.from")}</label>
             <input
               type="date"
               value={dateFrom}
@@ -1099,7 +1106,7 @@ function KartAnalytics() {
             />
           </div>
           <div>
-            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">Hasta</label>
+            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("analytics.to")}</label>
             <input
               type="date"
               value={dateTo}
@@ -1112,17 +1119,17 @@ function KartAnalytics() {
             disabled={!selectedCircuit || loading}
             className="bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold px-4 py-2 rounded-lg text-sm"
           >
-            {loading ? "Cargando..." : "Buscar"}
+            {loading ? t("analytics.loading") : t("analytics.search")}
           </button>
         </div>
 
         {raceLogs.length > 0 && (
           <div className="mt-3 flex items-center gap-3 text-[10px] text-neutral-400">
-            <span className="text-accent font-semibold">{raceLogs.length}</span> carreras encontradas
+            <span className="text-accent font-semibold">{raceLogs.length}</span> {t("analytics.racesFound")}
             <span className="text-neutral-600">|</span>
-            <span className="text-accent font-semibold">{stats.length}</span> karts
+            <span className="text-accent font-semibold">{stats.length}</span> {t("analytics.karts")}
             <span className="text-neutral-600">|</span>
-            <span className="text-accent font-semibold">{stats.reduce((a, s) => a + s.valid_laps, 0).toLocaleString()}</span> vueltas validas
+            <span className="text-accent font-semibold">{stats.reduce((a, s) => a + s.valid_laps, 0).toLocaleString()}</span> {t("analytics.validLaps")}
           </div>
         )}
       </div>
@@ -1130,8 +1137,8 @@ function KartAnalytics() {
       {stats.length > 0 && (
         <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
           <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">
-            Rendimiento de Karts
-            <span className="text-neutral-500 ml-2 normal-case">ordenados por media top 5</span>
+            {t("analytics.performance")}
+            <span className="text-neutral-500 ml-2 normal-case">{t("analytics.sortedByTop5")}</span>
           </h3>
 
           <div className="overflow-x-auto">
@@ -1139,13 +1146,13 @@ function KartAnalytics() {
               <thead className="text-[10px] text-neutral-400 uppercase tracking-wider">
                 <tr>
                   <th className="text-center px-2 py-1.5 w-8">#</th>
-                  <th className="text-center px-2 py-1.5">Kart</th>
-                  <th className="text-right px-2 py-1.5">Top 5 Media</th>
-                  <th className="text-right px-2 py-1.5">Media General</th>
-                  <th className="text-right px-2 py-1.5">Mejor Vuelta</th>
-                  <th className="text-right px-2 py-1.5">Carreras</th>
-                  <th className="text-right px-2 py-1.5">Vueltas</th>
-                  <th className="text-left px-2 py-1.5">Equipos</th>
+                  <th className="text-center px-2 py-1.5">{t("race.kart")}</th>
+                  <th className="text-right px-2 py-1.5">{t("analytics.top5Avg")}</th>
+                  <th className="text-right px-2 py-1.5">{t("analytics.generalAvg")}</th>
+                  <th className="text-right px-2 py-1.5">{t("analytics.bestLap")}</th>
+                  <th className="text-right px-2 py-1.5">{t("analytics.races")}</th>
+                  <th className="text-right px-2 py-1.5">{t("analytics.lapsCol")}</th>
+                  <th className="text-left px-2 py-1.5">{t("analytics.teams")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1175,11 +1182,11 @@ function KartAnalytics() {
 
           {stats.length > 0 && (
             <div className="mt-3 flex items-center gap-4 text-[10px]">
-              <span className="text-green-400">Rapido</span>
-              <span className="text-accent">Buen ritmo</span>
-              <span className="text-white">Normal</span>
-              <span className="text-orange-400">Lento</span>
-              <span className="text-red-400">Muy lento</span>
+              <span className="text-green-400">{t("analytics.fast")}</span>
+              <span className="text-accent">{t("analytics.goodPace")}</span>
+              <span className="text-white">{t("analytics.normal")}</span>
+              <span className="text-orange-400">{t("analytics.slow")}</span>
+              <span className="text-red-400">{t("analytics.verySlow")}</span>
             </div>
           )}
         </div>
@@ -1187,8 +1194,8 @@ function KartAnalytics() {
 
       {!loading && selectedCircuit > 0 && stats.length === 0 && raceLogs.length === 0 && (
         <div className="bg-white/[0.03] rounded-xl p-8 border border-border text-center">
-          <p className="text-neutral-500 text-sm">No hay datos de carreras para este circuito en el rango seleccionado.</p>
-          <p className="text-neutral-600 text-xs mt-2">Los datos se guardan automaticamente al finalizar cada sesion de monitoreo.</p>
+          <p className="text-neutral-500 text-sm">{t("analytics.noData")}</p>
+          <p className="text-neutral-600 text-xs mt-2">{t("analytics.autoSaveHint")}</p>
         </div>
       )}
     </div>
