@@ -146,6 +146,10 @@ class RaceStateManager:
         self.fifo_history: list[dict] = []
         self.classification: list[dict] = []
 
+        # Session metadata (auto-detected from Apex signals)
+        self.session_title: str = ""
+        self.real_start_time: str = ""  # HH:MM from green flag com|| message
+
         # Config (loaded at runtime)
         self.circuit_length_m: int = 1100
         self.pit_time_s: int = 120
@@ -168,6 +172,8 @@ class RaceStateManager:
         self.countdown_ms = 0
         self.track_name = ""
         self.start_time = 0.0
+        self.session_title = ""
+        self.real_start_time = ""
         self._event_buffer.clear()
         self.fifo_queue.clear()
         self.fifo_score = 0.0
@@ -448,35 +454,56 @@ class RaceStateManager:
         elif event.type == EventType.COUNTDOWN:
             self.countdown_ms = int(event.value)
             if not self.race_started:
-                self.race_started = True
-                self.start_time = time.time()
-                self._first_countdown_ms = self.countdown_ms
-                # Set stint_start for all existing karts.
-                # For fresh start: first countdown IS the race start.
-                # For reconnection: use duration config to back-calculate.
-                has_laps = any(k.total_laps > 0 for k in self.karts.values())
-                if has_laps:
-                    # Reconnection mid-race: use config duration
-                    race_start_ms = self.duration_min * 60 * 1000
-                else:
-                    # Fresh start: first countdown = race start
-                    race_start_ms = self.countdown_ms
-                for kart in self.karts.values():
-                    if kart.stint_start_countdown_ms == 0:
-                        if kart.pit_count == 0:
-                            kart.stint_start_countdown_ms = race_start_ms
-                        else:
-                            kart.stint_start_countdown_ms = self.countdown_ms
-                logger.info(f"Race started. Countdown: {self.countdown_ms}ms, "
-                            f"race_start_ms: {race_start_ms}, "
-                            f"karts: {len(self.karts)}, reconnect: {has_laps}")
-                # Flag to trigger snapshot broadcast (so frontend gets updated stints)
-                self._needs_snapshot = True
+                self._trigger_race_start(trigger="countdown")
             return {"event": "countdown", "ms": self.countdown_ms}
 
         elif event.type == EventType.COUNT_UP:
             self.countdown_ms = -int(event.value)
-            return {"event": "countUp", "ms": int(event.value)}
+            if not self.race_started:
+                self._trigger_race_start(trigger="count_up")
+            return {"event": "countdown", "ms": self.countdown_ms}
+
+        elif event.type == EventType.LIGHT:
+            light = event.value  # "lg"=green, "lr"=red, "lf"=finish
+            logger.info(f"Light signal: {light}")
+            if light == "lg" and not self.race_started:
+                # Green light is the earliest race start signal (before countdown in some circuits)
+                self._trigger_race_start(trigger="green_light")
+            return {"event": "light", "value": light}
+
+        elif event.type == EventType.SESSION_TITLE:
+            self.session_title = event.value
+            logger.info(f"Session title: {self.session_title}")
+            return {"event": "sessionTitle", "value": event.value}
+
+        elif event.type == EventType.TRACK_INFO:
+            self.track_name = event.value
+            circuit_length = event.extra.get("circuit_length_m")
+            if circuit_length and circuit_length > 0:
+                old_length = self.circuit_length_m
+                self.circuit_length_m = circuit_length
+                if old_length != circuit_length:
+                    logger.info(f"Circuit length auto-configured: {old_length}m -> {circuit_length}m")
+            return {"event": "track", "name": event.value,
+                    "circuitLengthM": self.circuit_length_m}
+
+        elif event.type == EventType.PRE_RACE_DURATION:
+            # Parse HH:MM:SS -> minutes
+            parts = event.value.split(":")
+            if len(parts) == 3:
+                try:
+                    hours = int(parts[0])
+                    minutes = int(parts[1])
+                    duration_min = hours * 60 + minutes
+                    if duration_min > 0:
+                        old_duration = self.duration_min
+                        self.duration_min = duration_min
+                        if old_duration != duration_min:
+                            logger.info(f"Race duration auto-configured: {old_duration}min -> {duration_min}min")
+                except ValueError:
+                    pass
+            return {"event": "preDuration", "value": event.value,
+                    "durationMin": self.duration_min}
 
         elif event.type == EventType.STATUS and kart:
             if event.value in ("gs", "gf", "gm", "gl"):
@@ -487,8 +514,18 @@ class RaceStateManager:
 
         elif event.type == EventType.FLAG:
             flag = event.value  # "green", "chequered", "penalty"
-            logger.info(f"Flag received: {flag}")
-            return {"event": "flag", "flag": flag}
+            real_time = event.extra.get("real_time", "")
+            if flag == "green" and real_time and not self.real_start_time:
+                self.real_start_time = real_time
+                logger.info(f"Real race start time recorded: {real_time}")
+            logger.info(f"Flag received: {flag}" + (f" at {real_time}" if real_time else ""))
+            result = {"event": "flag", "flag": flag}
+            if real_time:
+                result["realTime"] = real_time
+            if event.extra.get("kart_number"):
+                result["kartNumber"] = event.extra["kart_number"]
+                result["reason"] = event.extra.get("reason", "")
+            return result
 
         elif event.type == EventType.MESSAGE:
             if event.extra.get("subtype") == "track":
@@ -497,6 +534,41 @@ class RaceStateManager:
             return {"event": "message", "text": event.value}
 
         return None
+
+    def _trigger_race_start(self, trigger: str = "countdown"):
+        """Mark the race as started and initialize stint tracking for all karts.
+
+        Called by COUNTDOWN, COUNT_UP, or LIGHT green — whichever arrives first.
+        For green_light trigger without a countdown value, use duration_min as
+        the race start reference (same as reconnection logic).
+        """
+        self.race_started = True
+        self.start_time = time.time()
+        self._first_countdown_ms = self.countdown_ms
+
+        has_laps = any(k.total_laps > 0 for k in self.karts.values())
+
+        if has_laps:
+            # Reconnection mid-race: use config duration
+            race_start_ms = self.duration_min * 60 * 1000
+        elif self.countdown_ms > 0:
+            # Fresh start with valid countdown
+            race_start_ms = self.countdown_ms
+        else:
+            # Green light or count_up before any countdown arrived
+            race_start_ms = self.duration_min * 60 * 1000
+
+        for kart in self.karts.values():
+            if kart.stint_start_countdown_ms == 0:
+                if kart.pit_count == 0:
+                    kart.stint_start_countdown_ms = race_start_ms
+                else:
+                    kart.stint_start_countdown_ms = self.countdown_ms
+
+        logger.info(f"Race started via {trigger}. countdown_ms={self.countdown_ms}, "
+                    f"race_start_ms={race_start_ms}, karts={len(self.karts)}, "
+                    f"reconnect={has_laps}")
+        self._needs_snapshot = True
 
     def get_snapshot(self) -> dict:
         """Get full state snapshot for new client connections."""

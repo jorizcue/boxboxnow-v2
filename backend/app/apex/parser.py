@@ -44,6 +44,10 @@ class EventType(Enum):
     LAP_MS = "lap_ms"
     RANKING = "ranking"
     FLAG = "flag"
+    LIGHT = "light"              # light|lg|, light|lr|, light|lf|
+    SESSION_TITLE = "session_title"  # title2||...
+    TRACK_INFO = "track_info"    # track||... (with circuit length)
+    PRE_RACE_DURATION = "pre_race_duration"  # dyn1|text|HH:MM:SS
 
 
 @dataclass
@@ -146,19 +150,67 @@ class ApexMessageParser:
         if line.startswith("msg||"):
             return [RaceEvent(type=EventType.MESSAGE, value=line[5:])]
 
-        # Track info, CSS, title, etc. - skip
+        # Pre-race duration: dyn1|text|HH:MM:SS or dyn1|text|
+        if line.startswith("dyn1|text|"):
+            text_val = line.split("|", 2)[2] if len(line.split("|")) > 2 else ""
+            if text_val and re.match(r'^\d{1,2}:\d{2}:\d{2}$', text_val):
+                return [RaceEvent(type=EventType.PRE_RACE_DURATION, value=text_val)]
+            return []
+
+        # Track info, CSS, title, etc.
         if line.startswith(("css|", "best|", "effects|", "comments|",
-                            "title1|", "title2|", "light|", "wth",
-                            "track|", "com|")):
-            # But extract track name
+                            "title1|", "light|", "wth",
+                            "track|", "com|", "title2|")):
+            # Light signals: lg=green, lr=red, lf=finish/chequered
+            if line.startswith("light|"):
+                parts = line.split("|")
+                if len(parts) >= 2 and parts[1] in ("lg", "lr", "lf"):
+                    return [RaceEvent(type=EventType.LIGHT, value=parts[1])]
+                return []
+
+            # Session title: title2||CARRERA 3H, title2||Qualifying, etc.
+            if line.startswith("title2||"):
+                title = line[8:].strip()
+                if title:
+                    return [RaceEvent(type=EventType.SESSION_TITLE, value=title)]
+                return []
+
+            # Track info with circuit length
             if line.startswith("track||"):
-                return [RaceEvent(type=EventType.MESSAGE, value=line[7:],
-                                  extra={"subtype": "track"})]
-            # Extract flags from com|| messages (e.g. data-flag="green")
+                track_str = line[7:].strip()
+                events = [RaceEvent(type=EventType.TRACK_INFO, value=track_str)]
+                # Extract circuit length from patterns like "(700m)" or "(1100m)"
+                length_match = re.search(r'\((\d+)m\)', track_str)
+                if length_match:
+                    events[0].extra = {"circuit_length_m": int(length_match.group(1))}
+                return events
+
+            # Extract flags + real time from com|| messages
             if line.startswith("com||"):
-                flags = re.findall(r'data-flag="(\w+)"', line)
-                if flags:
-                    return [RaceEvent(type=EventType.FLAG, value=f) for f in flags]
+                events = []
+                # Extract all flags with their associated times
+                # Pattern: <b>HH:MM</b><span data-flag="green"></span>
+                flag_matches = re.findall(
+                    r'<b>(\d{1,2}:\d{2})</b>.*?data-flag="(\w+)"', line
+                )
+                for time_str, flag in flag_matches:
+                    events.append(RaceEvent(
+                        type=EventType.FLAG, value=flag,
+                        extra={"real_time": time_str}
+                    ))
+                # Also extract penalty details: data-flag="penalty" followed by kart info
+                penalty_matches = re.findall(
+                    r'<b>(\d{1,2}:\d{2})</b>.*?data-flag="penalty".*?class="com_no[^"]*">(\d+)</span>(.*?)</p>',
+                    line
+                )
+                for time_str, kart_num, reason in penalty_matches:
+                    events.append(RaceEvent(
+                        type=EventType.FLAG, value="penalty",
+                        extra={"real_time": time_str, "kart_number": int(kart_num),
+                               "reason": reason.strip().lstrip("- ")}
+                    ))
+                return events
+
             return []
 
         # Ranking change: r{id}|#|{pos}
