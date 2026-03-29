@@ -5,6 +5,9 @@ EXACT port of boxboxnow.py calcular_puntuacion_ponderada().
 The score is a PERCENTAGE 0-100 where:
   100 = all slow karts in the queue (good time to pit)
   0   = all fast karts in the queue (bad time to pit)
+
+Each queue entry is a dict:
+  {"score": int, "kartNumber": int, "teamName": str, "driverName": str}
 """
 
 import logging
@@ -18,12 +21,16 @@ logger = logging.getLogger(__name__)
 DEFAULT_SCORE = 25
 
 
+def _default_entry(score: int = DEFAULT_SCORE) -> dict:
+    return {"score": score, "kartNumber": 0, "teamName": "", "driverName": ""}
+
+
 class FifoManager:
     def __init__(self, queue_size: int = 30, box_lines: int = 2):
         self.queue_size = queue_size
         self.box_lines = box_lines
-        self.fifo: deque[int] = deque(
-            [DEFAULT_SCORE] * queue_size, maxlen=queue_size
+        self.fifo: deque[dict] = deque(
+            [_default_entry() for _ in range(queue_size)], maxlen=queue_size
         )
         self._history: list[dict] = []
 
@@ -31,14 +38,21 @@ class FifoManager:
         if queue_size != self.queue_size:
             self.queue_size = queue_size
             self.fifo = deque(
-                [DEFAULT_SCORE] * queue_size, maxlen=queue_size
+                [_default_entry() for _ in range(queue_size)], maxlen=queue_size
             )
         self.box_lines = box_lines
 
-    def add_entry(self, tier_score: int):
+    def add_entry(self, tier_score: int, kart_number: int = 0,
+                  team_name: str = "", driver_name: str = ""):
         """Add a kart's tier score when it enters the pit.
         Also records a history snapshot (only on actual pit entries)."""
-        self.fifo.append(tier_score)
+        entry = {
+            "score": tier_score,
+            "kartNumber": kart_number,
+            "teamName": team_name,
+            "driverName": driver_name,
+        }
+        self.fifo.append(entry)
         # Save history only when a kart actually enters pit
         score = self.get_weighted_score()
         self._history.append({
@@ -49,10 +63,9 @@ class FifoManager:
         if len(self._history) > 50:
             self._history = self._history[-50:]
 
-    def add_entries(self, scores: list[int]):
-        """Add multiple scores (batch pit entries)."""
-        for score in scores:
-            self.add_entry(score)
+    def _scores(self) -> list[int]:
+        """Extract numeric scores from queue entries."""
+        return [e["score"] if isinstance(e, dict) else e for e in self.fifo]
 
     def _calcular_pesos(self) -> np.ndarray:
         """
@@ -76,7 +89,7 @@ class FifoManager:
             return 0.0
 
         pesos = self._calcular_pesos()
-        fifo_arr = np.array(list(self.fifo), dtype=float)
+        fifo_arr = np.array(self._scores(), dtype=float)
 
         max_puntuacion = np.sum(pesos * 100)
         min_puntuacion = np.sum(pesos * 1)
@@ -90,7 +103,7 @@ class FifoManager:
 
         return float(max(0.0, min(porcentaje, 100.0)))
 
-    def get_queue_snapshot(self) -> list[int]:
+    def get_queue_snapshot(self) -> list[dict]:
         return list(self.fifo)
 
     def apply_to_state(self, state: RaceStateManager):

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { tierHex, secondsToHMS, msToLapTime } from "@/lib/formatters";
+import type { FifoEntry } from "@/types/race";
 import clsx from "clsx";
 
 export function FifoQueue() {
@@ -30,10 +31,18 @@ export function FifoQueue() {
   const boxKarts = config.boxKarts || 4;
   const kartsPerRow = Math.max(1, Math.ceil(boxKarts / boxLines));
 
+  // Helper to extract score from entry (handles both old number[] and new FifoEntry[] formats)
+  const entryScore = (e: FifoEntry | number): number =>
+    typeof e === "number" ? e : (e?.score ?? 25);
+  const entryTeam = (e: FifoEntry | number): string =>
+    typeof e === "object" && e ? (e.teamName || "") : "";
+  const entryDriver = (e: FifoEntry | number): string =>
+    typeof e === "object" && e ? (e.driverName || "") : "";
+
   // Split queue into rows of `kartsPerRow`
   const rows = useMemo(() => {
-    const result: number[][] = [];
-    const queue = fifo.queue.slice(0, boxKarts); // Only show boxKarts positions
+    const result: (FifoEntry | number)[][] = [];
+    const queue = fifo.queue.slice(0, boxKarts);
     for (let r = 0; r < boxLines; r++) {
       const start = r * kartsPerRow;
       const end = Math.min(start + kartsPerRow, queue.length);
@@ -75,26 +84,43 @@ export function FifoQueue() {
 
               {/* Cards in this row */}
               <div className="flex gap-1.5 sm:gap-3 flex-1 overflow-x-auto">
-                {row.map((score, colIdx) => (
-                  <div
-                    key={colIdx}
-                    className="flex-1 min-w-[56px] sm:min-w-[100px] max-w-[160px] rounded-lg border-2 border-neutral-600 bg-neutral-800/50 flex flex-col items-center justify-center py-2 sm:py-3 px-1 sm:px-2"
-                  >
-                    <span
-                      className="text-xl sm:text-3xl font-bold"
-                      style={{ color: tierHex(score) }}
+                {row.map((entry, colIdx) => {
+                  const score = entryScore(entry);
+                  const team = entryTeam(entry);
+                  const driver = entryDriver(entry);
+                  const hasInfo = team || driver;
+                  return (
+                    <div
+                      key={colIdx}
+                      className="flex-1 min-w-[56px] sm:min-w-[100px] max-w-[160px] rounded-lg border-2 border-neutral-600 bg-neutral-800/50 flex flex-col items-center justify-center py-1.5 sm:py-2 px-1 sm:px-2"
                     >
-                      {score}
-                    </span>
-                    <span className="text-[10px] sm:text-xs text-neutral-400 mt-0.5">Box</span>
-                  </div>
-                ))}
+                      <span
+                        className="text-xl sm:text-3xl font-bold leading-tight"
+                        style={{ color: tierHex(score) }}
+                      >
+                        {score}
+                      </span>
+                      {hasInfo ? (
+                        <>
+                          <span className="text-[8px] sm:text-[10px] text-neutral-300 mt-0.5 truncate w-full text-center leading-tight font-medium">
+                            {team}
+                          </span>
+                          <span className="text-[7px] sm:text-[9px] text-neutral-500 truncate w-full text-center leading-tight">
+                            {driver}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-[10px] sm:text-xs text-neutral-500 mt-0.5">Box</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Fila label */}
               <div className="flex-shrink-0 flex items-center gap-1">
                 <span className="text-xs sm:text-sm text-red-400 font-bold">F{rowIdx + 1}</span>
-                <span className="text-red-400 text-sm sm:text-lg">⬅</span>
+                <span className="text-red-400 text-sm sm:text-lg">&larr;</span>
               </div>
             </div>
           ))}
@@ -114,7 +140,7 @@ export function FifoQueue() {
         {/* Left: Stint metrics */}
         <div className="bg-surface rounded-xl border border-border overflow-hidden">
           <div className="bg-neutral-800/50 px-4 py-2 flex justify-between">
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">Métrica</span>
+            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">Metrica</span>
             <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">Valor</span>
           </div>
           <div className="divide-y divide-border">
@@ -123,11 +149,11 @@ export function FifoQueue() {
               value={secondsToHMS(ourStintSec)}
               highlight={ourStintSec / 60 >= config.maxStintMin}
             />
-            <InfoRow label="Tiempo hasta stint máximo" value={secondsToHMS(timeToMaxStint)} />
-            <InfoRow label="Vueltas hasta stint máximo" value={String(lapsToMaxStint)} />
+            <InfoRow label="Tiempo hasta stint maximo" value={secondsToHMS(timeToMaxStint)} />
+            <InfoRow label="Vueltas hasta stint maximo" value={String(lapsToMaxStint)} />
             <InfoRow label="Karts cerca de PIT" value={String(kartsNearPit)} />
-            <InfoRow label="Stint máximo" value={secondsToHMS(config.maxStintMin * 60)} />
-            <InfoRow label="Stint mínimo" value={secondsToHMS(config.minStintMin * 60)} />
+            <InfoRow label="Stint maximo" value={secondsToHMS(config.maxStintMin * 60)} />
+            <InfoRow label="Stint minimo" value={secondsToHMS(config.minStintMin * 60)} />
           </div>
         </div>
 
@@ -143,15 +169,15 @@ export function FifoQueue() {
               value={ourKart?.pitStatus === "in_pit" ? secondsToHMS(ourStintSec) : secondsToHMS(0)}
             />
             <InfoRow
-              label="Tiempo mínimo de pit"
+              label="Tiempo minimo de pit"
               value={secondsToHMS(config.pitTimeS)}
             />
             <InfoRow
-              label="Número de pits"
+              label="Numero de pits"
               value={ourKart ? String(ourKart.pitCount) : "0"}
             />
             <InfoRow
-              label="Número mínimo de pits"
+              label="Numero minimo de pits"
               value={String(config.minPits)}
             />
           </div>
@@ -186,24 +212,29 @@ export function FifoQueue() {
                       <div className="space-y-0.5">
                         {(() => {
                           const q = snap.queue.slice(0, boxKarts);
-                          const histRows: number[][] = [];
+                          const histRows: (FifoEntry | number)[][] = [];
                           for (let r = 0; r < boxLines; r++) {
                             const start = r * kartsPerRow;
                             const end = Math.min(start + kartsPerRow, q.length);
                             if (start < q.length) histRows.push(q.slice(start, end));
                           }
-                          return histRows.map((hr: number[], ri: number) => (
+                          return histRows.map((hr, ri) => (
                             <div key={ri} className="flex gap-0.5 items-center">
                               <span className="text-[7px] text-neutral-600 w-3 flex-shrink-0">F{ri + 1}</span>
-                              {hr.map((s: number, j: number) => (
-                                <div
-                                  key={j}
-                                  className="w-5 h-5 rounded-sm flex items-center justify-center text-[8px] font-bold text-black"
-                                  style={{ backgroundColor: tierHex(s) }}
-                                >
-                                  {s}
-                                </div>
-                              ))}
+                              {hr.map((entry, j) => {
+                                const s = entryScore(entry);
+                                const t = entryTeam(entry);
+                                return (
+                                  <div
+                                    key={j}
+                                    className="w-5 h-5 rounded-sm flex items-center justify-center text-[8px] font-bold text-black"
+                                    style={{ backgroundColor: tierHex(s) }}
+                                    title={t || undefined}
+                                  >
+                                    {s}
+                                  </div>
+                                );
+                              })}
                             </div>
                           ));
                         })()}

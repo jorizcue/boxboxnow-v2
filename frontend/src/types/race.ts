@@ -39,15 +39,22 @@ export interface KartState {
   driverDifferentialMs: number;
 }
 
+export interface FifoEntry {
+  score: number;
+  kartNumber: number;
+  teamName: string;
+  driverName: string;
+}
+
 export interface FifoState {
-  queue: number[];
+  queue: FifoEntry[];
   score: number;
   history: FifoSnapshot[];
 }
 
 export interface FifoSnapshot {
   timestamp: number;
-  queue: number[];
+  queue: FifoEntry[];
   score: number;
 }
 

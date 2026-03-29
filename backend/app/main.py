@@ -72,7 +72,12 @@ async def lifespan(app: FastAPI):
                     f"Replay FIFO entry: kart #{kart.kart_number} pit_in "
                     f"tier_score={kart.tier_score}"
                 )
-                replay_fifo.add_entry(kart.tier_score)
+                replay_fifo.add_entry(
+                    kart.tier_score,
+                    kart_number=kart.kart_number,
+                    team_name=kart.team_name,
+                    driver_name=kart.driver_name,
+                )
 
     replay_engine = ReplayEngine(replay_parser, replay_on_events, logs_dir="data/logs")
 

@@ -141,7 +141,7 @@ class RaceStateManager:
         self._broadcast_lock = asyncio.Lock()
 
         # Analytics state
-        self.fifo_queue: list[int] = []
+        self.fifo_queue: list[dict] = []
         self.fifo_score: float = 0.0
         self.fifo_history: list[dict] = []
         self.classification: list[dict] = []

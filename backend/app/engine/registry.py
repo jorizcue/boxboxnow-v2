@@ -57,7 +57,12 @@ class UserSession:
                         f"FIFO entry: kart #{kart.kart_number} pit_in "
                         f"tier_score={kart.tier_score}"
                     )
-                    self.fifo.add_entry(kart.tier_score)
+                    self.fifo.add_entry(
+                        kart.tier_score,
+                        kart_number=kart.kart_number,
+                        team_name=kart.team_name,
+                        driver_name=kart.driver_name,
+                    )
 
         self.on_events = on_events
         self.apex_client = ApexClient(ws_url, self.parser, on_events, recorder=self.recorder)
