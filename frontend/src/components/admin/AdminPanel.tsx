@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { useRaceStore } from "@/hooks/useRaceState";
 
 interface UserRow {
   id: number;
@@ -34,7 +35,7 @@ interface AccessRow {
 }
 
 export function AdminPanel() {
-  const [tab, setTab] = useState<"users" | "circuits" | "hub">("hub");
+  const [tab, setTab] = useState<"users" | "circuits" | "hub" | "replay">("users");
 
   const tabBtn = (key: typeof tab, label: string) => (
     <button
@@ -50,14 +51,16 @@ export function AdminPanel() {
   return (
     <div className="space-y-4">
       <div className="flex gap-0.5">
-        {tabBtn("hub", "CircuitHub")}
         {tabBtn("users", "Usuarios")}
         {tabBtn("circuits", "Circuitos")}
+        {tabBtn("hub", "CircuitHub")}
+        {tabBtn("replay", "Replay")}
       </div>
 
-      {tab === "hub" && <CircuitHubManager />}
       {tab === "users" && <UsersManager />}
       {tab === "circuits" && <CircuitsManager />}
+      {tab === "hub" && <CircuitHubManager />}
+      {tab === "replay" && <ReplayControls />}
     </div>
   );
 }
@@ -126,7 +129,7 @@ function UsersManager() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="bg-surface rounded-xl p-4 border border-border">
+      <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
         <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">Usuarios</h3>
 
         <div className="flex gap-2 mb-4">
@@ -175,7 +178,7 @@ function UsersManager() {
         </table>
       </div>
 
-      <div className="bg-surface rounded-xl p-4 border border-border">
+      <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
         <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">
           Acceso a Circuitos{selectedUser && ` — ${users.find((u) => u.id === selectedUser)?.username}`}
         </h3>
@@ -219,13 +222,13 @@ function UsersManager() {
                   </tr>
                 ))}
                 {access.length === 0 && (
-                  <tr><td colSpan={4} className="px-2 py-4 text-center text-neutral-700">Sin acceso a circuitos</td></tr>
+                  <tr><td colSpan={4} className="px-2 py-4 text-center text-neutral-500">Sin acceso a circuitos</td></tr>
                 )}
               </tbody>
             </table>
           </>
         ) : (
-          <p className="text-neutral-700 text-sm">Selecciona un usuario para gestionar su acceso</p>
+          <p className="text-neutral-500 text-sm">Selecciona un usuario para gestionar su acceso</p>
         )}
       </div>
     </div>
@@ -334,7 +337,7 @@ function CircuitsManager() {
   };
 
   const deleteCircuit = async (id: number) => {
-    if (!confirm("Eliminar circuito? Se perderán los accesos asociados.")) return;
+    if (!confirm("Eliminar circuito? Se perderan los accesos asociados.")) return;
     try {
       await api.deleteCircuit(id);
       loadCircuits();
@@ -347,7 +350,7 @@ function CircuitsManager() {
 
   const fieldInput = (label: string, key: keyof CircuitForm, type: string = "text", placeholder?: string) => (
     <div className="flex flex-col gap-1">
-      <label className="text-[10px] text-neutral-500 uppercase tracking-wider">{label}</label>
+      <label className="text-[10px] text-neutral-400 uppercase tracking-wider">{label}</label>
       <input
         type={type}
         value={form[key]}
@@ -359,9 +362,9 @@ function CircuitsManager() {
   );
 
   return (
-    <div className="bg-surface rounded-xl p-4 border border-border">
+    <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">Catálogo de Circuitos</h3>
+        <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">Catalogo de Circuitos</h3>
         {!showCreate && !editingId && (
           <button onClick={startCreate} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-sm">
             Nuevo circuito
@@ -441,7 +444,7 @@ function CircuitsManager() {
               </tr>
             ))}
             {circuits.length === 0 && (
-              <tr><td colSpan={9} className="px-2 py-4 text-center text-neutral-700">No hay circuitos</td></tr>
+              <tr><td colSpan={9} className="px-2 py-4 text-center text-neutral-500">No hay circuitos</td></tr>
             )}
           </tbody>
         </table>
@@ -508,7 +511,7 @@ function CircuitHubManager() {
   const totalSubscribers = circuits.reduce((acc, c) => acc + c.subscribers, 0);
 
   return (
-    <div className="bg-surface rounded-xl p-4 border border-border">
+    <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">CircuitHub — Estado en tiempo real</h3>
         <div className="flex items-center gap-4 text-[10px] text-neutral-400">
@@ -525,7 +528,7 @@ function CircuitHubManager() {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-[10px] text-neutral-500 uppercase tracking-wider">
+            <thead className="text-[10px] text-neutral-400 uppercase tracking-wider">
               <tr>
                 <th className="text-left px-2 py-1.5">Estado</th>
                 <th className="text-left px-2 py-1.5">Circuito</th>
@@ -587,6 +590,385 @@ function CircuitHubManager() {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+
+// --- Replay Controls ---
+
+// Module-level state for replay — survives tab changes (component re-mounts)
+let _replaySelectedLog = "";
+let _replaySelectedOwnerId: number | null = null;
+let _replaySelectedCircuitDir: string | null = null;
+let _replaySpeed = 10;
+
+interface RaceStartMarker {
+  block: number;
+  progress: number;
+  timestamp: string;
+  title: string;
+}
+
+interface LogAnalysis {
+  totalBlocks: number;
+  raceStarts: RaceStartMarker[];
+  startTime: string | null;
+  endTime: string | null;
+}
+
+interface RecordingCircuit {
+  circuit_dir: string;
+  circuit_name: string;
+  circuit_id: number | null;
+  dates: string[];
+}
+
+interface LogEntry {
+  filename: string;
+  owner_id?: number | null;
+  owner?: string;
+  circuit_dir?: string;
+}
+
+function ReplayControls() {
+  // Recording circuits (circuit+date selector)
+  const [recordingCircuits, setRecordingCircuits] = useState<RecordingCircuit[]>([]);
+  const [selectedRecCircuit, setSelectedRecCircuitState] = useState(_replaySelectedCircuitDir || "");
+  const [selectedDate, setSelectedDateState] = useState("");
+
+  // Legacy logs (flat file list)
+  const [legacyLogs, setLegacyLogs] = useState<LogEntry[]>([]);
+  const [showLegacy, setShowLegacy] = useState(false);
+
+  // Module-level state for replay params
+  const [selectedLog, setSelectedLogState] = useState(_replaySelectedLog);
+  const [selectedOwnerId, setSelectedOwnerIdState] = useState<number | null>(_replaySelectedOwnerId);
+  const [selectedCircuitDir, setSelectedCircuitDirState] = useState<string | null>(_replaySelectedCircuitDir);
+  const [speed, setSpeedState] = useState(_replaySpeed);
+  const [loading, setLoading] = useState(false);
+  const [analysis, setAnalysis] = useState<LogAnalysis | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+
+  const {
+    requestWsReconnect,
+    replayActive, replayPaused, replayProgress, replayTime, setReplayStatus,
+  } = useRaceStore();
+
+  // Setters that persist to module-level
+  const setSelectedLog = (v: string, ownerId: number | null = null, circuitDir: string | null = null) => {
+    _replaySelectedLog = v;
+    _replaySelectedOwnerId = ownerId;
+    _replaySelectedCircuitDir = circuitDir;
+    setSelectedLogState(v);
+    setSelectedOwnerIdState(ownerId);
+    setSelectedCircuitDirState(circuitDir);
+  };
+  const setSpeed = (v: number) => { _replaySpeed = v; setSpeedState(v); };
+  const setSelectedRecCircuit = (v: string) => { _replaySelectedCircuitDir = v || null; setSelectedRecCircuitState(v); };
+
+  // Sync replay status
+  const syncStatus = async () => {
+    try {
+      const st = await api.getReplayStatus();
+      setReplayStatus(st.active, st.paused, st.filename || "", st.progress || 0, st.currentTime || "");
+    } catch {}
+  };
+
+  // Load recording circuits + legacy logs on mount
+  useEffect(() => {
+    api.getRecordings()
+      .then((data) => setRecordingCircuits(data.circuits || []))
+      .catch(() => {});
+    api.getReplayLogs()
+      .then((data) => setLegacyLogs((data.logs || []).filter((l: LogEntry) => !l.circuit_dir)))
+      .catch(() => {});
+    syncStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Get dates for selected circuit
+  const selectedCircuitData = recordingCircuits.find((c) => c.circuit_dir === selectedRecCircuit);
+  const availableDates = selectedCircuitData?.dates || [];
+
+  // When circuit or date changes, update the replay selection
+  useEffect(() => {
+    if (selectedRecCircuit && selectedDate) {
+      const filename = `${selectedDate}.log`;
+      setSelectedLog(filename, null, selectedRecCircuit);
+    } else if (!selectedRecCircuit) {
+      if (selectedCircuitDir && !selectedOwnerId) {
+        setSelectedLog("", null, null);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRecCircuit, selectedDate]);
+
+  // Analyze log when selected
+  useEffect(() => {
+    if (!selectedLog) { setAnalysis(null); return; }
+    setAnalyzing(true);
+    api.analyzeLog(selectedLog, selectedOwnerId, selectedCircuitDir)
+      .then(setAnalysis)
+      .catch(() => setAnalysis(null))
+      .finally(() => setAnalyzing(false));
+  }, [selectedLog, selectedOwnerId, selectedCircuitDir]);
+
+  // Poll status while replay is active
+  useEffect(() => {
+    if (!replayActive) return;
+    const interval = setInterval(syncStatus, 2000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replayActive]);
+
+  const startFromBlock = async (block: number = 0) => {
+    if (!selectedLog) return;
+    setLoading(true);
+    try {
+      await api.startReplay(selectedLog, speed, block, selectedOwnerId, selectedCircuitDir);
+      requestWsReconnect();
+      await syncStatus();
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    }
+    setLoading(false);
+  };
+
+  const handleSeek = async (block: number) => {
+    if (!replayActive) return;
+    try {
+      await api.seekReplay(block);
+      await syncStatus();
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    }
+  };
+
+  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!analysis || analysis.totalBlocks === 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const block = Math.round(pct * analysis.totalBlocks);
+    if (replayActive) {
+      handleSeek(block);
+    } else {
+      startFromBlock(block);
+    }
+  };
+
+  // Legacy log select handler
+  const handleLegacySelect = (val: string) => {
+    if (!val) { setSelectedLog(""); return; }
+    const colonIdx = val.indexOf(":");
+    if (colonIdx > 0) {
+      const oid = parseInt(val.substring(0, colonIdx), 10);
+      setSelectedLog(val.substring(colonIdx + 1), isNaN(oid) ? null : oid, null);
+    } else {
+      setSelectedLog(val, null, null);
+    }
+    setSelectedRecCircuit("");
+    setSelectedDateState("");
+  };
+
+  return (
+    <div className="bg-white/[0.03] rounded-xl p-6 border border-border">
+      <h2 className="text-[11px] text-neutral-200 mb-4 uppercase tracking-wider">Replay</h2>
+
+      <div className="space-y-3">
+        {/* Circuit + Date selectors */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">Circuito</label>
+            <select
+              value={selectedRecCircuit}
+              onChange={(e) => {
+                setSelectedRecCircuit(e.target.value);
+                setSelectedDateState("");
+                if (!e.target.value) setSelectedLog("", null, null);
+              }}
+              disabled={replayActive}
+              className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
+            >
+              <option value="">Seleccionar...</option>
+              {recordingCircuits.map((c) => (
+                <option key={c.circuit_dir} value={c.circuit_dir}>
+                  {c.circuit_name} ({c.dates.length}d)
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">Fecha</label>
+            <select
+              value={selectedDate}
+              onChange={(e) => setSelectedDateState(e.target.value)}
+              disabled={replayActive || !selectedRecCircuit}
+              className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
+            >
+              <option value="">Seleccionar...</option>
+              {availableDates.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Legacy logs toggle */}
+        {legacyLogs.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowLegacy(!showLegacy)}
+              className="text-[10px] text-neutral-500 hover:text-neutral-300 transition-colors"
+            >
+              {showLegacy ? "Ocultar" : "Mostrar"} grabaciones antiguas ({legacyLogs.length})
+            </button>
+            {showLegacy && (
+              <select
+                value={selectedOwnerId != null ? `${selectedOwnerId}:${selectedLog}` : selectedLog}
+                onChange={(e) => handleLegacySelect(e.target.value)}
+                disabled={replayActive}
+                className="w-full mt-1 bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
+              >
+                <option value="">Seleccionar log antiguo...</option>
+                {legacyLogs.map((log, idx) => {
+                  const val = log.owner_id != null ? `${log.owner_id}:${log.filename}` : log.filename;
+                  const label = log.owner ? `[${log.owner}] ${log.filename}` : log.filename;
+                  return <option key={`${val}-${idx}`} value={val}>{label}</option>;
+                })}
+              </select>
+            )}
+          </div>
+        )}
+
+        {/* Timeline bar */}
+        {analysis && analysis.totalBlocks > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[10px] text-neutral-500">
+              <span>{analysis.startTime}</span>
+              <span>{analysis.totalBlocks} bloques</span>
+              <span>{analysis.endTime}</span>
+            </div>
+            <div
+              className="relative w-full h-6 bg-black rounded-lg cursor-pointer border border-border group"
+              onClick={handleTimelineClick}
+              title="Click para posicionarte"
+            >
+              {replayActive && (
+                <div
+                  className="absolute top-0 left-0 h-full bg-accent/20 rounded-lg transition-all"
+                  style={{ width: `${replayProgress * 100}%` }}
+                />
+              )}
+              {replayActive && (
+                <div
+                  className="absolute top-0 h-full w-0.5 bg-accent transition-all"
+                  style={{ left: `${replayProgress * 100}%` }}
+                />
+              )}
+              {analysis.raceStarts.map((rs, idx) => (
+                <div
+                  key={idx}
+                  className="absolute top-0 h-full flex flex-col items-center group/marker"
+                  style={{ left: `${rs.progress * 100}%` }}
+                >
+                  <div className="w-0.5 h-full bg-green-500" />
+                  <div className="absolute -top-5 text-[9px] text-green-400 font-mono whitespace-nowrap opacity-0 group-hover/marker:opacity-100 transition-opacity pointer-events-none">
+                    {rs.title ? `${rs.title} ${rs.timestamp}` : rs.timestamp}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {analysis.raceStarts.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {analysis.raceStarts.map((rs, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => replayActive ? handleSeek(rs.block) : startFromBlock(rs.block)}
+                    disabled={loading}
+                    className="flex items-center gap-1.5 bg-green-900/30 hover:bg-green-900/50 disabled:opacity-40 text-green-400 text-[10px] font-medium px-2 py-1 rounded border border-green-900/30 transition-colors"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                    <span className="truncate">{rs.title || `Carrera ${idx + 1}`}</span>
+                    <span className="text-green-600 flex-shrink-0">{rs.timestamp}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {analyzing && (
+          <p className="text-[10px] text-neutral-500">Analizando fichero...</p>
+        )}
+
+        <div>
+          <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">
+            Velocidad: {speed}x
+          </label>
+          <input
+            type="range" min="1" max="100" value={speed}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setSpeed(v);
+              if (replayActive) api.setReplaySpeed(v);
+            }}
+            className="w-full accent-accent"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => startFromBlock(0)}
+            disabled={!selectedLog || loading || replayActive}
+            className="w-10 h-10 flex items-center justify-center bg-accent hover:bg-accent-hover disabled:opacity-40 text-black rounded-lg transition-colors"
+            title="Iniciar"
+          >
+            {loading ? (
+              <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeLinecap="round"/></svg>
+            ) : (
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            )}
+          </button>
+          <button
+            onClick={async () => {
+              await api.pauseReplay();
+              await syncStatus();
+            }}
+            disabled={!replayActive}
+            className="w-10 h-10 flex items-center justify-center bg-black hover:bg-surface disabled:opacity-40 text-neutral-300 rounded-lg border border-border transition-colors"
+            title={replayPaused ? "Reanudar" : "Pausar"}
+          >
+            {replayPaused ? (
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            ) : (
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            )}
+          </button>
+          <button
+            onClick={async () => {
+              await api.stopReplay();
+              await syncStatus();
+              requestWsReconnect();
+            }}
+            disabled={!replayActive}
+            className="w-10 h-10 flex items-center justify-center bg-red-900/50 hover:bg-red-800 disabled:opacity-40 text-red-300 rounded-lg transition-colors"
+            title="Parar"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
+          </button>
+
+          {replayActive && (
+            <div className="flex-1 flex items-center justify-end gap-3 text-[11px] font-mono">
+              {replayTime && (
+                <span className="text-accent font-semibold">{replayTime}</span>
+              )}
+              <span className="text-neutral-400">{(replayProgress * 100).toFixed(1)}%</span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

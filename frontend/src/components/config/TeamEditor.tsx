@@ -255,11 +255,11 @@ export function TeamEditor() {
     );
 
   return (
-    <div className="bg-surface rounded-xl p-4 border border-border">
+    <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
         <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">
           Equipos y Pilotos
-          <span className="text-neutral-700 ml-2 normal-case tracking-normal hidden sm:inline">
+          <span className="text-neutral-500 ml-2 normal-case tracking-normal hidden sm:inline">
             (arrastra para reordenar)
           </span>
         </h3>
