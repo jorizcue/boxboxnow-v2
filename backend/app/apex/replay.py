@@ -82,6 +82,7 @@ class ReplayEngine:
                 title1 = ""
                 title2 = ""
                 has_countdown = False
+                has_chequered = 'data-flag="chequered"' in message
                 for line in message.split("\n"):
                     if line.startswith("title1||"):
                         title1 = line[8:].strip()
@@ -93,6 +94,10 @@ class ReplayEngine:
                 # Build combined title
                 parts = [p for p in (title1, title2) if p]
                 title = " - ".join(parts) if parts else ""
+
+                # If init block itself has a chequered flag, race already ended — skip
+                if has_chequered and not has_countdown:
+                    continue
 
                 if has_countdown:
                     # Init with countdown = race already running
