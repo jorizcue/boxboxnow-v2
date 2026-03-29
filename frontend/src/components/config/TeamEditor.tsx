@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
+import { useRaceStore } from "@/hooks/useRaceState";
 import { formatDifferential } from "@/lib/formatters";
 import {
   DndContext,
@@ -45,15 +46,25 @@ export function TeamEditor() {
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
+  const teamsUpdatedAt = useRaceStore((s) => s.teamsUpdatedAt);
+  const initialLoadDone = useRef(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  // Initial load
   useEffect(() => {
-    loadTeams();
+    loadTeams().then(() => { initialLoadDone.current = true; });
   }, []);
+
+  // Reload when backend pushes teams_updated (race start driver auto-load)
+  useEffect(() => {
+    if (initialLoadDone.current && teamsUpdatedAt > 0) {
+      loadTeams();
+    }
+  }, [teamsUpdatedAt]);
 
   const loadTeams = async () => {
     try {

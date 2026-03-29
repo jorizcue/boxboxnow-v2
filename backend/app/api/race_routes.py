@@ -115,6 +115,12 @@ async def connect_to_apex(request: Request, user: User = Depends(get_current_use
         refresh_s=session.refresh_interval_s,
     )
 
+    # Configure PHP API client for driver auto-loading
+    user_session.set_php_api(
+        php_api_url=circuit.php_api_url or "",
+        php_api_port=circuit.php_api_port or 0,
+    )
+
     # Load team positions and driver differentials for clustering
     team_positions = {}  # kart_number -> theoretical_position
     driver_differentials = {}  # kart_number -> {driver_name_lower: differential_ms}

@@ -5,13 +5,15 @@ so each user has their own isolated race state and Apex connection.
 """
 
 import asyncio
+import json
 import logging
 from app.engine.state import RaceStateManager
 from app.engine.fifo import FifoManager
 from app.engine.clustering import compute_clustering
 from app.engine.classification import compute_classification
-from app.apex.parser import ApexMessageParser
+from app.apex.parser import ApexMessageParser, EventType
 from app.apex.client import ApexClient
+from app.apex.api_client import ApexApiClient, DEFAULT_PHP_API_URL
 from app.apex.recorder import RaceRecorder
 from app.config import get_settings
 
@@ -27,6 +29,8 @@ class UserSession:
         self.state = RaceStateManager()
         self.fifo = FifoManager()
         self.recorder = RaceRecorder()
+        self.api_client: ApexApiClient | None = None
+        self._load_drivers_task: asyncio.Task | None = None
 
         async def on_events(events):
             # Track which karts were NOT in pit before processing
@@ -35,6 +39,18 @@ class UserSession:
                 for row_id, kart in self.state.karts.items()
             }
             await self.state.handle_events(events)
+
+            # Detect init kart batch → trigger driver loading from PHP API
+            init_kart_events = [e for e in events
+                                if e.type == EventType.INIT and e.value == "kart"]
+            if init_kart_events and self.api_client and self.api_client.php_api_port:
+                # Cancel any previous load task
+                if self._load_drivers_task and not self._load_drivers_task.done():
+                    self._load_drivers_task.cancel()
+                self._load_drivers_task = asyncio.create_task(
+                    self._load_drivers_from_api()
+                )
+
             # Only add to FIFO karts that TRANSITIONED to in_pit (not already in pit)
             pit_in_karts = []
             for row_id, kart in self.state.karts.items():
@@ -85,6 +101,10 @@ class UserSession:
                 await self._analytics_task
             except asyncio.CancelledError:
                 pass
+        if self._load_drivers_task and not self._load_drivers_task.done():
+            self._load_drivers_task.cancel()
+        if self.api_client:
+            await self.api_client.close()
         logger.info(f"User session stopped (user_id={self.user_id})")
 
     def configure(self, circuit_length_m: int, pit_time_s: int, laps_discard: int,
@@ -107,6 +127,13 @@ class UserSession:
         self._refresh_s = refresh_s
         self.fifo.update_config(box_karts, box_lines)
 
+    def set_php_api(self, php_api_url: str, php_api_port: int):
+        """Configure the PHP API client for driver loading."""
+        if php_api_port:
+            url = php_api_url or DEFAULT_PHP_API_URL
+            self.api_client = ApexApiClient(url, php_api_port)
+            logger.info(f"PHP API configured: port={php_api_port}, url={url}")
+
     def set_driver_differentials(self, differentials: dict[int, dict[str, int]],
                                   team_positions: dict[int, int]):
         """Set driver differentials and team positions for clustering.
@@ -118,11 +145,152 @@ class UserSession:
         self._driver_differentials = differentials
         self._team_positions = team_positions
 
+    async def _load_drivers_from_api(self):
+        """Fetch drivers from PHP API for all karts, save to DB, notify frontend.
+
+        Called when init kart events arrive (race starts / grid reload).
+        """
+        if not self.api_client:
+            return
+
+        # Small delay to ensure all init events have been processed
+        await asyncio.sleep(1.0)
+
+        logger.info(f"Loading drivers from PHP API for {len(self.state.karts)} karts "
+                     f"(user_id={self.user_id})")
+
+        teams_data = []  # List of {position, kart, team_name, drivers: [{driver_name, differential_ms}]}
+
+        for i, kart in enumerate(
+            sorted(self.state.karts.values(), key=lambda k: k.position or 999)
+        ):
+            row_id = kart.row_id
+            team_entry = {
+                "position": i + 1,
+                "kart": kart.kart_number,
+                "team_name": kart.team_name,
+                "drivers": [],
+            }
+
+            try:
+                html = await self.api_client.request_api(row_id, "INF")
+                if html:
+                    drivers = self.api_client.extract_drivers(html)
+                    for d in drivers:
+                        team_entry["drivers"].append({
+                            "driver_name": d["name"],
+                            "differential_ms": 0,  # Will be merged with existing
+                        })
+                    if drivers:
+                        logger.info(f"  Kart #{kart.kart_number} ({kart.team_name}): "
+                                     f"{len(drivers)} drivers")
+            except Exception as e:
+                logger.warning(f"  Failed to load drivers for kart #{kart.kart_number}: {e}")
+
+            teams_data.append(team_entry)
+
+        if not teams_data:
+            return
+
+        # Save to DB, preserving existing differentials
+        try:
+            await self._save_teams_to_db(teams_data)
+            logger.info(f"Saved {len(teams_data)} teams to DB (user_id={self.user_id})")
+        except Exception as e:
+            logger.error(f"Failed to save teams to DB: {e}", exc_info=True)
+
+        # Notify frontend to reload teams
+        if self.state._ws_clients:
+            msg = json.dumps({"type": "teams_updated", "data": {"teams": teams_data}})
+            dead = set()
+            for client in self.state._ws_clients:
+                try:
+                    await client.send_text(msg)
+                except Exception:
+                    dead.add(client)
+            for c in dead:
+                self.state._ws_clients.discard(c)
+
+    async def _save_teams_to_db(self, teams_data: list[dict]):
+        """Save teams and drivers to DB, merging differentials from existing entries."""
+        from app.models.database import async_session
+        from app.models.schemas import RaceSession, TeamPosition, TeamDriver
+        from sqlalchemy import select, delete
+        from sqlalchemy.orm import selectinload
+
+        async with async_session() as db:
+            # Get active session
+            result = await db.execute(
+                select(RaceSession)
+                .options(
+                    selectinload(RaceSession.team_positions)
+                    .selectinload(TeamPosition.drivers)
+                )
+                .where(
+                    RaceSession.user_id == self.user_id,
+                    RaceSession.is_active == True,
+                )
+            )
+            session = result.scalar_one_or_none()
+            if not session:
+                logger.warning(f"No active session for user {self.user_id}, skipping team save")
+                return
+
+            # Build map of existing differentials: {kart_number: {driver_name_lower: diff_ms}}
+            existing_diffs: dict[int, dict[str, int]] = {}
+            for tp in session.team_positions:
+                kart_diffs = {}
+                for d in tp.drivers:
+                    kart_diffs[d.driver_name.strip().lower()] = d.differential_ms
+                existing_diffs[tp.kart] = kart_diffs
+
+            # Delete existing teams
+            await db.execute(
+                delete(TeamPosition).where(TeamPosition.race_session_id == session.id)
+            )
+
+            # Insert new teams with merged differentials
+            for t in teams_data:
+                team = TeamPosition(
+                    race_session_id=session.id,
+                    position=t["position"],
+                    kart=t["kart"],
+                    team_name=t["team_name"],
+                )
+                kart_diffs = existing_diffs.get(t["kart"], {})
+                for d in t["drivers"]:
+                    # Preserve existing differential if driver already had one
+                    name = d["driver_name"]
+                    diff = kart_diffs.get(name.strip().lower(), d.get("differential_ms", 0))
+                    driver = TeamDriver(
+                        driver_name=name,
+                        differential_ms=diff,
+                    )
+                    team.drivers.append(driver)
+                db.add(team)
+
+            await db.commit()
+
+            # Update in-memory differentials for clustering
+            new_team_positions = {}
+            new_driver_diffs = {}
+            for t in teams_data:
+                new_team_positions[t["kart"]] = t["position"]
+                kart_diffs = existing_diffs.get(t["kart"], {})
+                if t["drivers"]:
+                    new_driver_diffs[t["kart"]] = {}
+                    for d in t["drivers"]:
+                        name = d["driver_name"]
+                        diff = kart_diffs.get(name.strip().lower(), 0)
+                        new_driver_diffs[t["kart"]][name.strip().lower()] = diff
+
+            self._driver_differentials = new_driver_diffs
+            self._team_positions = new_team_positions
+
     async def broadcast_snapshot(self):
         """Broadcast a full snapshot to all connected WS clients.
         Used when config changes so the frontend gets updated immediately."""
         if self.state._ws_clients:
-            import json
             snapshot = self.state.get_snapshot()
             data = json.dumps(snapshot)
             dead = set()
@@ -147,7 +315,6 @@ class UserSession:
                     compute_classification(self.state)
 
                     if self.state._ws_clients:
-                        import json
                         update = {
                             "type": "analytics",
                             "data": {

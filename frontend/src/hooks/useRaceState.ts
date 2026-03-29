@@ -37,6 +37,10 @@ interface RaceStore {
   wsReconnectTrigger: number;
   requestWsReconnect: () => void;
 
+  // Teams updated signal - incremented when backend loads teams from PHP API
+  teamsUpdatedAt: number;
+  notifyTeamsUpdated: () => void;
+
   setConnected: (v: boolean) => void;
   applySnapshot: (snapshot: RaceSnapshot) => void;
   applyUpdates: (events: WsUpdateEvent[]) => void;
@@ -81,6 +85,9 @@ export const useRaceStore = create<RaceStore>((set) => ({
 
   wsReconnectTrigger: 0,
   requestWsReconnect: () => set((s) => ({ wsReconnectTrigger: s.wsReconnectTrigger + 1 })),
+
+  teamsUpdatedAt: 0,
+  notifyTeamsUpdated: () => set((s) => ({ teamsUpdatedAt: s.teamsUpdatedAt + 1 })),
 
   setConnected: (v) => set({ connected: v }),
 

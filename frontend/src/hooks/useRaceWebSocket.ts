@@ -13,7 +13,7 @@ export function useRaceWebSocket() {
   const reconnectDelay = useRef(1000);
 
   const { token } = useAuth();
-  const { setConnected, applySnapshot, applyUpdates, applyAnalytics } =
+  const { setConnected, applySnapshot, applyUpdates, applyAnalytics, notifyTeamsUpdated } =
     useRaceStore();
   const wsReconnectTrigger = useRaceStore((s) => s.wsReconnectTrigger);
 
@@ -49,6 +49,8 @@ export function useRaceWebSocket() {
             applyUpdates(msg.events);
           } else if (msg.type === "analytics" && msg.data) {
             applyAnalytics(msg.data);
+          } else if (msg.type === "teams_updated") {
+            notifyTeamsUpdated();
           }
         } catch {
           // ignore parse errors
@@ -76,7 +78,7 @@ export function useRaceWebSocket() {
       }
     };
     // wsReconnectTrigger in deps => entire effect re-runs (close old WS, open new)
-  }, [token, wsReconnectTrigger, setConnected, applySnapshot, applyUpdates, applyAnalytics]);
+  }, [token, wsReconnectTrigger, setConnected, applySnapshot, applyUpdates, applyAnalytics, notifyTeamsUpdated]);
 
   return wsRef;
 }
