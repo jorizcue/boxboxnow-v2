@@ -455,6 +455,16 @@ class RaceStateManager:
                 kart.arrow_status = event.value
             return {"event": "status", "rowId": row_id, "value": event.value}
 
+        elif event.type == EventType.FLAG:
+            flag = event.value  # "green", "chequered", "penalty"
+            logger.info(f"Flag received: {flag}")
+            if flag == "green" and not self.race_started:
+                self.race_started = True
+                self.start_time = time.time()
+                self._needs_snapshot = True
+                logger.info(f"Race started via green flag, karts: {len(self.karts)}")
+            return {"event": "flag", "flag": flag}
+
         elif event.type == EventType.MESSAGE:
             if event.extra.get("subtype") == "track":
                 self.track_name = event.value

@@ -75,20 +75,22 @@ class ReplayEngine:
             return {"totalBlocks": 0, "raceStarts": [], "startTime": None, "endTime": None}
 
         race_starts = []
+        # Track the latest title1 seen so we can label each race start
+        current_title = ""
         for i, (timestamp, message) in enumerate(blocks):
-            # Detect race init: block contains "grid||" which is the full grid HTML
-            if "grid||" in message and "init|" in message:
-                # Extract title from title1|| line
-                title = ""
-                for line in message.split("\n"):
-                    if line.startswith("title1||"):
-                        title = line[8:].strip()
-                        break
+            # Update title from title1|| lines (appear in init blocks before the race)
+            for line in message.split("\n"):
+                if line.startswith("title1||"):
+                    t = line[8:].strip()
+                    if t:
+                        current_title = t
+            # Detect race start via green flag in com|| messages
+            if 'data-flag="green"' in message:
                 race_starts.append({
                     "block": i,
                     "progress": i / total,
                     "timestamp": timestamp.strftime("%H:%M:%S"),
-                    "title": title,
+                    "title": current_title,
                 })
 
         return {

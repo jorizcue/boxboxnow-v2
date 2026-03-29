@@ -43,6 +43,7 @@ class EventType(Enum):
     STATUS = "status"
     LAP_MS = "lap_ms"
     RANKING = "ranking"
+    FLAG = "flag"
 
 
 @dataclass
@@ -146,6 +147,11 @@ class ApexMessageParser:
             if line.startswith("track||"):
                 return [RaceEvent(type=EventType.MESSAGE, value=line[7:],
                                   extra={"subtype": "track"})]
+            # Extract flags from com|| messages (e.g. data-flag="green")
+            if line.startswith("com||"):
+                flags = re.findall(r'data-flag="(\w+)"', line)
+                if flags:
+                    return [RaceEvent(type=EventType.FLAG, value=f) for f in flags]
             return []
 
         # Ranking change: r{id}|#|{pos}
