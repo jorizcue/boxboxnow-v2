@@ -48,19 +48,16 @@ function useTouchDrag(
     }
   }, []);
 
-  const onTouchStart = useCallback((index: number, e: React.TouchEvent) => {
-    // Long press to start dragging (300ms)
+  const onTouchStart = useCallback((index: number) => {
     longPressTimer.current = setTimeout(() => {
       draggingIdx.current = index;
       setDragging(index);
-      // Vibrate if available
       if (navigator.vibrate) navigator.vibrate(30);
     }, 300);
   }, []);
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     if (draggingIdx.current === null) {
-      // Cancel long press if finger moves
       if (longPressTimer.current) {
         clearTimeout(longPressTimer.current);
         longPressTimer.current = null;
@@ -69,7 +66,6 @@ function useTouchDrag(
     }
     e.preventDefault();
     const touch = e.touches[0];
-    // Find which card the touch is over
     const entries = Array.from(cardRects.current.entries());
     for (const [idx, rect] of entries) {
       if (
@@ -79,7 +75,6 @@ function useTouchDrag(
         touch.clientY <= rect.bottom &&
         idx !== draggingIdx.current
       ) {
-        // Swap
         const newOrder = [...cardOrder];
         const fromIdx = draggingIdx.current!;
         const [dragged] = newOrder.splice(fromIdx, 1);
@@ -102,6 +97,52 @@ function useTouchDrag(
   }, []);
 
   return { dragging, registerRect, onTouchStart, onTouchMove, onTouchEnd };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Lap delta flash hook                                               */
+/* ------------------------------------------------------------------ */
+
+type LapDelta = "faster" | "slower" | null;
+
+function useLapDelta(ourKart: number): { delta: LapDelta; deltaMs: number } {
+  const karts = useRaceStore((s) => s.karts);
+  const [delta, setDelta] = useState<LapDelta>(null);
+  const [deltaMs, setDeltaMs] = useState(0);
+  const prevLapCount = useRef<number>(0);
+  const flashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (ourKart <= 0) return;
+    const kart = karts.find((k) => k.kartNumber === ourKart);
+    if (!kart) return;
+
+    // Detect new lap
+    if (kart.totalLaps > prevLapCount.current && prevLapCount.current > 0) {
+      if (kart.lastLapMs > 0 && kart.avgLapMs > 0) {
+        const diff = kart.lastLapMs - kart.avgLapMs;
+        setDelta(diff <= 0 ? "faster" : "slower");
+        setDeltaMs(diff);
+
+        // Clear flash after 8 seconds
+        if (flashTimeout.current) clearTimeout(flashTimeout.current);
+        flashTimeout.current = setTimeout(() => {
+          setDelta(null);
+          setDeltaMs(0);
+        }, 8000);
+      }
+    }
+    prevLapCount.current = kart.totalLaps;
+  }, [karts, ourKart]);
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (flashTimeout.current) clearTimeout(flashTimeout.current);
+    };
+  }, []);
+
+  return { delta, deltaMs };
 }
 
 /* ------------------------------------------------------------------ */
@@ -132,6 +173,9 @@ export function DriverView() {
   const circuitLengthM = config.circuitLengthM || 1100;
   const pitTimeS = config.pitTimeS || 0;
   const ourKart = config.ourKartNumber;
+
+  // Lap delta flash
+  const { delta, deltaMs } = useLapDelta(ourKart);
 
   /* ---------- Compute adjusted classification (distance-based) ---------- */
   const { ourData } = useMemo(() => {
@@ -268,18 +312,41 @@ export function DriverView() {
 
   const boxScore = fifo?.score ?? 0;
 
+  // Delta display for pace card
+  const deltaDisplay = delta ? (
+    <div className={`flex items-center gap-1.5 mt-1 ${delta === "faster" ? "text-green-400" : "text-red-400"}`}>
+      {delta === "faster" ? (
+        <svg className="w-5 h-5 animate-bounce" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M10 17a.75.75 0 01-.75-.75V5.612L5.29 9.77a.75.75 0 01-1.08-1.04l5.25-5.5a.75.75 0 011.08 0l5.25 5.5a.75.75 0 11-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0110 17z" clipRule="evenodd" />
+        </svg>
+      ) : (
+        <svg className="w-5 h-5 animate-bounce" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M10 3a.75.75 0 01.75.75v10.638l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z" clipRule="evenodd" />
+        </svg>
+      )}
+      <span className="text-sm font-mono font-bold">
+        {delta === "faster" ? "" : "+"}{(deltaMs / 1000).toFixed(2)}s
+      </span>
+    </div>
+  ) : null;
+
   const cards: Record<CardId, { label: string; content: React.ReactNode; accent: string }> = {
     pace: {
       label: t("driver.pace"),
-      accent: "from-blue-500/20 to-blue-500/5 border-blue-500/30",
+      accent: delta === "faster"
+        ? "from-green-500/25 to-green-500/5 border-green-400/50"
+        : delta === "slower"
+          ? "from-red-500/25 to-red-500/5 border-red-400/50"
+          : "from-blue-500/20 to-blue-500/5 border-blue-500/30",
       content: (
-        <div className="flex flex-col items-center gap-1">
+        <div className="flex flex-col items-center">
           <span className="text-3xl sm:text-4xl font-mono font-black text-white leading-none tracking-tight">
             {paceDisplay?.avgLapMs ? msToLapTime(Math.round(paceDisplay.avgLapMs)) : "--:--.---"}
           </span>
-          <span className="text-[10px] sm:text-xs text-neutral-500">
+          <span className="text-[10px] sm:text-xs text-neutral-500 mt-1">
             {t("driver.lastLap")}: {paceDisplay?.lastLapMs ? msToLapTime(paceDisplay.lastLapMs) : "-"}
           </span>
+          {deltaDisplay}
         </div>
       ),
     },
@@ -310,7 +377,7 @@ export function DriverView() {
           </span>
         </div>
       ) : (
-        <span className="text-3xl sm:text-4xl font-black text-accent leading-none">P1 🏆</span>
+        <span className="text-3xl sm:text-4xl font-black text-accent leading-none">P1</span>
       ),
     },
     gapBehind: {
@@ -398,7 +465,7 @@ export function DriverView() {
                 onDragEnter={() => onDragEnter(index)}
                 onDragEnd={onDragEnd}
                 onDragOver={(e) => e.preventDefault()}
-                onTouchStart={(e) => editMode && onTouchStart(index, e)}
+                onTouchStart={() => editMode && onTouchStart(index)}
                 onTouchMove={(e) => editMode && onTouchMove(e)}
                 onTouchEnd={() => editMode && onTouchEnd()}
                 className={`

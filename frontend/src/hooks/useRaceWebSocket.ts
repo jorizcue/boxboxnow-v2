@@ -29,22 +29,33 @@ export function useRaceWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout>>();
   const reconnectDelay = useRef(1000);
-  // Keep latest snapshot for re-sending on driver request
-  const lastSnapshot = useRef<any>(null);
 
   const { token } = useAuth();
   const { setConnected, applySnapshot, applyUpdates, applyFifoUpdate, applyAnalytics, notifyTeamsUpdated, setReplayStatus } =
     useRaceStore();
   const wsReconnectTrigger = useRaceStore((s) => s.wsReconnectTrigger);
 
-  // Listen for snapshot requests from driver window
+  // Listen for snapshot requests from driver window — send current store state
   useEffect(() => {
     const ch = getDriverChannel();
     if (!ch) return;
 
     const handler = (event: MessageEvent) => {
-      if (event.data?.type === "requestSnapshot" && lastSnapshot.current) {
-        ch.postMessage({ type: "snapshot", data: lastSnapshot.current });
+      if (event.data?.type === "requestSnapshot") {
+        const state = useRaceStore.getState();
+        ch.postMessage({
+          type: "snapshot",
+          data: {
+            raceStarted: state.raceStarted,
+            countdownMs: state.countdownMs,
+            trackName: state.trackName,
+            durationMs: state.durationMs,
+            karts: state.karts,
+            fifo: state.fifo,
+            classification: state.classification,
+            config: state.config,
+          },
+        });
       }
     };
     ch.addEventListener("message", handler);
@@ -81,8 +92,6 @@ export function useRaceWebSocket() {
 
           if (msg.type === "snapshot" && msg.data) {
             applySnapshot(msg.data);
-            lastSnapshot.current = msg.data;
-            // Forward to driver window
             ch?.postMessage({ type: "snapshot", data: msg.data });
           } else if (msg.type === "update" && msg.events) {
             applyUpdates(msg.events);
@@ -92,6 +101,7 @@ export function useRaceWebSocket() {
             ch?.postMessage({ type: "fifo_update", data: msg.data });
           } else if (msg.type === "analytics" && msg.data) {
             applyAnalytics(msg.data);
+            // Forward analytics as a full snapshot so driver gets complete kart data
             ch?.postMessage({ type: "analytics", data: msg.data });
           } else if (msg.type === "replay_status" && msg.data) {
             const rs = msg.data as any;
