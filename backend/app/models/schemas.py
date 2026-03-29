@@ -27,6 +27,7 @@ class Circuit(Base):
     length_m = Column(Integer, nullable=True)
     pit_time_s = Column(Integer, nullable=True)
     ws_port = Column(Integer, nullable=False)
+    ws_port_data = Column(Integer, nullable=True)  # WS data port (ws://), defaults to ws_port - 1
     php_api_port = Column(Integer, default=0)
     laps_discard = Column(Integer, default=2)
     lap_differential = Column(Integer, default=3000)

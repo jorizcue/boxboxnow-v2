@@ -16,6 +16,7 @@ interface CircuitRow {
   length_m: number | null;
   pit_time_s: number | null;
   ws_port: number;
+  ws_port_data: number | null;
   php_api_port: number;
   laps_discard: number;
   lap_differential: number;
@@ -237,6 +238,7 @@ interface CircuitForm {
   length_m: string;
   pit_time_s: string;
   ws_port: string;
+  ws_port_data: string;
   php_api_port: string;
   laps_discard: string;
   lap_differential: string;
@@ -249,6 +251,7 @@ const emptyForm: CircuitForm = {
   length_m: "",
   pit_time_s: "",
   ws_port: "",
+  ws_port_data: "",
   php_api_port: "0",
   laps_discard: "2",
   lap_differential: "3000",
@@ -262,6 +265,7 @@ function circuitToForm(c: CircuitRow): CircuitForm {
     length_m: c.length_m?.toString() ?? "",
     pit_time_s: c.pit_time_s?.toString() ?? "",
     ws_port: c.ws_port.toString(),
+    ws_port_data: c.ws_port_data?.toString() ?? "",
     php_api_port: c.php_api_port.toString(),
     laps_discard: c.laps_discard.toString(),
     lap_differential: c.lap_differential.toString(),
@@ -276,6 +280,7 @@ function formToPayload(f: CircuitForm) {
     length_m: f.length_m ? Number(f.length_m) : null,
     pit_time_s: f.pit_time_s ? Number(f.pit_time_s) : null,
     ws_port: Number(f.ws_port),
+    ws_port_data: f.ws_port_data ? Number(f.ws_port_data) : null,
     php_api_port: Number(f.php_api_port) || 0,
     laps_discard: Number(f.laps_discard) || 2,
     lap_differential: Number(f.lap_differential) || 3000,
@@ -373,7 +378,8 @@ function CircuitsManager() {
           </h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {fieldInput("Nombre", "name", "text", "Nombre del circuito")}
-            {fieldInput("WS Port", "ws_port", "number", "Puerto WebSocket")}
+            {fieldInput("WS Port (wss)", "ws_port", "number", "Puerto WSS")}
+            {fieldInput("WS Data Port (ws)", "ws_port_data", "number", "Puerto WS datos")}
             {fieldInput("PHP API Port", "php_api_port", "number", "Puerto PHP API")}
             {fieldInput("PHP API URL", "php_api_url", "text", "http://...")}
             {fieldInput("Longitud (m)", "length_m", "number", "Metros")}
@@ -400,7 +406,8 @@ function CircuitsManager() {
               <th className="text-left px-2 py-1">Nombre</th>
               <th className="text-right px-2 py-1">Longitud</th>
               <th className="text-right px-2 py-1">Pit (s)</th>
-              <th className="text-right px-2 py-1">WS</th>
+              <th className="text-right px-2 py-1">WSS</th>
+              <th className="text-right px-2 py-1">WS Data</th>
               <th className="text-right px-2 py-1">PHP</th>
               <th className="text-right px-2 py-1">Desc.</th>
               <th className="text-right px-2 py-1">Dif.</th>
@@ -419,6 +426,7 @@ function CircuitsManager() {
                 <td className="px-2 py-1.5 text-right text-neutral-400">{c.length_m ? `${c.length_m}m` : "-"}</td>
                 <td className="px-2 py-1.5 text-right text-neutral-400">{c.pit_time_s ?? "-"}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-neutral-400">{c.ws_port}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-accent">{c.ws_port_data ?? "-"}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-neutral-400">{c.php_api_port || "-"}</td>
                 <td className="px-2 py-1.5 text-right text-neutral-400">{c.laps_discard}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-neutral-400">{c.lap_differential}</td>

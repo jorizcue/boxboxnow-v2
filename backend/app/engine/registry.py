@@ -615,14 +615,19 @@ class SessionRegistry:
     def get(self, user_id: int) -> UserSession | None:
         return self._sessions.get(user_id)
 
-    async def start_session(self, user_id: int, ws_port: int, **config) -> UserSession:
-        """Start or restart a user's race session."""
+    async def start_session(self, user_id: int, ws_port: int,
+                            ws_port_data: int | None = None, **config) -> UserSession:
+        """Start or restart a user's race session.
+        Uses ws_port_data (ws://) if available, otherwise falls back to ws_port (wss://)."""
         # Stop existing session if any
         if user_id in self._sessions:
             await self._sessions[user_id].stop()
 
         settings = get_settings()
-        ws_url = f"wss://{settings.apex_ws_host}:{ws_port}"
+        if ws_port_data:
+            ws_url = f"ws://{settings.apex_ws_host}:{ws_port_data}"
+        else:
+            ws_url = f"wss://{settings.apex_ws_host}:{ws_port}"
 
         session = UserSession(user_id, ws_url)
         session.configure(**config)

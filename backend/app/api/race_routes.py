@@ -107,6 +107,7 @@ async def connect_to_apex(request: Request, user: User = Depends(get_current_use
     user_session = await registry.start_session(
         user_id=user.id,
         ws_port=circuit.ws_port,
+        ws_port_data=circuit.ws_port_data,
         circuit_length_m=circuit.length_m or 1100,
         pit_time_s=session.pit_time_s,
         laps_discard=circuit.laps_discard,

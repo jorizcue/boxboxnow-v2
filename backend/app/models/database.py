@@ -29,6 +29,16 @@ async def init_db():
         except Exception:
             pass  # Column already exists
 
+        # Add ws_port_data column and populate with ws_port - 1
+        try:
+            await conn.execute(text("ALTER TABLE circuits ADD COLUMN ws_port_data INTEGER"))
+        except Exception:
+            pass  # Column already exists
+        await conn.execute(text("""
+            UPDATE circuits SET ws_port_data = ws_port - 1
+            WHERE ws_port_data IS NULL
+        """))
+
         # Seed live timing URLs for known circuits
         await conn.execute(text("""
             UPDATE circuits SET live_timing_url = 'https://www.apex-timing.com/live-timing/ariza-racing-circuit/index.html'

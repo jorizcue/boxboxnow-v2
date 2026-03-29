@@ -64,16 +64,22 @@ class ApexClient:
 
     async def _connect_and_listen(self):
         """Connect to WebSocket and process messages sequentially."""
-        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
+        # Use SSL only for wss:// URLs
+        use_ssl = self.ws_url.startswith("wss://")
+        connect_kwargs = {
+            "ping_interval": 20,
+            "ping_timeout": 10,
+            "close_timeout": 5,
+        }
+        if use_ssl:
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            connect_kwargs["ssl"] = ssl_context
 
         async with websockets.connect(
             self.ws_url,
-            ssl=ssl_context,
-            ping_interval=20,
-            ping_timeout=10,
-            close_timeout=5,
+            **connect_kwargs,
         ) as ws:
             logger.info(f"Connected to {self.ws_url}")
             self._reconnect_delay = 1.0  # Reset on successful connect

@@ -68,6 +68,7 @@ class CircuitOut(BaseModel):
     length_m: int | None
     pit_time_s: int | None
     ws_port: int
+    ws_port_data: int | None = None
     php_api_port: int
     laps_discard: int
     lap_differential: int
@@ -82,6 +83,7 @@ class CircuitCreate(BaseModel):
     length_m: int | None = None
     pit_time_s: int | None = None
     ws_port: int
+    ws_port_data: int | None = None
     php_api_port: int = 0
     laps_discard: int = 2
     lap_differential: int = 3000
@@ -94,6 +96,7 @@ class CircuitUpdate(BaseModel):
     length_m: int | None = None
     pit_time_s: int | None = None
     ws_port: int | None = None
+    ws_port_data: int | None = None
     php_api_port: int | None = None
     laps_discard: int | None = None
     lap_differential: int | None = None
