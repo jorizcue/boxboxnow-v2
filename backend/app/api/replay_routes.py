@@ -111,6 +111,77 @@ def _list_circuit_recordings() -> list[dict]:
     return recordings
 
 
+@router.get("/recordings")
+async def list_recordings(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List available circuit recordings grouped by circuit with dates.
+    Non-admin sees only circuits they have access to.
+    Admin sees all circuits."""
+    from app.models.schemas import UserCircuitAccess
+    from datetime import datetime as dt, timezone as tz
+    import re
+
+    base = Path(RECORDINGS_BASE_DIR)
+    if not base.exists():
+        return {"circuits": []}
+
+    # Build map: safe_name -> circuit_dir contents
+    all_dirs = {}
+    for circuit_dir in sorted(base.iterdir()):
+        if circuit_dir.is_dir():
+            dates = sorted(
+                [f.stem for f in circuit_dir.glob("*.log") if re.match(r"\d{4}-\d{2}-\d{2}", f.stem)],
+                reverse=True,
+            )
+            if dates:
+                all_dirs[circuit_dir.name] = dates
+
+    if not all_dirs:
+        return {"circuits": []}
+
+    # Get circuits from DB to map safe_name -> circuit info
+    from app.models.schemas import Circuit as CircuitModel
+    result = await db.execute(select(CircuitModel))
+    db_circuits = result.scalars().all()
+
+    # Build safe_name -> circuit mapping
+    from app.apex.circuit_hub import _safe_name
+    circuit_map = {}
+    for c in db_circuits:
+        safe = _safe_name(c.name)
+        circuit_map[safe] = {"id": c.id, "name": c.name}
+
+    # Filter by user access if not admin
+    allowed_circuit_ids = None
+    if not user.is_admin:
+        now = dt.now(tz.utc)
+        result = await db.execute(
+            select(UserCircuitAccess.circuit_id).where(
+                UserCircuitAccess.user_id == user.id,
+                UserCircuitAccess.valid_from <= now,
+                UserCircuitAccess.valid_until >= now,
+            )
+        )
+        allowed_circuit_ids = {row[0] for row in result.all()}
+
+    circuits_out = []
+    for dir_name, dates in all_dirs.items():
+        info = circuit_map.get(dir_name, {"id": None, "name": dir_name})
+        # Filter by access
+        if allowed_circuit_ids is not None and info["id"] not in allowed_circuit_ids:
+            continue
+        circuits_out.append({
+            "circuit_dir": dir_name,
+            "circuit_name": info["name"],
+            "circuit_id": info["id"],
+            "dates": dates,
+        })
+
+    return {"circuits": circuits_out}
+
+
 @router.get("/logs")
 async def list_logs(
     user: User = Depends(get_current_user),

@@ -34,29 +34,28 @@ interface AccessRow {
 }
 
 export function AdminPanel() {
-  const [tab, setTab] = useState<"users" | "circuits">("users");
+  const [tab, setTab] = useState<"users" | "circuits" | "hub">("hub");
+
+  const tabBtn = (key: typeof tab, label: string) => (
+    <button
+      onClick={() => setTab(key)}
+      className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+        tab === key ? "bg-accent text-black" : "bg-surface text-neutral-200 hover:text-neutral-300"
+      }`}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex gap-0.5">
-        <button
-          onClick={() => setTab("users")}
-          className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === "users" ? "bg-accent text-black" : "bg-surface text-neutral-200 hover:text-neutral-300"
-          }`}
-        >
-          Usuarios
-        </button>
-        <button
-          onClick={() => setTab("circuits")}
-          className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === "circuits" ? "bg-accent text-black" : "bg-surface text-neutral-200 hover:text-neutral-300"
-          }`}
-        >
-          Circuitos
-        </button>
+        {tabBtn("hub", "CircuitHub")}
+        {tabBtn("users", "Usuarios")}
+        {tabBtn("circuits", "Circuitos")}
       </div>
 
+      {tab === "hub" && <CircuitHubManager />}
       {tab === "users" && <UsersManager />}
       {tab === "circuits" && <CircuitsManager />}
     </div>
@@ -447,6 +446,147 @@ function CircuitsManager() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+
+// --- CircuitHub Manager ---
+
+interface HubCircuit {
+  circuit_id: number;
+  circuit_name: string;
+  connected: boolean;
+  subscribers: number;
+  messages: number;
+  ws_url: string;
+}
+
+function CircuitHubManager() {
+  const [circuits, setCircuits] = useState<HubCircuit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionId, setActionId] = useState<number | null>(null);
+
+  const refresh = async () => {
+    try {
+      const data = await api.getAdminHubStatus();
+      setCircuits(data.circuits || []);
+    } catch {}
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    refresh();
+    const interval = setInterval(refresh, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleStart = async (circuitId: number) => {
+    setActionId(circuitId);
+    try {
+      await api.hubStartCircuit(circuitId);
+      await refresh();
+    } catch (e: any) {
+      alert(e.message);
+    }
+    setActionId(null);
+  };
+
+  const handleStop = async (circuitId: number) => {
+    setActionId(circuitId);
+    try {
+      await api.hubStopCircuit(circuitId);
+      await refresh();
+    } catch (e: any) {
+      alert(e.message);
+    }
+    setActionId(null);
+  };
+
+  const connectedCount = circuits.filter((c) => c.connected).length;
+  const totalMessages = circuits.reduce((acc, c) => acc + c.messages, 0);
+  const totalSubscribers = circuits.reduce((acc, c) => acc + c.subscribers, 0);
+
+  return (
+    <div className="bg-surface rounded-xl p-4 border border-border">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">CircuitHub — Estado en tiempo real</h3>
+        <div className="flex items-center gap-4 text-[10px] text-neutral-400">
+          <span>
+            <span className="text-accent font-semibold">{connectedCount}</span>/{circuits.length} conectados
+          </span>
+          <span>{totalMessages.toLocaleString()} msgs</span>
+          <span>{totalSubscribers} suscriptores</span>
+        </div>
+      </div>
+
+      {loading ? (
+        <p className="text-neutral-500 text-sm py-4 text-center">Cargando...</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-[10px] text-neutral-500 uppercase tracking-wider">
+              <tr>
+                <th className="text-left px-2 py-1.5">Estado</th>
+                <th className="text-left px-2 py-1.5">Circuito</th>
+                <th className="text-left px-2 py-1.5">URL</th>
+                <th className="text-right px-2 py-1.5">Mensajes</th>
+                <th className="text-right px-2 py-1.5">Usuarios</th>
+                <th className="text-right px-2 py-1.5">Accion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {circuits.map((c) => (
+                <tr key={c.circuit_id} className="border-t border-border hover:bg-black/30 transition-colors">
+                  <td className="px-2 py-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        c.connected ? "bg-accent" : "bg-red-500"
+                      }`} />
+                      <span className={`text-[10px] font-medium ${
+                        c.connected ? "text-accent" : "text-red-400"
+                      }`}>
+                        {c.connected ? "ON" : "OFF"}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-2 py-2 font-medium text-white">{c.circuit_name}</td>
+                  <td className="px-2 py-2 text-[11px] font-mono text-neutral-500">{c.ws_url}</td>
+                  <td className="px-2 py-2 text-right font-mono text-neutral-400">
+                    {c.messages.toLocaleString()}
+                  </td>
+                  <td className="px-2 py-2 text-right">
+                    {c.subscribers > 0 ? (
+                      <span className="text-accent font-medium">{c.subscribers}</span>
+                    ) : (
+                      <span className="text-neutral-700">0</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-2 text-right">
+                    {c.connected ? (
+                      <button
+                        onClick={() => handleStop(c.circuit_id)}
+                        disabled={actionId === c.circuit_id}
+                        className="text-red-400/70 hover:text-red-400 disabled:opacity-40 text-xs font-medium transition-colors"
+                      >
+                        {actionId === c.circuit_id ? "..." : "Parar"}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleStart(c.circuit_id)}
+                        disabled={actionId === c.circuit_id}
+                        className="text-accent/70 hover:text-accent disabled:opacity-40 text-xs font-medium transition-colors"
+                      >
+                        {actionId === c.circuit_id ? "..." : "Arrancar"}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

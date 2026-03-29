@@ -1,7 +1,7 @@
-"""Admin routes: manage users, circuits, and circuit access."""
+"""Admin routes: manage users, circuits, circuit access, and CircuitHub."""
 
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
@@ -212,3 +212,32 @@ async def revoke_access(access_id: int, admin: User = Depends(require_admin), db
     await db.delete(access)
     await db.commit()
     return {"deleted": True}
+
+
+# --- CircuitHub Management ---
+
+@router.get("/hub/status")
+async def hub_status(request: Request, admin: User = Depends(require_admin)):
+    """Get real-time status of all CircuitHub connections."""
+    circuit_hub = request.app.state.circuit_hub
+    return {"circuits": circuit_hub.get_status()}
+
+
+@router.post("/hub/{circuit_id}/start")
+async def hub_start_circuit(circuit_id: int, request: Request, admin: User = Depends(require_admin)):
+    """Start or restart a circuit connection."""
+    circuit_hub = request.app.state.circuit_hub
+    ok = await circuit_hub.start_connection(circuit_id)
+    if not ok:
+        raise HTTPException(404, "Circuit not found")
+    return {"status": "started", "circuit_id": circuit_id}
+
+
+@router.post("/hub/{circuit_id}/stop")
+async def hub_stop_circuit(circuit_id: int, request: Request, admin: User = Depends(require_admin)):
+    """Stop a circuit connection."""
+    circuit_hub = request.app.state.circuit_hub
+    ok = await circuit_hub.stop_connection(circuit_id)
+    if not ok:
+        raise HTTPException(404, "Circuit connection not found")
+    return {"status": "stopped", "circuit_id": circuit_id}

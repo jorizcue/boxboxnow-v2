@@ -244,6 +244,46 @@ class CircuitHub:
         for conn in self._connections.values():
             conn.unsubscribe(user_id)
 
+    async def start_connection(self, circuit_id: int) -> bool:
+        """Start (or restart) a single circuit connection from DB."""
+        conn = self._connections.get(circuit_id)
+        if conn and conn._running:
+            return True  # Already running
+
+        from app.models.database import async_session
+        from app.models.schemas import Circuit
+
+        async with async_session() as db:
+            result = await db.execute(select(Circuit).where(Circuit.id == circuit_id))
+            circuit = result.scalar_one_or_none()
+
+        if not circuit:
+            logger.warning(f"CircuitHub: circuit {circuit_id} not found in DB")
+            return False
+
+        settings = get_settings()
+        ws_port = circuit.ws_port_data or (circuit.ws_port - 1)
+        ws_url = f"ws://{settings.apex_ws_host}:{ws_port}"
+
+        # Stop existing if any
+        if conn:
+            await conn.stop()
+
+        new_conn = CircuitConnection(circuit.id, circuit.name, ws_url)
+        self._connections[circuit.id] = new_conn
+        await new_conn.start()
+        logger.info(f"CircuitHub: started connection to {circuit.name}")
+        return True
+
+    async def stop_connection(self, circuit_id: int) -> bool:
+        """Stop a single circuit connection."""
+        conn = self._connections.get(circuit_id)
+        if not conn:
+            return False
+        await conn.stop()
+        logger.info(f"CircuitHub: stopped connection to {conn.circuit_name}")
+        return True
+
     def get_connection(self, circuit_id: int) -> CircuitConnection | None:
         return self._connections.get(circuit_id)
 
@@ -256,6 +296,7 @@ class CircuitHub:
                 "connected": conn.connected,
                 "subscribers": conn.subscriber_count,
                 "messages": conn.message_count,
+                "ws_url": conn.ws_url,
             }
             for conn in self._connections.values()
         ]

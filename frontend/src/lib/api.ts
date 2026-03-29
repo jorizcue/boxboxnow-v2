@@ -103,6 +103,13 @@ export const api = {
   revokeAccess: (id: number) =>
     fetchApi<any>(`/api/admin/access/${id}`, { method: "DELETE" }),
 
+  // Admin: CircuitHub management
+  getAdminHubStatus: () => fetchApi<{ circuits: any[] }>("/api/admin/hub/status"),
+  hubStartCircuit: (circuitId: number) =>
+    fetchApi<any>(`/api/admin/hub/${circuitId}/start`, { method: "POST" }),
+  hubStopCircuit: (circuitId: number) =>
+    fetchApi<any>(`/api/admin/hub/${circuitId}/stop`, { method: "POST" }),
+
   // Config (user-scoped)
   getMyCircuits: () => fetchApi<any[]>("/api/config/circuits"),
   getActiveSession: () => fetchApi<any>("/api/config/session"),
@@ -132,6 +139,7 @@ export const api = {
   getLiveTeams: () => fetchApi<any>("/api/race/live-teams"),
 
   // Replay
+  getRecordings: () => fetchApi<{ circuits: Array<{ circuit_dir: string; circuit_name: string; circuit_id: number | null; dates: string[] }> }>("/api/replay/recordings"),
   getReplayLogs: () => fetchApi<{ logs: Array<{ filename: string; owner_id?: number | null; owner?: string; circuit_dir?: string }> }>("/api/replay/logs"),
   getReplayStatus: () => fetchApi<any>("/api/replay/status"),
   analyzeLog: (filename: string, ownerId?: number | null, circuitDir?: string | null) => {

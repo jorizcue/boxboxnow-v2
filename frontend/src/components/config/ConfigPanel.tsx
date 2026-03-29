@@ -281,15 +281,7 @@ function Field({
   );
 }
 
-// --- Circuit Hub Status (replaces old ApexConnection) ---
-
-interface HubCircuitStatus {
-  circuit_id: number;
-  circuit_name: string;
-  connected: boolean;
-  subscribers: number;
-  messages: number;
-}
+// --- Circuit Hub Status ---
 
 function CircuitHubStatus() {
   const { setApexStatus } = useRaceStore();
@@ -299,18 +291,25 @@ function CircuitHubStatus() {
     circuit_connected: boolean;
     circuit_messages: number;
   } | null>(null);
-  const [hubCircuits, setHubCircuits] = useState<HubCircuitStatus[]>([]);
-  const { user } = useAuth();
-  const isAdmin = user?.is_admin ?? false;
+  const [myCircuits, setMyCircuits] = useState<{ id: number; name: string }[]>([]);
+  const [hubStatus, setHubStatus] = useState<Record<number, { connected: boolean; messages: number }>>({});
 
   const refresh = async () => {
     try {
-      const [connStatus, hubStatus] = await Promise.all([
+      const [connStatus, circuitsList, hubData] = await Promise.all([
         api.getConnectionStatus(),
-        isAdmin ? api.getHubStatus() : Promise.resolve({ circuits: [] }),
+        api.getMyCircuits(),
+        api.getHubStatus().catch(() => ({ circuits: [] })),
       ]);
       setStatus(connStatus);
-      setHubCircuits(hubStatus.circuits || []);
+      setMyCircuits(circuitsList.map((c: any) => ({ id: c.id, name: c.name })));
+
+      // Build lookup for hub connection status
+      const lookup: Record<number, { connected: boolean; messages: number }> = {};
+      for (const c of hubData.circuits || []) {
+        lookup[c.circuit_id] = { connected: c.connected, messages: c.messages };
+      }
+      setHubStatus(lookup);
 
       // Sync apexConnected to zustand for other components
       if (connStatus.monitoring) {
@@ -363,23 +362,25 @@ function CircuitHubStatus() {
         </p>
       )}
 
-      {/* Admin: show all circuit connections */}
-      {isAdmin && hubCircuits.length > 0 && (
+      {/* User's accessible circuits with connection status */}
+      {myCircuits.length > 0 && (
         <div className="mt-3 pt-3 border-t border-border">
-          <p className="text-[10px] text-neutral-400 mb-2 uppercase tracking-wider">Circuitos conectados</p>
+          <p className="text-[10px] text-neutral-400 mb-2 uppercase tracking-wider">Mis circuitos</p>
           <div className="space-y-1">
-            {hubCircuits.map((c) => (
-              <div key={c.circuit_id} className="flex items-center gap-2 text-[10px]">
-                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                  c.connected ? "bg-accent" : "bg-red-500"
-                }`} />
-                <span className="text-neutral-300 truncate flex-1">{c.circuit_name}</span>
-                <span className="text-neutral-500">{c.messages.toLocaleString()} msgs</span>
-                {c.subscribers > 0 && (
-                  <span className="text-accent">{c.subscribers} usr</span>
-                )}
-              </div>
-            ))}
+            {myCircuits.map((c) => {
+              const hub = hubStatus[c.id];
+              return (
+                <div key={c.id} className="flex items-center gap-2 text-[10px]">
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                    hub?.connected ? "bg-accent" : "bg-neutral-700"
+                  }`} />
+                  <span className="text-neutral-300 truncate flex-1">{c.name}</span>
+                  {hub && (
+                    <span className="text-neutral-500 font-mono">{hub.messages.toLocaleString()} msgs</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -403,6 +404,13 @@ interface LogAnalysis {
   endTime: string | null;
 }
 
+interface RecordingCircuit {
+  circuit_dir: string;
+  circuit_name: string;
+  circuit_id: number | null;
+  dates: string[];
+}
+
 interface LogEntry {
   filename: string;
   owner_id?: number | null;
@@ -411,8 +419,16 @@ interface LogEntry {
 }
 
 function ReplayControls() {
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  // Use module-level vars to survive tab changes
+  // Recording circuits (circuit+date selector)
+  const [recordingCircuits, setRecordingCircuits] = useState<RecordingCircuit[]>([]);
+  const [selectedRecCircuit, setSelectedRecCircuitState] = useState(_replaySelectedCircuitDir || "");
+  const [selectedDate, setSelectedDateState] = useState("");
+
+  // Legacy logs (flat file list, admin only)
+  const [legacyLogs, setLegacyLogs] = useState<LogEntry[]>([]);
+  const [showLegacy, setShowLegacy] = useState(false);
+
+  // Module-level state for replay params
   const [selectedLog, setSelectedLogState] = useState(_replaySelectedLog);
   const [selectedOwnerId, setSelectedOwnerIdState] = useState<number | null>(_replaySelectedOwnerId);
   const [selectedCircuitDir, setSelectedCircuitDirState] = useState<string | null>(_replaySelectedCircuitDir);
@@ -420,13 +436,15 @@ function ReplayControls() {
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<LogAnalysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+
   const {
     requestWsReconnect,
-    replayActive, replayPaused, replayFilename, replayProgress, replayTime, setReplayStatus,
+    replayActive, replayPaused, replayProgress, replayTime, setReplayStatus,
   } = useRaceStore();
   const { user } = useAuth();
   const isAdmin = user?.is_admin ?? false;
 
+  // Setters that persist to module-level
   const setSelectedLog = (v: string, ownerId: number | null = null, circuitDir: string | null = null) => {
     _replaySelectedLog = v;
     _replaySelectedOwnerId = ownerId;
@@ -435,12 +453,10 @@ function ReplayControls() {
     setSelectedOwnerIdState(ownerId);
     setSelectedCircuitDirState(circuitDir);
   };
-  const setSpeed = (v: number) => {
-    _replaySpeed = v;
-    setSpeedState(v);
-  };
+  const setSpeed = (v: number) => { _replaySpeed = v; setSpeedState(v); };
+  const setSelectedRecCircuit = (v: string) => { _replaySelectedCircuitDir = v || null; setSelectedRecCircuitState(v); };
 
-  // Sync replay status from backend on mount and poll while active
+  // Sync replay status
   const syncStatus = async () => {
     try {
       const st = await api.getReplayStatus();
@@ -448,10 +464,37 @@ function ReplayControls() {
     } catch {}
   };
 
+  // Load recording circuits + legacy logs on mount
   useEffect(() => {
-    api.getReplayLogs().then((data) => setLogs(data.logs || [])).catch(() => {});
+    api.getRecordings()
+      .then((data) => setRecordingCircuits(data.circuits || []))
+      .catch(() => {});
+    if (isAdmin) {
+      api.getReplayLogs()
+        .then((data) => setLegacyLogs((data.logs || []).filter((l: LogEntry) => !l.circuit_dir)))
+        .catch(() => {});
+    }
     syncStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Get dates for selected circuit
+  const selectedCircuitData = recordingCircuits.find((c) => c.circuit_dir === selectedRecCircuit);
+  const availableDates = selectedCircuitData?.dates || [];
+
+  // When circuit or date changes, update the replay selection
+  useEffect(() => {
+    if (selectedRecCircuit && selectedDate) {
+      const filename = `${selectedDate}.log`;
+      setSelectedLog(filename, null, selectedRecCircuit);
+    } else if (!selectedRecCircuit) {
+      // Only clear if it was a circuit selection
+      if (selectedCircuitDir && !selectedOwnerId) {
+        setSelectedLog("", null, null);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRecCircuit, selectedDate]);
 
   // Analyze log when selected
   useEffect(() => {
@@ -468,6 +511,7 @@ function ReplayControls() {
     if (!replayActive) return;
     const interval = setInterval(syncStatus, 2000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [replayActive]);
 
   const startFromBlock = async (block: number = 0) => {
@@ -475,7 +519,6 @@ function ReplayControls() {
     setLoading(true);
     try {
       await api.startReplay(selectedLog, speed, block, selectedOwnerId, selectedCircuitDir);
-      // Switch WS to replay state
       requestWsReconnect();
       await syncStatus();
     } catch (e: any) {
@@ -506,75 +549,89 @@ function ReplayControls() {
     }
   };
 
-  // Parse the select value to extract log info
-  const parseSelectValue = (val: string): { filename: string; ownerId: number | null; circuitDir: string | null } => {
-    if (!val) return { filename: "", ownerId: null, circuitDir: null };
-
-    // Format: "circuit:{dir}:{filename}" for circuit recordings
-    if (val.startsWith("circuit:")) {
-      const rest = val.substring(8);
-      const colonIdx = rest.indexOf(":");
-      if (colonIdx > 0) {
-        return {
-          filename: rest.substring(colonIdx + 1),
-          ownerId: null,
-          circuitDir: rest.substring(0, colonIdx),
-        };
-      }
-    }
-
-    // Format: "{ownerId}:{filename}" for admin user logs
+  // Legacy log select handler (admin only)
+  const handleLegacySelect = (val: string) => {
+    if (!val) { setSelectedLog(""); return; }
     const colonIdx = val.indexOf(":");
-    if (colonIdx > 0 && isAdmin) {
+    if (colonIdx > 0) {
       const oid = parseInt(val.substring(0, colonIdx), 10);
-      return {
-        filename: val.substring(colonIdx + 1),
-        ownerId: isNaN(oid) ? null : oid,
-        circuitDir: null,
-      };
+      setSelectedLog(val.substring(colonIdx + 1), isNaN(oid) ? null : oid, null);
+    } else {
+      setSelectedLog(val, null, null);
     }
-
-    // Plain filename
-    return { filename: val, ownerId: null, circuitDir: null };
+    setSelectedRecCircuit("");
+    setSelectedDateState("");
   };
-
-  const buildSelectValue = (log: LogEntry): string => {
-    if (log.circuit_dir) return `circuit:${log.circuit_dir}:${log.filename}`;
-    if (log.owner_id != null) return `${log.owner_id}:${log.filename}`;
-    return log.filename;
-  };
-
-  const currentSelectValue = selectedCircuitDir
-    ? `circuit:${selectedCircuitDir}:${selectedLog}`
-    : selectedOwnerId != null
-    ? `${selectedOwnerId}:${selectedLog}`
-    : selectedLog;
 
   return (
     <div className="bg-surface rounded-xl p-6 border border-border">
       <h2 className="text-[11px] text-neutral-200 mb-4 uppercase tracking-wider">Replay</h2>
 
       <div className="space-y-3">
-        <select
-          value={currentSelectValue}
-          onChange={(e) => {
-            const parsed = parseSelectValue(e.target.value);
-            setSelectedLog(parsed.filename, parsed.ownerId, parsed.circuitDir);
-          }}
-          disabled={replayActive}
-          className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
-        >
-          <option value="">Seleccionar log...</option>
-          {logs.map((log, idx) => {
-            const val = buildSelectValue(log);
-            const label = log.circuit_dir
-              ? `[${log.owner}] ${log.filename}`
-              : log.owner
-              ? `[${log.owner}] ${log.filename}`
-              : log.filename;
-            return <option key={`${val}-${idx}`} value={val}>{label}</option>;
-          })}
-        </select>
+        {/* Circuit + Date selectors */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">Circuito</label>
+            <select
+              value={selectedRecCircuit}
+              onChange={(e) => {
+                setSelectedRecCircuit(e.target.value);
+                setSelectedDateState("");
+                if (!e.target.value) setSelectedLog("", null, null);
+              }}
+              disabled={replayActive}
+              className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
+            >
+              <option value="">Seleccionar...</option>
+              {recordingCircuits.map((c) => (
+                <option key={c.circuit_dir} value={c.circuit_dir}>
+                  {c.circuit_name} ({c.dates.length}d)
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">Fecha</label>
+            <select
+              value={selectedDate}
+              onChange={(e) => setSelectedDateState(e.target.value)}
+              disabled={replayActive || !selectedRecCircuit}
+              className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
+            >
+              <option value="">Seleccionar...</option>
+              {availableDates.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Legacy logs toggle (admin) */}
+        {isAdmin && legacyLogs.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowLegacy(!showLegacy)}
+              className="text-[10px] text-neutral-500 hover:text-neutral-300 transition-colors"
+            >
+              {showLegacy ? "Ocultar" : "Mostrar"} grabaciones antiguas ({legacyLogs.length})
+            </button>
+            {showLegacy && (
+              <select
+                value={selectedOwnerId != null ? `${selectedOwnerId}:${selectedLog}` : selectedLog}
+                onChange={(e) => handleLegacySelect(e.target.value)}
+                disabled={replayActive}
+                className="w-full mt-1 bg-black border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-40"
+              >
+                <option value="">Seleccionar log antiguo...</option>
+                {legacyLogs.map((log, idx) => {
+                  const val = log.owner_id != null ? `${log.owner_id}:${log.filename}` : log.filename;
+                  const label = log.owner ? `[${log.owner}] ${log.filename}` : log.filename;
+                  return <option key={`${val}-${idx}`} value={val}>{label}</option>;
+                })}
+              </select>
+            )}
+          </div>
+        )}
 
         {/* Timeline bar */}
         {analysis && analysis.totalBlocks > 0 && (
@@ -589,21 +646,18 @@ function ReplayControls() {
               onClick={handleTimelineClick}
               title="Click para posicionarte"
             >
-              {/* Progress fill */}
               {replayActive && (
                 <div
                   className="absolute top-0 left-0 h-full bg-accent/20 rounded-lg transition-all"
                   style={{ width: `${replayProgress * 100}%` }}
                 />
               )}
-              {/* Progress head */}
               {replayActive && (
                 <div
                   className="absolute top-0 h-full w-0.5 bg-accent transition-all"
                   style={{ left: `${replayProgress * 100}%` }}
                 />
               )}
-              {/* Race start markers */}
               {analysis.raceStarts.map((rs, idx) => (
                 <div
                   key={idx}
@@ -618,7 +672,6 @@ function ReplayControls() {
               ))}
             </div>
 
-            {/* Race start buttons */}
             {analysis.raceStarts.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {analysis.raceStarts.map((rs, idx) => (
@@ -658,7 +711,6 @@ function ReplayControls() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Play button */}
           <button
             onClick={() => startFromBlock(0)}
             disabled={!selectedLog || loading || replayActive}
@@ -671,7 +723,6 @@ function ReplayControls() {
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
             )}
           </button>
-          {/* Pause / Resume button */}
           <button
             onClick={async () => {
               await api.pauseReplay();
@@ -687,12 +738,10 @@ function ReplayControls() {
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
             )}
           </button>
-          {/* Stop button */}
           <button
             onClick={async () => {
               await api.stopReplay();
               await syncStatus();
-              // Switch WS back to live state
               requestWsReconnect();
             }}
             disabled={!replayActive}
@@ -702,7 +751,6 @@ function ReplayControls() {
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
           </button>
 
-          {/* Status info */}
           {replayActive && (
             <div className="flex-1 flex items-center justify-end gap-3 text-[11px] font-mono">
               {replayTime && (
