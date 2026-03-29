@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
+import { useSimNow } from "@/hooks/useSimNow";
 import { msToLapTime, tierHex } from "@/lib/formatters";
 import { useT } from "@/lib/i18n";
 import clsx from "clsx";
@@ -22,13 +23,7 @@ import clsx from "clsx";
 export function AdjustedClassification() {
   const t = useT();
   const { karts, config } = useRaceStore();
-  const [now, setNow] = useState(() => Date.now() / 1000);
-
-  // Tick every second for fractional distance updates
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now() / 1000), 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const { now, speed } = useSimNow();
 
   const circuitLengthM = config.circuitLengthM || 1100;
   const pitTimeS = config.pitTimeS || 0;
@@ -50,7 +45,7 @@ export function AdjustedClassification() {
         // Meters extra: interpolated position beyond last completed lap
         let metersExtra = 0;
         if (kart.pitStatus === "racing" && speedMs > 0 && kart.stintStartTime > 0) {
-          const wallTimeSinceStintS = Math.max(0, now - kart.stintStartTime);
+          const wallTimeSinceStintS = Math.max(0, (now - kart.stintStartTime) * speed);
           const stintElapsedS = kart.stintElapsedMs / 1000;
           const secondsSinceLastCrossing = wallTimeSinceStintS - stintElapsedS;
           if (secondsSinceLastCrossing > 0) {

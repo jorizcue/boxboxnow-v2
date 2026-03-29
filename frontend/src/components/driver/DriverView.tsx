@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
+import { useSimNow } from "@/hooks/useSimNow";
 import { msToLapTime, tierHex } from "@/lib/formatters";
 import { useT } from "@/lib/i18n";
 
@@ -152,7 +153,7 @@ function useLapDelta(ourKart: number): { delta: LapDelta; deltaMs: number } {
 export function DriverView() {
   const t = useT();
   const { karts, config, fifo, connected } = useRaceStore();
-  const [now, setNow] = useState(() => Date.now() / 1000);
+  const { now, speed } = useSimNow();
   const [cardOrder, setCardOrder] = useState<CardId[]>(DEFAULT_ORDER);
   const [editMode, setEditMode] = useState(false);
 
@@ -162,12 +163,6 @@ export function DriverView() {
   // Hydrate order from localStorage on mount
   useEffect(() => {
     setCardOrder(loadOrder());
-  }, []);
-
-  // Tick every second
-  useEffect(() => {
-    const iv = setInterval(() => setNow(Date.now() / 1000), 1000);
-    return () => clearInterval(iv);
   }, []);
 
   const circuitLengthM = config.circuitLengthM || 1100;
@@ -192,7 +187,7 @@ export function DriverView() {
 
         let metersExtra = 0;
         if (kart.pitStatus === "racing" && speedMs > 0 && kart.stintStartTime > 0) {
-          const wallS = Math.max(0, now - kart.stintStartTime);
+          const wallS = Math.max(0, (now - kart.stintStartTime) * speed);
           const stintElS = kart.stintElapsedMs / 1000;
           const sinceCross = wallS - stintElS;
           if (sinceCross > 0) {

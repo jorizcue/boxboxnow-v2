@@ -14,15 +14,18 @@ export interface DriverInfo {
 
 export function getDriverInfoForKart(
   kart: KartState | undefined,
-  minDriverTimeMin: number
+  minDriverTimeMin: number,
+  /** Override stint elapsed ms (e.g. interpolated from race clock at replay speed) */
+  stintElapsedOverrideMs?: number
 ): DriverInfo[] {
   if (!kart || !kart.driverTotalMs) return [];
 
   const minDriverTimeMs = (minDriverTimeMin || 30) * 60 * 1000;
 
   // Add current stint time for active driver (not yet committed to driver_total_ms)
+  const stintMs = stintElapsedOverrideMs !== undefined ? stintElapsedOverrideMs : kart.stintElapsedMs;
   const currentDriverStintMs =
-    kart.pitStatus === "racing" && kart.driverName ? kart.stintElapsedMs : 0;
+    kart.pitStatus === "racing" && kart.driverName ? stintMs : 0;
 
   // Ensure current driver appears even if they haven't pitted yet
   const driverMap = { ...kart.driverTotalMs };

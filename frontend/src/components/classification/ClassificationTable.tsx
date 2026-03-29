@@ -2,6 +2,7 @@
 
 import { useState, useCallback, Fragment } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
+import { useRaceClock } from "@/hooks/useRaceClock";
 import { msToLapTime, tierHex } from "@/lib/formatters";
 import { useT } from "@/lib/i18n";
 import { getDriverInfoForKart, DriverDetailsRow } from "@/components/shared/DriverDetails";
@@ -10,8 +11,15 @@ const COL_COUNT = 10; // number of <th> columns
 
 export function ClassificationTable() {
   const t = useT();
-  const { classification, config, karts } = useRaceStore();
+  const { classification, config, karts, durationMs } = useRaceStore();
+  const raceClockMs = useRaceClock();
   const [expandedKart, setExpandedKart] = useState<number | null>(null);
+
+  const stintMsFor = (kart: typeof karts[0]) => {
+    if (raceClockMs === 0) return 0;
+    const stintStart = kart.stintStartCountdownMs || durationMs || raceClockMs;
+    return Math.max(0, stintStart - raceClockMs);
+  };
 
   const toggleExpand = useCallback((kartNumber: number) => {
     setExpandedKart((prev) => (prev === kartNumber ? null : kartNumber));
@@ -51,7 +59,7 @@ export function ClassificationTable() {
               ? karts.find((k) => k.kartNumber === entry.kartNumber)
               : undefined;
             const drivers = kart
-              ? getDriverInfoForKart(kart, config.minDriverTimeMin)
+              ? getDriverInfoForKart(kart, config.minDriverTimeMin, stintMsFor(kart))
               : [];
 
             return (

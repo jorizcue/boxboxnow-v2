@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
+import { useSimNow } from "@/hooks/useSimNow";
 import { tierHex, secondsToHMS, msToLapTime } from "@/lib/formatters";
 import type { FifoEntry } from "@/types/race";
 import clsx from "clsx";
@@ -10,12 +11,7 @@ import { useT } from "@/lib/i18n";
 export function FifoQueue() {
   const { fifo, config, karts } = useRaceStore();
   const t = useT();
-  const [now, setNow] = useState(() => Date.now() / 1000);
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now() / 1000), 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const { now, speed } = useSimNow();
 
   const scoreColor =
     fifo.score >= 75 ? "text-accent" :
@@ -61,7 +57,7 @@ export function FifoQueue() {
     : undefined;
 
   const ourStintSec = ourKart
-    ? (ourKart.stintStartTime > 0 ? Math.max(0, now - ourKart.stintStartTime) : ourKart.stintDurationS)
+    ? (ourKart.stintStartTime > 0 ? Math.max(0, (now - ourKart.stintStartTime) * speed) : ourKart.stintDurationS)
     : 0;
 
   const timeToMaxStint = Math.max(0, config.maxStintMin * 60 - ourStintSec);
@@ -70,7 +66,7 @@ export function FifoQueue() {
     : 0;
 
   const kartsNearPit = karts.filter((k) => {
-    const stintSec = k.stintStartTime > 0 ? Math.max(0, now - k.stintStartTime) : k.stintDurationS;
+    const stintSec = k.stintStartTime > 0 ? Math.max(0, (now - k.stintStartTime) * speed) : k.stintDurationS;
     return stintSec / 60 >= config.maxStintMin - 5 && k.pitStatus !== "in_pit";
   }).length;
 
