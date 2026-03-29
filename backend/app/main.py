@@ -50,6 +50,29 @@ async def lifespan(app: FastAPI):
     replay_differentials: dict = {"team_positions": {}, "driver_differentials": {}}
 
     async def replay_on_events(events):
+        # Broadcast replay status (time + progress) to clients
+        if replay_state._ws_clients:
+            status = replay_engine.status
+            if status.get("currentTime"):
+                import json as _json_rs
+                rs_msg = _json_rs.dumps({
+                    "type": "replay_status",
+                    "data": {
+                        "progress": status["progress"],
+                        "currentTime": status["currentTime"],
+                        "paused": status["paused"],
+                        "active": status["active"],
+                    },
+                })
+                dead = set()
+                for client in replay_state._ws_clients:
+                    try:
+                        await client.send_text(rs_msg)
+                    except Exception:
+                        dead.add(client)
+                for c in dead:
+                    replay_state._ws_clients.discard(c)
+
         # Track which karts were NOT in pit before processing
         pre_pit_status = {
             row_id: kart.pit_status
