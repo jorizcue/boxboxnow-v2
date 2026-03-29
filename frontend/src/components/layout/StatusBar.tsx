@@ -24,6 +24,7 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   const replayPaused = useRaceStore((s) => s.replayPaused);
   const replayFilename = useRaceStore((s) => s.replayFilename);
   const replayProgress = useRaceStore((s) => s.replayProgress);
+  const replayTime = useRaceStore((s) => s.replayTime);
 
   // Use interpolated race clock that ticks every second
   const raceClockMs = useRaceClock();
@@ -74,6 +75,11 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
                 <span className="text-[10px] text-neutral-500 hidden sm:inline">
                   {(replayProgress * 100).toFixed(0)}%
                 </span>
+                {replayTime && (
+                  <span className="text-[10px] sm:text-[11px] text-orange-300 font-mono font-semibold">
+                    {replayTime}
+                  </span>
+                )}
               </div>
             )}
           </div>
