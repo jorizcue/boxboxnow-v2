@@ -120,14 +120,14 @@ async def update_session(
 
     await db.commit()
 
-    # If there's an active UserSession, reconfigure it with the updated values
-    # so changes take effect immediately without reconnecting.
+    # Reload circuit info for config values
+    circuit = await db.execute(select(Circuit).where(Circuit.id == session.circuit_id))
+    c = circuit.scalar_one_or_none()
+
+    # If there's an active UserSession (live Apex), reconfigure it
     registry = request.app.state.registry
     user_session = registry.get(user.id)
     if user_session:
-        # Reload circuit for pit_time_s and other defaults
-        circuit = await db.execute(select(Circuit).where(Circuit.id == session.circuit_id))
-        c = circuit.scalar_one_or_none()
         user_session.configure(
             circuit_length_m=c.length_m if c else 1100,
             pit_time_s=session.pit_time_s,
@@ -143,10 +143,31 @@ async def update_session(
             duration_min=session.duration_min,
             refresh_s=session.refresh_interval_s,
         )
-        # Broadcast updated snapshot to all WS clients immediately
         await user_session.broadcast_snapshot()
         logger.info(f"Live reconfigured session for user {user.id} "
                     f"(boxLines={session.box_lines}, boxKarts={session.box_karts})")
+
+    # Also update replay_state so analytics broadcasts don't overwrite frontend config
+    replay_state = getattr(request.app.state, "replay_state", None)
+    if replay_state:
+        replay_state.our_kart_number = session.our_kart_number
+        replay_state.min_pits = session.min_pits
+        replay_state.max_stint_min = session.max_stint_min
+        replay_state.min_stint_min = session.min_stint_min
+        replay_state.box_lines = session.box_lines
+        replay_state.box_karts = session.box_karts
+        replay_state.duration_min = session.duration_min
+        replay_state.pit_time_s = session.pit_time_s
+        replay_state.circuit_length_m = c.length_m if c else replay_state.circuit_length_m
+        replay_state.min_driver_time_min = session.min_driver_time_min
+        # Update replay FIFO config only if box params changed (update_config resets queue)
+        replay_fifo = getattr(request.app.state, "replay_fifo", None)
+        if replay_fifo and (
+            replay_fifo.queue_size != session.box_karts
+            or replay_fifo.box_lines != session.box_lines
+        ):
+            replay_fifo.update_config(session.box_karts, session.box_lines)
+        logger.info(f"Replay state updated for user {user.id} config change")
 
     return await _reload_session(user.id, db)
 
