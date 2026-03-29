@@ -48,11 +48,17 @@ export function ConfigPanel() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RaceSessionEditor />
         <div className="space-y-6">
-          <CircuitHubStatus />
-          {isAdmin && <ReplayControls />}
+          {isAdmin ? (
+            <>
+              <CircuitHubStatus />
+              <ReplayControls />
+            </>
+          ) : (
+            <TeamEditor />
+          )}
         </div>
       </div>
-      <TeamEditor />
+      {isAdmin && <TeamEditor />}
     </div>
   );
 }

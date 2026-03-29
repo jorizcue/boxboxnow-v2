@@ -84,7 +84,14 @@ COLUMN_TYPES = {
     "pit": "pit_count",
     "sta": "status",
     "grp": "group",
+    # Sector times — mapped so they are NOT mistaken for laps
+    "s1": "sector",
+    "s2": "sector",
+    "s3": "sector",
 }
+
+# Columns that should be ignored for lap counting / event generation
+IGNORED_SEMANTICS = {"sector"}
 
 # Lap time CSS classes
 LAP_CLASSES = {"tn", "ti", "tb", "to"}  # normal, improvement, best, other
@@ -338,6 +345,9 @@ class ApexMessageParser:
 
         # Lap time updates (tn=normal, ti=improvement, tb=best, to=other)
         if action in LAP_CLASSES:
+            # Skip sector columns — they are NOT laps
+            if semantic in IGNORED_SEMANTICS:
+                return []
             # Determine if this is last_lap or best_lap column
             if semantic == "best_lap":
                 return [RaceEvent(type=EventType.BEST_LAP, row_id=row_id,
@@ -348,6 +358,8 @@ class ApexMessageParser:
 
         # Generic "in" action - depends on column
         if action == "in":
+            if semantic in IGNORED_SEMANTICS:
+                return []
             if semantic == "last_lap":
                 return [RaceEvent(type=EventType.LAP, row_id=row_id, value=value)]
             if semantic == "best_lap":
@@ -379,6 +391,8 @@ class ApexMessageParser:
 
         # Gap/interval with special formatting
         if action == "ib":
+            if semantic in IGNORED_SEMANTICS:
+                return []
             if semantic == "best_lap":
                 return [RaceEvent(type=EventType.BEST_LAP, row_id=row_id, value=value)]
             return [RaceEvent(type=EventType.GAP, row_id=row_id, value=value)]
