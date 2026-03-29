@@ -308,6 +308,7 @@ const translations: Record<string, Record<Language, string>> = {
   "driver.boxScore": { es: "Punt. Box", en: "Box Score", it: "Punt. Box", de: "Box Punkt." },
   "driver.dragHint": { es: "Arrastra para reordenar", en: "Drag to reorder", it: "Trascina per riordinare", de: "Ziehen zum Umsortieren" },
   "driver.open": { es: "Piloto", en: "Driver", it: "Pilota", de: "Fahrer" },
+  "driver.connecting": { es: "Conectando...", en: "Connecting...", it: "Connessione...", de: "Verbindung..." },
 
   // === Common ===
   "common.loading": { es: "Cargando...", en: "Loading...", it: "Caricamento...", de: "Laden..." },

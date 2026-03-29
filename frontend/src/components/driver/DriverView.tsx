@@ -238,7 +238,20 @@ export function DriverView() {
     dragOverItem.current = null;
   }, [cardOrder]);
 
-  /* ---------- No kart selected ---------- */
+  /* ---------- Waiting for data / no kart ---------- */
+  const hasReceivedData = karts.length > 0 || config.ourKartNumber > 0;
+
+  if (!hasReceivedData) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center p-4">
+        <div className="text-center space-y-3">
+          <span className="text-accent text-lg font-bold animate-pulse">BBN</span>
+          <p className="text-neutral-500 text-sm">{connected ? t("common.loading") : t("driver.connecting")}</p>
+        </div>
+      </div>
+    );
+  }
+
   if (ourKart <= 0) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
