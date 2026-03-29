@@ -31,7 +31,8 @@ export function AdjustedClassification() {
   const adjusted = useMemo(() => {
     if (karts.length === 0) return [];
 
-    const maxPits = Math.max(...karts.map((k) => k.pitCount), 0);
+    // Only count completed pits (exclude karts currently in pit — their stop isn't done yet)
+    const maxPits = Math.max(...karts.filter((k) => k.pitStatus !== "in_pit").map((k) => k.pitCount), 0);
 
     return karts
       .filter((k) => k.totalLaps > 0)

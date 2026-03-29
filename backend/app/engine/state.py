@@ -430,12 +430,10 @@ class RaceStateManager:
             return {"event": "interval", "rowId": row_id, "value": event.value}
 
         elif event.type == EventType.TOTAL_LAPS and kart:
-            try:
-                kart.total_laps = int(event.value)
-            except ValueError:
-                pass
-            return {"event": "totalLaps", "rowId": row_id,
-                    "value": kart.total_laps}
+            # Ignore — lap count is driven exclusively by LAP events.
+            # Apex's total_laps column often sends values ahead of actual
+            # crossings, causing phantom lap increments.
+            return None
 
         elif event.type == EventType.PIT_TIME and kart:
             kart.pit_time = event.value

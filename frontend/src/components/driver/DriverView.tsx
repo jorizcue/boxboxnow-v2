@@ -177,7 +177,7 @@ export function DriverView() {
     if (karts.length === 0 || ourKart <= 0)
       return { ourData: null };
 
-    const maxPits = Math.max(...karts.map((k) => k.pitCount), 0);
+    const maxPits = Math.max(...karts.filter((k) => k.pitStatus !== "in_pit").map((k) => k.pitCount), 0);
 
     const mapped = karts
       .filter((k) => k.totalLaps > 0)

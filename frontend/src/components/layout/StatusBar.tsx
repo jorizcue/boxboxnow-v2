@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { msToCountdown } from "@/lib/formatters";
 import { useAuth } from "@/hooks/useAuth";
 import { useT, useLangStore, LANGUAGES } from "@/lib/i18n";
@@ -28,7 +28,24 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   const replayPaused = useRaceStore((s) => s.replayPaused);
   const replayFilename = useRaceStore((s) => s.replayFilename);
   const replayProgress = useRaceStore((s) => s.replayProgress);
+  const replaySpeed = useRaceStore((s) => s.replaySpeed);
+  const requestWsReconnect = useRaceStore((s) => s.requestWsReconnect);
   const replayTime = useReplayTime();
+
+  const handlePauseResume = useCallback(async () => {
+    try { await api.pauseReplay(); } catch {}
+  }, []);
+
+  const handleStop = useCallback(async () => {
+    try {
+      await api.stopReplay();
+      requestWsReconnect();
+    } catch {}
+  }, [requestWsReconnect]);
+
+  const handleSpeedChange = useCallback(async (speed: number) => {
+    try { await api.setReplaySpeed(speed); } catch {}
+  }, []);
 
   // Use interpolated race clock that ticks every second
   const raceClockMs = useRaceClock();
@@ -71,19 +88,68 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
               </div>
             )}
             {replayActive && (
-              <div className="flex items-center gap-1 border-l border-border pl-2 min-w-0">
-                <div className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse shrink-0" />
-                <span className="text-[10px] sm:text-[11px] text-orange-400 font-medium truncate">
-                  {replayPaused ? t("status.replayPaused") : "Replay"}
-                </span>
-                <span className="text-[10px] text-neutral-500 hidden sm:inline">
-                  {(replayProgress * 100).toFixed(0)}%
-                </span>
+              <div className="flex items-center gap-1.5 sm:gap-2 border-l border-border pl-2 min-w-0">
+                {/* Indicator dot */}
+                <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${replayPaused ? "bg-orange-400" : "bg-orange-400 animate-pulse"}`} />
+
+                {/* Replay time */}
                 {replayTime && (
                   <span className="text-[10px] sm:text-[11px] text-orange-300 font-mono font-semibold">
                     {replayTime}
                   </span>
                 )}
+
+                {/* Progress bar (desktop) */}
+                <div className="hidden sm:flex items-center gap-1.5 min-w-0">
+                  <div className="w-20 lg:w-32 h-1.5 bg-neutral-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-orange-400 rounded-full transition-all duration-500"
+                      style={{ width: `${(replayProgress * 100).toFixed(1)}%` }}
+                    />
+                  </div>
+                  <span className="text-[9px] text-neutral-500 tabular-nums w-7 text-right">
+                    {(replayProgress * 100).toFixed(0)}%
+                  </span>
+                </div>
+
+                {/* Speed selector */}
+                <select
+                  value={replaySpeed}
+                  onChange={(e) => handleSpeedChange(Number(e.target.value))}
+                  className="bg-neutral-800 border border-border rounded px-1 py-0 text-[10px] sm:text-[11px] text-orange-300 font-mono cursor-pointer appearance-none text-center w-10"
+                >
+                  {[1, 2, 3, 5, 10, 20, 50, 100].map((s) => (
+                    <option key={s} value={s}>{s}x</option>
+                  ))}
+                </select>
+
+                {/* Pause/Resume */}
+                <button
+                  onClick={handlePauseResume}
+                  className="text-orange-400 hover:text-orange-300 transition-colors"
+                  title={replayPaused ? "Resume" : "Pause"}
+                >
+                  {replayPaused ? (
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M6.3 2.84A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.27l9.344-5.891a1.5 1.5 0 000-2.538L6.3 2.841z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.25 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z" />
+                    </svg>
+                  )}
+                </button>
+
+                {/* Stop */}
+                <button
+                  onClick={handleStop}
+                  className="text-red-500 hover:text-red-400 transition-colors"
+                  title="Stop"
+                >
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                    <rect x="4" y="4" width="12" height="12" rx="1.5" />
+                  </svg>
+                </button>
               </div>
             )}
           </div>
