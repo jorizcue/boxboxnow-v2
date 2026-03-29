@@ -255,3 +255,28 @@ class ReplayStatusOut(BaseModel):
     progress: float
     speed: float
     paused: bool
+
+
+# --- Kart Analytics ---
+
+class KartStatsOut(BaseModel):
+    kart_number: int
+    races: int
+    total_laps: int
+    valid_laps: int
+    avg_lap_ms: float
+    best5_avg_ms: float
+    best_lap_ms: int
+    teams: list[str]
+
+
+class RaceLogOut(BaseModel):
+    id: int
+    circuit_id: int
+    race_date: datetime
+    session_name: str
+    duration_min: int
+    total_karts: int
+    created_at: datetime | None = None
+
+    model_config = {"from_attributes": True}

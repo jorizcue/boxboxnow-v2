@@ -19,6 +19,7 @@ from app.api.admin_routes import router as admin_router
 from app.api.config_routes import router as config_router
 from app.api.race_routes import router as race_router
 from app.api.replay_routes import router as replay_router
+from app.api.analytics_routes import router as analytics_router
 from app.ws.server import router as ws_router
 
 logging.basicConfig(
@@ -81,6 +82,7 @@ app.include_router(admin_router)
 app.include_router(config_router)
 app.include_router(race_router)
 app.include_router(replay_router)
+app.include_router(analytics_router)
 app.include_router(ws_router)
 
 

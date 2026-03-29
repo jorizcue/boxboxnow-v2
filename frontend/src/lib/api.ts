@@ -168,4 +168,18 @@ export const api = {
     fetchApi<any>("/api/replay/seek", { method: "POST", body: JSON.stringify({ block }) }),
   setReplaySpeed: (speed: number) =>
     fetchApi<any>("/api/replay/speed", { method: "POST", body: JSON.stringify({ speed }) }),
+
+  // Analytics
+  getKartStats: (circuitId: number, dateFrom?: string, dateTo?: string) => {
+    const params = new URLSearchParams({ circuit_id: String(circuitId) });
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    return fetchApi<any[]>(`/api/analytics/kart-stats?${params}`);
+  },
+  getRaceLogs: (circuitId: number, dateFrom?: string, dateTo?: string) => {
+    const params = new URLSearchParams({ circuit_id: String(circuitId) });
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    return fetchApi<any[]>(`/api/analytics/race-logs?${params}`);
+  },
 };

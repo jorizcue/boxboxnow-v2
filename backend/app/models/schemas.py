@@ -124,6 +124,39 @@ class TeamDriver(Base):
     team_position = relationship("TeamPosition", back_populates="drivers")
 
 
+class RaceLog(Base):
+    """Historical record of a completed race at a circuit."""
+    __tablename__ = "race_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    circuit_id = Column(Integer, ForeignKey("circuits.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    race_date = Column(DateTime, nullable=False)
+    session_name = Column(String(200), default="")
+    duration_min = Column(Integer, default=0)
+    total_karts = Column(Integer, default=0)
+    created_at = Column(DateTime, server_default=func.now())
+
+    circuit = relationship("Circuit")
+    laps = relationship("KartLap", back_populates="race_log", cascade="all, delete-orphan")
+
+
+class KartLap(Base):
+    """Individual lap time for a kart in a historical race."""
+    __tablename__ = "kart_laps"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    race_log_id = Column(Integer, ForeignKey("race_logs.id", ondelete="CASCADE"), nullable=False, index=True)
+    kart_number = Column(Integer, nullable=False, index=True)
+    team_name = Column(String(100), default="")
+    driver_name = Column(String(100), default="")
+    lap_number = Column(Integer, nullable=False)
+    lap_time_ms = Column(Integer, nullable=False)
+    is_valid = Column(Boolean, default=True)
+
+    race_log = relationship("RaceLog", back_populates="laps")
+
+
 class DeviceSession(Base):
     """
     Tracks active device sessions per user (OTT-style concurrent device control).

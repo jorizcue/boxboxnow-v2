@@ -101,7 +101,13 @@ class UserSession:
         logger.info(f"User session started (user_id={self.user_id}, circuit={self.circuit_id})")
 
     async def stop(self):
-        """Stop all tasks."""
+        """Stop all tasks and save race data."""
+        # Save race laps before stopping
+        try:
+            await self.save_race_laps()
+        except Exception as e:
+            logger.error(f"Failed to save race laps on stop (user={self.user_id}): {e}")
+
         if self._analytics_task:
             self._analytics_task.cancel()
             try:
@@ -113,6 +119,53 @@ class UserSession:
         if self.api_client:
             await self.api_client.close()
         logger.info(f"User session stopped (user_id={self.user_id})")
+
+    async def save_race_laps(self):
+        """Save all kart laps to the database for historical analytics."""
+        from datetime import datetime, timezone
+        from app.models.database import async_session
+        from app.models.schemas import RaceLog, KartLap
+
+        # Only save if we have meaningful data
+        total_laps = sum(len(k.all_laps) for k in self.state.karts.values())
+        if total_laps < 10:
+            logger.info(f"Skipping race save: only {total_laps} laps (user={self.user_id})")
+            return
+
+        async with async_session() as db:
+            race_log = RaceLog(
+                circuit_id=self.circuit_id,
+                user_id=self.user_id,
+                race_date=datetime.now(timezone.utc),
+                session_name=f"Race {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                duration_min=self.state.duration_min,
+                total_karts=len(self.state.karts),
+            )
+            db.add(race_log)
+            await db.flush()  # Get race_log.id
+
+            # Collect valid lap times from valid_laps set for quick lookup
+            for kart in self.state.karts.values():
+                valid_lap_set = set()
+                for vl in kart.valid_laps:
+                    valid_lap_set.add((vl["totalLap"], vl["lapTime"]))
+
+                for lap in kart.all_laps:
+                    kart_lap = KartLap(
+                        race_log_id=race_log.id,
+                        kart_number=kart.kart_number,
+                        team_name=kart.team_name,
+                        driver_name=lap.get("driverName", ""),
+                        lap_number=lap["totalLap"],
+                        lap_time_ms=lap["lapTime"],
+                        is_valid=(lap["totalLap"], lap["lapTime"]) in valid_lap_set,
+                    )
+                    db.add(kart_lap)
+
+            await db.commit()
+            logger.info(f"Saved race log #{race_log.id}: {total_laps} laps, "
+                        f"{len(self.state.karts)} karts (user={self.user_id}, "
+                        f"circuit={self.circuit_id})")
 
     def configure(self, circuit_length_m: int, pit_time_s: int, laps_discard: int,
                   lap_differential: float, rain: bool, our_kart: int, min_pits: int,
