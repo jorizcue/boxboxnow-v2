@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useT, useLangStore, LANGUAGES } from "@/lib/i18n";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useRaceClock } from "@/hooks/useRaceClock";
+import { useReplayTime } from "@/hooks/useReplayTime";
 import { api } from "@/lib/api";
 import { SessionManager } from "@/components/auth/SessionManager";
 
@@ -27,7 +28,7 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   const replayPaused = useRaceStore((s) => s.replayPaused);
   const replayFilename = useRaceStore((s) => s.replayFilename);
   const replayProgress = useRaceStore((s) => s.replayProgress);
-  const replayTime = useRaceStore((s) => s.replayTime);
+  const replayTime = useReplayTime();
 
   // Use interpolated race clock that ticks every second
   const raceClockMs = useRaceClock();
