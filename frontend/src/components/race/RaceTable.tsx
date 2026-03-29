@@ -1,14 +1,23 @@
 "use client";
 
-import { useMemo } from "react";
+import { Fragment, useCallback, useState } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useRaceClock } from "@/hooks/useRaceClock";
 import { msToLapTime, secondsToStint, secondsToHMS, tierHex, formatDifferential } from "@/lib/formatters";
+import { getDriverInfoForKart, DriverDetailsRow } from "@/components/shared/DriverDetails";
 import clsx from "clsx";
 
+const COL_COUNT = 13; // number of <th> columns
+
 export function RaceTable() {
-  const { karts, config, classification } = useRaceStore();
+  const { karts, config } = useRaceStore();
   const raceClockMs = useRaceClock();
+  const [expandedKart, setExpandedKart] = useState<number | null>(null);
+
+  const toggleExpand = useCallback(
+    (kartNumber: number) => setExpandedKart((prev) => (prev === kartNumber ? null : kartNumber)),
+    []
+  );
 
   // Sort by avg lap time (fastest first), karts without avg go to the end
   const sorted = [...karts].sort((a, b) => {
@@ -30,18 +39,12 @@ export function RaceTable() {
     ? sorted.find((k) => k.kartNumber === config.ourKartNumber)
     : undefined;
 
-  // Compute stint duration for our kart (clock-based, ticks every second)
   const ourStintSec = ourKart ? stintSecondsFor(ourKart) : 0;
-
-  // Time until max stint
   const timeToMaxStint = Math.max(0, config.maxStintMin * 60 - ourStintSec);
-
-  // Laps until max stint
   const lapsToMaxStint = ourKart && ourKart.avgLapMs > 0
     ? Math.floor(timeToMaxStint / (ourKart.avgLapMs / 1000))
     : 0;
 
-  // Count karts near PIT (within 5 min of max stint)
   const kartsNearPit = sorted.filter((k) => {
     const stintMin = k.stintDurationS / 60;
     return stintMin >= config.maxStintMin - 5 && k.pitStatus !== "in_pit";
@@ -88,74 +91,96 @@ export function RaceTable() {
               const stintWarning = stintMin >= config.maxStintMin;
               const stintAlert = stintMin >= config.maxStintMin - 5 && stintMin < config.maxStintMin;
               const pitsRemaining = Math.max(0, config.minPits - kart.pitCount);
+              const isExpanded = expandedKart === kart.kartNumber;
+              const drivers = isExpanded
+                ? getDriverInfoForKart(kart, config.minDriverTimeMin)
+                : [];
 
               return (
-                <tr
-                  key={kart.rowId}
-                  className={clsx(
-                    "border-b border-border hover:bg-surface/50 transition-colors",
-                    isOurTeam && "our-team",
-                    kart.pitStatus === "in_pit" && "opacity-50"
-                  )}
-                >
-                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center font-mono text-neutral-500">{index + 1}</td>
-                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 font-mono text-neutral-300">{kart.kartNumber}</td>
-                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 font-medium truncate max-w-[100px] sm:max-w-[180px] text-white">
-                    {kart.teamName}
-                  </td>
-                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 truncate max-w-[80px] sm:max-w-[140px] text-neutral-400 text-xs">
-                    {kart.driverName || "-"}
-                  </td>
-                  <td className="px-2 py-1.5 text-right font-mono text-neutral-300">
-                    {kart.avgLapMs > 0 ? msToLapTime(Math.round(kart.avgLapMs)) : "-"}
-                  </td>
-                  <td className="px-2 py-1.5 text-right font-mono text-neutral-400">
-                    {kart.bestAvgMs > 0 ? msToLapTime(Math.round(kart.bestAvgMs)) : "-"}
-                  </td>
-                  <td className="px-2 py-1.5 text-right font-mono text-white">
-                    {msToLapTime(kart.lastLapMs)}
-                  </td>
-                  <td className="px-2 py-1.5 text-right font-mono text-accent">
-                    {msToLapTime(kart.bestLapMs)}
-                  </td>
-                  <td className="px-2 py-1.5 text-center text-neutral-300">{kart.totalLaps}</td>
-                  <td className="px-2 py-1.5 text-center">
-                    <span className={pitsRemaining > 0 ? "text-tier-25" : "text-neutral-300"}>
-                      {kart.pitCount}
-                    </span>
-                    {pitsRemaining > 0 && (
-                      <span className="text-xs text-neutral-700 ml-0.5">/{config.minPits}</span>
+                <Fragment key={kart.rowId}>
+                  <tr
+                    className={clsx(
+                      "border-b border-border hover:bg-surface/50 transition-colors cursor-pointer select-none",
+                      isOurTeam && "our-team",
+                      kart.pitStatus === "in_pit" && "opacity-50"
                     )}
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
-                    <span
-                      className="tier-badge"
-                      style={{ backgroundColor: tierHex(kart.tierScore) }}
-                    >
-                      {kart.tierScore}
-                    </span>
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
-                    <span
-                      className={clsx(
-                        "font-mono",
-                        stintWarning && "text-tier-1 font-bold animate-pulse",
-                        stintAlert && "text-tier-25"
+                    onDoubleClick={() => toggleExpand(kart.kartNumber)}
+                  >
+                    <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center font-mono text-neutral-500">{index + 1}</td>
+                    <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 font-mono text-neutral-300">{kart.kartNumber}</td>
+                    <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 font-medium truncate max-w-[100px] sm:max-w-[180px] text-white">
+                      {kart.teamName}
+                      {isExpanded ? (
+                        <span className="ml-1 text-neutral-500 text-xs">&#9650;</span>
+                      ) : (
+                        <span className="ml-1 text-neutral-600 text-xs">&#9660;</span>
                       )}
-                    >
-                      {secondsToStint(stintSec)}
-                    </span>
-                    <span className="text-xs text-neutral-700 ml-0.5">
-                      ({kart.stintLapsCount}v)
-                    </span>
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
-                    <span
-                      className={`pit-indicator ${kart.pitStatus}`}
-                      title={kart.pitStatus === "in_pit" ? "En boxes" : "En pista"}
-                    />
-                  </td>
-                </tr>
+                    </td>
+                    <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 truncate max-w-[80px] sm:max-w-[140px] text-neutral-400 text-xs">
+                      {kart.driverName || "-"}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono text-neutral-300">
+                      {kart.avgLapMs > 0 ? msToLapTime(Math.round(kart.avgLapMs)) : "-"}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono text-neutral-400">
+                      {kart.bestAvgMs > 0 ? msToLapTime(Math.round(kart.bestAvgMs)) : "-"}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono text-white">
+                      {msToLapTime(kart.lastLapMs)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono text-accent">
+                      {msToLapTime(kart.bestLapMs)}
+                    </td>
+                    <td className="px-2 py-1.5 text-center text-neutral-300">{kart.totalLaps}</td>
+                    <td className="px-2 py-1.5 text-center">
+                      <span className={pitsRemaining > 0 ? "text-tier-25" : "text-neutral-300"}>
+                        {kart.pitCount}
+                      </span>
+                      {pitsRemaining > 0 && (
+                        <span className="text-xs text-neutral-700 ml-0.5">/{config.minPits}</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      <span
+                        className="tier-badge"
+                        style={{ backgroundColor: tierHex(kart.tierScore) }}
+                      >
+                        {kart.tierScore}
+                      </span>
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      <span
+                        className={clsx(
+                          "font-mono",
+                          stintWarning && "text-tier-1 font-bold animate-pulse",
+                          stintAlert && "text-tier-25"
+                        )}
+                      >
+                        {secondsToStint(stintSec)}
+                      </span>
+                      <span className="text-xs text-neutral-700 ml-0.5">
+                        ({kart.stintLapsCount}v)
+                      </span>
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      <span
+                        className={`pit-indicator ${kart.pitStatus}`}
+                        title={kart.pitStatus === "in_pit" ? "En boxes" : "En pista"}
+                      />
+                    </td>
+                  </tr>
+
+                  {/* Expanded driver detail rows */}
+                  {isExpanded && drivers.length > 0 && (
+                    <tr className="border-b border-border">
+                      <DriverDetailsRow
+                        drivers={drivers}
+                        minDriverTimeMin={config.minDriverTimeMin}
+                        colSpan={COL_COUNT}
+                      />
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>
