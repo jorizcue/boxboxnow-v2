@@ -52,7 +52,8 @@ export function useRaceWebSocket() {
           } else if (msg.type === "analytics" && msg.data) {
             applyAnalytics(msg.data);
           } else if (msg.type === "replay_status" && msg.data) {
-            setReplayStatus(msg.data.active, msg.data.paused, undefined, msg.data.progress, msg.data.currentTime);
+            const rs = msg.data as any;
+            setReplayStatus(rs.active, rs.paused, undefined, rs.progress, rs.currentTime);
           } else if (msg.type === "teams_updated") {
             notifyTeamsUpdated();
           }
