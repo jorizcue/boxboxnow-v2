@@ -1,6 +1,6 @@
 """WebSocket server for browser clients.
 Authenticates via JWT token passed as query parameter.
-Routes to the user's RaceStateManager instance.
+Routes to the user's RaceStateManager instance (live or replay).
 """
 
 import json
@@ -17,6 +17,11 @@ router = APIRouter()
 async def race_websocket(websocket: WebSocket, token: str = Query("")):
     """WebSocket endpoint for real-time race updates.
     Connect with: ws://host/ws/race?token=<jwt>
+
+    Routing priority:
+    1. If user has an active live session (Apex connection) -> use that state
+    2. If user has an active replay session -> use that state
+    3. Otherwise -> use a blank replay state (so WS stays connected)
     """
     # Authenticate
     if not token:
@@ -32,15 +37,21 @@ async def race_websocket(websocket: WebSocket, token: str = Query("")):
 
     await websocket.accept()
 
-    # Get user's session from registry
+    # Get user's session from registries
     registry = websocket.app.state.registry
-    session = registry.get(user_id)
+    replay_registry = websocket.app.state.replay_registry
 
-    if not session:
-        # No active session - use replay state as fallback
-        state = websocket.app.state.replay_state
+    live_session = registry.get(user_id)
+    replay_session = replay_registry.get(user_id)
+
+    if live_session:
+        state = live_session.state
+    elif replay_session:
+        state = replay_session.state
     else:
-        state = session.state
+        # Create a replay session as fallback (empty state, ready for replay)
+        replay_session = replay_registry.get_or_create(user_id)
+        state = replay_session.state
 
     state.add_client(websocket)
 
@@ -55,7 +66,13 @@ async def race_websocket(websocket: WebSocket, token: str = Query("")):
             try:
                 msg = json.loads(data)
                 if msg.get("type") == "requestSnapshot":
-                    snapshot = state.get_snapshot()
+                    # Re-resolve state in case user switched between live/replay
+                    live_s = registry.get(user_id)
+                    replay_s = replay_registry.get(user_id)
+                    current_state = (live_s.state if live_s
+                                     else replay_s.state if replay_s
+                                     else state)
+                    snapshot = current_state.get_snapshot()
                     await websocket.send_text(json.dumps(snapshot))
             except json.JSONDecodeError:
                 pass

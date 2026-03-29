@@ -161,27 +161,13 @@ async def update_session(
         logger.info(f"Live reconfigured session for user {user.id} "
                     f"(boxLines={session.box_lines}, boxKarts={session.box_karts})")
 
-    # Also update replay_state so analytics broadcasts don't overwrite frontend config
-    replay_state = getattr(request.app.state, "replay_state", None)
-    if replay_state:
-        replay_state.our_kart_number = session.our_kart_number
-        replay_state.min_pits = session.min_pits
-        replay_state.max_stint_min = session.max_stint_min
-        replay_state.min_stint_min = session.min_stint_min
-        replay_state.box_lines = session.box_lines
-        replay_state.box_karts = session.box_karts
-        replay_state.duration_min = session.duration_min
-        replay_state.pit_time_s = session.pit_time_s
-        replay_state.circuit_length_m = c.length_m if c else replay_state.circuit_length_m
-        replay_state.min_driver_time_min = session.min_driver_time_min
-        # Update replay FIFO config only if box params changed (update_config resets queue)
-        replay_fifo = getattr(request.app.state, "replay_fifo", None)
-        if replay_fifo and (
-            replay_fifo.queue_size != session.box_karts
-            or replay_fifo.box_lines != session.box_lines
-        ):
-            replay_fifo.update_config(session.box_karts, session.box_lines)
-        logger.info(f"Replay state updated for user {user.id} config change")
+    # Also update user's replay session if active
+    replay_reg = getattr(request.app.state, "replay_registry", None)
+    if replay_reg:
+        replay_session = replay_reg.get(user.id)
+        if replay_session:
+            replay_session.update_config_fields(session, c)
+            logger.info(f"Replay state updated for user {user.id} config change")
 
     return await _reload_session(user.id, db)
 
@@ -268,11 +254,13 @@ async def replace_teams(
     if user_session:
         user_session.set_driver_differentials(driver_differentials, team_positions)
 
-    # Update replay differentials too
-    replay_diffs = getattr(request.app.state, "replay_differentials", None)
-    if replay_diffs is not None:
-        replay_diffs["team_positions"] = team_positions
-        replay_diffs["driver_differentials"] = driver_differentials
+    # Update user's replay session differentials too
+    replay_reg = getattr(request.app.state, "replay_registry", None)
+    if replay_reg:
+        replay_session = replay_reg.get(user.id)
+        if replay_session:
+            replay_session.differentials["team_positions"] = team_positions
+            replay_session.differentials["driver_differentials"] = driver_differentials
 
     logger.info(f"Updated in-memory differentials for user {user.id}: "
                 f"{sum(len(d) for d in driver_differentials.values())} drivers")

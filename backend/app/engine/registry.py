@@ -381,6 +381,231 @@ class UserSession:
                 logger.error(f"Analytics error (user={self.user_id}): {e}", exc_info=True)
 
 
+class ReplaySession:
+    """Per-user replay session with isolated state, engine, FIFO and analytics."""
+
+    def __init__(self, user_id: int):
+        self.user_id = user_id
+        self.parser = ApexMessageParser()
+        self.state = RaceStateManager()
+        self.fifo = FifoManager()
+        self.differentials: dict = {"team_positions": {}, "driver_differentials": {}}
+        self._analytics_task: asyncio.Task | None = None
+
+        from app.apex.replay import ReplayEngine
+
+        async def on_events(events):
+            # Broadcast replay status (time + progress) to clients
+            if self.state._ws_clients:
+                status = self.engine.status
+                if status.get("currentTime"):
+                    rs_msg = json.dumps({
+                        "type": "replay_status",
+                        "data": {
+                            "progress": status["progress"],
+                            "currentTime": status["currentTime"],
+                            "paused": status["paused"],
+                            "active": status["active"],
+                        },
+                    })
+                    dead = set()
+                    for client in self.state._ws_clients:
+                        try:
+                            await client.send_text(rs_msg)
+                        except Exception:
+                            dead.add(client)
+                    for c in dead:
+                        self.state._ws_clients.discard(c)
+
+            # Track pit transitions
+            pre_pit_status = {
+                row_id: kart.pit_status
+                for row_id, kart in self.state.karts.items()
+            }
+            await self.state.handle_events(events)
+
+            pit_in_karts = []
+            for row_id, kart in self.state.karts.items():
+                if (kart.pit_status == "in_pit"
+                        and pre_pit_status.get(row_id) != "in_pit"):
+                    pit_in_karts.append(kart)
+
+            if pit_in_karts:
+                try:
+                    compute_clustering(
+                        self.state,
+                        self.differentials["team_positions"],
+                        self.differentials["driver_differentials"],
+                    )
+                except Exception as e:
+                    logger.warning(f"Replay clustering before FIFO entry failed: {e}")
+
+                for kart in pit_in_karts:
+                    self.fifo.add_entry(
+                        kart.tier_score,
+                        kart_number=kart.kart_number,
+                        team_name=kart.team_name,
+                        driver_name=kart.driver_name,
+                    )
+
+                self.fifo.apply_to_state(self.state)
+                await self._broadcast_fifo()
+
+        self.engine = ReplayEngine(self.parser, on_events, logs_dir="data/logs")
+
+    async def start_analytics(self):
+        """Start the analytics loop for this replay session."""
+        if self._analytics_task and not self._analytics_task.done():
+            return
+        self._analytics_task = asyncio.create_task(self._analytics_loop())
+
+    async def stop(self):
+        """Stop engine and analytics."""
+        await self.engine.stop()
+        if self._analytics_task:
+            self._analytics_task.cancel()
+            try:
+                await self._analytics_task
+            except asyncio.CancelledError:
+                pass
+        # Broadcast reset so clients see stopped state
+        self.state.reset()
+        await self.state._broadcast(self.state.get_snapshot())
+        logger.info(f"Replay session stopped (user_id={self.user_id})")
+
+    def apply_config(self, session, circuit=None):
+        """Apply race session config from DB model."""
+        self.state.box_karts = session.box_karts or 30
+        self.state.box_lines = session.box_lines or 2
+        self.state.our_kart_number = session.our_kart_number or 0
+        self.state.duration_min = session.duration_min or 180
+        self.state.max_stint_min = session.max_stint_min or 40
+        self.state.min_stint_min = session.min_stint_min or 15
+        self.state.min_pits = session.min_pits or 3
+        self.state.pit_time_s = session.pit_time_s or 120
+        self.state.min_driver_time_min = session.min_driver_time_min or 30
+        if circuit:
+            self.state.circuit_length_m = circuit.length_m or 1100
+            self.state.laps_discard = circuit.laps_discard or 2
+            self.state.lap_differential = circuit.lap_differential or 3000
+
+    def update_config_fields(self, session, circuit=None):
+        """Update config fields without full reset (for live config changes)."""
+        self.state.our_kart_number = session.our_kart_number
+        self.state.min_pits = session.min_pits
+        self.state.max_stint_min = session.max_stint_min
+        self.state.min_stint_min = session.min_stint_min
+        self.state.box_lines = session.box_lines
+        self.state.box_karts = session.box_karts
+        self.state.duration_min = session.duration_min
+        self.state.pit_time_s = session.pit_time_s
+        self.state.min_driver_time_min = session.min_driver_time_min
+        if circuit:
+            self.state.circuit_length_m = circuit.length_m or self.state.circuit_length_m
+        if (self.fifo.queue_size != session.box_karts
+                or self.fifo.box_lines != session.box_lines):
+            self.fifo.update_config(session.box_karts, session.box_lines)
+
+    async def _broadcast_fifo(self):
+        if not self.state._ws_clients:
+            return
+        msg = json.dumps({
+            "type": "fifo_update",
+            "data": {
+                "fifo": {
+                    "queue": self.state.fifo_queue,
+                    "score": self.state.fifo_score,
+                    "history": self.state.fifo_history[-10:],
+                },
+            },
+        })
+        dead = set()
+        for client in self.state._ws_clients:
+            try:
+                await client.send_text(msg)
+            except Exception:
+                dead.add(client)
+        for c in dead:
+            self.state._ws_clients.discard(c)
+
+    async def _analytics_loop(self):
+        while True:
+            await asyncio.sleep(10)
+            try:
+                if len(self.state.karts) > 0:
+                    compute_clustering(
+                        self.state,
+                        self.differentials["team_positions"],
+                        self.differentials["driver_differentials"],
+                    )
+                    self.fifo.apply_to_state(self.state)
+                    compute_classification(self.state)
+
+                    if self.state._ws_clients:
+                        update = {
+                            "type": "analytics",
+                            "data": {
+                                "karts": [k.to_dict() for k in sorted(
+                                    self.state.karts.values(), key=lambda k: k.position or 999
+                                )],
+                                "fifo": {
+                                    "queue": self.state.fifo_queue,
+                                    "score": self.state.fifo_score,
+                                    "history": self.state.fifo_history[-10:],
+                                },
+                                "classification": self.state.classification,
+                                "config": {
+                                    "circuitLengthM": self.state.circuit_length_m,
+                                    "pitTimeS": self.state.pit_time_s,
+                                    "ourKartNumber": self.state.our_kart_number,
+                                    "minPits": self.state.min_pits,
+                                    "maxStintMin": self.state.max_stint_min,
+                                    "minStintMin": self.state.min_stint_min,
+                                    "durationMin": self.state.duration_min,
+                                    "boxLines": self.state.box_lines,
+                                    "boxKarts": self.state.box_karts,
+                                    "minDriverTimeMin": self.state.min_driver_time_min,
+                                },
+                            },
+                        }
+                        data = json.dumps(update)
+                        dead = set()
+                        for client in self.state._ws_clients:
+                            try:
+                                await client.send_text(data)
+                            except Exception:
+                                dead.add(client)
+                        for c in dead:
+                            self.state._ws_clients.discard(c)
+            except Exception as e:
+                logger.error(f"Replay analytics error (user={self.user_id}): {e}", exc_info=True)
+
+
+class ReplayRegistry:
+    """Registry of per-user replay sessions."""
+
+    def __init__(self):
+        self._sessions: dict[int, ReplaySession] = {}
+
+    def get(self, user_id: int) -> ReplaySession | None:
+        return self._sessions.get(user_id)
+
+    def get_or_create(self, user_id: int) -> ReplaySession:
+        if user_id not in self._sessions:
+            self._sessions[user_id] = ReplaySession(user_id)
+        return self._sessions[user_id]
+
+    async def stop_session(self, user_id: int):
+        session = self._sessions.pop(user_id, None)
+        if session:
+            await session.stop()
+
+    async def stop_all(self):
+        for session in self._sessions.values():
+            await session.stop()
+        self._sessions.clear()
+
+
 class SessionRegistry:
     """Registry of active user sessions."""
 
