@@ -184,6 +184,7 @@ async def list_teams(user: User = Depends(get_current_user), db: AsyncSession = 
 @router.put("/teams", response_model=list[TeamPositionOut])
 async def replace_teams(
     teams: list[TeamPositionCreate],
+    request: Request,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -214,6 +215,24 @@ async def replace_teams(
         new_teams.append(team)
 
     await db.commit()
+
+    # Update in-memory differentials on the active UserSession so clustering
+    # picks up changes immediately without requiring an Apex reconnect.
+    registry = request.app.state.registry
+    user_session = registry.get(user.id)
+    if user_session:
+        team_positions = {}
+        driver_differentials = {}
+        for t in teams:
+            team_positions[t.kart] = t.position
+            if t.drivers:
+                driver_differentials[t.kart] = {
+                    d.driver_name.strip().lower(): d.differential_ms
+                    for d in t.drivers
+                }
+        user_session.set_driver_differentials(driver_differentials, team_positions)
+        logger.info(f"Updated in-memory differentials for user {user.id}: "
+                    f"{sum(len(d) for d in driver_differentials.values())} drivers")
 
     # Re-query with eager loading to avoid lazy load errors on serialization
     result = await db.execute(
