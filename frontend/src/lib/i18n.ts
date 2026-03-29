@@ -129,6 +129,7 @@ const translations: Record<string, Record<Language, string>> = {
   "adjusted.title": { es: "Clasificacion Ajustada", en: "Adjusted Classification", it: "Classifica Corretta", de: "Bereinigte Klassifizierung" },
   "adjusted.missingPits": { es: "Pits pend.", en: "Missing pits", it: "Pit manc.", de: "Fehl. Pits" },
   "adjusted.adjustedLaps": { es: "Vlt. Ajust.", en: "Adj. Laps", it: "Giri Corr.", de: "Ber. Runden" },
+  "adjusted.adjustedDist": { es: "Dist. Ajust.", en: "Adj. Dist.", it: "Dist. Corr.", de: "Ber. Dist." },
   "adjusted.noData": { es: "Sin datos de carrera", en: "No race data", it: "Nessun dato di gara", de: "Keine Renndaten" },
   "adjusted.explanation": { es: "Clasificacion ajustada igualando paradas a {maxPits} pits (equipo con mas paradas)", en: "Classification adjusted equalizing stops to {maxPits} pits (team with most stops)", it: "Classifica corretta equalizzando le soste a {maxPits} pit (squadra con piu soste)", de: "Klassifizierung bereinigt auf {maxPits} Pits (Team mit den meisten Stopps)" },
   "adjusted.gapMeters": { es: "Dif. (m)", en: "Gap (m)", it: "Diff. (m)", de: "Abst. (m)" },

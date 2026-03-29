@@ -6,19 +6,32 @@ import { msToLapTime, tierHex } from "@/lib/formatters";
 import { useT } from "@/lib/i18n";
 import clsx from "clsx";
 
+/**
+ * Clasificación Real — distance-based calculation (inspired by Prepro/boxboxnow.py)
+ *
+ * Algorithm:
+ * 1. For each kart, compute average speed (m/s) from avgLapMs and circuit length.
+ * 2. Total distance = (completedLaps × circuitLength) + metersExtra
+ *    where metersExtra = speed × secondsSinceLastLapCrossing (interpolated position).
+ * 3. Pit penalty = missedPits × speed × pitTimeS  (distance NOT covered while in pit).
+ * 4. Adjusted distance = totalDistance − pitPenalty
+ * 5. Gap (to leader) in seconds = (leaderDist − kartDist) / kartSpeed
+ * 6. Interval (to kart ahead) in seconds = (aheadDist − kartDist) / kartSpeed
+ * 7. Gap/Interval in meters = gap/int seconds × kartSpeed
+ */
 export function AdjustedClassification() {
   const t = useT();
   const { karts, config } = useRaceStore();
   const [now, setNow] = useState(() => Date.now() / 1000);
 
-  // Tick every second for fractional lap updates
+  // Tick every second for fractional distance updates
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now() / 1000), 1000);
     return () => clearInterval(interval);
   }, []);
 
   const circuitLengthM = config.circuitLengthM || 1100;
-  const pitTimeMs = config.pitTimeS * 1000;
+  const pitTimeS = config.pitTimeS || 0;
 
   const adjusted = useMemo(() => {
     if (karts.length === 0) return [];
@@ -28,34 +41,45 @@ export function AdjustedClassification() {
     return karts
       .filter((k) => k.totalLaps > 0)
       .map((kart) => {
-        // Calculate fractional laps based on time since last lap crossing
-        let fraction = 0;
-        if (kart.pitStatus === "racing" && kart.avgLapMs > 0 && kart.stintStartTime > 0) {
-          const wallTimeSinceStintMs = Math.max(0, (now - kart.stintStartTime) * 1000);
-          const timeSinceLastLapMs = wallTimeSinceStintMs - kart.stintElapsedMs;
-          if (timeSinceLastLapMs > 0) {
-            fraction = Math.min(timeSinceLastLapMs / kart.avgLapMs, 0.99);
+        // Average speed in m/s from avgLapMs and circuit length
+        const speedMs = kart.avgLapMs > 0 ? circuitLengthM / (kart.avgLapMs / 1000) : 0;
+
+        // Base distance: completed laps × circuit length
+        const baseDistanceM = kart.totalLaps * circuitLengthM;
+
+        // Meters extra: interpolated position beyond last completed lap
+        let metersExtra = 0;
+        if (kart.pitStatus === "racing" && speedMs > 0 && kart.stintStartTime > 0) {
+          const wallTimeSinceStintS = Math.max(0, now - kart.stintStartTime);
+          const stintElapsedS = kart.stintElapsedMs / 1000;
+          const secondsSinceLastCrossing = wallTimeSinceStintS - stintElapsedS;
+          if (secondsSinceLastCrossing > 0) {
+            // Cap at one full lap worth of distance
+            metersExtra = Math.min(secondsSinceLastCrossing * speedMs, circuitLengthM * 0.99);
           }
         }
 
-        const currentLaps = kart.totalLaps + Math.max(0, fraction);
+        const totalDistanceM = baseDistanceM + metersExtra;
 
-        // Pit penalty
+        // Pit penalty: distance not covered while in pit for missing stops
         const missingPits = Math.max(0, maxPits - kart.pitCount);
-        const penaltyLaps = kart.avgLapMs > 0 ? (missingPits * pitTimeMs) / kart.avgLapMs : 0;
-        const adjustedLaps = currentLaps - penaltyLaps;
+        const pitPenaltyM = missingPits * speedMs * pitTimeS;
+
+        const adjustedDistanceM = totalDistanceM - pitPenaltyM;
 
         return {
           ...kart,
-          currentLaps,
+          speedMs,
+          totalDistanceM,
+          metersExtra,
           missingPits,
-          penaltyLaps,
-          adjustedLaps,
+          pitPenaltyM,
+          adjustedDistanceM,
           maxPits,
         };
       })
-      .sort((a, b) => b.adjustedLaps - a.adjustedLaps);
-  }, [karts, now, pitTimeMs]);
+      .sort((a, b) => b.adjustedDistanceM - a.adjustedDistanceM);
+  }, [karts, now, circuitLengthM, pitTimeS]);
 
   if (karts.length === 0 || adjusted.length === 0) {
     return (
@@ -91,7 +115,7 @@ export function AdjustedClassification() {
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">{t("race.driver")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">{t("race.pit")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">{t("adjusted.missingPits")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right font-semibold text-accent">{t("adjusted.adjustedLaps")}</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right font-semibold text-accent">{t("adjusted.adjustedDist")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("adjusted.gapMeters")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("adjusted.gapSeconds")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("adjusted.intMeters")}</th>
@@ -104,16 +128,17 @@ export function AdjustedClassification() {
             {adjusted.map((kart, index) => {
               const isOurTeam = config.ourKartNumber > 0 && kart.kartNumber === config.ourKartNumber;
 
-              // Gap to leader
-              const gapLaps = leader.adjustedLaps - kart.adjustedLaps;
-              const gapMeters = Math.round(gapLaps * circuitLengthM);
-              const gapSeconds = kart.avgLapMs > 0 ? (gapLaps * kart.avgLapMs) / 1000 : 0;
+              // Gap to leader (seconds) = distance diff / this kart's speed
+              const gapM = leader.adjustedDistanceM - kart.adjustedDistanceM;
+              const gapS = kart.speedMs > 0 ? gapM / kart.speedMs : 0;
 
               // Interval to kart immediately ahead
               const kartAhead = index > 0 ? adjusted[index - 1] : null;
-              const intLaps = kartAhead ? kartAhead.adjustedLaps - kart.adjustedLaps : 0;
-              const intMeters = Math.round(intLaps * circuitLengthM);
-              const intSeconds = kart.avgLapMs > 0 ? (intLaps * kart.avgLapMs) / 1000 : 0;
+              const intM = kartAhead ? kartAhead.adjustedDistanceM - kart.adjustedDistanceM : 0;
+              const intS = kart.speedMs > 0 ? intM / kart.speedMs : 0;
+
+              // Adjusted laps (for display) = adjustedDistance / circuitLength
+              const adjustedLaps = kart.adjustedDistanceM / circuitLengthM;
 
               return (
                 <tr
@@ -137,34 +162,34 @@ export function AdjustedClassification() {
                     )}
                   </td>
                   <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-right font-mono font-bold text-accent">
-                    {kart.adjustedLaps.toFixed(2)}
+                    {adjustedLaps.toFixed(2)}
                   </td>
                   <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-right font-mono text-xs">
                     {index === 0 ? (
                       <span className="text-neutral-500">-</span>
                     ) : (
-                      <span className="text-red-400">{gapMeters.toLocaleString()}m</span>
+                      <span className="text-red-400">{Math.round(gapM).toLocaleString()}m</span>
                     )}
                   </td>
                   <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-right font-mono text-xs">
                     {index === 0 ? (
                       <span className="text-neutral-500">-</span>
                     ) : (
-                      <span className="text-red-400">{gapSeconds.toFixed(1)}s</span>
+                      <span className="text-red-400">{gapS.toFixed(1)}s</span>
                     )}
                   </td>
                   <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-right font-mono text-xs">
                     {index === 0 ? (
                       <span className="text-neutral-500">-</span>
                     ) : (
-                      <span className="text-yellow-400">{intMeters.toLocaleString()}m</span>
+                      <span className="text-yellow-400">{Math.round(intM).toLocaleString()}m</span>
                     )}
                   </td>
                   <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-right font-mono text-xs">
                     {index === 0 ? (
                       <span className="text-neutral-500">-</span>
                     ) : (
-                      <span className="text-yellow-400">{intSeconds.toFixed(1)}s</span>
+                      <span className="text-yellow-400">{intS.toFixed(1)}s</span>
                     )}
                   </td>
                   <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-right font-mono text-neutral-300">
