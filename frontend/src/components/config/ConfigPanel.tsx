@@ -40,13 +40,16 @@ let _replaySelectedCircuitDir: string | null = null;
 let _replaySpeed = 10;
 
 export function ConfigPanel() {
+  const { user } = useAuth();
+  const isAdmin = user?.is_admin ?? false;
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RaceSessionEditor />
         <div className="space-y-6">
           <CircuitHubStatus />
-          <ReplayControls />
+          {isAdmin && <ReplayControls />}
         </div>
       </div>
       <TeamEditor />
