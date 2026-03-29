@@ -132,7 +132,7 @@ class UserSession:
         self.state.min_driver_time_min = min_driver_time_min
         self.state.box_lines = box_lines
         self.state.box_karts = box_karts
-        self.state.duration_min = duration_min
+        self.state.update_duration(duration_min)
         self._refresh_s = refresh_s
         self.fifo.update_config(box_karts, box_lines)
 
@@ -478,7 +478,7 @@ class ReplaySession:
         self.state.min_stint_min = session.min_stint_min
         self.state.box_lines = session.box_lines
         self.state.box_karts = session.box_karts
-        self.state.duration_min = session.duration_min
+        self.state.update_duration(session.duration_min)
         self.state.pit_time_s = session.pit_time_s
         self.state.min_driver_time_min = session.min_driver_time_min
         if circuit:

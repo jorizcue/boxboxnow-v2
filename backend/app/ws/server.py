@@ -2,16 +2,33 @@
 Authenticates via JWT token passed as query parameter.
 Routes to the user's RaceStateManager instance (live or replay).
 Auto-starts monitoring via CircuitHub if user has an active session.
+
+Security:
+- JWT token required as query parameter
+- Device session validated against DB (killed sessions are rejected)
+- Token expiration enforced
 """
 
 import json
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from sqlalchemy import select
 from app.api.auth_routes import decode_token
+from app.models.database import async_session
+from app.models.schemas import DeviceSession
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+async def _validate_session_token(session_token: str) -> bool:
+    """Check that the device session hasn't been killed."""
+    async with async_session() as db:
+        result = await db.execute(
+            select(DeviceSession.id).where(DeviceSession.session_token == session_token)
+        )
+        return result.scalar_one_or_none() is not None
 
 
 def _resolve_state(registry, replay_registry, user_id):
@@ -54,8 +71,18 @@ async def race_websocket(websocket: WebSocket, token: str = Query("")):
     try:
         payload = decode_token(token)
         user_id = payload.get("sub")
+        session_token = payload.get("sid")
     except Exception:
         await websocket.close(code=4001, reason="Invalid token")
+        return
+
+    if not user_id or not session_token:
+        await websocket.close(code=4001, reason="Invalid token payload")
+        return
+
+    # Verify device session is still active (not killed by admin or user)
+    if not await _validate_session_token(session_token):
+        await websocket.close(code=4001, reason="Session terminated")
         return
 
     await websocket.accept()

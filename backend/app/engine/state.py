@@ -176,6 +176,36 @@ class RaceStateManager:
         self._first_countdown_ms = 0
         self._needs_snapshot = False
 
+    def update_duration(self, new_duration_min: int):
+        """Update duration_min and recalculate stint_start_countdown_ms
+        for karts in their first stint (pit_count == 0).
+
+        This is needed when the user corrects the race duration mid-race,
+        especially after a reconnection where stint starts were estimated
+        from the old duration_min.
+        """
+        old_duration_min = self.duration_min
+        self.duration_min = new_duration_min
+
+        if not self.race_started or old_duration_min == new_duration_min:
+            return
+
+        old_race_start_ms = old_duration_min * 60 * 1000
+        new_race_start_ms = new_duration_min * 60 * 1000
+
+        updated = 0
+        for kart in self.karts.values():
+            if kart.pit_count == 0 and kart.stint_start_countdown_ms > 0:
+                # Only adjust karts whose stint_start was calculated from duration
+                # (reconnection case). In fresh start, stint_start == _first_countdown_ms.
+                if kart.stint_start_countdown_ms == old_race_start_ms:
+                    kart.stint_start_countdown_ms = new_race_start_ms
+                    updated += 1
+
+        if updated:
+            logger.info(f"Duration changed {old_duration_min}->{new_duration_min}min, "
+                        f"updated stint_start for {updated} first-stint karts")
+
     def add_client(self, ws):
         self._ws_clients.add(ws)
         logger.info(f"Client connected. Total: {len(self._ws_clients)}")
