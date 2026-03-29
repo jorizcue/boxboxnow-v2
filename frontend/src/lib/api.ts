@@ -94,6 +94,8 @@ export const api = {
     fetchApi<any>("/api/admin/circuits", { method: "POST", body: JSON.stringify(data) }),
   updateCircuit: (id: number, data: any) =>
     fetchApi<any>(`/api/admin/circuits/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteCircuit: (id: number) =>
+    fetchApi<any>(`/api/admin/circuits/${id}`, { method: "DELETE" }),
 
   getUserAccess: (userId: number) => fetchApi<any[]>(`/api/admin/access/user/${userId}`),
   grantAccess: (data: any) =>

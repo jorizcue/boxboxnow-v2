@@ -14,8 +14,12 @@ interface CircuitRow {
   id: number;
   name: string;
   length_m: number | null;
-  ws_port: number;
   pit_time_s: number | null;
+  ws_port: number;
+  php_api_port: number;
+  laps_discard: number;
+  lap_differential: number;
+  php_api_url: string | null;
 }
 
 interface AccessRow {
@@ -227,38 +231,208 @@ function UsersManager() {
   );
 }
 
+interface CircuitForm {
+  name: string;
+  length_m: string;
+  pit_time_s: string;
+  ws_port: string;
+  php_api_port: string;
+  laps_discard: string;
+  lap_differential: string;
+  php_api_url: string;
+}
+
+const emptyForm: CircuitForm = {
+  name: "",
+  length_m: "",
+  pit_time_s: "",
+  ws_port: "",
+  php_api_port: "0",
+  laps_discard: "2",
+  lap_differential: "3000",
+  php_api_url: "",
+};
+
+function circuitToForm(c: CircuitRow): CircuitForm {
+  return {
+    name: c.name,
+    length_m: c.length_m?.toString() ?? "",
+    pit_time_s: c.pit_time_s?.toString() ?? "",
+    ws_port: c.ws_port.toString(),
+    php_api_port: c.php_api_port.toString(),
+    laps_discard: c.laps_discard.toString(),
+    lap_differential: c.lap_differential.toString(),
+    php_api_url: c.php_api_url ?? "",
+  };
+}
+
+function formToPayload(f: CircuitForm) {
+  return {
+    name: f.name,
+    length_m: f.length_m ? Number(f.length_m) : null,
+    pit_time_s: f.pit_time_s ? Number(f.pit_time_s) : null,
+    ws_port: Number(f.ws_port),
+    php_api_port: Number(f.php_api_port) || 0,
+    laps_discard: Number(f.laps_discard) || 2,
+    lap_differential: Number(f.lap_differential) || 3000,
+    php_api_url: f.php_api_url || null,
+  };
+}
+
 function CircuitsManager() {
   const [circuits, setCircuits] = useState<CircuitRow[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState<CircuitForm>(emptyForm);
 
   useEffect(() => {
-    api.getAllCircuits().then(setCircuits).catch(() => {});
+    loadCircuits();
   }, []);
+
+  const loadCircuits = async () => {
+    try { setCircuits(await api.getAllCircuits()); } catch {}
+  };
+
+  const startEdit = (c: CircuitRow) => {
+    setEditingId(c.id);
+    setForm(circuitToForm(c));
+    setShowCreate(false);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setShowCreate(false);
+    setForm(emptyForm);
+  };
+
+  const startCreate = () => {
+    setShowCreate(true);
+    setEditingId(null);
+    setForm(emptyForm);
+  };
+
+  const saveCircuit = async () => {
+    if (!form.name || !form.ws_port) return;
+    try {
+      if (editingId) {
+        await api.updateCircuit(editingId, formToPayload(form));
+      } else {
+        await api.createCircuit(formToPayload(form));
+      }
+      cancelEdit();
+      loadCircuits();
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const deleteCircuit = async (id: number) => {
+    if (!confirm("Eliminar circuito? Se perderán los accesos asociados.")) return;
+    try {
+      await api.deleteCircuit(id);
+      loadCircuits();
+      if (editingId === id) cancelEdit();
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const setField = (key: keyof CircuitForm, value: string) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
+
+  const fieldInput = (label: string, key: keyof CircuitForm, type: string = "text", placeholder?: string) => (
+    <div className="flex flex-col gap-1">
+      <label className="text-[10px] text-neutral-500 uppercase tracking-wider">{label}</label>
+      <input
+        type={type}
+        value={form[key]}
+        onChange={(e) => setField(key, e.target.value)}
+        placeholder={placeholder}
+        className="bg-black border border-border rounded-lg px-2 py-1.5 text-sm w-full"
+      />
+    </div>
+  );
 
   return (
     <div className="bg-surface rounded-xl p-4 border border-border">
-      <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">Catalogo de Circuitos</h3>
-      <table className="w-full text-sm">
-        <thead className="text-[11px] text-neutral-400 uppercase tracking-wider">
-          <tr>
-            <th className="text-left px-2 py-1">ID</th>
-            <th className="text-left px-2 py-1">Nombre</th>
-            <th className="text-right px-2 py-1">Longitud</th>
-            <th className="text-right px-2 py-1">WS Port</th>
-            <th className="text-right px-2 py-1">Pit (s)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {circuits.map((c) => (
-            <tr key={c.id} className="border-t border-border">
-              <td className="px-2 py-1.5 text-neutral-400">{c.id}</td>
-              <td className="px-2 py-1.5 font-medium text-white">{c.name}</td>
-              <td className="px-2 py-1.5 text-right text-neutral-400">{c.length_m ? `${c.length_m}m` : "-"}</td>
-              <td className="px-2 py-1.5 text-right font-mono text-neutral-400">{c.ws_port}</td>
-              <td className="px-2 py-1.5 text-right text-neutral-400">{c.pit_time_s || "-"}</td>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">Catálogo de Circuitos</h3>
+        {!showCreate && !editingId && (
+          <button onClick={startCreate} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-sm">
+            Nuevo circuito
+          </button>
+        )}
+      </div>
+
+      {/* Create / Edit form */}
+      {(showCreate || editingId) && (
+        <div className="mb-4 p-3 bg-black rounded-lg border border-border space-y-3">
+          <h4 className="text-xs text-neutral-300 font-medium">
+            {editingId ? "Editar circuito" : "Nuevo circuito"}
+          </h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {fieldInput("Nombre", "name", "text", "Nombre del circuito")}
+            {fieldInput("WS Port", "ws_port", "number", "Puerto WebSocket")}
+            {fieldInput("PHP API Port", "php_api_port", "number", "Puerto PHP API")}
+            {fieldInput("PHP API URL", "php_api_url", "text", "http://...")}
+            {fieldInput("Longitud (m)", "length_m", "number", "Metros")}
+            {fieldInput("Pit Time (s)", "pit_time_s", "number", "Segundos")}
+            {fieldInput("Vueltas descarte", "laps_discard", "number", "2")}
+            {fieldInput("Diferencial (ms)", "lap_differential", "number", "3000")}
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button onClick={saveCircuit} className="bg-accent text-black font-semibold px-4 py-1.5 rounded-lg text-sm">
+              {editingId ? "Guardar" : "Crear"}
+            </button>
+            <button onClick={cancelEdit} className="bg-surface text-neutral-200 px-4 py-1.5 rounded-lg text-sm border border-border hover:text-white transition-colors">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-[11px] text-neutral-400 uppercase tracking-wider">
+            <tr>
+              <th className="text-left px-2 py-1">Nombre</th>
+              <th className="text-right px-2 py-1">Longitud</th>
+              <th className="text-right px-2 py-1">Pit (s)</th>
+              <th className="text-right px-2 py-1">WS</th>
+              <th className="text-right px-2 py-1">PHP</th>
+              <th className="text-right px-2 py-1">Desc.</th>
+              <th className="text-right px-2 py-1">Dif.</th>
+              <th className="text-left px-2 py-1">API URL</th>
+              <th className="text-right px-2 py-1"></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {circuits.map((c) => (
+              <tr
+                key={c.id}
+                className={`border-t border-border cursor-pointer hover:bg-black/50 transition-colors ${editingId === c.id ? "bg-black" : ""}`}
+                onClick={() => startEdit(c)}
+              >
+                <td className="px-2 py-1.5 font-medium text-white">{c.name}</td>
+                <td className="px-2 py-1.5 text-right text-neutral-400">{c.length_m ? `${c.length_m}m` : "-"}</td>
+                <td className="px-2 py-1.5 text-right text-neutral-400">{c.pit_time_s ?? "-"}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-neutral-400">{c.ws_port}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-neutral-400">{c.php_api_port || "-"}</td>
+                <td className="px-2 py-1.5 text-right text-neutral-400">{c.laps_discard}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-neutral-400">{c.lap_differential}</td>
+                <td className="px-2 py-1.5 text-neutral-500 text-xs truncate max-w-[200px]">{c.php_api_url || "-"}</td>
+                <td className="px-2 py-1.5 text-right">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteCircuit(c.id); }}
+                    className="text-red-400/60 hover:text-red-400 text-xs transition-colors"
+                  >
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {circuits.length === 0 && (
+              <tr><td colSpan={9} className="px-2 py-4 text-center text-neutral-700">No hay circuitos</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

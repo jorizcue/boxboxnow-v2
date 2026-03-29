@@ -35,12 +35,14 @@ class FifoManager:
         self._history: list[dict] = []
 
     def update_config(self, queue_size: int, box_lines: int):
-        if queue_size != self.queue_size:
-            self.queue_size = queue_size
-            self.fifo = deque(
-                [_default_entry() for _ in range(queue_size)], maxlen=queue_size
-            )
+        """Reinitialize the FIFO queue and clear history.
+        Always resets — needed when replaying the same config twice."""
+        self.queue_size = queue_size
+        self.fifo = deque(
+            [_default_entry() for _ in range(queue_size)], maxlen=queue_size
+        )
         self.box_lines = box_lines
+        self._history.clear()
 
     def add_entry(self, tier_score: int, kart_number: int = 0,
                   team_name: str = "", driver_name: str = ""):
