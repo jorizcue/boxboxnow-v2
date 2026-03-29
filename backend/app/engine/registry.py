@@ -526,6 +526,7 @@ class ReplaySession:
                             "currentTime": status["currentTime"],
                             "paused": status["paused"],
                             "active": status["active"],
+                            "speed": status.get("speed", 1),
                         },
                     })
                     dead = set()

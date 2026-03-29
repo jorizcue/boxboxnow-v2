@@ -397,8 +397,10 @@ class ApexMessageParser:
 
         # Lap time updates (tn=normal, ti=improvement, tb=best, to=other)
         if action in LAP_CLASSES:
-            # Skip sector columns — they are NOT laps
-            if semantic in IGNORED_SEMANTICS:
+            # Skip sector and total_laps columns — they are NOT lap time events.
+            # Some circuits (e.g. Santos) send lap times with LAP_CLASS actions
+            # on the "Vueltas" column (total_laps), which would create phantom laps.
+            if semantic in IGNORED_SEMANTICS or semantic == "total_laps":
                 return []
             # Determine if this is last_lap or best_lap column
             if semantic == "best_lap":

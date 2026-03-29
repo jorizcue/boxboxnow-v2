@@ -112,7 +112,7 @@ export function useRaceWebSocket(options?: WsOptions) {
             ch?.postMessage({ type: "analytics", data: msg.data });
           } else if (msg.type === "replay_status" && msg.data) {
             const rs = msg.data as any;
-            setReplayStatus(rs.active, rs.paused, undefined, rs.progress, rs.currentTime);
+            setReplayStatus(rs.active, rs.paused, undefined, rs.progress, rs.currentTime, rs.speed);
           } else if (msg.type === "teams_updated") {
             notifyTeamsUpdated();
           }

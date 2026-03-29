@@ -290,7 +290,10 @@ class RaceStateManager:
             # Lap counting from cell update (exact port of original websocket_Secuencial.py)
             # Only cell updates on the llp column count as new laps.
             lap_ms = time_to_ms(event.value)
-            if lap_ms > 0 and kart:
+            # Minimum lap time filter: some circuits (Santos) briefly show the
+            # lap NUMBER in the llp column (e.g. "1" → 1000ms) before the real
+            # time. No karting lap is under 15 seconds.
+            if lap_ms > 15000 and kart:
                 # Skip CSS class repaints: Apex resends the same lap time with a
                 # different class (e.g. tb→ti) which is NOT a new lap. Two consecutive
                 # laps with identical ms is impossible in karting.

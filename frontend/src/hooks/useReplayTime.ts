@@ -4,35 +4,30 @@ import { useEffect, useRef, useState } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 
 /**
- * Hook that returns a replay timestamp that ticks every second.
+ * Hook that returns a replay timestamp that ticks smoothly at replay speed.
  *
  * The backend sends replay_status with currentTime (HH:MM:SS) only when
- * a new message block is processed, which can have gaps of 30+ seconds.
- * This hook interpolates between updates so the clock ticks smoothly.
+ * a new message block is processed. This hook interpolates between updates
+ * using the replay speed multiplier so the clock advances smoothly.
  */
 export function useReplayTime(): string {
   const serverTime = useRaceStore((s) => s.replayTime);
   const replayActive = useRaceStore((s) => s.replayActive);
   const replayPaused = useRaceStore((s) => s.replayPaused);
+  const replaySpeed = useRaceStore((s) => s.replaySpeed);
 
   const [display, setDisplay] = useState(serverTime);
   const lastServerSecsRef = useRef(0);
   const lastWallRef = useRef(Date.now());
 
-  // Parse HH:MM:SS to seconds
   const parseTime = (t: string): number => {
     if (!t) return 0;
     const parts = t.split(":");
-    if (parts.length === 3) {
-      return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
-    }
-    if (parts.length === 2) {
-      return parseInt(parts[0]) * 60 + parseInt(parts[1]);
-    }
+    if (parts.length === 3) return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+    if (parts.length === 2) return parseInt(parts[0]) * 60 + parseInt(parts[1]);
     return 0;
   };
 
-  // Format seconds back to HH:MM:SS
   const formatTime = (secs: number): string => {
     const h = Math.floor(secs / 3600);
     const m = Math.floor((secs % 3600) / 60);
@@ -48,20 +43,20 @@ export function useReplayTime(): string {
     setDisplay(serverTime);
   }, [serverTime]);
 
-  // Tick every second
+  // Tick at 200ms intervals, advancing at replay speed
   useEffect(() => {
     if (!replayActive || replayPaused || !serverTime) return;
 
     const interval = setInterval(() => {
-      const elapsedMs = Date.now() - lastWallRef.current;
-      const currentSecs = lastServerSecsRef.current + Math.floor(elapsedMs / 1000);
+      const elapsedWallMs = Date.now() - lastWallRef.current;
+      const simElapsedSecs = (elapsedWallMs * (replaySpeed || 1)) / 1000;
+      const currentSecs = lastServerSecsRef.current + Math.floor(simElapsedSecs);
       setDisplay(formatTime(currentSecs));
-    }, 1000);
+    }, 200);
 
     return () => clearInterval(interval);
-  }, [replayActive, replayPaused, serverTime]);
+  }, [replayActive, replayPaused, serverTime, replaySpeed]);
 
-  // Reset when replay stops
   useEffect(() => {
     if (!replayActive) setDisplay("");
   }, [replayActive]);

@@ -4,18 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 
 /**
- * Hook that returns a race clock (countdownMs) that ticks every second.
+ * Hook that returns a race clock (countdownMs) that ticks smoothly.
  *
  * The Apex timing system sends countdown updates every ~30s. This hook
- * interpolates between updates so the UI ticks second-by-second.
+ * interpolates between updates so the UI ticks smoothly.
  *
+ * During replay, advances at the replay speed multiplier.
  * Pauses interpolation when replay is paused.
  *
  * Returns the interpolated countdownMs value.
  */
 export function useRaceClock(): number {
   const serverCountdownMs = useRaceStore((s) => s.countdownMs);
+  const replayActive = useRaceStore((s) => s.replayActive);
   const replayPaused = useRaceStore((s) => s.replayPaused);
+  const replaySpeed = useRaceStore((s) => s.replaySpeed);
   const [localMs, setLocalMs] = useState(serverCountdownMs);
   const lastServerRef = useRef(serverCountdownMs);
   const lastServerTimeRef = useRef(Date.now());
@@ -32,33 +35,34 @@ export function useRaceClock(): number {
   // Track pause transitions
   useEffect(() => {
     if (replayPaused) {
-      // Freeze at current interpolated value
       pausedAtRef.current = localMs;
     } else if (pausedAtRef.current !== null) {
-      // Resume: recalibrate from current value
       lastServerRef.current = pausedAtRef.current;
       lastServerTimeRef.current = Date.now();
       pausedAtRef.current = null;
     }
   }, [replayPaused]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Tick every second (only when not paused)
+  // Tick at 200ms intervals (smooth), applying replay speed
   useEffect(() => {
     if (serverCountdownMs === 0 || replayPaused) return;
 
+    const speed = replayActive ? (replaySpeed || 1) : 1;
+
     const interval = setInterval(() => {
-      const elapsed = Date.now() - lastServerTimeRef.current;
+      const wallElapsed = Date.now() - lastServerTimeRef.current;
+      const simElapsed = wallElapsed * speed;
       const serverVal = lastServerRef.current;
 
       if (serverVal > 0) {
-        setLocalMs(Math.max(0, serverVal - elapsed));
+        setLocalMs(Math.max(0, serverVal - simElapsed));
       } else {
-        setLocalMs(serverVal - elapsed);
+        setLocalMs(serverVal - simElapsed);
       }
     }, 200);
 
     return () => clearInterval(interval);
-  }, [serverCountdownMs, replayPaused]);
+  }, [serverCountdownMs, replayPaused, replayActive, replaySpeed]);
 
   return localMs;
 }
