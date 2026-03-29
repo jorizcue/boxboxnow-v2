@@ -264,7 +264,14 @@ class RaceStateManager:
             if best_lap_str:
                 kart.best_lap_ms = time_to_ms(best_lap_str)
             kart.stint_start_time = time.time()
-            kart.stint_start_countdown_ms = self.countdown_ms
+            # If race already started, first-stint karts use race start reference
+            # (not current countdown, which may be seconds behind the actual start).
+            # This handles the common case where grid|| arrives AFTER countdown
+            # in the same message block.
+            if self.race_started and kart.pit_count == 0:
+                kart.stint_start_countdown_ms = getattr(self, '_race_start_ms', self.countdown_ms)
+            else:
+                kart.stint_start_countdown_ms = self.countdown_ms
             self.karts[row_id] = kart
             return None  # Init sends snapshot, not individual updates
 
@@ -539,24 +546,19 @@ class RaceStateManager:
         """Mark the race as started and initialize stint tracking for all karts.
 
         Called by COUNTDOWN, COUNT_UP, or LIGHT green — whichever arrives first.
-        For green_light trigger without a countdown value, use duration_min as
-        the race start reference (same as reconnection logic).
+        Always uses duration_min as race start reference because the first
+        countdown/signal we receive is always a few seconds late (Apex has
+        already been running the timer before we get the message).
         """
         self.race_started = True
         self.start_time = time.time()
-        self._first_countdown_ms = self.countdown_ms
 
-        has_laps = any(k.total_laps > 0 for k in self.karts.values())
-
-        if has_laps:
-            # Reconnection mid-race: use config duration
-            race_start_ms = self.duration_min * 60 * 1000
-        elif self.countdown_ms > 0:
-            # Fresh start with valid countdown
-            race_start_ms = self.countdown_ms
-        else:
-            # Green light or count_up before any countdown arrived
-            race_start_ms = self.duration_min * 60 * 1000
+        # Use configured duration as the canonical race start reference.
+        # The first countdown we receive (e.g. 10,786,217 for a 3h race)
+        # is always slightly less than the true start (10,800,000).
+        race_start_ms = self.duration_min * 60 * 1000
+        self._race_start_ms = race_start_ms
+        self._first_countdown_ms = race_start_ms
 
         for kart in self.karts.values():
             if kart.stint_start_countdown_ms == 0:
@@ -566,8 +568,7 @@ class RaceStateManager:
                     kart.stint_start_countdown_ms = self.countdown_ms
 
         logger.info(f"Race started via {trigger}. countdown_ms={self.countdown_ms}, "
-                    f"race_start_ms={race_start_ms}, karts={len(self.karts)}, "
-                    f"reconnect={has_laps}")
+                    f"race_start_ms={race_start_ms}, karts={len(self.karts)}")
         self._needs_snapshot = True
 
     def get_snapshot(self) -> dict:
