@@ -169,7 +169,22 @@ function UsersManager() {
                 className={`border-t border-border cursor-pointer transition-colors ${selectedUser === u.id ? "bg-accent/10 border-l-2 border-l-accent" : "hover:bg-black/50"}`}
                 onClick={() => loadAccess(u.id)}>
                 <td className="px-2 py-1.5 text-white">{u.username}</td>
-                <td className="px-2 py-1.5 text-center font-mono text-neutral-400">{u.max_devices}</td>
+                <td className="px-2 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={u.max_devices}
+                    onChange={async (e) => {
+                      const val = Math.max(1, Math.min(10, Number(e.target.value)));
+                      try {
+                        await api.updateUser(u.id, { max_devices: val });
+                        loadUsers();
+                      } catch {}
+                    }}
+                    className="w-12 bg-black border border-border rounded px-1 py-0.5 text-sm text-center font-mono text-neutral-400"
+                  />
+                </td>
                 <td className="px-2 py-1.5 text-center">
                   {u.is_admin ? <span className="text-accent text-xs font-medium">{t("common.yes")}</span> : <span className="text-neutral-700">-</span>}
                 </td>

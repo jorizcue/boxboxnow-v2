@@ -127,13 +127,14 @@ const translations: Record<string, Record<Language, string>> = {
 
   // === Adjusted Classification ===
   "adjusted.title": { es: "Clasificacion Ajustada", en: "Adjusted Classification", it: "Classifica Corretta", de: "Bereinigte Klassifizierung" },
-  "adjusted.realLaps": { es: "Vueltas", en: "Laps", it: "Giri", de: "Runden" },
   "adjusted.missingPits": { es: "Pits pend.", en: "Missing pits", it: "Pit manc.", de: "Fehl. Pits" },
-  "adjusted.penalty": { es: "Penaliz.", en: "Penalty", it: "Penalita", de: "Strafe" },
   "adjusted.adjustedLaps": { es: "Vlt. Ajust.", en: "Adj. Laps", it: "Giri Corr.", de: "Ber. Runden" },
   "adjusted.noData": { es: "Sin datos de carrera", en: "No race data", it: "Nessun dato di gara", de: "Keine Renndaten" },
   "adjusted.explanation": { es: "Clasificacion ajustada igualando paradas a {maxPits} pits (equipo con mas paradas)", en: "Classification adjusted equalizing stops to {maxPits} pits (team with most stops)", it: "Classifica corretta equalizzando le soste a {maxPits} pit (squadra con piu soste)", de: "Klassifizierung bereinigt auf {maxPits} Pits (Team mit den meisten Stopps)" },
-  "adjusted.diffLaps": { es: "Dif.", en: "Diff.", it: "Diff.", de: "Diff." },
+  "adjusted.gapMeters": { es: "Dif. (m)", en: "Gap (m)", it: "Diff. (m)", de: "Abst. (m)" },
+  "adjusted.gapSeconds": { es: "Dif. (s)", en: "Gap (s)", it: "Diff. (s)", de: "Abst. (s)" },
+  "adjusted.intMeters": { es: "Int. (m)", en: "Int. (m)", it: "Int. (m)", de: "Int. (m)" },
+  "adjusted.intSeconds": { es: "Int. (s)", en: "Int. (s)", it: "Int. (s)", de: "Int. (s)" },
 
   // === Live Timing ===
   "live.loading": { es: "Cargando...", en: "Loading...", it: "Caricamento...", de: "Laden..." },
