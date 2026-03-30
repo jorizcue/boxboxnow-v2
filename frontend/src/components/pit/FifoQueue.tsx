@@ -238,7 +238,7 @@ export function FifoQueue() {
             className="text-3xl sm:text-4xl font-black leading-none"
             style={{ color: tierHex(boxScore) }}
           >
-            {boxScore > 0 ? boxScore.toFixed(0) : "-"}
+            {boxScore > 0 ? boxScore.toFixed(1) : "-"}
           </span>
           <span className="text-[8px] text-neutral-600 uppercase tracking-widest mt-0.5">/ 100</span>
         </div>
