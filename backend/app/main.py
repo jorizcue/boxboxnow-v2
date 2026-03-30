@@ -49,11 +49,12 @@ async def lifespan(app: FastAPI):
     # Start circuit hub (connects to all circuits)
     await circuit_hub.start_all()
 
-    # Start periodic log compression (runs every 6 hours, compresses logs > 24h old)
-    from app.tasks.compress_logs import compress_old_logs, periodic_compress_loop
+    # Start periodic maintenance (log compression + docker prune, every 6 hours)
+    from app.tasks.compress_logs import compress_old_logs, docker_prune, periodic_compress_loop
     # Run once at startup in executor (non-blocking)
     loop = asyncio.get_event_loop()
     loop.run_in_executor(None, compress_old_logs)
+    loop.run_in_executor(None, docker_prune)
     compress_task = asyncio.create_task(periodic_compress_loop(interval_hours=6))
 
     logger.info("BoxboxNow v2 started (multi-tenant + CircuitHub)")

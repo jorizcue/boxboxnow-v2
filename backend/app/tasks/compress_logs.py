@@ -100,16 +100,40 @@ def compress_old_logs(base_dirs: list[str] | None = None, min_age_hours: int = M
     return total_compressed, total_saved_bytes
 
 
+def docker_prune():
+    """Run 'docker system prune -af' to free unused images/containers/volumes."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["docker", "system", "prune", "-af", "--volumes"],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode == 0:
+            # Extract "Total reclaimed space" line
+            for line in result.stdout.splitlines():
+                if "Total reclaimed" in line:
+                    logger.info(f"Docker prune: {line.strip()}")
+                    return
+            logger.info("Docker prune completed")
+        else:
+            logger.warning(f"Docker prune failed (rc={result.returncode}): {result.stderr[:200]}")
+    except FileNotFoundError:
+        logger.debug("Docker not available, skipping prune")
+    except Exception as e:
+        logger.error(f"Docker prune error: {e}")
+
+
 async def periodic_compress_loop(interval_hours: int = 6):
-    """Background task that periodically compresses old logs."""
+    """Background task that periodically compresses old logs and prunes Docker."""
     import asyncio
     while True:
         await asyncio.sleep(interval_hours * 3600)
         try:
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, compress_old_logs)
+            await loop.run_in_executor(None, docker_prune)
         except Exception as e:
-            logger.error(f"Periodic log compression failed: {e}")
+            logger.error(f"Periodic maintenance failed: {e}")
 
 
 if __name__ == "__main__":
