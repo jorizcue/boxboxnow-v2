@@ -517,6 +517,8 @@ class ReplaySession:
         self.differentials: dict = {"team_positions": {}, "driver_differentials": {}}
         self._analytics_task: asyncio.Task | None = None
 
+        self._init_teams_loaded = False  # Track if we already auto-loaded teams
+
         from app.apex.replay import ReplayEngine
 
         async def on_events(events):
@@ -549,6 +551,13 @@ class ReplaySession:
                 for row_id, kart in self.state.karts.items()
             }
             await self.state.handle_events(events)
+
+            # Detect init kart batch -> auto-load teams into config
+            init_kart_events = [e for e in events
+                                if e.type == EventType.INIT and e.value == "kart"]
+            if init_kart_events and not self._init_teams_loaded:
+                self._init_teams_loaded = True
+                asyncio.create_task(self._auto_load_teams())
 
             pit_in_karts = []
             for row_id, kart in self.state.karts.items():
@@ -584,8 +593,116 @@ class ReplaySession:
             return
         self._analytics_task = asyncio.create_task(self._analytics_loop())
 
+    async def _auto_load_teams(self):
+        """Auto-load karts from replay init as teams, save to DB, notify frontend.
+        Merges with existing driver differentials from the user's config."""
+        await asyncio.sleep(0.5)  # Wait for all init karts to arrive
+
+        if not self.state.karts:
+            return
+
+        teams_data = []
+        for i, kart in enumerate(
+            sorted(self.state.karts.values(), key=lambda k: k.position or 999)
+        ):
+            teams_data.append({
+                "position": i + 1,
+                "kart": kart.kart_number,
+                "team_name": kart.team_name,
+                "drivers": [],
+            })
+
+        if not teams_data:
+            return
+
+        # Save to DB (merging existing differentials)
+        try:
+            from app.models.database import async_session
+            from app.models.schemas import RaceSession, TeamPosition, TeamDriver
+            from sqlalchemy import select, delete
+            from sqlalchemy.orm import selectinload
+
+            async with async_session() as db:
+                result = await db.execute(
+                    select(RaceSession)
+                    .options(
+                        selectinload(RaceSession.team_positions)
+                        .selectinload(TeamPosition.drivers)
+                    )
+                    .where(
+                        RaceSession.user_id == self.user_id,
+                        RaceSession.is_active == True,
+                    )
+                )
+                session = result.scalar_one_or_none()
+                if not session:
+                    logger.warning(f"No active session for user {self.user_id}, "
+                                   f"skipping replay team auto-load")
+                    return
+
+                # Preserve existing differentials
+                existing_diffs: dict[int, dict[str, int]] = {}
+                for tp in session.team_positions:
+                    kart_diffs = {}
+                    for d in tp.drivers:
+                        kart_diffs[d.driver_name.strip().lower()] = d.differential_ms
+                    existing_diffs[tp.kart] = kart_diffs
+
+                # Replace teams
+                await db.execute(
+                    delete(TeamPosition).where(TeamPosition.race_session_id == session.id)
+                )
+
+                for t in teams_data:
+                    team = TeamPosition(
+                        race_session_id=session.id,
+                        position=t["position"],
+                        kart=t["kart"],
+                        team_name=t["team_name"],
+                    )
+                    # Re-attach existing drivers with their differentials
+                    kart_diffs = existing_diffs.get(t["kart"], {})
+                    for name, diff in kart_diffs.items():
+                        driver = TeamDriver(driver_name=name, differential_ms=diff)
+                        team.drivers.append(driver)
+                    db.add(team)
+
+                await db.commit()
+
+            # Update in-memory differentials
+            new_team_positions = {}
+            new_driver_diffs = {}
+            for t in teams_data:
+                new_team_positions[t["kart"]] = t["position"]
+                kart_diffs = existing_diffs.get(t["kart"], {})
+                if kart_diffs:
+                    new_driver_diffs[t["kart"]] = dict(kart_diffs)
+
+            self.differentials["team_positions"] = new_team_positions
+            self.differentials["driver_differentials"] = new_driver_diffs
+
+            logger.info(f"Replay auto-loaded {len(teams_data)} teams "
+                        f"(user_id={self.user_id})")
+
+        except Exception as e:
+            logger.error(f"Replay auto-load teams failed (user={self.user_id}): {e}",
+                         exc_info=True)
+
+        # Broadcast teams_updated to frontend so TeamEditor reloads
+        if self.state._ws_clients:
+            msg = json.dumps({"type": "teams_updated", "data": {"teams": teams_data}})
+            dead = set()
+            for client in self.state._ws_clients:
+                try:
+                    await client.send_text(msg)
+                except Exception:
+                    dead.add(client)
+            for c in dead:
+                self.state._ws_clients.discard(c)
+
     async def stop(self):
         await self.engine.stop()
+        self._init_teams_loaded = False
         if self._analytics_task:
             self._analytics_task.cancel()
             try:

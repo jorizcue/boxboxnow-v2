@@ -416,6 +416,7 @@ async def seek_replay(
 
     # Reset state and FIFO before seeking
     replay_session.state.reset()
+    replay_session._init_teams_loaded = False  # Allow teams to re-load from new init
     replay_session.fifo.update_config(replay_session.fifo.queue_size, replay_session.fifo.box_lines)
     replay_session.fifo._history.clear()
 
