@@ -302,9 +302,16 @@ class RaceStateManager:
             return None  # Init sends snapshot, not individual updates
 
         if event.type == EventType.INIT and event.value == "init":
-            # Reset state for new init
+            # Reset state for new init block (new race / new session).
+            # countdown_ms MUST be reset so that karts created in this init
+            # get stint_start_countdown_ms=0 (which _trigger_race_start will
+            # then properly set to race_start_ms).
             self.karts.clear()
             self.race_started = False
+            self.race_finished = False
+            self.countdown_ms = 0
+            self._first_countdown_ms = 0
+            self._race_start_ms = 0
             return None
 
         # Get or skip unknown karts
@@ -489,6 +496,10 @@ class RaceStateManager:
             self.countdown_ms = int(event.value)
             if not self.race_started:
                 self._trigger_race_start(trigger="countdown")
+            elif self._first_countdown_ms == 0 and self.countdown_ms > 0:
+                # First real countdown arrived AFTER race was started by green
+                # light. Auto-detect the true duration and fix stint starts.
+                self._recalibrate_from_countdown()
             return {"event": "countdown", "ms": self.countdown_ms}
 
         elif event.type == EventType.COUNT_UP:
@@ -608,7 +619,11 @@ class RaceStateManager:
             race_start_ms = self.duration_min * 60 * 1000
 
         self._race_start_ms = race_start_ms
-        self._first_countdown_ms = race_start_ms
+        # _first_countdown_ms tracks the ACTUAL first countdown value.
+        # For green_light trigger, leave it at 0 so _recalibrate_from_countdown
+        # fires when the real countdown arrives moments later.
+        if trigger != "green_light":
+            self._first_countdown_ms = race_start_ms
 
         for kart in self.karts.values():
             if kart.stint_start_countdown_ms == 0:
@@ -620,6 +635,29 @@ class RaceStateManager:
         logger.info(f"Race started via {trigger}. countdown_ms={self.countdown_ms}, "
                     f"race_start_ms={race_start_ms}, duration_min={self.duration_min}, "
                     f"karts={len(self.karts)}")
+        self._needs_snapshot = True
+
+    def _recalibrate_from_countdown(self):
+        """Re-detect race duration when first countdown arrives after green light.
+
+        This handles circuits like Eupen where green light comes BEFORE the
+        first countdown in the same init block. The green light uses configured
+        duration_min, but the actual countdown reveals the true duration.
+        """
+        import math
+        detected_ms = math.ceil(self.countdown_ms / 60000) * 60000
+        old_race_start = self._race_start_ms
+        self._race_start_ms = detected_ms
+        self._first_countdown_ms = detected_ms
+        detected_min = detected_ms // 60000
+        logger.info(f"Recalibrated race duration from first countdown: "
+                    f"{self.countdown_ms}ms → {detected_min}min ({detected_ms}ms), "
+                    f"was {old_race_start}ms")
+
+        # Fix stint starts for all karts (they were set from the wrong value)
+        for kart in self.karts.values():
+            if kart.pit_count == 0:
+                kart.stint_start_countdown_ms = detected_ms
         self._needs_snapshot = True
 
     def _trigger_race_end(self):
