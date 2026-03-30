@@ -29,6 +29,9 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   const durationMs = useRaceStore((s) => s.durationMs);
   const pitClosedStartMin = useRaceStore((s) => s.config.pitClosedStartMin);
   const pitClosedEndMin = useRaceStore((s) => s.config.pitClosedEndMin);
+  const minStintMin = useRaceStore((s) => s.config.minStintMin);
+  const ourKartNumber = useRaceStore((s) => s.config.ourKartNumber);
+  const karts = useRaceStore((s) => s.karts);
   const replayActive = useRaceStore((s) => s.replayActive);
   const replayPaused = useRaceStore((s) => s.replayPaused);
   const replayFilename = useRaceStore((s) => s.replayFilename);
@@ -65,13 +68,22 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   // Format the timer display using the interpolated clock
   const timerDisplay = raceClockMs !== 0 ? msToCountdown(raceClockMs) : "00:00:00";
 
-  // Pit window status
-  const hasPitWindow = raceStarted && (pitClosedStartMin > 0 || pitClosedEndMin > 0);
+  // Pit window status: closed during first/last N minutes AND during min stint after pit out
+  const ourKart = ourKartNumber > 0 ? karts.find((k) => k.kartNumber === ourKartNumber) : undefined;
+  const hasPitWindow = raceStarted && (pitClosedStartMin > 0 || pitClosedEndMin > 0 || minStintMin > 0);
   const pitIsClosed = (() => {
-    if (!hasPitWindow || raceClockMs === 0 || durationMs === 0) return false;
+    if (!raceStarted || raceClockMs === 0 || durationMs === 0) return false;
     const elapsedMin = (durationMs - raceClockMs) / 60000;
     const remainingMin = raceClockMs / 60000;
-    return elapsedMin < pitClosedStartMin || remainingMin < pitClosedEndMin;
+    // Regulation window: first/last N minutes
+    if (pitClosedStartMin > 0 && elapsedMin < pitClosedStartMin) return true;
+    if (pitClosedEndMin > 0 && remainingMin < pitClosedEndMin) return true;
+    // Min stint lockout: after our kart's pit out, closed until minStintMin elapsed
+    if (minStintMin > 0 && ourKart && ourKart.pitStatus === "racing" && ourKart.stintStartCountdownMs > 0) {
+      const stintElapsedMin = (ourKart.stintStartCountdownMs - raceClockMs) / 60000;
+      if (stintElapsedMin >= 0 && stintElapsedMin < minStintMin) return true;
+    }
+    return false;
   })();
 
   return (

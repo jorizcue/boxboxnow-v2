@@ -108,6 +108,7 @@ const translations: Record<string, Record<Language, string>> = {
   "driver.avgPace": { es: "Ritmo medio", en: "Avg pace", it: "Ritmo medio", de: "Durchschn. Tempo" },
   "driver.bestAvg3": { es: "Mejor media (3 mejores)", en: "Best avg (3 best)", it: "Miglior media (3 migliori)", de: "Beste Schn. (3 beste)" },
   "driver.totalTime": { es: "Tiempo total", en: "Total time", it: "Tempo totale", de: "Gesamtzeit" },
+  "driver.avgLap": { es: "Media vuelta", en: "Avg lap", it: "Media giro", de: "Schnitt Runde" },
   "driver.remainingMin": { es: "Restante min.", en: "Remaining min.", it: "Minimo restante", de: "Verbleibend Min." },
   "driver.minPerDriver": { es: "Min. por piloto", en: "Min. per driver", it: "Min. per pilota", de: "Min. pro Fahrer" },
 

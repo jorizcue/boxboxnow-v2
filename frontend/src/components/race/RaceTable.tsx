@@ -42,15 +42,34 @@ export function RaceTable() {
     : undefined;
 
   const ourStintSec = ourKart ? stintSecondsFor(ourKart) : 0;
+  const ourStintMin = ourStintSec / 60;
   const timeToMaxStint = Math.max(0, config.maxStintMin * 60 - ourStintSec);
   const lapsToMaxStint = ourKart && ourKart.avgLapMs > 0
     ? Math.floor(timeToMaxStint / (ourKart.avgLapMs / 1000))
     : 0;
 
   const kartsNearPit = sorted.filter((k) => {
-    const stintMin = k.stintDurationS / 60;
+    const stintSec = stintSecondsFor(k);
+    const stintMin = stintSec / 60;
     return stintMin >= config.maxStintMin - 5 && k.pitStatus !== "in_pit";
   }).length;
+
+  // Stint color logic:
+  // Red if < minStintMin (can't pit yet) or >= maxStintMin (overdue)
+  // Orange if within 5min of maxStintMin
+  // Green otherwise (safe window)
+  const stintColor = (() => {
+    if (ourStintMin < config.minStintMin) return "text-red-400";
+    if (ourStintMin >= config.maxStintMin) return "text-red-400 animate-pulse";
+    if (ourStintMin >= config.maxStintMin - 5) return "text-orange-400";
+    return "text-green-400";
+  })();
+
+  const timeToMaxColor = (() => {
+    if (timeToMaxStint <= 0) return "text-red-400 animate-pulse";
+    if (timeToMaxStint / 60 <= 5) return "text-orange-400";
+    return "text-neutral-200";
+  })();
 
   if (sorted.length === 0) {
     return (
@@ -64,9 +83,57 @@ export function RaceTable() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Main race table */}
-      <div className="overflow-x-auto -mx-2 sm:mx-0">
+    <div className="flex flex-col h-full">
+      {/* Sticky indicator cards at the top */}
+      <div className="sticky top-0 z-20 bg-black pb-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          {/* Stint time */}
+          <div className="bg-surface rounded-xl border border-border p-3 sm:p-4 flex flex-col items-center justify-center">
+            <span className="text-[9px] sm:text-[10px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+              {t("metric.currentStint")}
+            </span>
+            <span className={clsx("text-xl sm:text-2xl font-mono font-black leading-none", stintColor)}>
+              {secondsToHMS(ourStintSec)}
+            </span>
+          </div>
+
+          {/* Time to max stint */}
+          <div className="bg-surface rounded-xl border border-border p-3 sm:p-4 flex flex-col items-center justify-center">
+            <span className="text-[9px] sm:text-[10px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+              {t("metric.timeToMaxStint")}
+            </span>
+            <span className={clsx("text-xl sm:text-2xl font-mono font-black leading-none", timeToMaxColor)}>
+              {secondsToHMS(timeToMaxStint)}
+            </span>
+          </div>
+
+          {/* Laps to max stint */}
+          <div className="bg-surface rounded-xl border border-border p-3 sm:p-4 flex flex-col items-center justify-center">
+            <span className="text-[9px] sm:text-[10px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+              {t("metric.lapsToMaxStint")}
+            </span>
+            <span className="text-xl sm:text-2xl font-mono font-black leading-none text-neutral-200">
+              {lapsToMaxStint}
+            </span>
+          </div>
+
+          {/* Karts near pit */}
+          <div className="bg-surface rounded-xl border border-border p-3 sm:p-4 flex flex-col items-center justify-center">
+            <span className="text-[9px] sm:text-[10px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+              {t("metric.kartsNearPit")}
+            </span>
+            <span className={clsx(
+              "text-xl sm:text-2xl font-mono font-black leading-none",
+              kartsNearPit > 3 ? "text-orange-400" : kartsNearPit > 0 ? "text-yellow-400" : "text-neutral-200"
+            )}>
+              {kartsNearPit}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Scrollable race table */}
+      <div className="flex-1 overflow-y-auto overflow-x-auto -mx-2 sm:mx-0">
         <table className="w-full text-xs sm:text-sm">
           <thead className="bg-surface text-neutral-200 sticky top-0 z-10 text-[10px] sm:text-[11px] uppercase tracking-wider">
             <tr>
@@ -188,76 +255,6 @@ export function RaceTable() {
           </tbody>
         </table>
       </div>
-
-      {/* Info panels below the table */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Left: Stint metrics for our kart */}
-        <div className="bg-surface rounded-xl border border-border overflow-hidden">
-          <div className="bg-neutral-800/50 px-4 py-2 flex justify-between">
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("metric.metric")}</span>
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("metric.value")}</span>
-          </div>
-          <div className="divide-y divide-border">
-            <InfoRow
-              label={t("metric.currentStint")}
-              value={secondsToHMS(ourStintSec)}
-              highlight={ourStintSec / 60 >= config.maxStintMin}
-            />
-            <InfoRow label={t("metric.timeToMaxStint")} value={secondsToHMS(timeToMaxStint)} />
-            <InfoRow label={t("metric.lapsToMaxStint")} value={String(lapsToMaxStint)} />
-            <InfoRow label={t("metric.kartsNearPit")} value={String(kartsNearPit)} />
-            <InfoRow label={t("metric.maxStint")} value={secondsToHMS(config.maxStintMin * 60)} />
-            <InfoRow label={t("metric.minStint")} value={secondsToHMS(config.minStintMin * 60)} />
-          </div>
-        </div>
-
-        {/* Right: Driver info for our kart */}
-        <div className="bg-surface rounded-xl border border-border overflow-hidden">
-          <div className="bg-neutral-800/50 px-4 py-2 flex justify-between">
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("driver.driver")}</span>
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("driver.info")}</span>
-          </div>
-          <div className="divide-y divide-border">
-            <InfoRow
-              label={t("driver.currentDriver")}
-              value={ourKart?.driverName || "-"}
-            />
-            <InfoRow
-              label={t("driver.driverTime")}
-              value={ourKart?.driverTime || "-"}
-            />
-            <InfoRow
-              label={t("driver.driverDiffTime")}
-              value={ourKart ? formatDifferential(ourKart.driverDifferentialMs) : "-"}
-            />
-            <InfoRow
-              label={t("driver.stintLaps")}
-              value={ourKart ? String(ourKart.stintLapsCount) : "0"}
-            />
-            <InfoRow
-              label={t("driver.avgPace")}
-              value={ourKart && ourKart.avgLapMs > 0 ? msToLapTime(Math.round(ourKart.avgLapMs)) : "-"}
-            />
-            <InfoRow
-              label={t("driver.bestAvg3")}
-              value={ourKart && ourKart.bestAvgMs > 0 ? msToLapTime(Math.round(ourKart.bestAvgMs)) : "-"}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InfoRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
-  return (
-    <div className="flex justify-between items-center px-4 py-2">
-      <span className={clsx("text-sm", highlight ? "text-tier-1 font-semibold" : "text-neutral-300")}>
-        {label}
-      </span>
-      <span className={clsx("text-sm font-mono", highlight ? "text-tier-1 font-bold" : "text-white")}>
-        {value}
-      </span>
     </div>
   );
 }

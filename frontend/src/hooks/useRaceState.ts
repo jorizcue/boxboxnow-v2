@@ -128,10 +128,6 @@ export const useRaceStore = create<RaceStore>((set) => ({
           countdownMs = ev.ms;
           continue;
         }
-        if (ev.event === "countUp" && typeof ev.ms === "number") {
-          countdownMs = -(ev.ms as number);
-          continue;
-        }
         if (ev.event === "track" && ev.name) {
           trackName = ev.name as string;
           continue;

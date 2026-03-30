@@ -33,6 +33,7 @@ export interface KartState {
   stintStartCountdownMs: number;  // race clock (ms) when stint started
   pitHistory: PitRecord[];
   driverTotalMs: Record<string, number>;
+  driverAvgLapMs: Record<string, number>;
   tierScore: number;
   avgLapMs: number;
   bestAvgMs: number;

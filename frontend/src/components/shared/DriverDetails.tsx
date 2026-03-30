@@ -1,7 +1,7 @@
 "use client";
 
 import { useRaceStore } from "@/hooks/useRaceState";
-import { secondsToHMS } from "@/lib/formatters";
+import { secondsToHMS, msToLapTime } from "@/lib/formatters";
 import { useT } from "@/lib/i18n";
 import type { KartState } from "@/types/race";
 
@@ -10,6 +10,7 @@ export interface DriverInfo {
   totalMs: number;
   remainingMs: number;
   metMinimum: boolean;
+  avgLapMs: number;
 }
 
 export function getDriverInfoForKart(
@@ -33,6 +34,8 @@ export function getDriverInfoForKart(
     driverMap[kart.driverName] = 0;
   }
 
+  const avgMap = kart.driverAvgLapMs || {};
+
   return Object.entries(driverMap)
     .map(([name, totalMs]) => {
       const effectiveMs =
@@ -41,7 +44,8 @@ export function getDriverInfoForKart(
           : totalMs;
       const remainingMs = Math.max(0, minDriverTimeMs - effectiveMs);
       const metMinimum = remainingMs <= 0;
-      return { name, totalMs: effectiveMs, remainingMs, metMinimum };
+      const avgLapMs = avgMap[name] || 0;
+      return { name, totalMs: effectiveMs, remainingMs, metMinimum, avgLapMs };
     })
     .sort((a, b) => b.totalMs - a.totalMs);
 }
@@ -70,6 +74,7 @@ export function DriverDetailsRow({
             <tr className="text-neutral-500 text-[10px] uppercase tracking-wider">
               <th className="px-3 py-1.5 text-left">{t("driver.driver")}</th>
               <th className="px-3 py-1.5 text-right">{t("driver.totalTime")}</th>
+              <th className="px-3 py-1.5 text-right">{t("driver.avgLap")}</th>
               <th className="px-3 py-1.5 text-right">{t("driver.remainingMin")}</th>
             </tr>
           </thead>
@@ -81,6 +86,9 @@ export function DriverDetailsRow({
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono text-neutral-300">
                   {secondsToHMS(d.totalMs / 1000)}
+                </td>
+                <td className="px-3 py-1.5 text-right font-mono text-neutral-400">
+                  {d.avgLapMs > 0 ? msToLapTime(Math.round(d.avgLapMs)) : "-"}
                 </td>
                 <td
                   className={`px-3 py-1.5 text-right font-mono font-bold ${

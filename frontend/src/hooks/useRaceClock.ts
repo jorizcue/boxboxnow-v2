@@ -54,11 +54,7 @@ export function useRaceClock(): number {
       const simElapsed = wallElapsed * speed;
       const serverVal = lastServerRef.current;
 
-      if (serverVal > 0) {
-        setLocalMs(Math.max(0, serverVal - simElapsed));
-      } else {
-        setLocalMs(serverVal - simElapsed);
-      }
+      setLocalMs(Math.max(0, serverVal - simElapsed));
     }, 200);
 
     return () => clearInterval(interval);

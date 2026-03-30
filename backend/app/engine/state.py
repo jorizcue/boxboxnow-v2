@@ -95,6 +95,15 @@ class KartState:
         """Number of laps in current stint (all laps, not just valid)."""
         return sum(1 for lap in self.all_laps if lap.get("pitNumber") == self.pit_count)
 
+    def driver_avg_lap_ms_map(self) -> dict:
+        """Compute average lap time per driver from valid laps."""
+        sums: dict[str, list[int]] = {}
+        for lap in self.valid_laps:
+            name = lap.get("driverName", "")
+            if name:
+                sums.setdefault(name, []).append(lap["lapTime"])
+        return {name: sum(times) / len(times) for name, times in sums.items() if times}
+
     def to_dict(self) -> dict:
         return {
             "rowId": self.row_id,
@@ -120,6 +129,7 @@ class KartState:
             "stintStartCountdownMs": self.stint_start_countdown_ms,
             "pitHistory": [p.to_dict() for p in self.pit_history],
             "driverTotalMs": self.driver_total_ms,
+            "driverAvgLapMs": self.driver_avg_lap_ms_map(),
             "tierScore": self.tier_score,
             "driverDifferentialMs": self.driver_differential_ms,
             "avgLapMs": self.avg_lap_ms,
@@ -468,7 +478,11 @@ class RaceStateManager:
             return {"event": "countdown", "ms": self.countdown_ms}
 
         elif event.type == EventType.COUNT_UP:
-            self.countdown_ms = -int(event.value)
+            # Convert count-up (elapsed ms) to countdown (remaining ms)
+            # so all downstream calculations use a uniform decreasing value.
+            elapsed_ms = int(event.value)
+            race_duration_ms = self.duration_min * 60 * 1000
+            self.countdown_ms = max(0, race_duration_ms - elapsed_ms)
             if not self.race_started:
                 self._trigger_race_start(trigger="count_up")
             return {"event": "countdown", "ms": self.countdown_ms}
