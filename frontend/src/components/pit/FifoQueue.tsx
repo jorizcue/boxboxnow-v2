@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
+import { useRaceClock } from "@/hooks/useRaceClock";
 import { useSimNow } from "@/hooks/useSimNow";
 import { tierHex, secondsToHMS, msToLapTime } from "@/lib/formatters";
 import type { FifoEntry } from "@/types/race";
@@ -12,24 +13,15 @@ export function FifoQueue() {
   const { fifo, config, karts } = useRaceStore();
   const t = useT();
   const { now, speed } = useSimNow();
-
-  const scoreColor =
-    fifo.score >= 75 ? "text-accent" :
-    fifo.score >= 50 ? "text-tier-75" :
-    fifo.score >= 25 ? "text-tier-50" :
-    "text-tier-1";
-
-  const scoreDotColor =
-    fifo.score >= 75 ? "bg-accent" :
-    fifo.score >= 50 ? "bg-yellow-500" :
-    fifo.score >= 25 ? "bg-orange-500" :
-    "bg-red-500";
+  const raceClockMs = useRaceClock();
+  const durationMs = useRaceStore((s) => s.durationMs);
+  const raceStarted = useRaceStore((s) => s.raceStarted);
 
   const boxLines = config.boxLines || 2;
   const boxKarts = config.boxKarts || 4;
   const kartsPerRow = Math.max(1, Math.ceil(boxKarts / boxLines));
 
-  // Helper to extract score from entry (handles both old number[] and new FifoEntry[] formats)
+  // Entry helpers (handles old number[] and new FifoEntry[] formats)
   const entryScore = (e: FifoEntry | number): number =>
     typeof e === "number" ? e : (e?.score ?? 25);
   const entryTeam = (e: FifoEntry | number): string =>
@@ -37,7 +29,7 @@ export function FifoQueue() {
   const entryDriver = (e: FifoEntry | number): string =>
     typeof e === "object" && e ? (e.driverName || "") : "";
 
-  // Split queue into rows of `kartsPerRow`
+  // Split queue into rows
   const rows = useMemo(() => {
     const result: (FifoEntry | number)[][] = [];
     const queue = fifo.queue.slice(0, boxKarts);
@@ -51,141 +43,283 @@ export function FifoQueue() {
     return result;
   }, [fifo.queue, boxLines, boxKarts, kartsPerRow]);
 
-  // Our kart info
+  // Sort karts by avg for position calc
+  const sorted = useMemo(() =>
+    [...karts].sort((a, b) => {
+      const aAvg = a.avgLapMs > 0 ? a.avgLapMs : Infinity;
+      const bAvg = b.avgLapMs > 0 ? b.avgLapMs : Infinity;
+      return aAvg - bAvg;
+    }), [karts]);
+
+  // Our kart
   const ourKart = config.ourKartNumber > 0
     ? karts.find((k) => k.kartNumber === config.ourKartNumber)
     : undefined;
 
-  const ourStintSec = ourKart
-    ? (ourKart.stintStartTime > 0 ? Math.max(0, (now - ourKart.stintStartTime) * speed) : ourKart.stintDurationS)
-    : 0;
+  // Stint calc using race clock (same as RaceTable)
+  const stintSecondsFor = (kart: typeof karts[0]) => {
+    if (raceClockMs === 0) return 0;
+    const stintStart = kart.stintStartCountdownMs || durationMs || raceClockMs;
+    return Math.max(0, stintStart - raceClockMs) / 1000;
+  };
 
+  const ourStintSec = ourKart ? stintSecondsFor(ourKart) : 0;
+  const ourStintMin = ourStintSec / 60;
   const timeToMaxStint = Math.max(0, config.maxStintMin * 60 - ourStintSec);
   const lapsToMaxStint = ourKart && ourKart.avgLapMs > 0
-    ? Math.floor(timeToMaxStint / (ourKart.avgLapMs / 1000))
+    ? timeToMaxStint / (ourKart.avgLapMs / 1000)
     : 0;
 
-  const kartsNearPit = karts.filter((k) => {
-    const stintSec = k.stintStartTime > 0 ? Math.max(0, (now - k.stintStartTime) * speed) : k.stintDurationS;
+  const kartsNearPit = sorted.filter((k) => {
+    const stintSec = stintSecondsFor(k);
     return stintSec / 60 >= config.maxStintMin - 5 && k.pitStatus !== "in_pit";
   }).length;
 
+  const ourAvgPosition = ourKart
+    ? sorted.findIndex((k) => k.kartNumber === config.ourKartNumber) + 1
+    : 0;
+
+  // Lap delta tracking for last lap card
+  const prevLastLapRef = useRef<number>(0);
+  const [lastLapDelta, setLastLapDelta] = useState<"faster" | "slower" | null>(null);
+  const ourLastLapMs = ourKart?.lastLapMs ?? 0;
+  useEffect(() => {
+    if (ourLastLapMs > 0 && prevLastLapRef.current > 0 && ourLastLapMs !== prevLastLapRef.current) {
+      setLastLapDelta(ourLastLapMs < prevLastLapRef.current ? "faster" : "slower");
+    }
+    if (ourLastLapMs > 0) {
+      prevLastLapRef.current = ourLastLapMs;
+    }
+  }, [ourLastLapMs]);
+
+  // Stint colors
+  const stintColor = (() => {
+    if (ourStintMin < config.minStintMin) return "text-red-400";
+    if (ourStintMin >= config.maxStintMin) return "text-red-400 animate-pulse";
+    if (ourStintMin >= config.maxStintMin - 5) return "text-orange-400";
+    return "text-green-400";
+  })();
+
+  const timeToMaxColor = (() => {
+    if (timeToMaxStint <= 0) return "text-red-400 animate-pulse";
+    if (timeToMaxStint / 60 <= 5) return "text-orange-400";
+    return "text-neutral-200";
+  })();
+
+  // Score
+  const boxScore = fifo.score ?? 0;
+  const scoreDotColor =
+    boxScore >= 75 ? "bg-accent" :
+    boxScore >= 50 ? "bg-yellow-500" :
+    boxScore >= 25 ? "bg-orange-500" :
+    "bg-red-500";
+
   return (
-    <div className="space-y-4">
-      {/* Visual FIFO queue grid */}
-      <div className="bg-surface rounded-xl p-3 sm:p-6 border border-border">
-        <div className="space-y-3 sm:space-y-4">
-          {rows.map((row, rowIdx) => (
-            <div key={rowIdx} className="flex items-center gap-2 sm:gap-3">
-              {/* Checkered flag */}
-              <div className="flex-shrink-0 w-7 sm:w-10 text-center text-lg sm:text-2xl">🏁</div>
+    <div className="flex flex-col h-full">
+      {/* ── Indicator cards (same as race tab) ── */}
+      <div className="sticky top-0 z-20 bg-black pb-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2">
+          {/* Driver / Last lap */}
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
+              {t("metric.driverLastLap")}
+            </span>
+            <span className="text-sm sm:text-base font-bold leading-none text-neutral-200 truncate max-w-full mb-0.5">
+              {ourKart?.driverName || ourKart?.teamName || "-"}
+            </span>
+            <span className={clsx(
+              "text-lg sm:text-xl font-mono font-black leading-none",
+              lastLapDelta === "faster" ? "text-green-400" :
+              lastLapDelta === "slower" ? "text-yellow-400" : "text-white"
+            )}>
+              {ourKart && ourKart.lastLapMs > 0 ? (
+                <>
+                  {lastLapDelta === "faster" && <span className="mr-0.5">↓</span>}
+                  {lastLapDelta === "slower" && <span className="mr-0.5">↑</span>}
+                  {msToLapTime(ourKart.lastLapMs)}
+                </>
+              ) : "-"}
+            </span>
+          </div>
 
-              {/* Cards in this row */}
-              <div className="flex gap-1.5 sm:gap-3 flex-1 overflow-x-auto">
-                {row.map((entry, colIdx) => {
-                  const score = entryScore(entry);
-                  const team = entryTeam(entry);
-                  const driver = entryDriver(entry);
-                  const hasInfo = team || driver;
-                  return (
-                    <div
-                      key={colIdx}
-                      className="flex-1 min-w-[56px] sm:min-w-[100px] max-w-[160px] rounded-lg border-2 border-neutral-600 bg-neutral-800/50 flex flex-col items-center justify-center py-1.5 sm:py-2 px-1 sm:px-2"
-                    >
-                      <span
-                        className="text-xl sm:text-3xl font-bold leading-tight"
-                        style={{ color: tierHex(score) }}
+          {/* Avg 20 laps */}
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
+              {t("metric.avgLap")}
+            </span>
+            <span className="text-lg sm:text-xl font-mono font-black leading-none text-neutral-200">
+              {ourKart && ourKart.avgLapMs > 0 ? msToLapTime(Math.round(ourKart.avgLapMs)) : "-"}
+            </span>
+          </div>
+
+          {/* Position by avg */}
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
+              {t("metric.avgPosition")}
+            </span>
+            <span className={clsx(
+              "text-lg sm:text-xl font-mono font-black leading-none",
+              ourAvgPosition <= 3 ? "text-accent" : ourAvgPosition <= 10 ? "text-green-400" : "text-neutral-200"
+            )}>
+              {ourAvgPosition > 0 ? `${ourAvgPosition}/${sorted.length}` : "-"}
+            </span>
+          </div>
+
+          {/* Stint time */}
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
+              {t("metric.currentStint")}
+            </span>
+            <span className={clsx("text-lg sm:text-xl font-mono font-black leading-none", stintColor)}>
+              {secondsToHMS(ourStintSec)}
+            </span>
+          </div>
+
+          {/* Time to max stint */}
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
+              {t("metric.timeToMaxStint")}
+            </span>
+            <span className={clsx("text-lg sm:text-xl font-mono font-black leading-none", timeToMaxColor)}>
+              {secondsToHMS(timeToMaxStint)}
+            </span>
+          </div>
+
+          {/* Laps to max stint */}
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
+              {t("metric.lapsToMaxStint")}
+            </span>
+            <span className="text-lg sm:text-xl font-mono font-black leading-none text-neutral-200">
+              {lapsToMaxStint > 0 ? lapsToMaxStint.toFixed(1) : "0"}
+            </span>
+          </div>
+
+          {/* Karts near pit */}
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
+              {t("metric.kartsNearPit")}
+            </span>
+            <span className={clsx(
+              "text-lg sm:text-xl font-mono font-black leading-none",
+              kartsNearPit > 3 ? "text-orange-400" : kartsNearPit > 0 ? "text-yellow-400" : "text-neutral-200"
+            )}>
+              {kartsNearPit}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Box score + FIFO queue rows ── */}
+      <div className="flex gap-2 sm:gap-3 mt-2">
+        {/* Box score card (left) */}
+        <div className="flex-shrink-0 bg-surface rounded-xl border border-border p-3 sm:p-4 flex flex-col items-center justify-center w-24 sm:w-28">
+          <span className={`w-2.5 h-2.5 rounded-full ${scoreDotColor} mb-1.5`} />
+          <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
+            {t("driver.boxScore")}
+          </span>
+          <span
+            className="text-3xl sm:text-4xl font-black leading-none"
+            style={{ color: tierHex(boxScore) }}
+          >
+            {boxScore > 0 ? boxScore.toFixed(0) : "-"}
+          </span>
+          <span className="text-[8px] text-neutral-600 uppercase tracking-widest mt-0.5">/ 100</span>
+        </div>
+
+        {/* FIFO queue rows (right, takes remaining space) */}
+        <div className="flex-1 bg-surface rounded-xl border border-border p-2 sm:p-3">
+          <div className="space-y-2 sm:space-y-3">
+            {rows.map((row, rowIdx) => (
+              <div key={rowIdx} className="flex items-center gap-1.5 sm:gap-2">
+                {/* Checkered flag */}
+                <div className="flex-shrink-0 w-6 sm:w-8 text-center text-base sm:text-xl">🏁</div>
+
+                {/* Cards */}
+                <div className="flex gap-1 sm:gap-2 flex-1 overflow-x-auto">
+                  {row.map((entry, colIdx) => {
+                    const score = entryScore(entry);
+                    const team = entryTeam(entry);
+                    const driver = entryDriver(entry);
+                    const hasInfo = team || driver;
+                    return (
+                      <div
+                        key={colIdx}
+                        className="flex-1 min-w-[48px] sm:min-w-[80px] max-w-[140px] rounded-lg border-2 border-neutral-600 bg-neutral-800/50 flex flex-col items-center justify-center py-1 sm:py-1.5 px-1"
                       >
-                        {score}
-                      </span>
-                      {hasInfo ? (
-                        <>
-                          <span className="text-[8px] sm:text-[10px] text-neutral-300 mt-0.5 truncate w-full text-center leading-tight font-medium">
-                            {team}
-                          </span>
-                          <span className="text-[7px] sm:text-[9px] text-neutral-500 truncate w-full text-center leading-tight">
-                            {driver}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-[10px] sm:text-xs text-neutral-500 mt-0.5">Box</span>
-                      )}
-                    </div>
-                  );
-                })}
+                        <span
+                          className="text-lg sm:text-2xl font-bold leading-tight"
+                          style={{ color: tierHex(score) }}
+                        >
+                          {score}
+                        </span>
+                        {hasInfo ? (
+                          <>
+                            <span className="text-[7px] sm:text-[9px] text-neutral-300 mt-0.5 truncate w-full text-center leading-tight font-medium">
+                              {team}
+                            </span>
+                            <span className="text-[6px] sm:text-[8px] text-neutral-500 truncate w-full text-center leading-tight">
+                              {driver}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-[9px] sm:text-[10px] text-neutral-500 mt-0.5">Box</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Row label */}
+                <div className="flex-shrink-0 flex items-center gap-0.5">
+                  <span className="text-[10px] sm:text-xs text-red-400 font-bold">F{rowIdx + 1}</span>
+                  <span className="text-red-400 text-xs sm:text-sm">&larr;</span>
+                </div>
               </div>
-
-              {/* Fila label */}
-              <div className="flex-shrink-0 flex items-center gap-1">
-                <span className="text-xs sm:text-sm text-red-400 font-bold">F{rowIdx + 1}</span>
-                <span className="text-red-400 text-sm sm:text-lg">&larr;</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Score */}
-      <div className="bg-surface rounded-xl p-3 sm:p-4 border border-border flex items-center justify-center gap-2 sm:gap-3">
-        <span className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${scoreDotColor}`} />
-        <span className={`text-base sm:text-xl font-bold ${scoreColor}`}>
-          Score = {fifo.score.toFixed(1)}
-        </span>
-      </div>
-
-      {/* Info panels */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Left: Stint metrics */}
-        <div className="bg-surface rounded-xl border border-border overflow-hidden">
-          <div className="bg-neutral-800/50 px-4 py-2 flex justify-between">
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("metric.metric")}</span>
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("metric.value")}</span>
-          </div>
-          <div className="divide-y divide-border">
-            <InfoRow
-              label={t("metric.currentStint")}
-              value={secondsToHMS(ourStintSec)}
-              highlight={ourStintSec / 60 >= config.maxStintMin}
-            />
-            <InfoRow label={t("metric.timeToMaxStint")} value={secondsToHMS(timeToMaxStint)} />
-            <InfoRow label={t("metric.lapsToMaxStint")} value={String(lapsToMaxStint)} />
-            <InfoRow label={t("metric.kartsNearPit")} value={String(kartsNearPit)} />
-            <InfoRow label={t("metric.maxStint")} value={secondsToHMS(config.maxStintMin * 60)} />
-            <InfoRow label={t("metric.minStint")} value={secondsToHMS(config.minStintMin * 60)} />
-          </div>
-        </div>
-
-        {/* Right: Pit info */}
-        <div className="bg-surface rounded-xl border border-border overflow-hidden">
-          <div className="bg-neutral-800/50 px-4 py-2 flex justify-between">
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("pit.pits")}</span>
-            <span className="text-[11px] text-neutral-200 uppercase tracking-wider font-semibold">{t("metric.value")}</span>
-          </div>
-          <div className="divide-y divide-border">
-            <InfoRow
-              label={t("pit.currentPit")}
-              value={ourKart?.pitStatus === "in_pit" ? secondsToHMS(ourStintSec) : secondsToHMS(0)}
-            />
-            <InfoRow
-              label={t("pit.minPitTime")}
-              value={secondsToHMS(config.pitTimeS)}
-            />
-            <InfoRow
-              label={t("pit.pitCount")}
-              value={ourKart ? String(ourKart.pitCount) : "0"}
-            />
-            <InfoRow
-              label={t("pit.minPitCount")}
-              value={String(config.minPits)}
-            />
+            ))}
           </div>
         </div>
       </div>
 
-      {/* FIFO history (only shows entries from actual pit events) */}
+      {/* ── Pit info cards ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 mt-3">
+        {/* Current pit time */}
+        <PitCard
+          label={t("pit.currentPit")}
+          value={ourKart?.pitStatus === "in_pit" ? secondsToHMS(ourStintSec) : secondsToHMS(0)}
+          accent={ourKart?.pitStatus === "in_pit"}
+        />
+        {/* Min pit time */}
+        <PitCard
+          label={t("pit.minPitTime")}
+          value={secondsToHMS(config.pitTimeS)}
+        />
+        {/* Pit count */}
+        <PitCard
+          label={t("pit.pitCount")}
+          value={ourKart ? String(ourKart.pitCount) : "0"}
+        />
+        {/* Min pit count */}
+        <PitCard
+          label={t("pit.minPitCount")}
+          value={String(config.minPits)}
+        />
+        {/* Max stint */}
+        <PitCard
+          label={t("metric.maxStint")}
+          value={secondsToHMS(config.maxStintMin * 60)}
+        />
+        {/* Min stint */}
+        <PitCard
+          label={t("metric.minStint")}
+          value={secondsToHMS(config.minStintMin * 60)}
+        />
+      </div>
+
+      {/* ── FIFO history ── */}
       {fifo.history.length > 0 && (
-        <div className="bg-surface rounded-xl p-4 border border-border">
-          <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">
+        <div className="bg-surface rounded-xl p-3 sm:p-4 border border-border mt-3">
+          <h3 className="text-[11px] text-neutral-300 mb-3 uppercase tracking-wider font-bold">
             {t("pit.history")} ({fifo.history.length})
           </h3>
           <div className="overflow-x-auto">
@@ -221,13 +355,13 @@ export function FifoQueue() {
                               <span className="text-[7px] text-neutral-600 w-3 flex-shrink-0">F{ri + 1}</span>
                               {hr.map((entry, j) => {
                                 const s = entryScore(entry);
-                                const t = entryTeam(entry);
+                                const tm = entryTeam(entry);
                                 return (
                                   <div
                                     key={j}
                                     className="w-5 h-5 rounded-sm flex items-center justify-center text-[8px] font-bold text-black"
                                     style={{ backgroundColor: tierHex(s) }}
-                                    title={t || undefined}
+                                    title={tm || undefined}
                                   >
                                     {s}
                                   </div>
@@ -249,13 +383,20 @@ export function FifoQueue() {
   );
 }
 
-function InfoRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+/* ── Small pit info card ── */
+function PitCard({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="flex justify-between items-center px-4 py-2">
-      <span className={clsx("text-sm", highlight ? "text-tier-1 font-semibold" : "text-neutral-300")}>
+    <div className={clsx(
+      "bg-surface rounded-xl border p-2 sm:p-3 flex flex-col items-center justify-center",
+      accent ? "border-accent/40" : "border-border"
+    )}>
+      <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1 text-center leading-tight">
         {label}
       </span>
-      <span className={clsx("text-sm font-mono", highlight ? "text-tier-1 font-bold" : "text-white")}>
+      <span className={clsx(
+        "text-lg sm:text-xl font-mono font-black leading-none",
+        accent ? "text-accent" : "text-white"
+      )}>
         {value}
       </span>
     </div>
