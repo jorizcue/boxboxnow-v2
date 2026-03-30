@@ -79,6 +79,22 @@ export function FifoQueue() {
     ? sorted.findIndex((k) => k.kartNumber === config.ourKartNumber) + 1
     : 0;
 
+  // Compute actual pit-in elapsed time (independent of stint timer)
+  const pitElapsedSec = useMemo(() => {
+    if (!ourKart || ourKart.pitStatus !== "in_pit" || durationMs === 0 || raceClockMs === 0) return 0;
+    // Find last pit record still in pit (pitTimeMs === 0)
+    const history = ourKart.pitHistory;
+    if (history.length > 0) {
+      const last = history[history.length - 1];
+      if (last.pitTimeMs === 0 && last.raceTimeMs > 0) {
+        const raceElapsedMs = durationMs - raceClockMs;
+        return Math.max(0, (raceElapsedMs - last.raceTimeMs) / 1000);
+      }
+    }
+    // Fallback: use stint timer
+    return ourStintSec;
+  }, [ourKart, durationMs, raceClockMs, ourStintSec]);
+
   // Lap delta tracking for last lap card
   const prevLastLapRef = useRef<number>(0);
   const [lastLapDelta, setLastLapDelta] = useState<"faster" | "slower" | null>(null);
@@ -286,7 +302,7 @@ export function FifoQueue() {
         {/* Current pit time */}
         <PitCard
           label={t("pit.currentPit")}
-          value={ourKart?.pitStatus === "in_pit" ? secondsToHMS(ourStintSec) : secondsToHMS(0)}
+          value={ourKart?.pitStatus === "in_pit" ? secondsToHMS(pitElapsedSec) : secondsToHMS(0)}
           accent={ourKart?.pitStatus === "in_pit"}
         />
         {/* Min pit time */}
