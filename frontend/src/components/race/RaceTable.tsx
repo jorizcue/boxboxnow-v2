@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useRaceClock } from "@/hooks/useRaceClock";
 import { useT } from "@/lib/i18n";
@@ -21,6 +21,10 @@ export function RaceTable() {
     []
   );
 
+  // Track previous lap time for our kart (for comparison arrow)
+  const prevLastLapRef = useRef<number>(0);
+  const [lastLapDelta, setLastLapDelta] = useState<"faster" | "slower" | null>(null);
+
   // Sort by avg lap time (fastest first), karts without avg go to the end
   const sorted = [...karts].sort((a, b) => {
     const aAvg = a.avgLapMs > 0 ? a.avgLapMs : Infinity;
@@ -40,6 +44,17 @@ export function RaceTable() {
   const ourKart = config.ourKartNumber > 0
     ? sorted.find((k) => k.kartNumber === config.ourKartNumber)
     : undefined;
+
+  // Update lap comparison when our kart's last lap changes
+  const ourLastLapMs = ourKart?.lastLapMs ?? 0;
+  useEffect(() => {
+    if (ourLastLapMs > 0 && prevLastLapRef.current > 0 && ourLastLapMs !== prevLastLapRef.current) {
+      setLastLapDelta(ourLastLapMs < prevLastLapRef.current ? "faster" : "slower");
+    }
+    if (ourLastLapMs > 0) {
+      prevLastLapRef.current = ourLastLapMs;
+    }
+  }, [ourLastLapMs]);
 
   const ourStintSec = ourKart ? stintSecondsFor(ourKart) : 0;
   const ourStintMin = ourStintSec / 60;
@@ -94,20 +109,30 @@ export function RaceTable() {
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2">
           {/* Driver / Last lap */}
           <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
-            <span className="text-[8px] sm:text-[9px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.driverLastLap")}
             </span>
             <span className="text-sm sm:text-base font-bold leading-none text-neutral-200 truncate max-w-full mb-0.5">
-              {ourKart?.driverName || "-"}
+              {ourKart?.driverName || ourKart?.teamName || "-"}
             </span>
-            <span className="text-lg sm:text-xl font-mono font-black leading-none text-white">
-              {ourKart && ourKart.lastLapMs > 0 ? msToLapTime(ourKart.lastLapMs) : "-"}
+            <span className={clsx(
+              "text-lg sm:text-xl font-mono font-black leading-none",
+              lastLapDelta === "faster" ? "text-green-400" :
+              lastLapDelta === "slower" ? "text-yellow-400" : "text-white"
+            )}>
+              {ourKart && ourKart.lastLapMs > 0 ? (
+                <>
+                  {lastLapDelta === "faster" && <span className="mr-0.5">↓</span>}
+                  {lastLapDelta === "slower" && <span className="mr-0.5">↑</span>}
+                  {msToLapTime(ourKart.lastLapMs)}
+                </>
+              ) : "-"}
             </span>
           </div>
 
           {/* Avg 20 laps */}
           <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
-            <span className="text-[8px] sm:text-[9px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.avgLap")}
             </span>
             <span className="text-lg sm:text-xl font-mono font-black leading-none text-neutral-200">
@@ -117,7 +142,7 @@ export function RaceTable() {
 
           {/* Position by avg */}
           <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
-            <span className="text-[8px] sm:text-[9px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.avgPosition")}
             </span>
             <span className={clsx(
@@ -130,7 +155,7 @@ export function RaceTable() {
 
           {/* Stint time */}
           <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
-            <span className="text-[8px] sm:text-[9px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.currentStint")}
             </span>
             <span className={clsx("text-lg sm:text-xl font-mono font-black leading-none", stintColor)}>
@@ -140,7 +165,7 @@ export function RaceTable() {
 
           {/* Time to max stint */}
           <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
-            <span className="text-[8px] sm:text-[9px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.timeToMaxStint")}
             </span>
             <span className={clsx("text-lg sm:text-xl font-mono font-black leading-none", timeToMaxColor)}>
@@ -150,7 +175,7 @@ export function RaceTable() {
 
           {/* Laps to max stint */}
           <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
-            <span className="text-[8px] sm:text-[9px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.lapsToMaxStint")}
             </span>
             <span className="text-lg sm:text-xl font-mono font-black leading-none text-neutral-200">
@@ -160,7 +185,7 @@ export function RaceTable() {
 
           {/* Karts near pit */}
           <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
-            <span className="text-[8px] sm:text-[9px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.kartsNearPit")}
             </span>
             <span className={clsx(
