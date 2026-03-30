@@ -89,6 +89,7 @@ export interface RaceConfig {
 
 export interface RaceSnapshot {
   raceStarted: boolean;
+  raceFinished?: boolean;
   countdownMs: number;
   trackName: string;
   karts: KartState[];

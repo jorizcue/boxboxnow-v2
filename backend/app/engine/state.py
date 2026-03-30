@@ -143,6 +143,7 @@ class RaceStateManager:
     def __init__(self):
         self.karts: dict[str, KartState] = {}
         self.race_started: bool = False
+        self.race_finished: bool = False
         self.countdown_ms: int = 0
         self.track_name: str = ""
         self.start_time: float = 0.0
@@ -181,6 +182,7 @@ class RaceStateManager:
         """Reset all race state (used when starting/stopping replay)."""
         self.karts.clear()
         self.race_started = False
+        self.race_finished = False
         self.countdown_ms = 0
         self.track_name = ""
         self.start_time = 0.0
@@ -505,6 +507,9 @@ class RaceStateManager:
             if light == "lg" and not self.race_started:
                 # Green light is the earliest race start signal (before countdown in some circuits)
                 self._trigger_race_start(trigger="green_light")
+            elif light == "lf" and self.race_started:
+                self._trigger_race_end()
+                return {"event": "raceEnd", "countdownMs": 0}
             return {"event": "light", "value": light}
 
         elif event.type == EventType.SESSION_TITLE:
@@ -585,6 +590,7 @@ class RaceStateManager:
         - LIGHT green: No countdown received yet, use configured duration_min.
         """
         self.race_started = True
+        self.race_finished = False
         self.start_time = time.time()
 
         if trigger == "countdown" and self.countdown_ms > 0:
@@ -616,6 +622,19 @@ class RaceStateManager:
                     f"karts={len(self.karts)}")
         self._needs_snapshot = True
 
+    def _trigger_race_end(self):
+        """Mark race as finished via finish flag (light|lf|).
+
+        Sets countdown to 0 so the frontend clock shows 00:00:00.
+        Keeps race_started=True so UI stays visible with final standings.
+        """
+        logger.info(f"Race ended via finish flag (light|lf|). "
+                    f"countdown_ms was {self.countdown_ms}, "
+                    f"elapsed since start: {time.time() - self.start_time:.1f}s")
+        self.countdown_ms = 0
+        self.race_finished = True
+        self._needs_snapshot = True
+
     def get_snapshot(self) -> dict:
         """Get full state snapshot for new client connections."""
         sorted_karts = sorted(self.karts.values(), key=lambda k: k.position or 999)
@@ -623,6 +642,7 @@ class RaceStateManager:
             "type": "snapshot",
             "data": {
                 "raceStarted": self.race_started,
+                "raceFinished": self.race_finished,
                 "countdownMs": self.countdown_ms,
                 "trackName": self.track_name,
                 "karts": [k.to_dict() for k in sorted_karts],

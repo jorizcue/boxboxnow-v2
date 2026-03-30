@@ -303,6 +303,12 @@ class CircuitConnection:
                     self._on_race_start(duration_ms=0, is_count_up=True)
                 continue
 
+            # Finish flag — race end
+            if line == "light|lf|":
+                if self._race_active:
+                    self._on_race_end(reason="finish_light")
+                continue
+
             # Checkered flag — race end
             if 'data-flag="chequered"' in line:
                 if self._race_active:

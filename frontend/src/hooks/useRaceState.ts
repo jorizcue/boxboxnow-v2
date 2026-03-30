@@ -13,6 +13,7 @@ import type {
 interface RaceStore {
   connected: boolean;
   raceStarted: boolean;
+  raceFinished: boolean;
   countdownMs: number;
   trackName: string;
   durationMs: number;
@@ -69,6 +70,7 @@ const defaultConfig: RaceConfig = {
 export const useRaceStore = create<RaceStore>((set) => ({
   connected: false,
   raceStarted: false,
+  raceFinished: false,
   countdownMs: 0,
   trackName: "",
   durationMs: 0,
@@ -108,6 +110,7 @@ export const useRaceStore = create<RaceStore>((set) => ({
   applySnapshot: (snapshot) =>
     set({
       raceStarted: snapshot.raceStarted,
+      raceFinished: snapshot.raceFinished || false,
       countdownMs: snapshot.countdownMs,
       trackName: snapshot.trackName,
       durationMs: snapshot.durationMs || 0,
@@ -123,7 +126,14 @@ export const useRaceStore = create<RaceStore>((set) => ({
       let countdownMs = state.countdownMs;
       let trackName = state.trackName;
 
+      let raceFinished = state.raceFinished;
+
       for (const ev of events) {
+        if (ev.event === "raceEnd") {
+          countdownMs = 0;
+          raceFinished = true;
+          continue;
+        }
         if (ev.event === "countdown" && typeof ev.ms === "number") {
           countdownMs = ev.ms;
           continue;
@@ -191,7 +201,7 @@ export const useRaceStore = create<RaceStore>((set) => ({
         karts[idx] = kart;
       }
 
-      return { karts, countdownMs, trackName };
+      return { karts, countdownMs, trackName, raceFinished };
     }),
 
   applyFifoUpdate: (data) =>
