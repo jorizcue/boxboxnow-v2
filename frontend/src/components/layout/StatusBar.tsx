@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { msToCountdown } from "@/lib/formatters";
 import { useAuth } from "@/hooks/useAuth";
 import { useT, useLangStore, LANGUAGES } from "@/lib/i18n";
@@ -67,6 +67,15 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
 
   // Format the timer display using the interpolated clock
   const timerDisplay = raceClockMs !== 0 ? msToCountdown(raceClockMs) : "00:00:00";
+
+  // Compute race start wall-clock time (HH:MM:SS)
+  const raceStartTime = useMemo(() => {
+    if (!raceStarted || durationMs === 0 || raceClockMs === 0) return null;
+    const elapsedMs = durationMs - raceClockMs;
+    const startEpoch = Date.now() - elapsedMs;
+    const d = new Date(startEpoch);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }, [raceStarted, durationMs, Math.floor(raceClockMs / 60000)]); // recalc every ~1min
 
   // Pit window status: closed during first/last N minutes AND during min stint after pit out
   const ourKart = ourKartNumber > 0 ? karts.find((k) => k.kartNumber === ourKartNumber) : undefined;
@@ -183,6 +192,11 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
           {/* Center: countdown + pit status (hidden on very small, visible on sm+) */}
           <div className="hidden sm:flex items-center gap-2">
             <span className="text-[11px] text-neutral-400 uppercase tracking-wider">{t("status.race")}</span>
+            {raceStartTime && (
+              <span className="text-[10px] text-neutral-400 font-mono tabular-nums">
+                {raceStartTime}
+              </span>
+            )}
             <span className="text-base font-bold tabular-nums text-white">
               {timerDisplay}
             </span>
@@ -264,6 +278,11 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
                 }`}
               >
                 {pitIsClosed ? t("status.pitClosed") : t("status.pitOpen")}
+              </span>
+            )}
+            {raceStartTime && (
+              <span className="text-[9px] text-neutral-400 font-mono tabular-nums">
+                {raceStartTime}
               </span>
             )}
             <span className="text-sm font-bold tabular-nums text-white">
