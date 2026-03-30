@@ -97,6 +97,9 @@ const translations: Record<string, Record<Language, string>> = {
   "metric.kartsNearPit": { es: "Karts cerca de PIT", en: "Karts near PIT", it: "Kart vicini al PIT", de: "Karts nahe PIT" },
   "metric.maxStint": { es: "Stint maximo", en: "Max stint", it: "Stint massimo", de: "Max Stint" },
   "metric.minStint": { es: "Stint minimo", en: "Min stint", it: "Stint minimo", de: "Min Stint" },
+  "metric.driverLastLap": { es: "Piloto / Ult. vuelta", en: "Driver / Last lap", it: "Pilota / Ultimo giro", de: "Fahrer / Letzte Runde" },
+  "metric.avgLap": { es: "Media 20v", en: "Avg 20 laps", it: "Media 20 giri", de: "Schnitt 20 Rnd" },
+  "metric.avgPosition": { es: "Posicion por media", en: "Pos. by avg", it: "Pos. per media", de: "Pos. nach Schnitt" },
 
   // === Driver info ===
   "driver.driver": { es: "Piloto", en: "Driver", it: "Pilota", de: "Fahrer" },

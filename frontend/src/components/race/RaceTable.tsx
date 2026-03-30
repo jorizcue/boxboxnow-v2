@@ -54,6 +54,11 @@ export function RaceTable() {
     return stintMin >= config.maxStintMin - 5 && k.pitStatus !== "in_pit";
   }).length;
 
+  // Our kart position in the avg-sorted table (1-based)
+  const ourAvgPosition = ourKart
+    ? sorted.findIndex((k) => k.kartNumber === config.ourKartNumber) + 1
+    : 0;
+
   // Stint color logic:
   // Red if < minStintMin (can't pit yet) or >= maxStintMin (overdue)
   // Orange if within 5min of maxStintMin
@@ -86,44 +91,80 @@ export function RaceTable() {
     <div className="flex flex-col h-full">
       {/* Sticky indicator cards at the top */}
       <div className="sticky top-0 z-20 bg-black pb-2">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2">
+          {/* Driver / Last lap */}
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+            <span className="text-[8px] sm:text-[9px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+              {t("metric.driverLastLap")}
+            </span>
+            <span className="text-sm sm:text-base font-bold leading-none text-neutral-200 truncate max-w-full mb-0.5">
+              {ourKart?.driverName || "-"}
+            </span>
+            <span className="text-lg sm:text-xl font-mono font-black leading-none text-white">
+              {ourKart && ourKart.lastLapMs > 0 ? msToLapTime(ourKart.lastLapMs) : "-"}
+            </span>
+          </div>
+
+          {/* Avg 20 laps */}
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+            <span className="text-[8px] sm:text-[9px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+              {t("metric.avgLap")}
+            </span>
+            <span className="text-lg sm:text-xl font-mono font-black leading-none text-neutral-200">
+              {ourKart && ourKart.avgLapMs > 0 ? msToLapTime(Math.round(ourKart.avgLapMs)) : "-"}
+            </span>
+          </div>
+
+          {/* Position by avg */}
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+            <span className="text-[8px] sm:text-[9px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+              {t("metric.avgPosition")}
+            </span>
+            <span className={clsx(
+              "text-lg sm:text-xl font-mono font-black leading-none",
+              ourAvgPosition <= 3 ? "text-accent" : ourAvgPosition <= 10 ? "text-green-400" : "text-neutral-200"
+            )}>
+              {ourAvgPosition > 0 ? `${ourAvgPosition}/${sorted.length}` : "-"}
+            </span>
+          </div>
+
           {/* Stint time */}
-          <div className="bg-surface rounded-xl border border-border p-3 sm:p-4 flex flex-col items-center justify-center">
-            <span className="text-[9px] sm:text-[10px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+            <span className="text-[8px] sm:text-[9px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
               {t("metric.currentStint")}
             </span>
-            <span className={clsx("text-xl sm:text-2xl font-mono font-black leading-none", stintColor)}>
+            <span className={clsx("text-lg sm:text-xl font-mono font-black leading-none", stintColor)}>
               {secondsToHMS(ourStintSec)}
             </span>
           </div>
 
           {/* Time to max stint */}
-          <div className="bg-surface rounded-xl border border-border p-3 sm:p-4 flex flex-col items-center justify-center">
-            <span className="text-[9px] sm:text-[10px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+            <span className="text-[8px] sm:text-[9px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
               {t("metric.timeToMaxStint")}
             </span>
-            <span className={clsx("text-xl sm:text-2xl font-mono font-black leading-none", timeToMaxColor)}>
+            <span className={clsx("text-lg sm:text-xl font-mono font-black leading-none", timeToMaxColor)}>
               {secondsToHMS(timeToMaxStint)}
             </span>
           </div>
 
           {/* Laps to max stint */}
-          <div className="bg-surface rounded-xl border border-border p-3 sm:p-4 flex flex-col items-center justify-center">
-            <span className="text-[9px] sm:text-[10px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+            <span className="text-[8px] sm:text-[9px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
               {t("metric.lapsToMaxStint")}
             </span>
-            <span className="text-xl sm:text-2xl font-mono font-black leading-none text-neutral-200">
+            <span className="text-lg sm:text-xl font-mono font-black leading-none text-neutral-200">
               {lapsToMaxStint > 0 ? lapsToMaxStint.toFixed(1) : "0"}
             </span>
           </div>
 
           {/* Karts near pit */}
-          <div className="bg-surface rounded-xl border border-border p-3 sm:p-4 flex flex-col items-center justify-center">
-            <span className="text-[9px] sm:text-[10px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+            <span className="text-[8px] sm:text-[9px] text-neutral-500 uppercase tracking-widest font-bold mb-1">
               {t("metric.kartsNearPit")}
             </span>
             <span className={clsx(
-              "text-xl sm:text-2xl font-mono font-black leading-none",
+              "text-lg sm:text-xl font-mono font-black leading-none",
               kartsNearPit > 3 ? "text-orange-400" : kartsNearPit > 0 ? "text-yellow-400" : "text-neutral-200"
             )}>
               {kartsNearPit}
