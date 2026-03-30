@@ -10,9 +10,9 @@ import { useT } from "@/lib/i18n";
 /*  Persistent card order                                              */
 /* ------------------------------------------------------------------ */
 
-type CardId = "pace" | "position" | "gapAhead" | "gapBehind" | "realPos" | "boxScore";
+type CardId = "lastLap" | "pace" | "position" | "gapAhead" | "gapBehind" | "realPos" | "boxScore";
 
-const DEFAULT_ORDER: CardId[] = ["pace", "position", "gapAhead", "gapBehind", "realPos", "boxScore"];
+const DEFAULT_ORDER: CardId[] = ["lastLap", "pace", "position", "gapAhead", "gapBehind", "realPos", "boxScore"];
 
 function loadOrder(): CardId[] {
   if (typeof window === "undefined") return DEFAULT_ORDER;
@@ -20,7 +20,9 @@ function loadOrder(): CardId[] {
     const raw = localStorage.getItem("bbn-driver-order");
     if (raw) {
       const parsed = JSON.parse(raw) as CardId[];
-      if (parsed.length === DEFAULT_ORDER.length) return parsed;
+      // Reset if card set changed (new cards added / removed)
+      const hasAll = DEFAULT_ORDER.every((c) => parsed.includes(c));
+      if (parsed.length === DEFAULT_ORDER.length && hasAll) return parsed;
     }
   } catch {}
   return DEFAULT_ORDER;
@@ -147,6 +149,36 @@ function useLapDelta(ourKart: number): { delta: LapDelta; deltaMs: number } {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Previous lap tracking hook                                         */
+/* ------------------------------------------------------------------ */
+
+function usePrevLap(ourKart: number): { prevLapMs: number; lastLapMs: number; lapDelta: "faster" | "slower" | null } {
+  const karts = useRaceStore((s) => s.karts);
+  const prevRef = useRef<number>(0);
+  const [prevLapMs, setPrevLapMs] = useState(0);
+  const [lastLapMs, setLastLapMs] = useState(0);
+  const [lapDelta, setLapDelta] = useState<"faster" | "slower" | null>(null);
+
+  useEffect(() => {
+    if (ourKart <= 0) return;
+    const kart = karts.find((k) => k.kartNumber === ourKart);
+    if (!kart || kart.lastLapMs <= 0) return;
+
+    if (kart.lastLapMs !== prevRef.current) {
+      // New lap detected
+      if (prevRef.current > 0) {
+        setPrevLapMs(prevRef.current);
+        setLapDelta(kart.lastLapMs < prevRef.current ? "faster" : "slower");
+      }
+      setLastLapMs(kart.lastLapMs);
+      prevRef.current = kart.lastLapMs;
+    }
+  }, [karts, ourKart]);
+
+  return { prevLapMs, lastLapMs, lapDelta };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -171,6 +203,8 @@ export function DriverView() {
 
   // Lap delta flash
   const { delta, deltaMs } = useLapDelta(ourKart);
+  // Previous lap tracking for lastLap card
+  const { lastLapMs: lastLapVal, lapDelta } = usePrevLap(ourKart);
 
   /* ---------- Compute adjusted classification (distance-based) ---------- */
   const { ourData } = useMemo(() => {
@@ -326,6 +360,35 @@ export function DriverView() {
   ) : null;
 
   const cards: Record<CardId, { label: string; content: React.ReactNode; accent: string }> = {
+    lastLap: {
+      label: t("driver.lastLap"),
+      accent: lapDelta === "faster"
+        ? "from-green-500/25 to-green-500/5 border-green-400/50"
+        : lapDelta === "slower"
+          ? "from-yellow-500/25 to-yellow-500/5 border-yellow-400/50"
+          : "from-neutral-500/20 to-neutral-500/5 border-neutral-500/30",
+      content: (
+        <div className="flex flex-col items-center">
+          <span className={`text-3xl sm:text-4xl font-mono font-black leading-none tracking-tight ${
+            lapDelta === "faster" ? "text-green-400" : lapDelta === "slower" ? "text-yellow-400" : "text-white"
+          }`}>
+            {lastLapVal > 0 ? msToLapTime(lastLapVal) : "--:--.---"}
+          </span>
+          {lapDelta && (
+            <div className={`flex items-center gap-1 mt-1.5 ${lapDelta === "faster" ? "text-green-400" : "text-yellow-400"}`}>
+              {lapDelta === "faster" ? (
+                <span className="text-lg leading-none">↓</span>
+              ) : (
+                <span className="text-lg leading-none">↑</span>
+              )}
+              <span className="text-xs font-mono font-bold">
+                {lapDelta === "faster" ? t("driver.fasterLap") : t("driver.slowerLap")}
+              </span>
+            </div>
+          )}
+        </div>
+      ),
+    },
     pace: {
       label: t("driver.pace"),
       accent: delta === "faster"
@@ -447,7 +510,7 @@ export function DriverView() {
 
       {/* Cards grid — 3×2 landscape layout */}
       <div className="flex-1 p-2 sm:p-3 overflow-hidden">
-        <div className="grid grid-cols-3 grid-rows-2 gap-2 sm:gap-3 h-full">
+        <div className="grid grid-cols-3 auto-rows-fr gap-2 sm:gap-3 h-full">
           {cardOrder.map((cardId, index) => {
             const card = cards[cardId];
             const isDragging = dragging === index;
