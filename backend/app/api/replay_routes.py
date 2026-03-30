@@ -62,15 +62,22 @@ def _resolve_logs_dir(user: User, owner_id: int | None = None,
     return os.path.join(LOGS_BASE_DIR, str(user.id))
 
 
+def _list_log_files(directory: Path) -> list[Path]:
+    """List .log and .log.gz files in a directory."""
+    logs = list(directory.glob("*.log"))
+    logs += list(directory.glob("*.log.gz"))
+    return logs
+
+
 def _list_user_logs(user_id: int) -> list[dict]:
     """List log files for a specific user."""
-    user_dir = os.path.join(LOGS_BASE_DIR, str(user_id))
-    if not os.path.isdir(user_dir):
+    user_dir = Path(os.path.join(LOGS_BASE_DIR, str(user_id)))
+    if not user_dir.is_dir():
         return []
     return sorted(
         [
             {"filename": f.name, "owner_id": user_id}
-            for f in Path(user_dir).glob("*.log")
+            for f in _list_log_files(user_dir)
         ],
         key=lambda x: x["filename"],
         reverse=True,
@@ -85,7 +92,7 @@ def _list_root_logs() -> list[dict]:
     return sorted(
         [
             {"filename": f.name, "owner_id": None}
-            for f in base.glob("*.log")
+            for f in _list_log_files(base)
             if f.is_file()
         ],
         key=lambda x: x["filename"],
@@ -101,7 +108,7 @@ def _list_circuit_recordings() -> list[dict]:
     recordings = []
     for circuit_dir in sorted(base.iterdir()):
         if circuit_dir.is_dir():
-            for f in sorted(circuit_dir.glob("*.log"), reverse=True):
+            for f in sorted(_list_log_files(circuit_dir), reverse=True):
                 recordings.append({
                     "filename": f.name,
                     "owner_id": None,

@@ -1,6 +1,6 @@
 """
 Log file replay engine.
-Parses .log files captured from Apex Timing WebSocket sessions
+Parses .log and .log.gz files captured from Apex Timing WebSocket sessions
 and replays them through the same parser pipeline.
 
 Log format:
@@ -12,6 +12,7 @@ Log format:
 """
 
 import asyncio
+import gzip
 import logging
 import os
 import re
@@ -57,11 +58,13 @@ class ReplayEngine:
         }
 
     def list_logs(self) -> list[str]:
-        """List available .log files."""
+        """List available .log and .log.gz files."""
         log_path = Path(self.logs_dir)
         if not log_path.exists():
             return []
-        return sorted([f.name for f in log_path.glob("*.log")])
+        logs = [f.name for f in log_path.glob("*.log")]
+        logs += [f.name for f in log_path.glob("*.log.gz")]
+        return sorted(set(logs))
 
     def analyze_log(self, filename: str) -> dict:
         """Analyze a log file and return metadata: total blocks, race starts, timestamps."""
@@ -297,13 +300,20 @@ class ReplayEngine:
         self._progress = 1.0
         logger.info("Replay completed")
 
+    def _open_log_file(self, filepath: str):
+        """Open a log file, supporting both plain .log and .log.gz."""
+        if filepath.endswith(".gz"):
+            return gzip.open(filepath, "rt", encoding="utf-8", errors="replace")
+        return open(filepath, "r", encoding="utf-8", errors="replace")
+
     def _parse_log_file(self, filepath: str) -> list[tuple[datetime, str]]:
-        """Parse a log file into (timestamp, message_block) tuples."""
+        """Parse a log file into (timestamp, message_block) tuples.
+        Supports both .log and .log.gz files."""
         blocks = []
         current_timestamp = None
         current_lines = []
 
-        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+        with self._open_log_file(filepath) as f:
             for line in f:
                 line = line.rstrip("\n")
 

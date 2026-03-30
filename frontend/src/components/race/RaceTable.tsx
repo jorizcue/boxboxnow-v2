@@ -45,7 +45,7 @@ export function RaceTable() {
   const ourStintMin = ourStintSec / 60;
   const timeToMaxStint = Math.max(0, config.maxStintMin * 60 - ourStintSec);
   const lapsToMaxStint = ourKart && ourKart.avgLapMs > 0
-    ? Math.floor(timeToMaxStint / (ourKart.avgLapMs / 1000))
+    ? timeToMaxStint / (ourKart.avgLapMs / 1000)
     : 0;
 
   const kartsNearPit = sorted.filter((k) => {
@@ -113,7 +113,7 @@ export function RaceTable() {
               {t("metric.lapsToMaxStint")}
             </span>
             <span className="text-xl sm:text-2xl font-mono font-black leading-none text-neutral-200">
-              {lapsToMaxStint}
+              {lapsToMaxStint > 0 ? lapsToMaxStint.toFixed(1) : "0"}
             </span>
           </div>
 

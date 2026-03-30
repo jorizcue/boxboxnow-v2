@@ -1,7 +1,10 @@
+import logging
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -46,6 +49,17 @@ async def init_db():
             pass
         try:
             await conn.execute(text("ALTER TABLE race_sessions ADD COLUMN pit_closed_end_min INTEGER DEFAULT 0"))
+        except Exception:
+            pass
+
+        # Recreate live_race_state if it has the old schema (race_session_id column)
+        try:
+            result = await conn.execute(text("PRAGMA table_info(live_race_state)"))
+            columns = [row[1] for row in result.fetchall()]
+            if columns and "race_session_id" in columns:
+                await conn.execute(text("DROP TABLE IF EXISTS live_pit_events"))
+                await conn.execute(text("DROP TABLE IF EXISTS live_race_state"))
+                logger.info("Dropped old live_race_state/live_pit_events tables (schema migration)")
         except Exception:
             pass
 

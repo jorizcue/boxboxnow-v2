@@ -284,6 +284,18 @@ class RaceStateManager:
                 kart.stint_start_countdown_ms = getattr(self, '_race_start_ms', self.countdown_ms)
             else:
                 kart.stint_start_countdown_ms = self.countdown_ms
+
+            # Apply restored pit summary from DB (after backend restart mid-race)
+            pit_summary = getattr(self, '_restored_pit_summary', {})
+            if pit_summary and kart.kart_number in pit_summary:
+                ps = pit_summary[kart.kart_number]
+                # Restore pit count if Apex init data shows fewer pits than DB
+                if ps["pit_count"] > kart.pit_count:
+                    kart.pit_count = ps["pit_count"]
+                # Restore stint start from last pit-out countdown
+                if ps["last_pit_out_countdown_ms"] is not None:
+                    kart.stint_start_countdown_ms = ps["last_pit_out_countdown_ms"]
+
             self.karts[row_id] = kart
             return None  # Init sends snapshot, not individual updates
 

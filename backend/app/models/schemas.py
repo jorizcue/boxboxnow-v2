@@ -161,6 +161,47 @@ class KartLap(Base):
     race_log = relationship("RaceLog", back_populates="laps")
 
 
+class LiveRaceState(Base):
+    """
+    Persists the current live race at a circuit.
+    One row per circuit (unique constraint). Managed by CircuitConnection
+    when it detects race start/end from Apex WS messages.
+    Cleared when a new race starts or the race ends (checkered flag / reset).
+    """
+    __tablename__ = "live_race_state"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    circuit_id = Column(Integer, ForeignKey("circuits.id"), nullable=False, unique=True, index=True)
+    race_start_at = Column(DateTime, nullable=False)           # wall clock of race start (UTC)
+    duration_ms = Column(Integer, nullable=False)               # race duration in ms (from countdown)
+    is_count_up = Column(Boolean, default=False)                # True if circuit uses count-up mode
+    created_at = Column(DateTime, server_default=func.now())
+
+    circuit = relationship("Circuit")
+    pit_events = relationship("LivePitEvent", back_populates="live_race", cascade="all, delete-orphan")
+
+
+class LivePitEvent(Base):
+    """
+    Persists each pit-in / pit-out event for karts in the current live race.
+    Used to reconstruct stint times after backend restart or browser refresh.
+    """
+    __tablename__ = "live_pit_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    live_race_id = Column(Integer, ForeignKey("live_race_state.id", ondelete="CASCADE"), nullable=False, index=True)
+    kart_number = Column(Integer, nullable=False)
+    team_name = Column(String(100), default="")
+    driver_name = Column(String(100), default="")
+    stint_number = Column(Integer, default=0)
+    pit_in_at = Column(DateTime, nullable=True)                 # wall clock of pit entry
+    pit_out_at = Column(DateTime, nullable=True)                # wall clock of pit exit (null = still in pit)
+    pit_in_countdown_ms = Column(Integer, nullable=True)        # countdown at pit entry
+    pit_out_countdown_ms = Column(Integer, nullable=True)       # countdown at pit exit
+
+    live_race = relationship("LiveRaceState", back_populates="pit_events")
+
+
 class DeviceSession(Base):
     """
     Tracks active device sessions per user (OTT-style concurrent device control).

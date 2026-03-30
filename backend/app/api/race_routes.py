@@ -70,6 +70,8 @@ async def ensure_monitoring(app_state, user_id: int):
         duration_min=session.duration_min,
         refresh_s=session.refresh_interval_s,
         min_driver_time_min=session.min_driver_time_min,
+        pit_closed_start_min=session.pit_closed_start_min or 0,
+        pit_closed_end_min=session.pit_closed_end_min or 0,
     )
 
     # Configure PHP API client for driver auto-loading
@@ -89,6 +91,25 @@ async def ensure_monitoring(app_state, user_id: int):
                 for d in tp.drivers
             }
     user_session.set_driver_differentials(driver_differentials, team_positions)
+
+    # Restore live race state from CircuitHub if race is already in progress
+    conn = circuit_hub.get_connection(circuit.id)
+    if conn and conn.live_race_state:
+        lrs = conn.live_race_state
+        state = user_session.state
+        state.race_started = True
+        if lrs["duration_ms"] > 0:
+            state._race_start_ms = lrs["duration_ms"]
+            state._first_countdown_ms = lrs["duration_ms"]
+            state.countdown_ms = lrs["estimated_countdown_ms"]
+        # Load pit summary from DB for stint restoration
+        try:
+            pit_summary = await conn.load_pit_summary()
+            state._restored_pit_summary = pit_summary
+        except Exception:
+            pass
+        logger.info(f"Restored live race state from hub for user {user_id} "
+                    f"(countdown≈{state.countdown_ms}ms)")
 
     logger.info(f"Auto-started monitoring for user {user_id} on circuit {circuit.name}")
     return user_session
