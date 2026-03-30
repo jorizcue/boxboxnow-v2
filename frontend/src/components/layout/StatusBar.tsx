@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { msToCountdown } from "@/lib/formatters";
 import { useAuth } from "@/hooks/useAuth";
 import { useT, useLangStore, LANGUAGES } from "@/lib/i18n";
@@ -60,6 +60,15 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   // Use interpolated race clock that ticks every second
   const raceClockMs = useRaceClock();
 
+  // Wall clock that ticks every second
+  const [clockStr, setClockStr] = useState("");
+  useEffect(() => {
+    const tick = () => setClockStr(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const handleLogout = async () => {
     try { await api.logout(); } catch {}
     logout();
@@ -106,6 +115,11 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
             <span className="text-sm font-bold tracking-wider text-white shrink-0">
               BB<span className="text-accent">N</span>
             </span>
+            {clockStr && (
+              <span className="text-[10px] sm:text-[11px] text-neutral-400 font-mono tabular-nums shrink-0">
+                {clockStr}
+              </span>
+            )}
             <div className="flex items-center gap-1.5">
               <div
                 className={`w-2 h-2 rounded-full shrink-0 ${

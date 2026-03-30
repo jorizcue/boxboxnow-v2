@@ -575,22 +575,18 @@ class RaceStateManager:
         """Mark the race as started and initialize stint tracking for all karts.
 
         Called by COUNTDOWN, COUNT_UP, or LIGHT green — whichever arrives first.
-        Uses the ACTUAL first countdown value from Apex as the duration reference
-        so elapsed time starts at ~0 and stays in sync with the Apex live view.
-        Falls back to configured duration_min only if no countdown received yet
-        (e.g. triggered by green light before first countdown).
+        Always uses duration_min as race start reference because:
+        - For COUNT_UP circuits (e.g. Campillos): the elapsed value from Apex is
+          absolute, so durationMs must be the full configured duration to compute
+          correct elapsed = durationMs - countdownMs.
+        - For COUNTDOWN circuits: the first countdown is always a few seconds
+          less than the true start, but the small offset corrects quickly as
+          Apex sends updates every ~30s.
         """
         self.race_started = True
         self.start_time = time.time()
 
-        # Use actual first countdown value to stay in sync with Apex live timing.
-        # The configured duration_min * 60000 is always higher than the first
-        # countdown we receive (Apex has already been running for a few seconds),
-        # causing a visible desync if used as reference.
-        if self.countdown_ms > 0:
-            race_start_ms = self.countdown_ms
-        else:
-            race_start_ms = self.duration_min * 60 * 1000
+        race_start_ms = self.duration_min * 60 * 1000
         self._race_start_ms = race_start_ms
         self._first_countdown_ms = race_start_ms
 
