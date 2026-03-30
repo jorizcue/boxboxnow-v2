@@ -575,18 +575,32 @@ class RaceStateManager:
         """Mark the race as started and initialize stint tracking for all karts.
 
         Called by COUNTDOWN, COUNT_UP, or LIGHT green — whichever arrives first.
-        Always uses duration_min as race start reference because:
-        - For COUNT_UP circuits (e.g. Campillos): the elapsed value from Apex is
-          absolute, so durationMs must be the full configured duration to compute
-          correct elapsed = durationMs - countdownMs.
-        - For COUNTDOWN circuits: the first countdown is always a few seconds
-          less than the true start, but the small offset corrects quickly as
-          Apex sends updates every ~30s.
+
+        Duration detection strategy:
+        - COUNTDOWN circuits (e.g. Eupen): The first countdown value IS the race
+          duration (e.g. 1080053 ≈ 18min). Round up to the nearest minute for a
+          clean reference. This auto-detects duration without user config.
+        - COUNT_UP circuits (e.g. Campillos): The elapsed value grows from ~0.
+          We can't know total duration yet, so use configured duration_min.
+        - LIGHT green: No countdown received yet, use configured duration_min.
         """
         self.race_started = True
         self.start_time = time.time()
 
-        race_start_ms = self.duration_min * 60 * 1000
+        if trigger == "countdown" and self.countdown_ms > 0:
+            # Auto-detect duration from first countdown value.
+            # Round up to nearest minute (e.g. 1080053 → 1080000 = 18min,
+            # 774582 → 780000 = 13min). This handles the small Apex delay.
+            import math
+            detected_ms = math.ceil(self.countdown_ms / 60000) * 60000
+            race_start_ms = detected_ms
+            detected_min = detected_ms // 60000
+            logger.info(f"Auto-detected race duration from countdown: "
+                        f"{self.countdown_ms}ms → {detected_min}min ({detected_ms}ms)")
+        else:
+            # COUNT_UP or green light: use configured duration
+            race_start_ms = self.duration_min * 60 * 1000
+
         self._race_start_ms = race_start_ms
         self._first_countdown_ms = race_start_ms
 
