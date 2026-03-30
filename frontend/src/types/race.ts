@@ -82,6 +82,8 @@ export interface RaceConfig {
   boxLines: number;
   boxKarts: number;
   minDriverTimeMin: number;
+  pitClosedStartMin: number;
+  pitClosedEndMin: number;
 }
 
 export interface RaceSnapshot {

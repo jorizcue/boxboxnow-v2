@@ -27,6 +27,8 @@ interface RaceSession {
   pit_time_s: number;
   min_driver_time_min: number;
   rain: boolean;
+  pit_closed_start_min: number;
+  pit_closed_end_min: number;
   box_lines: number;
   box_karts: number;
   our_kart_number: number;
@@ -64,6 +66,8 @@ function RaceSessionEditor() {
   const [pitTime, setPitTime] = useState(120);
   const [minDriverTime, setMinDriverTime] = useState(30);
   const [rain, setRain] = useState(false);
+  const [pitClosedStart, setPitClosedStart] = useState(0);
+  const [pitClosedEnd, setPitClosedEnd] = useState(0);
   const [boxLines, setBoxLines] = useState(2);
   const [boxKarts, setBoxKarts] = useState(30);
   const [ourKart, setOurKart] = useState(0);
@@ -98,6 +102,8 @@ function RaceSessionEditor() {
     setPitTime(s.pit_time_s);
     setMinDriverTime(s.min_driver_time_min);
     setRain(s.rain);
+    setPitClosedStart(s.pit_closed_start_min ?? 0);
+    setPitClosedEnd(s.pit_closed_end_min ?? 0);
     setBoxLines(s.box_lines);
     setBoxKarts(s.box_karts);
     setOurKart(s.our_kart_number);
@@ -127,6 +133,8 @@ function RaceSessionEditor() {
         pit_time_s: pitTime,
         min_driver_time_min: minDriverTime,
         rain,
+        pit_closed_start_min: pitClosedStart,
+        pit_closed_end_min: pitClosedEnd,
         box_lines: boxLines,
         box_karts: boxKarts,
         our_kart_number: ourKart,
@@ -155,6 +163,8 @@ function RaceSessionEditor() {
           boxLines: boxLines,
           boxKarts: boxKarts,
           minDriverTimeMin: minDriverTime,
+          pitClosedStartMin: pitClosedStart,
+          pitClosedEndMin: pitClosedEnd,
         },
       }));
 
@@ -219,6 +229,8 @@ function RaceSessionEditor() {
           <Field label={t("config.pitTime")} value={pitTime} onChange={setPitTime} />
           <Field label={t("config.minDriverTime")} value={minDriverTime} onChange={setMinDriverTime} />
           <Field label={t("config.refresh")} value={refreshInterval} onChange={setRefreshInterval} />
+          <Field label={t("config.pitClosedStart")} value={pitClosedStart} onChange={setPitClosedStart} />
+          <Field label={t("config.pitClosedEnd")} value={pitClosedEnd} onChange={setPitClosedEnd} />
           <Field label={t("config.boxLines")} value={boxLines} onChange={setBoxLines} />
           <Field label={t("config.boxKarts")} value={boxKarts} onChange={setBoxKarts} />
         </div>

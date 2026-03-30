@@ -252,7 +252,8 @@ class UserSession:
                   lap_differential: float, rain: bool, our_kart: int, min_pits: int,
                   max_stint_min: int, min_stint_min: int, box_lines: int,
                   box_karts: int, duration_min: int, refresh_s: int,
-                  min_driver_time_min: int = 30):
+                  min_driver_time_min: int = 30,
+                  pit_closed_start_min: int = 0, pit_closed_end_min: int = 0):
         """Apply race session config to state and fifo."""
         self.state.circuit_length_m = circuit_length_m or 1100
         self.state.pit_time_s = pit_time_s or 120
@@ -264,6 +265,8 @@ class UserSession:
         self.state.max_stint_min = max_stint_min
         self.state.min_stint_min = min_stint_min
         self.state.min_driver_time_min = min_driver_time_min
+        self.state.pit_closed_start_min = pit_closed_start_min
+        self.state.pit_closed_end_min = pit_closed_end_min
         self.state.box_lines = box_lines
         self.state.box_karts = box_karts
         self.state.update_duration(duration_min)
@@ -485,6 +488,8 @@ class UserSession:
                                     "boxLines": self.state.box_lines,
                                     "boxKarts": self.state.box_karts,
                                     "minDriverTimeMin": self.state.min_driver_time_min,
+                                    "pitClosedStartMin": self.state.pit_closed_start_min,
+                                    "pitClosedEndMin": self.state.pit_closed_end_min,
                                 },
                             },
                         }
@@ -601,6 +606,8 @@ class ReplaySession:
         self.state.min_pits = session.min_pits or 3
         self.state.pit_time_s = session.pit_time_s or 120
         self.state.min_driver_time_min = session.min_driver_time_min or 30
+        self.state.pit_closed_start_min = getattr(session, 'pit_closed_start_min', 0) or 0
+        self.state.pit_closed_end_min = getattr(session, 'pit_closed_end_min', 0) or 0
         if circuit:
             self.state.circuit_length_m = circuit.length_m or 1100
             self.state.laps_discard = circuit.laps_discard or 2
@@ -616,6 +623,8 @@ class ReplaySession:
         self.state.update_duration(session.duration_min)
         self.state.pit_time_s = session.pit_time_s
         self.state.min_driver_time_min = session.min_driver_time_min
+        self.state.pit_closed_start_min = getattr(session, 'pit_closed_start_min', 0) or 0
+        self.state.pit_closed_end_min = getattr(session, 'pit_closed_end_min', 0) or 0
         if circuit:
             self.state.circuit_length_m = circuit.length_m or self.state.circuit_length_m
         if (self.fifo.queue_size != session.box_karts
@@ -681,6 +690,8 @@ class ReplaySession:
                                     "boxLines": self.state.box_lines,
                                     "boxKarts": self.state.box_karts,
                                     "minDriverTimeMin": self.state.min_driver_time_min,
+                                    "pitClosedStartMin": self.state.pit_closed_start_min,
+                                    "pitClosedEndMin": self.state.pit_closed_end_min,
                                 },
                             },
                         }

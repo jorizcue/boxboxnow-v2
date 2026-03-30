@@ -161,6 +161,8 @@ class RaceStateManager:
         self.max_stint_min: int = 40
         self.min_stint_min: int = 15
         self.min_driver_time_min: int = 30
+        self.pit_closed_start_min: int = 0
+        self.pit_closed_end_min: int = 0
         self.box_lines: int = 2
         self.box_karts: int = 30
         self.duration_min: int = 180
@@ -599,6 +601,8 @@ class RaceStateManager:
                     "boxLines": self.box_lines,
                     "boxKarts": self.box_karts,
                     "minDriverTimeMin": self.min_driver_time_min,
+                    "pitClosedStartMin": self.pit_closed_start_min,
+                    "pitClosedEndMin": self.pit_closed_end_min,
                 },
                 "durationMs": getattr(self, '_first_countdown_ms', 0) or self.duration_min * 60 * 1000,
             },

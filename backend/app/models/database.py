@@ -39,6 +39,16 @@ async def init_db():
             WHERE ws_port_data IS NULL
         """))
 
+        # Add pit window columns to race_sessions
+        try:
+            await conn.execute(text("ALTER TABLE race_sessions ADD COLUMN pit_closed_start_min INTEGER DEFAULT 0"))
+        except Exception:
+            pass
+        try:
+            await conn.execute(text("ALTER TABLE race_sessions ADD COLUMN pit_closed_end_min INTEGER DEFAULT 0"))
+        except Exception:
+            pass
+
         # Seed live timing URLs for known circuits
         await conn.execute(text("""
             UPDATE circuits SET live_timing_url = 'https://www.apex-timing.com/live-timing/ariza-racing-circuit/index.html'

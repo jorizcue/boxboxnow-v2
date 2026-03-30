@@ -25,6 +25,10 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   const [showSessions, setShowSessions] = useState(false);
   const apexConnected = useRaceStore((s) => s.apexConnected);
   const apexStatusMsg = useRaceStore((s) => s.apexStatusMsg);
+  const raceStarted = useRaceStore((s) => s.raceStarted);
+  const durationMs = useRaceStore((s) => s.durationMs);
+  const pitClosedStartMin = useRaceStore((s) => s.config.pitClosedStartMin);
+  const pitClosedEndMin = useRaceStore((s) => s.config.pitClosedEndMin);
   const replayActive = useRaceStore((s) => s.replayActive);
   const replayPaused = useRaceStore((s) => s.replayPaused);
   const replayFilename = useRaceStore((s) => s.replayFilename);
@@ -60,6 +64,15 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
 
   // Format the timer display using the interpolated clock
   const timerDisplay = raceClockMs !== 0 ? msToCountdown(raceClockMs) : "00:00:00";
+
+  // Pit window status
+  const hasPitWindow = raceStarted && (pitClosedStartMin > 0 || pitClosedEndMin > 0);
+  const pitIsClosed = (() => {
+    if (!hasPitWindow || raceClockMs === 0 || durationMs === 0) return false;
+    const elapsedMin = (durationMs - raceClockMs) / 60000;
+    const remainingMin = raceClockMs / 60000;
+    return elapsedMin < pitClosedStartMin || remainingMin < pitClosedEndMin;
+  })();
 
   return (
     <>
@@ -155,12 +168,23 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
             )}
           </div>
 
-          {/* Center: countdown (hidden on very small, visible on sm+) */}
+          {/* Center: countdown + pit status (hidden on very small, visible on sm+) */}
           <div className="hidden sm:flex items-center gap-2">
             <span className="text-[11px] text-neutral-400 uppercase tracking-wider">{t("status.race")}</span>
             <span className="text-base font-bold tabular-nums text-white">
               {timerDisplay}
             </span>
+            {hasPitWindow && (
+              <span
+                className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                  pitIsClosed
+                    ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                    : "bg-green-500/20 text-green-400 border border-green-500/30"
+                }`}
+              >
+                {pitIsClosed ? t("status.pitClosed") : t("status.pitOpen")}
+              </span>
+            )}
           </div>
 
           {/* Right: user + actions */}
@@ -213,14 +237,27 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
           </div>
         </div>
 
-        {/* Mobile-only: second row with track + countdown */}
+        {/* Mobile-only: second row with track + countdown + pit status */}
         <div className="flex items-center justify-between px-3 py-1 border-t border-border/50 sm:hidden">
           <span className="text-xs text-neutral-300 truncate">
             {trackName || t("status.noCircuit")}
           </span>
-          <span className="text-sm font-bold tabular-nums text-white shrink-0">
-            {timerDisplay}
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {hasPitWindow && (
+              <span
+                className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                  pitIsClosed
+                    ? "bg-red-500/20 text-red-400"
+                    : "bg-green-500/20 text-green-400"
+                }`}
+              >
+                {pitIsClosed ? t("status.pitClosed") : t("status.pitOpen")}
+              </span>
+            )}
+            <span className="text-sm font-bold tabular-nums text-white">
+              {timerDisplay}
+            </span>
+          </div>
         </div>
 
         {/* Desktop-only: track name (shown in center of top row instead) */}

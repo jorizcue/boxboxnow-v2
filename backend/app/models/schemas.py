@@ -72,6 +72,10 @@ class RaceSession(Base):
     min_driver_time_min = Column(Integer, default=30)
     rain = Column(Boolean, default=False)
 
+    # Pit window
+    pit_closed_start_min = Column(Integer, default=0)  # pit closed first N minutes
+    pit_closed_end_min = Column(Integer, default=0)     # pit closed last N minutes
+
     # Box configuration
     box_lines = Column(Integer, default=2)
     box_karts = Column(Integer, default=30)

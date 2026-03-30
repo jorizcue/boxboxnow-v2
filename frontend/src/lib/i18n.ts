@@ -35,6 +35,8 @@ const translations: Record<string, Record<Language, string>> = {
   "status.logout": { es: "Salir", en: "Logout", it: "Esci", de: "Abmelden" },
   "status.noCircuit": { es: "Sin circuito", en: "No circuit", it: "Nessun circuito", de: "Keine Strecke" },
   "status.replayPaused": { es: "Replay (pausa)", en: "Replay (paused)", it: "Replay (pausa)", de: "Replay (Pause)" },
+  "status.pitClosed": { es: "PIT CERRADO", en: "PIT CLOSED", it: "PIT CHIUSO", de: "PIT GESCHL." },
+  "status.pitOpen": { es: "PIT ABIERTO", en: "PIT OPEN", it: "PIT APERTO", de: "PIT OFFEN" },
 
   // === Navbar ===
   "nav.race": { es: "Carrera", en: "Race", it: "Gara", de: "Rennen" },
@@ -158,6 +160,8 @@ const translations: Record<string, Record<Language, string>> = {
   "config.refresh": { es: "Refresh (s)", en: "Refresh (s)", it: "Refresh (s)", de: "Refresh (s)" },
   "config.boxLines": { es: "Lineas box", en: "Box lines", it: "Linee box", de: "Box-Reihen" },
   "config.boxKarts": { es: "Karts en box", en: "Karts in box", it: "Kart nel box", de: "Karts in Box" },
+  "config.pitClosedStart": { es: "Pit cerrado inicio (min)", en: "Pit closed start (min)", it: "Pit chiuso inizio (min)", de: "Pit geschlossen Start (Min)" },
+  "config.pitClosedEnd": { es: "Pit cerrado final (min)", en: "Pit closed end (min)", it: "Pit chiuso fine (min)", de: "Pit geschlossen Ende (Min)" },
   "config.rainMode": { es: "Modo lluvia", en: "Rain mode", it: "Modalita pioggia", de: "Regenmodus" },
   "config.rainHint": { es: "(desactiva filtro de outliers)", en: "(disables outlier filter)", it: "(disattiva filtro outlier)", de: "(deaktiviert Ausreisser-Filter)" },
   "config.saving": { es: "Guardando...", en: "Saving...", it: "Salvataggio...", de: "Speichern..." },

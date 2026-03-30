@@ -144,6 +144,8 @@ class RaceSessionOut(BaseModel):
     pit_time_s: int
     min_driver_time_min: int
     rain: bool
+    pit_closed_start_min: int
+    pit_closed_end_min: int
     box_lines: int
     box_karts: int
     our_kart_number: int
@@ -164,6 +166,8 @@ class RaceSessionCreate(BaseModel):
     pit_time_s: int = 120
     min_driver_time_min: int = 30
     rain: bool = False
+    pit_closed_start_min: int = 0
+    pit_closed_end_min: int = 0
     box_lines: int = 2
     box_karts: int = 30
     our_kart_number: int = 0
@@ -180,6 +184,8 @@ class RaceSessionUpdate(BaseModel):
     pit_time_s: int | None = None
     min_driver_time_min: int | None = None
     rain: bool | None = None
+    pit_closed_start_min: int | None = None
+    pit_closed_end_min: int | None = None
     box_lines: int | None = None
     box_karts: int | None = None
     our_kart_number: int | None = None
