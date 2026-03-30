@@ -65,6 +65,7 @@ class DailyRecorder:
             self._file.flush()
             self._file.close()
         self._current_date = today
+        self._msg_count = 0
         filepath = os.path.join(self._dir, f"{today}.log")
         self._file = open(filepath, "a", encoding="utf-8")
         logger.info(f"DailyRecorder: rotated to {filepath}")
@@ -94,7 +95,6 @@ class CircuitConnection:
         self._running = False
         self._reconnect_delay = 1.0
         self._connected = False
-        self.message_count = 0
 
         # --- Live race tracking ---
         self._race_active = False
@@ -108,6 +108,11 @@ class CircuitConnection:
     @property
     def connected(self) -> bool:
         return self._connected
+
+    @property
+    def message_count(self) -> int:
+        """Today's message count (resets on day rotation)."""
+        return self._recorder._msg_count
 
     @property
     def subscriber_count(self) -> int:
@@ -221,8 +226,6 @@ class CircuitConnection:
             self._recorder.write(message)
         except Exception as e:
             logger.error(f"[{self.circuit_name}] Recording error: {e}")
-
-        self.message_count += 1
 
         # --- Lightweight live race detection ---
         try:
