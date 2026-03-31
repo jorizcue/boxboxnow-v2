@@ -108,6 +108,15 @@ button {
   display: none;
 }
 
+/* Mobile landscape: un-sticky indicator cards so table gets full height */
+@media (orientation: landscape) and (max-height: 500px) {
+  .sticky-cards {
+    position: relative !important;
+    top: auto !important;
+    z-index: auto !important;
+  }
+}
+
 /* Driver view: edit mode wiggle */
 @keyframes wiggle {
   0%, 100% { transform: rotate(-0.5deg); }

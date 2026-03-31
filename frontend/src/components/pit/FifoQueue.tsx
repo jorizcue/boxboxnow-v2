@@ -135,7 +135,7 @@ export function FifoQueue() {
   return (
     <div className="flex flex-col h-full">
       {/* ── Indicator cards (same as race tab) ── */}
-      <div className="sticky top-0 z-20 bg-black pb-2">
+      <div className="sticky-cards sticky top-0 z-20 bg-black pb-2">
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2">
           {/* Driver / Last lap */}
           <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
