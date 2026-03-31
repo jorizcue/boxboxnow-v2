@@ -90,11 +90,9 @@ async def race_websocket(
     max_devices for the driver steering-wheel display.
     """
     is_driver_view = view == "driver"
-    logger.info(f"WS attempt: token_len={len(token)}, view={view}")
 
     # Authenticate
     if not token:
-        logger.warning("WS rejected: missing token")
         await websocket.close(code=4001, reason="Missing token")
         return
 
@@ -102,20 +100,16 @@ async def race_websocket(
         payload = decode_token(token)
         user_id = payload.get("sub")
         session_token = payload.get("sid")
-        logger.info(f"WS decoded: user_id={user_id}, sid={session_token[:12] if session_token else 'none'}...")
-    except Exception as e:
-        logger.warning(f"WS rejected: invalid token: {e}")
+    except Exception:
         await websocket.close(code=4001, reason="Invalid token")
         return
 
     if not user_id or not session_token:
-        logger.warning(f"WS rejected: missing payload fields user_id={user_id}")
         await websocket.close(code=4001, reason="Invalid token payload")
         return
 
     # Verify device session is still active (not killed by admin or user)
     if not await _validate_session_token(session_token):
-        logger.warning(f"WS rejected: session terminated (user={user_id}, sid={session_token[:12]}...)")
         await websocket.close(code=4001, reason="Session terminated")
         return
 
@@ -126,7 +120,6 @@ async def race_websocket(
         max_devices = result.scalar_one_or_none() or 1
     effective_max = max_devices + 1 if is_driver_view else max_devices
     current_ws_count = len(_ws_connections.get(user_id, set()))
-    logger.info(f"WS device check: user={user_id}, current={current_ws_count}, max={max_devices}, effective_max={effective_max}")
     if current_ws_count >= effective_max:
         logger.warning(f"WS rejected: max devices (user={user_id}, current={current_ws_count}, max={effective_max})")
         await websocket.close(code=4003, reason="Max devices reached")
