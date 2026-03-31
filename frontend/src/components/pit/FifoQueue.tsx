@@ -458,17 +458,19 @@ function BoxCallButton() {
 function AdjustableCard({ label, value, field, min, max }: {
   label: string; value: number; field: string; min: number; max: number;
 }) {
-  const [saving, setSaving] = useState(false);
+  // configKey maps DB field name to RaceConfig key
+  const configKey = field === "box_lines" ? "boxLines" : "boxKarts";
 
-  const adjust = useCallback(async (delta: number) => {
+  const adjust = useCallback((delta: number) => {
     const newVal = Math.max(min, Math.min(max, value + delta));
     if (newVal === value) return;
-    setSaving(true);
-    try {
-      await api.updateSession({ [field]: newVal });
-    } catch {}
-    setSaving(false);
-  }, [value, field, min, max]);
+    // Optimistic update
+    useRaceStore.setState((s) => ({ config: { ...s.config, [configKey]: newVal } }));
+    // Persist (fire and forget)
+    api.updateSession({ [field]: newVal }).catch(() => {
+      useRaceStore.setState((s) => ({ config: { ...s.config, [configKey]: value } }));
+    });
+  }, [value, field, configKey, min, max]);
 
   return (
     <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
@@ -478,7 +480,7 @@ function AdjustableCard({ label, value, field, min, max }: {
       <div className="flex items-center gap-2">
         <button
           onClick={() => adjust(-1)}
-          disabled={saving || value <= min}
+          disabled={value <= min}
           className="w-6 h-6 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-sm disabled:opacity-30 transition-colors"
         >
           -
@@ -488,7 +490,7 @@ function AdjustableCard({ label, value, field, min, max }: {
         </span>
         <button
           onClick={() => adjust(1)}
-          disabled={saving || value >= max}
+          disabled={value >= max}
           className="w-6 h-6 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-sm disabled:opacity-30 transition-colors"
         >
           +

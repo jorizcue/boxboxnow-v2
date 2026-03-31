@@ -371,20 +371,21 @@ function BoxCallButton() {
 function RainToggle() {
   const t = useT();
   const rain = useRaceStore((s) => s.config.rain);
-  const [saving, setSaving] = useState(false);
 
-  const toggle = useCallback(async () => {
-    setSaving(true);
-    try {
-      await api.updateSession({ rain: !rain });
-    } catch {}
-    setSaving(false);
+  const toggle = useCallback(() => {
+    const newVal = !rain;
+    // Optimistic update
+    useRaceStore.setState((s) => ({ config: { ...s.config, rain: newVal } }));
+    // Persist to backend (fire and forget)
+    api.updateSession({ rain: newVal }).catch(() => {
+      // Revert on error
+      useRaceStore.setState((s) => ({ config: { ...s.config, rain: !newVal } }));
+    });
   }, [rain]);
 
   return (
     <button
       onClick={toggle}
-      disabled={saving}
       className={clsx(
         "bg-surface rounded-xl border p-2 sm:p-3 flex flex-col items-center justify-center transition-all active:scale-95",
         rain ? "border-blue-400/60 bg-blue-500/15" : "border-border hover:border-neutral-600"

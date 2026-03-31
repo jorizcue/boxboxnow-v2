@@ -71,7 +71,6 @@ function RaceSessionEditor() {
   const [boxLines, setBoxLines] = useState(2);
   const [boxKarts, setBoxKarts] = useState(30);
   const [ourKart, setOurKart] = useState(0);
-  const [refreshInterval, setRefreshInterval] = useState(30);
 
   useEffect(() => {
     loadData();
@@ -107,7 +106,6 @@ function RaceSessionEditor() {
     setBoxLines(s.box_lines);
     setBoxKarts(s.box_karts);
     setOurKart(s.our_kart_number);
-    setRefreshInterval(s.refresh_interval_s);
   };
 
   const handleCircuitChange = (id: number) => {
@@ -138,7 +136,7 @@ function RaceSessionEditor() {
         box_lines: boxLines,
         box_karts: boxKarts,
         our_kart_number: ourKart,
-        refresh_interval_s: refreshInterval,
+        refresh_interval_s: 1,
       };
 
       let result;
@@ -230,9 +228,6 @@ function RaceSessionEditor() {
           <ConfigCard label={t("config.minStint")} value={minStint} onChange={setMinStint} />
           <ConfigCard label={t("config.maxStint")} value={maxStint} onChange={setMaxStint} />
           <ConfigCard label={t("config.minDriverTime")} value={minDriverTime} onChange={setMinDriverTime} />
-          <ConfigCard label={t("config.refresh")} value={refreshInterval} onChange={setRefreshInterval} />
-          <ConfigCard label={t("config.boxLines")} value={boxLines} onChange={setBoxLines} />
-          <ConfigCard label={t("config.boxKarts")} value={boxKarts} onChange={setBoxKarts} />
           <ConfigCard label={t("config.pitClosedStart")} value={pitClosedStart} onChange={setPitClosedStart} />
           <ConfigCard label={t("config.pitClosedEnd")} value={pitClosedEnd} onChange={setPitClosedEnd} />
         </div>
