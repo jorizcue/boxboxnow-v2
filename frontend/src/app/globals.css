@@ -108,12 +108,20 @@ button {
   display: none;
 }
 
-/* Mobile landscape: un-sticky indicator cards so table gets full height */
+/* Mobile landscape: cards + table scroll together as one block */
 @media (orientation: landscape) and (max-height: 500px) {
+  .race-layout {
+    height: auto !important;
+    overflow-y: auto !important;
+  }
   .sticky-cards {
     position: relative !important;
     top: auto !important;
     z-index: auto !important;
+  }
+  .race-table-scroll {
+    flex: none !important;
+    overflow-y: visible !important;
   }
 }
 

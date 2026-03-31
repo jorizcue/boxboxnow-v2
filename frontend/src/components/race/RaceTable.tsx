@@ -105,7 +105,7 @@ export function RaceTable() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="race-layout flex flex-col h-full">
       {/* Sticky indicator cards at the top */}
       <div className="sticky-cards sticky top-0 z-20 bg-black pb-2">
         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-1.5 sm:gap-2">
@@ -207,7 +207,7 @@ export function RaceTable() {
       </div>
 
       {/* Scrollable race table */}
-      <div className="flex-1 overflow-y-auto overflow-x-auto -mx-2 sm:mx-0">
+      <div className="race-table-scroll flex-1 overflow-y-auto overflow-x-auto -mx-2 sm:mx-0">
         <table className="w-full text-xs sm:text-sm">
           <thead className="bg-surface text-neutral-200 sticky top-0 z-10 text-[10px] sm:text-[11px] uppercase tracking-wider">
             <tr>
