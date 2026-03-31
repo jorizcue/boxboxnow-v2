@@ -6,6 +6,7 @@ import { useRaceClock } from "@/hooks/useRaceClock";
 import { useT } from "@/lib/i18n";
 import { msToLapTime, secondsToStint, secondsToHMS, tierHex, formatDifferential } from "@/lib/formatters";
 import { getDriverInfoForKart, DriverDetailsRow } from "@/components/shared/DriverDetails";
+import { sendBoxCall } from "@/lib/driverChannel";
 import clsx from "clsx";
 
 const COL_COUNT = 13; // number of <th> columns
@@ -195,6 +196,9 @@ export function RaceTable() {
               {kartsNearPit}
             </span>
           </div>
+
+          {/* BOX call button */}
+          <BoxCallButton />
         </div>
       </div>
 
@@ -322,5 +326,39 @@ export function RaceTable() {
         </table>
       </div>
     </div>
+  );
+}
+
+/* ── BOX call button (shared between race/pit tabs) ── */
+function BoxCallButton() {
+  const t = useT();
+  const [sent, setSent] = useState(false);
+
+  const handleClick = useCallback(() => {
+    sendBoxCall();
+    setSent(true);
+    setTimeout(() => setSent(false), 2000);
+  }, []);
+
+  return (
+    <button
+      onClick={handleClick}
+      className={clsx(
+        "rounded-xl border-2 p-2 sm:p-3 flex flex-col items-center justify-center transition-all active:scale-95",
+        sent
+          ? "bg-red-500/20 border-red-400/60"
+          : "bg-red-500/10 border-red-500/40 hover:bg-red-500/25 hover:border-red-400/60"
+      )}
+    >
+      <span className="text-[8px] sm:text-[9px] text-red-300 uppercase tracking-widest font-bold mb-1">
+        {t("box.callBox")}
+      </span>
+      <span className={clsx(
+        "text-lg sm:text-xl font-black leading-none",
+        sent ? "text-red-300" : "text-red-500"
+      )}>
+        {sent ? t("box.sent") : "BOX"}
+      </span>
+    </button>
   );
 }

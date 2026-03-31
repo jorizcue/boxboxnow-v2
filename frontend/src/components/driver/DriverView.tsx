@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useSimNow } from "@/hooks/useSimNow";
 import { msToLapTime, tierHex } from "@/lib/formatters";
+import { getDriverChannel } from "@/lib/driverChannel";
 import { useT } from "@/lib/i18n";
 
 /* ------------------------------------------------------------------ */
@@ -179,6 +180,41 @@ function usePrevLap(ourKart: number): { prevLapMs: number; lastLapMs: number; la
 }
 
 /* ------------------------------------------------------------------ */
+/*  BOX alert hook (listens on BroadcastChannel)                       */
+/* ------------------------------------------------------------------ */
+
+function useBoxAlert() {
+  const [active, setActive] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const ch = getDriverChannel();
+    if (!ch) return;
+
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === "boxCall") {
+        setActive(true);
+        // Auto-dismiss after 30 seconds
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => setActive(false), 30000);
+      }
+    };
+    ch.addEventListener("message", handler);
+    return () => {
+      ch.removeEventListener("message", handler);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  const dismiss = useCallback(() => {
+    setActive(false);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  }, []);
+
+  return { active, dismiss };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -191,6 +227,7 @@ export function DriverView() {
 
   const { dragging, registerRect, onTouchStart, onTouchMove, onTouchEnd } =
     useTouchDrag(cardOrder, setCardOrder);
+  const boxAlert = useBoxAlert();
 
   // Hydrate order from localStorage on mount
   useEffect(() => {
@@ -487,6 +524,19 @@ export function DriverView() {
 
   return (
     <div className="min-h-screen bg-black flex flex-col select-none">
+      {/* BOX alert overlay */}
+      {boxAlert.active && (
+        <div
+          onClick={boxAlert.dismiss}
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center cursor-pointer animate-[boxFlash_0.5s_ease-in-out_infinite]"
+        >
+          <span className="text-[20vw] font-black text-white leading-none tracking-wider drop-shadow-[0_0_40px_rgba(255,0,0,0.8)]">
+            BOX
+          </span>
+          <span className="text-sm text-white/60 mt-4">{t("driver.tapDismiss")}</span>
+        </div>
+      )}
+
       {/* Minimal header */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/20 shrink-0">
         <div className="flex items-center gap-2">

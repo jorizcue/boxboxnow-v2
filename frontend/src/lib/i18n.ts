@@ -319,6 +319,12 @@ const translations: Record<string, Record<Language, string>> = {
   "driver.dragHint": { es: "Arrastra para reordenar", en: "Drag to reorder", it: "Trascina per riordinare", de: "Ziehen zum Umsortieren" },
   "driver.open": { es: "Piloto", en: "Driver", it: "Pilota", de: "Fahrer" },
   "driver.connecting": { es: "Conectando...", en: "Connecting...", it: "Connessione...", de: "Verbindung..." },
+  "driver.boxAlert": { es: "BOX BOX BOX", en: "BOX BOX BOX", it: "BOX BOX BOX", de: "BOX BOX BOX" },
+  "driver.tapDismiss": { es: "Toca para cerrar", en: "Tap to dismiss", it: "Tocca per chiudere", de: "Tippen zum Schliessen" },
+
+  // BOX call button
+  "box.callBox": { es: "Llamar a BOX", en: "Call BOX", it: "Chiama BOX", de: "BOX rufen" },
+  "box.sent": { es: "Enviado!", en: "Sent!", it: "Inviato!", de: "Gesendet!" },
 
   // === Common ===
   "common.loading": { es: "Cargando...", en: "Loading...", it: "Caricamento...", de: "Laden..." },

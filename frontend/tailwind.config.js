@@ -23,6 +23,15 @@ module.exports = {
       fontFamily: {
         sans: ['Space Grotesk', 'system-ui', 'sans-serif'],
       },
+      keyframes: {
+        boxFlash: {
+          '0%, 100%': { backgroundColor: 'rgba(220, 38, 38, 1)' },
+          '50%': { backgroundColor: 'rgba(220, 38, 38, 0.3)' },
+        },
+      },
+      animation: {
+        boxFlash: 'boxFlash 0.5s ease-in-out infinite',
+      },
     },
   },
   plugins: [],

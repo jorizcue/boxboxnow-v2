@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useRaceClock } from "@/hooks/useRaceClock";
 import { useSimNow } from "@/hooks/useSimNow";
 import { tierHex, secondsToHMS, msToLapTime } from "@/lib/formatters";
+import { sendBoxCall } from "@/lib/driverChannel";
 import type { FifoEntry } from "@/types/race";
 import clsx from "clsx";
 import { useT } from "@/lib/i18n";
@@ -223,6 +224,9 @@ export function FifoQueue() {
               {kartsNearPit}
             </span>
           </div>
+
+          {/* BOX call button */}
+          <BoxCallButton />
         </div>
       </div>
 
@@ -396,6 +400,40 @@ export function FifoQueue() {
         </div>
       )}
     </div>
+  );
+}
+
+/* ── BOX call button ── */
+function BoxCallButton() {
+  const t = useT();
+  const [sent, setSent] = useState(false);
+
+  const handleClick = useCallback(() => {
+    sendBoxCall();
+    setSent(true);
+    setTimeout(() => setSent(false), 2000);
+  }, []);
+
+  return (
+    <button
+      onClick={handleClick}
+      className={clsx(
+        "rounded-xl border-2 p-2 sm:p-3 flex flex-col items-center justify-center transition-all active:scale-95",
+        sent
+          ? "bg-red-500/20 border-red-400/60"
+          : "bg-red-500/10 border-red-500/40 hover:bg-red-500/25 hover:border-red-400/60"
+      )}
+    >
+      <span className="text-[8px] sm:text-[9px] text-red-300 uppercase tracking-widest font-bold mb-1">
+        {t("box.callBox")}
+      </span>
+      <span className={clsx(
+        "text-lg sm:text-xl font-black leading-none",
+        sent ? "text-red-300" : "text-red-500"
+      )}>
+        {sent ? t("box.sent") : "BOX"}
+      </span>
+    </button>
   );
 }
 
