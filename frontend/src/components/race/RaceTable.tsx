@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n";
 import { msToLapTime, secondsToStint, secondsToHMS, tierHex, formatDifferential } from "@/lib/formatters";
 import { getDriverInfoForKart, DriverDetailsRow } from "@/components/shared/DriverDetails";
 import { sendBoxCall } from "@/lib/driverChannel";
+import { api } from "@/lib/api";
 import clsx from "clsx";
 
 const COL_COUNT = 13; // number of <th> columns
@@ -107,7 +108,7 @@ export function RaceTable() {
     <div className="flex flex-col h-full">
       {/* Sticky indicator cards at the top */}
       <div className="sticky top-0 z-20 bg-black pb-2">
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2">
+        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-1.5 sm:gap-2">
           {/* Driver / Last lap */}
           <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
@@ -199,6 +200,9 @@ export function RaceTable() {
 
           {/* BOX call button */}
           <BoxCallButton />
+
+          {/* Rain toggle */}
+          <RainToggle />
         </div>
       </div>
 
@@ -358,6 +362,42 @@ function BoxCallButton() {
         sent ? "text-red-300" : "text-red-500"
       )}>
         {sent ? t("box.sent") : "BOX"}
+      </span>
+    </button>
+  );
+}
+
+/* ── Rain mode toggle ── */
+function RainToggle() {
+  const t = useT();
+  const rain = useRaceStore((s) => s.config.rain);
+  const [saving, setSaving] = useState(false);
+
+  const toggle = useCallback(async () => {
+    setSaving(true);
+    try {
+      await api.updateSession({ rain: !rain });
+    } catch {}
+    setSaving(false);
+  }, [rain]);
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={saving}
+      className={clsx(
+        "bg-surface rounded-xl border p-2 sm:p-3 flex flex-col items-center justify-center transition-all active:scale-95",
+        rain ? "border-blue-400/60 bg-blue-500/15" : "border-border hover:border-neutral-600"
+      )}
+    >
+      <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
+        {t("config.rainMode")}
+      </span>
+      <span className={clsx(
+        "text-lg sm:text-xl font-black leading-none",
+        rain ? "text-blue-400" : "text-neutral-500"
+      )}>
+        {rain ? "ON" : "OFF"}
       </span>
     </button>
   );

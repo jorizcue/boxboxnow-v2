@@ -714,21 +714,25 @@ class ReplaySession:
         logger.info(f"Replay session stopped (user_id={self.user_id})")
 
     def apply_config(self, session, circuit=None):
-        self.state.box_karts = session.box_karts or 30
-        self.state.box_lines = session.box_lines or 2
-        self.state.our_kart_number = session.our_kart_number or 0
-        self.state.duration_min = session.duration_min or 180
-        self.state.max_stint_min = session.max_stint_min or 40
-        self.state.min_stint_min = session.min_stint_min or 15
-        self.state.min_pits = session.min_pits or 3
-        self.state.pit_time_s = session.pit_time_s or 120
-        self.state.min_driver_time_min = session.min_driver_time_min or 30
-        self.state.pit_closed_start_min = getattr(session, 'pit_closed_start_min', 0) or 0
-        self.state.pit_closed_end_min = getattr(session, 'pit_closed_end_min', 0) or 0
+        def _val(v, default):
+            return v if v is not None else default
+
+        self.state.box_karts = _val(session.box_karts, 30)
+        self.state.box_lines = _val(session.box_lines, 2)
+        self.state.our_kart_number = _val(session.our_kart_number, 0)
+        self.state.duration_min = _val(session.duration_min, 180)
+        self.state.max_stint_min = _val(session.max_stint_min, 40)
+        self.state.min_stint_min = _val(session.min_stint_min, 15)
+        self.state.min_pits = _val(session.min_pits, 3)
+        self.state.pit_time_s = _val(session.pit_time_s, 120)
+        self.state.min_driver_time_min = _val(session.min_driver_time_min, 30)
+        self.state.rain_mode = _val(getattr(session, 'rain', False), False)
+        self.state.pit_closed_start_min = _val(getattr(session, 'pit_closed_start_min', 0), 0)
+        self.state.pit_closed_end_min = _val(getattr(session, 'pit_closed_end_min', 0), 0)
         if circuit:
-            self.state.circuit_length_m = circuit.length_m or 1100
-            self.state.laps_discard = circuit.laps_discard or 2
-            self.state.lap_differential = circuit.lap_differential or 3000
+            self.state.circuit_length_m = _val(circuit.length_m, 1100)
+            self.state.laps_discard = _val(circuit.laps_discard, 2)
+            self.state.lap_differential = _val(circuit.lap_differential, 3000)
 
     def update_config_fields(self, session, circuit=None):
         self.state.our_kart_number = session.our_kart_number
@@ -740,6 +744,7 @@ class ReplaySession:
         self.state.update_duration(session.duration_min)
         self.state.pit_time_s = session.pit_time_s
         self.state.min_driver_time_min = session.min_driver_time_min
+        self.state.rain_mode = getattr(session, 'rain', False) or False
         self.state.pit_closed_start_min = getattr(session, 'pit_closed_start_min', 0) or 0
         self.state.pit_closed_end_min = getattr(session, 'pit_closed_end_min', 0) or 0
         if circuit:

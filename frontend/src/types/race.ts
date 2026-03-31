@@ -85,6 +85,7 @@ export interface RaceConfig {
   minDriverTimeMin: number;
   pitClosedStartMin: number;
   pitClosedEndMin: number;
+  rain: boolean;
 }
 
 export interface RaceSnapshot {

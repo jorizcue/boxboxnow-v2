@@ -65,6 +65,7 @@ const defaultConfig: RaceConfig = {
   minDriverTimeMin: 30,
   pitClosedStartMin: 0,
   pitClosedEndMin: 0,
+  rain: false,
 };
 
 export const useRaceStore = create<RaceStore>((set) => ({

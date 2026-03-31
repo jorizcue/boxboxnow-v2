@@ -165,6 +165,7 @@ function RaceSessionEditor() {
           minDriverTimeMin: minDriverTime,
           pitClosedStartMin: pitClosedStart,
           pitClosedEndMin: pitClosedEnd,
+          rain,
         },
       }));
 
@@ -187,9 +188,10 @@ function RaceSessionEditor() {
   const selectedCircuit = circuits.find((c) => c.id === circuitId);
 
   return (
-    <div className="bg-white/[0.03] rounded-xl p-6 border border-border">
+    <div className="bg-white/[0.03] rounded-xl p-4 sm:p-6 border border-border">
+      {/* Header */}
       <div className="flex items-center justify-between mb-5">
-        <h2 className="text-[11px] text-neutral-200 uppercase tracking-wider">{t("config.raceSession")}</h2>
+        <h2 className="text-[11px] text-neutral-200 uppercase tracking-wider font-bold">{t("config.raceSession")}</h2>
         {session && (
           <span className="text-[10px] bg-accent/15 text-accent px-2 py-0.5 rounded uppercase tracking-wider font-medium">
             {t("config.active")}
@@ -197,10 +199,10 @@ function RaceSessionEditor() {
         )}
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         {/* Circuit selector */}
         <div>
-          <label className="block text-[11px] text-neutral-400 mb-1.5 uppercase tracking-wider">{t("config.circuit")}</label>
+          <label className="block text-[10px] text-neutral-400 mb-1.5 uppercase tracking-wider font-bold">{t("config.circuit")}</label>
           <StyledSelect
             value={circuitId}
             onChange={(v) => handleCircuitChange(Number(v))}
@@ -211,7 +213,7 @@ function RaceSessionEditor() {
             placeholder={t("config.selectCircuit")}
           />
           {selectedCircuit && (
-            <p className="text-[10px] text-neutral-400 mt-1">
+            <p className="text-[10px] text-neutral-500 mt-1">
               {t("config.wsPort")}: {selectedCircuit.ws_port}
               {selectedCircuit.pit_time_s && ` · Pit: ${selectedCircuit.pit_time_s}s`}
               {selectedCircuit.length_m && ` · ${selectedCircuit.length_m}m`}
@@ -219,39 +221,27 @@ function RaceSessionEditor() {
           )}
         </div>
 
-        {/* Two column grid for params */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label={t("config.duration")} value={durationMin} onChange={setDurationMin} />
-          <Field label={t("config.ourKart")} value={ourKart} onChange={setOurKart} />
-          <Field label={t("config.minStint")} value={minStint} onChange={setMinStint} />
-          <Field label={t("config.maxStint")} value={maxStint} onChange={setMaxStint} />
-          <Field label={t("config.minPits")} value={minPits} onChange={setMinPits} />
-          <Field label={t("config.pitTime")} value={pitTime} onChange={setPitTime} />
-          <Field label={t("config.minDriverTime")} value={minDriverTime} onChange={setMinDriverTime} />
-          <Field label={t("config.refresh")} value={refreshInterval} onChange={setRefreshInterval} />
-          <Field label={t("config.pitClosedStart")} value={pitClosedStart} onChange={setPitClosedStart} />
-          <Field label={t("config.pitClosedEnd")} value={pitClosedEnd} onChange={setPitClosedEnd} />
-          <Field label={t("config.boxLines")} value={boxLines} onChange={setBoxLines} />
-          <Field label={t("config.boxKarts")} value={boxKarts} onChange={setBoxKarts} />
+        {/* Cards grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <ConfigCard label={t("config.ourKart")} value={ourKart} onChange={setOurKart} highlight />
+          <ConfigCard label={t("config.duration")} value={durationMin} onChange={setDurationMin} />
+          <ConfigCard label={t("config.minPits")} value={minPits} onChange={setMinPits} />
+          <ConfigCard label={t("config.pitTime")} value={pitTime} onChange={setPitTime} />
+          <ConfigCard label={t("config.minStint")} value={minStint} onChange={setMinStint} />
+          <ConfigCard label={t("config.maxStint")} value={maxStint} onChange={setMaxStint} />
+          <ConfigCard label={t("config.minDriverTime")} value={minDriverTime} onChange={setMinDriverTime} />
+          <ConfigCard label={t("config.refresh")} value={refreshInterval} onChange={setRefreshInterval} />
+          <ConfigCard label={t("config.boxLines")} value={boxLines} onChange={setBoxLines} />
+          <ConfigCard label={t("config.boxKarts")} value={boxKarts} onChange={setBoxKarts} />
+          <ConfigCard label={t("config.pitClosedStart")} value={pitClosedStart} onChange={setPitClosedStart} />
+          <ConfigCard label={t("config.pitClosedEnd")} value={pitClosedEnd} onChange={setPitClosedEnd} />
         </div>
-
-        {/* Rain toggle */}
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={rain}
-            onChange={(e) => setRain(e.target.checked)}
-            className="accent-accent w-4 h-4"
-          />
-          <span className="text-sm text-neutral-300">{t("config.rainMode")}</span>
-          <span className="text-[10px] text-neutral-400">{t("config.rainHint")}</span>
-        </label>
 
         {/* Save button */}
         <button
           onClick={saveSession}
           disabled={!circuitId || saving}
-          className="w-full bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-2.5 rounded-lg"
+          className="w-full bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-bold py-2.5 rounded-lg transition-colors text-sm uppercase tracking-wider"
         >
           {saving ? t("config.saving") : session ? t("config.updateSession") : t("config.createSession")}
         </button>
@@ -260,25 +250,28 @@ function RaceSessionEditor() {
   );
 }
 
-function Field({
+function ConfigCard({
   label,
   value,
   onChange,
+  highlight,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
+  highlight?: boolean;
 }) {
   return (
-    <div>
-      <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{label}</label>
+    <div className={`bg-surface rounded-xl border ${highlight ? "border-accent/30" : "border-border"} p-2.5 sm:p-3 flex flex-col items-center`}>
+      <label className="text-[8px] sm:text-[9px] text-neutral-400 uppercase tracking-widest font-bold mb-1.5 text-center leading-tight">
+        {label}
+      </label>
       <input
         type="number"
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm font-mono"
+        className={`w-full bg-black/50 border border-border rounded-lg px-2 py-1.5 text-center text-base sm:text-lg font-mono font-bold ${highlight ? "text-accent" : "text-white"} focus:border-accent/50 focus:outline-none transition-colors`}
       />
     </div>
   );
 }
-

@@ -6,6 +6,7 @@ import { useRaceClock } from "@/hooks/useRaceClock";
 import { useSimNow } from "@/hooks/useSimNow";
 import { tierHex, secondsToHMS, msToLapTime } from "@/lib/formatters";
 import { sendBoxCall } from "@/lib/driverChannel";
+import { api } from "@/lib/api";
 import type { FifoEntry } from "@/types/race";
 import clsx from "clsx";
 import { useT } from "@/lib/i18n";
@@ -135,7 +136,7 @@ export function FifoQueue() {
     <div className="flex flex-col h-full">
       {/* ── Indicator cards (same as race tab) ── */}
       <div className="sticky top-0 z-20 bg-black pb-2">
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2">
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2">
           {/* Driver / Last lap */}
           <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
@@ -302,7 +303,7 @@ export function FifoQueue() {
       </div>
 
       {/* ── Pit info cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 mt-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2 mt-3">
         {/* Current pit time */}
         <PitCard
           label={t("pit.currentPit")}
@@ -324,15 +325,31 @@ export function FifoQueue() {
           label={t("pit.minPitCount")}
           value={String(config.minPits)}
         />
+        {/* Min stint (before max) */}
+        <PitCard
+          label={t("metric.minStint")}
+          value={secondsToHMS(config.minStintMin * 60)}
+        />
         {/* Max stint */}
         <PitCard
           label={t("metric.maxStint")}
           value={secondsToHMS(config.maxStintMin * 60)}
         />
-        {/* Min stint */}
-        <PitCard
-          label={t("metric.minStint")}
-          value={secondsToHMS(config.minStintMin * 60)}
+        {/* Box lines (+/-) */}
+        <AdjustableCard
+          label={t("config.boxLines")}
+          value={config.boxLines}
+          field="box_lines"
+          min={1}
+          max={6}
+        />
+        {/* Box karts (+/-) */}
+        <AdjustableCard
+          label={t("config.boxKarts")}
+          value={config.boxKarts}
+          field="box_karts"
+          min={1}
+          max={60}
         />
       </div>
 
@@ -434,6 +451,50 @@ function BoxCallButton() {
         {sent ? t("box.sent") : "BOX"}
       </span>
     </button>
+  );
+}
+
+/* ── Adjustable +/- card ── */
+function AdjustableCard({ label, value, field, min, max }: {
+  label: string; value: number; field: string; min: number; max: number;
+}) {
+  const [saving, setSaving] = useState(false);
+
+  const adjust = useCallback(async (delta: number) => {
+    const newVal = Math.max(min, Math.min(max, value + delta));
+    if (newVal === value) return;
+    setSaving(true);
+    try {
+      await api.updateSession({ [field]: newVal });
+    } catch {}
+    setSaving(false);
+  }, [value, field, min, max]);
+
+  return (
+    <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+      <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1 text-center leading-tight">
+        {label}
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => adjust(-1)}
+          disabled={saving || value <= min}
+          className="w-6 h-6 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-sm disabled:opacity-30 transition-colors"
+        >
+          -
+        </button>
+        <span className="text-lg sm:text-xl font-mono font-black leading-none text-white min-w-[2ch] text-center">
+          {value}
+        </span>
+        <button
+          onClick={() => adjust(1)}
+          disabled={saving || value >= max}
+          className="w-6 h-6 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-sm disabled:opacity-30 transition-colors"
+        >
+          +
+        </button>
+      </div>
+    </div>
   );
 }
 
