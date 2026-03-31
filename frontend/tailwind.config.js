@@ -4,12 +4,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // KartingNow brand
+        // BoxBoxNow brand
         bg: '#000000',
         surface: '#111111',
         card: '#0a0a0a',
         border: '#1a1a1a',
-        accent: '#9fe556',       // KartingNow green
+        accent: '#9fe556',       // BoxBoxNow green
         'accent-hover': '#b8f070',
         'accent-dim': 'rgba(159, 229, 86, 0.15)',
         muted: '#e5e5e5',

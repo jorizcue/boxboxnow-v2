@@ -37,7 +37,7 @@ export function msToCountdown(ms: number): string {
 }
 
 /**
- * Get the CSS color class for a tier score (KartingNow palette).
+ * Get the CSS color class for a tier score (BoxBoxNow palette).
  */
 export function tierColor(score: number): string {
   if (score >= 100) return "text-tier-100";
@@ -48,7 +48,7 @@ export function tierColor(score: number): string {
 }
 
 /**
- * Get the hex color for a tier score (KartingNow palette).
+ * Get the hex color for a tier score (BoxBoxNow palette).
  */
 export function tierHex(score: number): string {
   if (score >= 100) return "#9fe556";  // brand green

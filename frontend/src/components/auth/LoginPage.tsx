@@ -125,10 +125,10 @@ export function LoginPage() {
         {/* Brand header */}
         <div className="text-center mb-8 sm:mb-10">
           <div className="inline-flex items-center gap-2 mb-2">
-            <span className="text-4xl font-bold text-accent">K</span>
+            <span className="text-4xl font-bold text-accent">B</span>
           </div>
           <h1 className="text-2xl font-bold tracking-wider text-white">
-            KARTING<span className="text-accent">NOW</span>
+            BOXBOX<span className="text-accent">NOW</span>
           </h1>
           <p className="text-neutral-400 text-xs tracking-widest mt-1 uppercase">Race Strategy</p>
         </div>

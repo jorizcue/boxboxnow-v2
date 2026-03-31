@@ -25,7 +25,7 @@ export default function Home() {
   if (!_hydrated) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <span className="text-accent text-lg font-bold animate-pulse">KARTINGNOW</span>
+        <span className="text-lg font-bold animate-pulse"><span className="text-white">BOXBOX</span><span className="text-accent">NOW</span></span>
       </div>
     );
   }
