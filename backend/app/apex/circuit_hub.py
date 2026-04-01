@@ -20,6 +20,8 @@ import websockets
 from sqlalchemy import select, delete
 
 from app.config import get_settings
+from app.apex.parser import ApexMessageParser, EventType
+from app.engine.state import RaceStateManager
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +107,14 @@ class CircuitConnection:
         self._row_to_kart: dict[str, int] = {}    # r7980 -> kart_number
         self._row_to_team: dict[str, str] = {}    # r7980 -> team_name
 
+        # --- Automatic lap persistence (runs for ALL circuits) ---
+        self._lap_parser = ApexMessageParser()
+        self._lap_state = RaceStateManager()  # headless (no ws_clients)
+        self._lap_race_log_id: int | None = None
+        self._lap_saved_per_kart: dict[int, int] = {}
+        self._lap_save_lock = asyncio.Lock()
+        self._lap_save_counter = 0  # batch saves every N lap events
+
     @property
     def connected(self) -> bool:
         return self._connected
@@ -148,6 +158,8 @@ class CircuitConnection:
                 await self._task
             except asyncio.CancelledError:
                 pass
+        # Finalize any pending lap data before shutdown
+        await self._finalize_lap_race_log()
         self._recorder.close()
         self._connected = False
 
@@ -232,6 +244,24 @@ class CircuitConnection:
             self._detect_race_events(message)
         except Exception as e:
             logger.error(f"[{self.circuit_name}] Race detection error: {e}")
+
+        # --- Automatic lap extraction & persistence ---
+        try:
+            events = self._lap_parser.parse(message)
+            if events:
+                await self._lap_state.handle_events(events)
+                has_laps = any(e.type == EventType.LAP for e in events)
+                has_init = any(e.type == EventType.INIT and e.value == "init" for e in events)
+                if has_init:
+                    # New race: finalize previous race_log and reset
+                    await self._finalize_lap_race_log()
+                if has_laps:
+                    self._lap_save_counter += 1
+                    if self._lap_save_counter >= 5:  # batch every 5 lap events
+                        self._lap_save_counter = 0
+                        asyncio.create_task(self._save_circuit_laps())
+        except Exception as e:
+            logger.error(f"[{self.circuit_name}] Lap extraction error: {e}")
 
         # Broadcast to subscribers
         if self._subscribers:
@@ -371,6 +401,8 @@ class CircuitConnection:
         self._race_start_at = None
         self._race_duration_ms = 0
         asyncio.create_task(self._persist_race_end())
+        # Finalize lap data for this race
+        asyncio.create_task(self._finalize_lap_race_log())
 
     # --- DB persistence ---
 
@@ -461,6 +493,78 @@ class CircuitConnection:
                     await db.commit()
         except Exception as e:
             logger.error(f"[{self.circuit_name}] Failed to persist pit-out kart #{kart_number}: {e}")
+
+    async def _save_circuit_laps(self):
+        """Save newly arrived laps to DB (automatic, no user session needed)."""
+        try:
+            from app.models.database import async_session
+            from app.models.schemas import RaceLog, KartLap
+
+            async with self._lap_save_lock:
+                async with async_session() as db:
+                    if self._lap_race_log_id is None:
+                        race_log = RaceLog(
+                            circuit_id=self.circuit_id,
+                            user_id=None,
+                            race_date=datetime.now(timezone.utc),
+                            session_name=f"Auto {self.circuit_name} {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                            duration_min=self._lap_state.duration_min,
+                            total_karts=len(self._lap_state.karts),
+                        )
+                        db.add(race_log)
+                        await db.flush()
+                        self._lap_race_log_id = race_log.id
+                        logger.info(f"[{self.circuit_name}] Auto race_log #{race_log.id} created")
+
+                    new_count = 0
+                    for kart in self._lap_state.karts.values():
+                        saved = self._lap_saved_per_kart.get(kart.kart_number, 0)
+                        if len(kart.all_laps) <= saved:
+                            continue
+                        valid_set = {(vl["totalLap"], vl["lapTime"]) for vl in kart.valid_laps}
+                        for lap in kart.all_laps[saved:]:
+                            db.add(KartLap(
+                                race_log_id=self._lap_race_log_id,
+                                kart_number=kart.kart_number,
+                                team_name=kart.team_name,
+                                driver_name=lap.get("driverName", ""),
+                                lap_number=lap["totalLap"],
+                                lap_time_ms=lap["lapTime"],
+                                is_valid=(lap["totalLap"], lap["lapTime"]) in valid_set,
+                            ))
+                            new_count += 1
+                        self._lap_saved_per_kart[kart.kart_number] = len(kart.all_laps)
+
+                    if new_count > 0:
+                        await db.commit()
+        except Exception as e:
+            logger.error(f"[{self.circuit_name}] Auto lap save failed: {e}")
+
+    async def _finalize_lap_race_log(self):
+        """Finalize current race_log and reset for next race."""
+        if self._lap_race_log_id is not None:
+            try:
+                # Flush any remaining laps
+                await self._save_circuit_laps()
+                from app.models.database import async_session
+                from app.models.schemas import RaceLog
+                from sqlalchemy import update
+
+                async with async_session() as db:
+                    await db.execute(
+                        update(RaceLog)
+                        .where(RaceLog.id == self._lap_race_log_id)
+                        .values(total_karts=len(self._lap_state.karts))
+                    )
+                    await db.commit()
+                logger.info(f"[{self.circuit_name}] Auto race_log #{self._lap_race_log_id} finalized "
+                            f"({len(self._lap_state.karts)} karts)")
+            except Exception as e:
+                logger.error(f"[{self.circuit_name}] Auto race_log finalize failed: {e}")
+
+        self._lap_race_log_id = None
+        self._lap_saved_per_kart.clear()
+        self._lap_save_counter = 0
 
     async def _restore_from_db(self):
         """Restore live race state from DB on startup (if backend restarted mid-race)."""
