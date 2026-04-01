@@ -7,7 +7,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 
 from app.models.database import get_db
-from app.models.schemas import User, Circuit, UserCircuitAccess
+from app.models.schemas import User, Circuit, UserCircuitAccess, AppSetting
 from app.models.pydantic_models import (
     UserOut, UserCreate, UserUpdate,
     CircuitOut, CircuitCreate, CircuitUpdate,
@@ -267,3 +267,33 @@ async def hub_stop_circuit(circuit_id: int, request: Request, admin: User = Depe
     if not ok:
         raise HTTPException(404, "Circuit connection not found")
     return {"status": "stopped", "circuit_id": circuit_id}
+
+
+# --- App Settings ---
+
+@router.get("/settings/{key}")
+async def get_setting(key: str, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(AppSetting).where(AppSetting.key == key))
+    setting = result.scalar_one_or_none()
+    if not setting:
+        raise HTTPException(404, "Setting not found")
+    return {"key": setting.key, "value": setting.value}
+
+
+@router.patch("/settings/{key}")
+async def update_setting(key: str, request: Request, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    body = await request.json()
+    value = body.get("value")
+    if value is None:
+        raise HTTPException(400, "Missing 'value'")
+
+    result = await db.execute(select(AppSetting).where(AppSetting.key == key))
+    setting = result.scalar_one_or_none()
+    if not setting:
+        setting = AppSetting(key=key, value=str(value))
+        db.add(setting)
+    else:
+        setting.value = str(value)
+
+    await db.commit()
+    return {"key": key, "value": str(value)}

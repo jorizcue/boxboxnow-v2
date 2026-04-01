@@ -301,6 +301,8 @@ const translations: Record<string, Record<Language, string>> = {
   "analytics.verySlow": { es: "Muy lento", en: "Very slow", it: "Molto lento", de: "Sehr langsam" },
   "analytics.noData": { es: "No hay datos de carreras para este circuito en el rango seleccionado.", en: "No race data for this circuit in the selected range.", it: "Nessun dato di gara per questo circuito nell'intervallo selezionato.", de: "Keine Renndaten fur diese Strecke im ausgewahlten Zeitraum." },
   "analytics.autoSaveHint": { es: "Los datos se guardan automaticamente al finalizar cada sesion de monitoreo.", en: "Data is saved automatically when each monitoring session ends.", it: "I dati vengono salvati automaticamente al termine di ogni sessione di monitoraggio.", de: "Daten werden automatisch gespeichert, wenn jede Uberwachungssitzung endet." },
+  "analytics.retention": { es: "Retención", en: "Retention", it: "Conservazione", de: "Aufbewahrung" },
+  "analytics.days": { es: "días", en: "days", it: "giorni", de: "Tage" },
 
   // === Driver View ===
   "driver.title": { es: "Vista Piloto", en: "Driver View", it: "Vista Pilota", de: "Fahreransicht" },

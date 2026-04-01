@@ -63,6 +63,11 @@ async def init_db():
         except Exception:
             pass
 
+        # Seed default app settings
+        await conn.execute(text("""
+            INSERT OR IGNORE INTO app_settings (key, value) VALUES ('kart_analytics_retention_days', '30')
+        """))
+
         # Seed live timing URLs for known circuits
         await conn.execute(text("""
             UPDATE circuits SET live_timing_url = 'https://www.apex-timing.com/live-timing/ariza-racing-circuit/index.html'

@@ -202,6 +202,14 @@ class LivePitEvent(Base):
     live_race = relationship("LiveRaceState", back_populates="pit_events")
 
 
+class AppSetting(Base):
+    """Global application settings (key-value store). Admin-only."""
+    __tablename__ = "app_settings"
+
+    key = Column(String(100), primary_key=True)
+    value = Column(String(500), nullable=False)
+
+
 class DeviceSession(Base):
     """
     Tracks active device sessions per user (OTT-style concurrent device control).

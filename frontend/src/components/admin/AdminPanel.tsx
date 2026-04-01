@@ -1050,10 +1050,24 @@ function KartAnalytics() {
   const [stats, setStats] = useState<KartStat[]>([]);
   const [raceLogs, setRaceLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [retentionDays, setRetentionDays] = useState<number>(30);
+  const [retentionSaved, setRetentionSaved] = useState(false);
 
   useEffect(() => {
     api.getAllCircuits().then(setCircuits).catch(() => {});
+    api.getSetting("kart_analytics_retention_days").then((r) => {
+      setRetentionDays(Number(r.value) || 30);
+    }).catch(() => {});
   }, []);
+
+  const saveRetention = async (days: number) => {
+    setRetentionDays(days);
+    try {
+      await api.updateSetting("kart_analytics_retention_days", String(days));
+      setRetentionSaved(true);
+      setTimeout(() => setRetentionSaved(false), 2000);
+    } catch {}
+  };
 
   const loadStats = async () => {
     if (!selectedCircuit) return;
@@ -1131,6 +1145,24 @@ function KartAnalytics() {
           >
             {loading ? t("analytics.loading") : t("analytics.search")}
           </button>
+        </div>
+
+        <div className="mt-3 flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] text-neutral-400 uppercase tracking-wider whitespace-nowrap">{t("analytics.retention")}</label>
+            <input
+              type="number"
+              min={1}
+              max={365}
+              value={retentionDays}
+              onChange={(e) => setRetentionDays(Number(e.target.value))}
+              onBlur={() => saveRetention(retentionDays)}
+              onKeyDown={(e) => { if (e.key === "Enter") saveRetention(retentionDays); }}
+              className="w-16 bg-black border border-border rounded-lg px-2 py-1 text-sm text-center font-mono"
+            />
+            <span className="text-[10px] text-neutral-500">{t("analytics.days")}</span>
+            {retentionSaved && <span className="text-[10px] text-accent">✓</span>}
+          </div>
         </div>
 
         {raceLogs.length > 0 && (

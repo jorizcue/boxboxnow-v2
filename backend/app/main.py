@@ -51,11 +51,15 @@ async def lifespan(app: FastAPI):
 
     # Start periodic maintenance (log compression + docker prune, every 6 hours)
     from app.tasks.compress_logs import compress_old_logs, docker_prune, periodic_compress_loop
+    from app.tasks.cleanup_analytics import cleanup_old_analytics, periodic_analytics_cleanup
     # Run once at startup in executor (non-blocking)
     loop = asyncio.get_event_loop()
     loop.run_in_executor(None, compress_old_logs)
     loop.run_in_executor(None, docker_prune)
     compress_task = asyncio.create_task(periodic_compress_loop(interval_hours=6))
+    # Run analytics cleanup once at startup, then daily
+    asyncio.create_task(cleanup_old_analytics())
+    analytics_cleanup_task = asyncio.create_task(periodic_analytics_cleanup(interval_hours=24))
 
     logger.info("BoxboxNow v2 started (multi-tenant + CircuitHub)")
 
@@ -63,6 +67,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     compress_task.cancel()
+    analytics_cleanup_task.cancel()
     await registry.stop_all()
     await replay_registry.stop_all()
     await circuit_hub.stop_all()

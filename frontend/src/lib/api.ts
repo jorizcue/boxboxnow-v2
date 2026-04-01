@@ -169,6 +169,14 @@ export const api = {
   setReplaySpeed: (speed: number) =>
     fetchApi<any>("/api/replay/speed", { method: "POST", body: JSON.stringify({ speed }) }),
 
+  // Admin: Settings
+  getSetting: (key: string) => fetchApi<{ key: string; value: string }>(`/api/admin/settings/${key}`),
+  updateSetting: (key: string, value: string) =>
+    fetchApi<{ key: string; value: string }>(`/api/admin/settings/${key}`, {
+      method: "PATCH",
+      body: JSON.stringify({ value }),
+    }),
+
   // Analytics
   getKartStats: (circuitId: number, dateFrom?: string, dateTo?: string) => {
     const params = new URLSearchParams({ circuit_id: String(circuitId) });
