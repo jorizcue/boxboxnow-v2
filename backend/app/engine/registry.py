@@ -519,6 +519,12 @@ class ReplaySession:
 
         self._init_teams_loaded = False  # Track if we already auto-loaded teams
 
+        # Lap persistence (same mechanism as UserSession)
+        self._race_log_id: int | None = None
+        self._saved_laps_per_kart: dict[int, int] = {}
+        self._save_lock = asyncio.Lock()
+        self.circuit_id: int | None = None
+
         from app.apex.replay import ReplayEngine
 
         async def on_events(events):
@@ -585,6 +591,11 @@ class ReplaySession:
 
                 self.fifo.apply_to_state(self.state)
                 await self._broadcast_fifo()
+
+            # Real-time lap saving during replay
+            lap_events = [e for e in events if e.type == EventType.LAP]
+            if lap_events and self.circuit_id:
+                asyncio.create_task(self._save_realtime_laps())
 
         self.engine = ReplayEngine(self.parser, on_events, logs_dir="data/logs")
 
@@ -700,6 +711,53 @@ class ReplaySession:
             for c in dead:
                 self.state._ws_clients.discard(c)
 
+    async def _save_realtime_laps(self):
+        """Save newly arrived replay laps to DB."""
+        from app.models.database import async_session
+        from app.models.schemas import RaceLog, KartLap
+        from datetime import datetime, timezone
+
+        try:
+            async with self._save_lock:
+                async with async_session() as db:
+                    if self._race_log_id is None:
+                        race_log = RaceLog(
+                            circuit_id=self.circuit_id,
+                            user_id=self.user_id,
+                            race_date=datetime.now(timezone.utc),
+                            session_name=f"Replay {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                            duration_min=self.state.duration_min,
+                            total_karts=len(self.state.karts),
+                        )
+                        db.add(race_log)
+                        await db.flush()
+                        self._race_log_id = race_log.id
+                        logger.info(f"Created race_log #{race_log.id} for replay saving (user={self.user_id})")
+
+                    new_count = 0
+                    for kart in self.state.karts.values():
+                        saved = self._saved_laps_per_kart.get(kart.kart_number, 0)
+                        if len(kart.all_laps) <= saved:
+                            continue
+                        valid_set = {(vl["totalLap"], vl["lapTime"]) for vl in kart.valid_laps}
+                        for lap in kart.all_laps[saved:]:
+                            db.add(KartLap(
+                                race_log_id=self._race_log_id,
+                                kart_number=kart.kart_number,
+                                team_name=kart.team_name,
+                                driver_name=lap.get("driverName", ""),
+                                lap_number=lap["totalLap"],
+                                lap_time_ms=lap["lapTime"],
+                                is_valid=(lap["totalLap"], lap["lapTime"]) in valid_set,
+                            ))
+                            new_count += 1
+                        self._saved_laps_per_kart[kart.kart_number] = len(kart.all_laps)
+
+                    if new_count > 0:
+                        await db.commit()
+        except Exception as e:
+            logger.error(f"Replay lap save failed (user={self.user_id}): {e}")
+
     async def stop(self):
         await self.engine.stop()
         self._init_teams_loaded = False
@@ -709,6 +767,27 @@ class ReplaySession:
                 await self._analytics_task
             except asyncio.CancelledError:
                 pass
+
+        # Final flush of lap data before reset
+        if self._race_log_id is not None:
+            try:
+                await self._save_realtime_laps()
+                from app.models.database import async_session
+                from app.models.schemas import RaceLog
+                from sqlalchemy import update
+                async with async_session() as db:
+                    await db.execute(
+                        update(RaceLog)
+                        .where(RaceLog.id == self._race_log_id)
+                        .values(total_karts=len(self.state.karts))
+                    )
+                    await db.commit()
+                logger.info(f"Replay race_log #{self._race_log_id} finalized (user={self.user_id})")
+            except Exception as e:
+                logger.error(f"Replay final lap save failed (user={self.user_id}): {e}")
+
+        self._race_log_id = None
+        self._saved_laps_per_kart.clear()
         self.state.reset()
         await self.state._broadcast(self.state.get_snapshot())
         logger.info(f"Replay session stopped (user_id={self.user_id})")
@@ -717,6 +796,7 @@ class ReplaySession:
         def _val(v, default):
             return v if v is not None else default
 
+        self.circuit_id = session.circuit_id
         self.state.box_karts = _val(session.box_karts, 30)
         self.state.box_lines = _val(session.box_lines, 2)
         self.state.our_kart_number = _val(session.our_kart_number, 0)
