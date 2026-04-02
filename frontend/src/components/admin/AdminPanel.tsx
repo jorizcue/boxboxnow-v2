@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { StyledSelect } from "@/components/shared/StyledSelect";
+import { CalendarPicker } from "@/components/shared/CalendarPicker";
 
 interface UserRow {
   id: number;
@@ -348,18 +349,25 @@ function UsersManager() {
               <div className="border-t border-border pt-4">
                 <label className="block text-[10px] text-neutral-400 mb-2 uppercase tracking-wider">{t("admin.circuitAccess")}</label>
 
-                <div className="flex gap-2 mb-3 items-center flex-wrap">
-                  <StyledSelect
-                    value={newCircuitId}
-                    onChange={(v) => setNewCircuitId(Number(v))}
-                    options={circuits.map((c) => ({ value: c.id, label: c.name }))}
-                    placeholder={t("admin.selectCircuitPlaceholder")}
-                  />
-                  <input type="date" value={newValidFrom} onChange={(e) => setNewValidFrom(e.target.value)}
-                    className="bg-black border border-border rounded-lg px-2 py-1.5 text-xs" />
-                  <input type="date" value={newValidUntil} onChange={(e) => setNewValidUntil(e.target.value)}
-                    className="bg-black border border-border rounded-lg px-2 py-1.5 text-xs" />
-                  <button onClick={grantAccess} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-xs">
+                <div className="flex gap-2 mb-3 items-end flex-wrap">
+                  <div className="min-w-[140px]">
+                    <label className="block text-[9px] text-neutral-500 mb-1 uppercase tracking-wider">{t("config.circuit")}</label>
+                    <StyledSelect
+                      value={newCircuitId}
+                      onChange={(v) => setNewCircuitId(Number(v))}
+                      options={circuits.map((c) => ({ value: c.id, label: c.name }))}
+                      placeholder={t("admin.selectCircuitPlaceholder")}
+                    />
+                  </div>
+                  <div className="w-[150px]">
+                    <label className="block text-[9px] text-neutral-500 mb-1 uppercase tracking-wider">{t("admin.from")}</label>
+                    <CalendarPicker value={newValidFrom} onChange={setNewValidFrom} placeholder={t("admin.from")} />
+                  </div>
+                  <div className="w-[150px]">
+                    <label className="block text-[9px] text-neutral-500 mb-1 uppercase tracking-wider">{t("admin.until")}</label>
+                    <CalendarPicker value={newValidUntil} onChange={setNewValidUntil} placeholder={t("admin.until")} />
+                  </div>
+                  <button onClick={grantAccess} className="bg-accent hover:bg-accent-hover text-black font-bold w-8 h-8 rounded-lg text-sm flex items-center justify-center transition-colors flex-shrink-0">
                     +
                   </button>
                 </div>
