@@ -29,6 +29,9 @@ _ws_connections: dict[int, set] = {}
 # user_id -> circuit_id
 _user_circuits: dict[int, int] = {}
 
+# Track session_token -> set of WebSocket objects (for killing sessions)
+_ws_by_session: dict[str, set[WebSocket]] = {}
+
 
 def get_connected_users() -> dict[int, int]:
     """Return {user_id: connection_count} for all connected users."""
@@ -38,6 +41,34 @@ def get_connected_users() -> dict[int, int]:
 def get_user_circuit_map() -> dict[int, int]:
     """Return {user_id: circuit_id} for connected users."""
     return dict(_user_circuits)
+
+
+async def close_ws_for_session(session_token: str):
+    """Close all WebSocket connections for a killed session."""
+    ws_set = _ws_by_session.get(session_token)
+    if not ws_set:
+        return
+    for ws in list(ws_set):
+        try:
+            await ws.close(code=4001, reason="Session terminated")
+        except Exception:
+            pass
+
+
+async def close_ws_for_user(user_id: int, except_session: str | None = None):
+    """Close all WebSocket connections for a user, optionally except one session."""
+    ws_set = _ws_connections.get(user_id)
+    if not ws_set:
+        return
+    for ws in list(ws_set):
+        # Find the session_token for this ws
+        ws_sid = getattr(ws, "_bbn_session_token", None)
+        if except_session and ws_sid == except_session:
+            continue
+        try:
+            await ws.close(code=4001, reason="Session terminated")
+        except Exception:
+            pass
 
 
 async def _validate_session_token(session_token: str) -> bool:
@@ -132,6 +163,12 @@ async def race_websocket(
         _ws_connections[user_id] = set()
     _ws_connections[user_id].add(websocket)
 
+    # Track session_token -> ws for session killing
+    websocket._bbn_session_token = session_token  # type: ignore[attr-defined]
+    if session_token not in _ws_by_session:
+        _ws_by_session[session_token] = set()
+    _ws_by_session[session_token].add(websocket)
+
     # Get registries
     registry = websocket.app.state.registry
     replay_registry = websocket.app.state.replay_registry
@@ -186,3 +223,8 @@ async def race_websocket(
         if user_id in _ws_connections and not _ws_connections[user_id]:
             del _ws_connections[user_id]
         _user_circuits.pop(user_id, None)
+        # Unregister session_token -> ws
+        if session_token in _ws_by_session:
+            _ws_by_session[session_token].discard(websocket)
+            if not _ws_by_session[session_token]:
+                del _ws_by_session[session_token]

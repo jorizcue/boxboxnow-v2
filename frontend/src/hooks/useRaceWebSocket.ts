@@ -84,8 +84,13 @@ export function useRaceWebSocket(options?: WsOptions) {
         reconnectDelay.current = 1000;
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         setConnected(false);
+        // If server closed with 4001, session was terminated — logout
+        if (event.code === 4001) {
+          useAuth.getState().logout();
+          return;
+        }
         scheduleReconnect();
       };
 

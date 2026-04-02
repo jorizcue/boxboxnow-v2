@@ -354,8 +354,13 @@ async def kill_session(
     if not session:
         raise HTTPException(404, "Session not found")
 
+    session_token = session.session_token
     await db.delete(session)
     await db.commit()
+
+    # Close active WebSocket connections for this session
+    from app.ws.server import close_ws_for_session
+    await close_ws_for_session(session_token)
 
     return {"killed": True, "device": session.device_name}
 
@@ -369,6 +374,15 @@ async def kill_all_other_sessions(
     """Kill all sessions except the current one."""
     current_sid = getattr(request.state, "session_token", None)
 
+    # Get session tokens to close their WS connections
+    result = await db.execute(
+        select(DeviceSession.session_token).where(
+            DeviceSession.user_id == user.id,
+            DeviceSession.session_token != current_sid,
+        )
+    )
+    tokens_to_kill = [row[0] for row in result.all()]
+
     await db.execute(
         delete(DeviceSession).where(
             DeviceSession.user_id == user.id,
@@ -376,6 +390,11 @@ async def kill_all_other_sessions(
         )
     )
     await db.commit()
+
+    # Close active WebSocket connections for killed sessions
+    from app.ws.server import close_ws_for_session
+    for tk in tokens_to_kill:
+        await close_ws_for_session(tk)
 
     return {"killed_all_others": True}
 
@@ -393,6 +412,8 @@ async def logout(
             delete(DeviceSession).where(DeviceSession.session_token == current_sid)
         )
         await db.commit()
+        from app.ws.server import close_ws_for_session
+        await close_ws_for_session(current_sid)
     return {"logged_out": True}
 
 
@@ -424,7 +445,12 @@ async def kill_session_unauthenticated(
     if not session:
         raise HTTPException(404, "Session not found")
 
+    session_token = session.session_token
     await db.delete(session)
     await db.commit()
+
+    # Close active WebSocket connections for this session
+    from app.ws.server import close_ws_for_session
+    await close_ws_for_session(session_token)
 
     return {"killed": True, "device": session.device_name}

@@ -132,18 +132,34 @@ async def admin_kill_session(user_id: int, session_id: int, admin: User = Depend
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(404, "Session not found")
+    session_token = session.session_token
     await db.delete(session)
     await db.commit()
+
+    from app.ws.server import close_ws_for_session
+    await close_ws_for_session(session_token)
+
     return {"killed": True, "device": session.device_name}
 
 
 @router.delete("/users/{user_id}/sessions")
 async def admin_kill_all_sessions(user_id: int, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     """Admin: kill all device sessions for a user."""
+    # Get session tokens first to close WS
+    result2 = await db.execute(
+        select(DeviceSession.session_token).where(DeviceSession.user_id == user_id)
+    )
+    tokens_to_kill = [row[0] for row in result2.all()]
+
     await db.execute(
         delete(DeviceSession).where(DeviceSession.user_id == user_id)
     )
     await db.commit()
+
+    from app.ws.server import close_ws_for_session
+    for tk in tokens_to_kill:
+        await close_ws_for_session(tk)
+
     return {"killed_all": True}
 
 

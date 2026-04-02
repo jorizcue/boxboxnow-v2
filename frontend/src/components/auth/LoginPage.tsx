@@ -136,8 +136,9 @@ export function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Brand header */}
         <div className="text-center mb-8 sm:mb-10">
-          <div className="inline-flex items-center gap-2 mb-2">
-            <span className="text-4xl font-bold text-accent">B</span>
+          <div className="inline-flex items-center gap-0 mb-2">
+            <span className="text-4xl font-bold text-white">BB</span>
+            <span className="text-4xl font-bold text-accent">N</span>
           </div>
           <h1 className="text-2xl font-bold tracking-wider text-white">
             BOXBOX<span className="text-accent">NOW</span>
