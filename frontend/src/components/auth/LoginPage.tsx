@@ -38,8 +38,20 @@ export function LoginPage() {
       const data = await api.login(username, password);
       setAuth(data.access_token, data.session_token, data.user);
     } catch (err: any) {
+      const msg = err.message || "";
+      // 403: no circuit access
+      if (msg.includes("API error 403:")) {
+        try {
+          const body = JSON.parse(msg.replace("API error 403: ", ""));
+          setError(body.detail || t("login.noCircuitAccess"));
+        } catch {
+          setError(t("login.noCircuitAccess"));
+        }
+        return;
+      }
+      // 409: device limit
       try {
-        const body = JSON.parse(err.message.replace("API error 409: ", ""));
+        const body = JSON.parse(msg.replace("API error 409: ", ""));
         if (body.detail?.active_sessions) {
           setDeviceLimit(body.detail);
         } else {

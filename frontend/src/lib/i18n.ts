@@ -62,6 +62,7 @@ const translations: Record<string, Record<Language, string>> = {
   "login.activeSessions": { es: "Sesiones activas", en: "Active sessions", it: "Sessioni attive", de: "Aktive Sitzungen" },
   "login.close": { es: "Cerrar", en: "Close", it: "Chiudi", de: "Schliessen" },
   "login.backToLogin": { es: "Volver al login", en: "Back to login", it: "Torna al login", de: "Zuruck zum Login" },
+  "login.noCircuitAccess": { es: "No tienes acceso a ningun circuito. Contacta con el administrador.", en: "You don't have access to any circuit. Contact the administrator.", it: "Non hai accesso a nessun circuito. Contatta l'amministratore.", de: "Sie haben keinen Zugang zu einer Strecke. Kontaktieren Sie den Administrator." },
 
   // === Session Manager ===
   "sessions.connectedDevices": { es: "Dispositivos conectados", en: "Connected devices", it: "Dispositivi collegati", de: "Verbundene Gerate" },
@@ -227,6 +228,8 @@ const translations: Record<string, Record<Language, string>> = {
   "admin.selectUserHint": { es: "Selecciona un usuario para gestionar su acceso", en: "Select a user to manage access", it: "Seleziona un utente per gestire l'accesso", de: "Wahle einen Benutzer um den Zugang zu verwalten" },
   "admin.tabs": { es: "Pestanas", en: "Tabs", it: "Schede", de: "Tabs" },
   "admin.allTabs": { es: "Todas", en: "All", it: "Tutte", de: "Alle" },
+  "admin.newUser": { es: "Nuevo usuario", en: "New user", it: "Nuovo utente", de: "Neuer Benutzer" },
+  "admin.noUsers": { es: "No hay usuarios", en: "No users", it: "Nessun utente", de: "Keine Benutzer" },
 
   // === Admin: Circuits ===
   "admin.circuitCatalog": { es: "Catalogo de Circuitos", en: "Circuit Catalog", it: "Catalogo Circuiti", de: "Streckenkatalog" },

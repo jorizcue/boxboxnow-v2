@@ -49,13 +49,25 @@ export function AdminHubPanel() {
   return <CircuitHubManager />;
 }
 
+const ALL_TAB_OPTIONS: [string, string][] = [
+  ["race", "Carrera"],
+  ["pit", "Box"],
+  ["live", "Live"],
+  ["adjusted", "C.Real"],
+  ["config", "Config"],
+  ["replay", "Replay"],
+  ["analytics", "Analytics"],
+];
+
 function UsersManager() {
   const t = useT();
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [showCreate, setShowCreate] = useState(false);
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newIsAdmin, setNewIsAdmin] = useState(false);
   const [newMaxDevices, setNewMaxDevices] = useState(1);
+  const [newTabs, setNewTabs] = useState<string[]>(ALL_TAB_OPTIONS.map(([k]) => k));
   const [selectedUser, setSelectedUser] = useState<number | null>(null);
   const [access, setAccess] = useState<AccessRow[]>([]);
   const [circuits, setCircuits] = useState<CircuitRow[]>([]);
@@ -76,7 +88,14 @@ function UsersManager() {
     if (!newUsername || !newPassword) return;
     try {
       await api.createUser({ username: newUsername, password: newPassword, is_admin: newIsAdmin, max_devices: newMaxDevices });
+      // Set tab access for the new user
+      const created = (await api.getUsers()).find((u: UserRow) => u.username === newUsername);
+      if (created && !newIsAdmin) {
+        await api.updateUserTabs(created.id, newTabs);
+      }
       setNewUsername(""); setNewPassword(""); setNewIsAdmin(false); setNewMaxDevices(1);
+      setNewTabs(ALL_TAB_OPTIONS.map(([k]) => k));
+      setShowCreate(false);
       loadUsers();
     } catch (e: any) { alert(e.message); }
   };
@@ -92,6 +111,7 @@ function UsersManager() {
 
   const loadAccess = async (userId: number) => {
     setSelectedUser(userId);
+    setShowCreate(false);
     try { setAccess(await api.getUserAccess(userId)); } catch {}
   };
 
@@ -112,87 +132,176 @@ function UsersManager() {
     try { await api.revokeAccess(accessId); if (selectedUser) loadAccess(selectedUser); } catch {}
   };
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
-        <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">{t("admin.usersTitle")}</h3>
+  const toggleNewTab = (tab: string) => {
+    setNewTabs((prev) => prev.includes(tab) ? prev.filter((t) => t !== tab) : [...prev, tab]);
+  };
 
-        <div className="flex gap-2 mb-4">
-          <input placeholder={t("admin.userPlaceholder")} value={newUsername} onChange={(e) => setNewUsername(e.target.value)}
-            className="flex-1 bg-black border border-border rounded-lg px-2 py-1.5 text-sm" />
-          <input placeholder="Password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
-            className="flex-1 bg-black border border-border rounded-lg px-2 py-1.5 text-sm" />
-          <input placeholder={t("admin.devicesShort")} type="number" min="1" max="10" value={newMaxDevices}
-            onChange={(e) => setNewMaxDevices(Number(e.target.value))}
-            className="w-16 bg-black border border-border rounded-lg px-2 py-1.5 text-sm" title={t("admin.devicesTitle")} />
-          <label className="flex items-center gap-1 text-xs text-neutral-200">
-            <input type="checkbox" checked={newIsAdmin} onChange={(e) => setNewIsAdmin(e.target.checked)} className="accent-accent" />
-            Admin
-          </label>
-          <button onClick={createUser} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-sm">
-            {t("admin.create")}
+  const panelOpen = showCreate || selectedUser !== null;
+
+  return (
+    <div className="flex gap-4">
+      {/* Left: user list */}
+      <div className={`bg-white/[0.03] rounded-xl p-4 border border-border transition-all ${panelOpen ? "flex-1 min-w-0" : "w-full"}`}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">{t("admin.usersTitle")}</h3>
+          <button onClick={() => { setShowCreate(true); setSelectedUser(null); }} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-sm">
+            {t("admin.new")}
           </button>
         </div>
 
-        <table className="w-full text-sm">
-          <thead className="text-[11px] text-neutral-400 uppercase tracking-wider">
-            <tr>
-              <th className="text-left px-2 py-1">{t("admin.userPlaceholder")}</th>
-              <th className="text-center px-2 py-1">{t("admin.devicesShort")}</th>
-              <th className="text-center px-2 py-1">Admin</th>
-              <th className="text-center px-2 py-1">{t("admin.tabs")}</th>
-              <th className="text-right px-2 py-1"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id}
-                className={`border-t border-border cursor-pointer transition-colors ${selectedUser === u.id ? "bg-accent/10 border-l-2 border-l-accent" : "hover:bg-black/50"}`}
-                onClick={() => loadAccess(u.id)}>
-                <td className="px-2 py-1.5 text-white">{u.username}</td>
-                <td className="px-2 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+        <div className="space-y-1">
+          {users.map((u) => (
+            <div
+              key={u.id}
+              onClick={() => loadAccess(u.id)}
+              className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                selectedUser === u.id
+                  ? "bg-accent/10 border border-accent/30"
+                  : "hover:bg-black/50 border border-transparent"
+              }`}
+            >
+              <div className="min-w-0">
+                <div className={`text-sm font-medium truncate ${selectedUser === u.id ? "text-accent" : "text-white"}`}>
+                  {u.username}
+                  {u.is_admin && <span className="ml-1.5 text-[9px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-semibold uppercase">Admin</span>}
+                </div>
+                <div className="flex gap-2 text-[10px] text-neutral-500 mt-0.5">
+                  <span>{t("admin.devicesShort")} {u.max_devices}</span>
+                  <span>{t("admin.tabs")}: {u.is_admin ? t("admin.allTabs") : (u.tab_access?.length || 0)}</span>
+                </div>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteUser(u.id); }}
+                className="text-red-400/40 hover:text-red-400 text-xs transition-colors ml-2 flex-shrink-0"
+              >
+                {t("admin.delete")}
+              </button>
+            </div>
+          ))}
+          {users.length === 0 && (
+            <p className="text-neutral-500 text-sm py-4 text-center">{t("admin.noUsers")}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Right: slide-in panel */}
+      {panelOpen && (
+        <div className="w-80 flex-shrink-0 bg-white/[0.03] rounded-xl border border-border p-4 space-y-3 animate-in slide-in-from-right-4 duration-200">
+          {showCreate ? (
+            /* === Create user form === */
+            <>
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs text-neutral-200 font-medium uppercase tracking-wider">{t("admin.newUser")}</h4>
+                <button onClick={() => setShowCreate(false)} className="text-neutral-500 hover:text-white text-lg leading-none transition-colors">&times;</button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("admin.userPlaceholder")}</label>
                   <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={u.max_devices}
-                    onChange={async (e) => {
-                      const val = Math.max(1, Math.min(10, Number(e.target.value)));
-                      try {
-                        await api.updateUser(u.id, { max_devices: val });
-                        loadUsers();
-                      } catch {}
-                    }}
-                    className="w-12 bg-black border border-border rounded px-1 py-0.5 text-sm text-center font-mono text-neutral-400"
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value)}
+                    placeholder={t("admin.userPlaceholder")}
+                    className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm"
+                    autoFocus
                   />
-                </td>
-                <td className="px-2 py-1.5 text-center">
-                  {u.is_admin ? <span className="text-accent text-xs font-medium">{t("common.yes")}</span> : <span className="text-neutral-700">-</span>}
-                </td>
-                <td className="px-2 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
-                  {u.is_admin ? (
-                    <span className="text-[10px] text-neutral-500">{t("admin.allTabs")}</span>
-                  ) : (
-                    <div className="flex items-center gap-1.5 justify-center flex-wrap">
-                      {([
-                        ["race", t("nav.race")],
-                        ["pit", t("nav.box")],
-                        ["live", t("nav.live")],
-                        ["adjusted", t("nav.adjustedShort")],
-                        ["config", t("nav.config")],
-                        ["replay", "Replay"],
-                        ["analytics", "Analytics"],
-                      ] as [string, string][]).map(([tab, label]) => (
-                        <label key={tab} className="flex items-center gap-0.5 text-[10px] text-neutral-300 cursor-pointer">
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("login.password")}</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder={t("login.password")}
+                    className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("admin.devicesTitle")}</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={newMaxDevices}
+                      onChange={(e) => setNewMaxDevices(Number(e.target.value))}
+                      className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-center font-mono"
+                    />
+                  </div>
+                  <div className="flex items-end pb-1">
+                    <label className="flex items-center gap-2 text-sm text-neutral-200 cursor-pointer">
+                      <input type="checkbox" checked={newIsAdmin} onChange={(e) => setNewIsAdmin(e.target.checked)} className="accent-accent w-4 h-4" />
+                      Admin
+                    </label>
+                  </div>
+                </div>
+
+                {!newIsAdmin && (
+                  <div>
+                    <label className="block text-[10px] text-neutral-400 mb-2 uppercase tracking-wider">{t("admin.tabs")}</label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {ALL_TAB_OPTIONS.map(([tab, label]) => (
+                        <label key={tab} className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer bg-black/30 rounded-lg px-2.5 py-1.5 border border-border hover:border-neutral-600 transition-colors">
                           <input
                             type="checkbox"
-                            checked={u.tab_access?.includes(tab)}
+                            checked={newTabs.includes(tab)}
+                            onChange={() => toggleNewTab(tab)}
+                            className="accent-accent"
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={createUser}
+                  disabled={!newUsername || !newPassword}
+                  className="flex-1 bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-2 rounded-lg text-sm transition-colors"
+                >
+                  {t("admin.create")}
+                </button>
+                <button onClick={() => setShowCreate(false)} className="bg-surface text-neutral-300 px-4 py-2 rounded-lg text-sm border border-border hover:text-white transition-colors">
+                  {t("admin.cancel")}
+                </button>
+              </div>
+            </>
+          ) : selectedUser ? (
+            /* === User detail: tabs + circuit access === */
+            <>
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs text-neutral-200 font-medium uppercase tracking-wider">
+                  {users.find((u) => u.id === selectedUser)?.username}
+                </h4>
+                <button onClick={() => setSelectedUser(null)} className="text-neutral-500 hover:text-white text-lg leading-none transition-colors">&times;</button>
+              </div>
+
+              {/* Tab access for selected user */}
+              {(() => {
+                const su = users.find((u) => u.id === selectedUser);
+                if (!su || su.is_admin) return (
+                  <p className="text-[10px] text-neutral-500">{su?.is_admin ? t("admin.allTabs") : ""}</p>
+                );
+                return (
+                  <div>
+                    <label className="block text-[10px] text-neutral-400 mb-2 uppercase tracking-wider">{t("admin.tabs")}</label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {ALL_TAB_OPTIONS.map(([tab, label]) => (
+                        <label key={tab} className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer bg-black/30 rounded-lg px-2.5 py-1.5 border border-border hover:border-neutral-600 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={su.tab_access?.includes(tab)}
                             onChange={async (e) => {
-                              const newTabs = e.target.checked
-                                ? [...(u.tab_access || []), tab]
-                                : (u.tab_access || []).filter((t) => t !== tab);
+                              const updated = e.target.checked
+                                ? [...(su.tab_access || []), tab]
+                                : (su.tab_access || []).filter((t) => t !== tab);
                               try {
-                                await api.updateUserTabs(u.id, newTabs);
+                                await api.updateUserTabs(su.id, updated);
                                 loadUsers();
                               } catch {}
                             }}
@@ -202,72 +311,77 @@ function UsersManager() {
                         </label>
                       ))}
                     </div>
-                  )}
-                </td>
-                <td className="px-2 py-1.5 text-right">
-                  <button onClick={(e) => { e.stopPropagation(); deleteUser(u.id); }}
-                    className="text-red-400/60 hover:text-red-400 text-xs transition-colors">{t("admin.delete")}</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  </div>
+                );
+              })()}
 
-      <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
-        <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">
-          {t("admin.circuitAccess")}{selectedUser && ` — ${users.find((u) => u.id === selectedUser)?.username}`}
-        </h3>
+              {/* Devices */}
+              {(() => {
+                const su = users.find((u) => u.id === selectedUser);
+                if (!su) return null;
+                return (
+                  <div>
+                    <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("admin.devicesTitle")}</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={su.max_devices}
+                      onChange={async (e) => {
+                        const val = Math.max(1, Math.min(10, Number(e.target.value)));
+                        try {
+                          await api.updateUser(su.id, { max_devices: val });
+                          loadUsers();
+                        } catch {}
+                      }}
+                      className="w-20 bg-black border border-border rounded-lg px-3 py-1.5 text-sm text-center font-mono"
+                    />
+                  </div>
+                );
+              })()}
 
-        {selectedUser ? (
-          <>
-            <div className="flex gap-2 mb-4 flex-wrap">
-              <StyledSelect
-                value={newCircuitId}
-                onChange={(v) => setNewCircuitId(Number(v))}
-                options={circuits.map((c) => ({ value: c.id, label: c.name }))}
-                placeholder={t("admin.selectCircuitPlaceholder")}
-              />
-              <input type="date" value={newValidFrom} onChange={(e) => setNewValidFrom(e.target.value)}
-                className="bg-black border border-border rounded-lg px-2 py-1.5 text-sm" />
-              <input type="date" value={newValidUntil} onChange={(e) => setNewValidUntil(e.target.value)}
-                className="bg-black border border-border rounded-lg px-2 py-1.5 text-sm" />
-              <button onClick={grantAccess} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-sm">
-                {t("admin.grantAccess")}
-              </button>
-            </div>
+              {/* Circuit access */}
+              <div className="border-t border-border pt-3">
+                <label className="block text-[10px] text-neutral-400 mb-2 uppercase tracking-wider">{t("admin.circuitAccess")}</label>
 
-            <table className="w-full text-sm">
-              <thead className="text-[11px] text-neutral-400 uppercase tracking-wider">
-                <tr>
-                  <th className="text-left px-2 py-1">{t("config.circuit")}</th>
-                  <th className="text-left px-2 py-1">{t("admin.from")}</th>
-                  <th className="text-left px-2 py-1">{t("admin.until")}</th>
-                  <th className="text-right px-2 py-1"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {access.map((a) => (
-                  <tr key={a.id} className="border-t border-border">
-                    <td className="px-2 py-1.5 text-white">{a.circuit_name}</td>
-                    <td className="px-2 py-1.5 text-neutral-200">{new Date(a.valid_from).toLocaleDateString()}</td>
-                    <td className="px-2 py-1.5 text-neutral-200">{new Date(a.valid_until).toLocaleDateString()}</td>
-                    <td className="px-2 py-1.5 text-right">
+                <div className="flex gap-1.5 mb-3 flex-wrap">
+                  <StyledSelect
+                    value={newCircuitId}
+                    onChange={(v) => setNewCircuitId(Number(v))}
+                    options={circuits.map((c) => ({ value: c.id, label: c.name }))}
+                    placeholder={t("admin.selectCircuitPlaceholder")}
+                  />
+                  <input type="date" value={newValidFrom} onChange={(e) => setNewValidFrom(e.target.value)}
+                    className="bg-black border border-border rounded-lg px-2 py-1 text-xs flex-1 min-w-0" />
+                  <input type="date" value={newValidUntil} onChange={(e) => setNewValidUntil(e.target.value)}
+                    className="bg-black border border-border rounded-lg px-2 py-1 text-xs flex-1 min-w-0" />
+                  <button onClick={grantAccess} className="bg-accent text-black font-semibold px-2.5 py-1 rounded-lg text-xs">
+                    +
+                  </button>
+                </div>
+
+                <div className="space-y-1 max-h-40 overflow-y-auto scrollbar-none">
+                  {access.map((a) => (
+                    <div key={a.id} className="flex items-center justify-between bg-black/30 rounded-lg px-2.5 py-1.5 text-xs">
+                      <div>
+                        <span className="text-white font-medium">{a.circuit_name}</span>
+                        <span className="text-neutral-500 ml-2">
+                          {new Date(a.valid_from).toLocaleDateString()} - {new Date(a.valid_until).toLocaleDateString()}
+                        </span>
+                      </div>
                       <button onClick={() => revokeAccess(a.id)}
-                        className="text-red-400/60 hover:text-red-400 text-xs transition-colors">{t("admin.revoke")}</button>
-                    </td>
-                  </tr>
-                ))}
-                {access.length === 0 && (
-                  <tr><td colSpan={4} className="px-2 py-4 text-center text-neutral-500">{t("admin.noAccess")}</td></tr>
-                )}
-              </tbody>
-            </table>
-          </>
-        ) : (
-          <p className="text-neutral-500 text-sm">{t("admin.selectUserHint")}</p>
-        )}
-      </div>
+                        className="text-red-400/60 hover:text-red-400 text-[10px] transition-colors ml-2">{t("admin.revoke")}</button>
+                    </div>
+                  ))}
+                  {access.length === 0 && (
+                    <p className="text-neutral-600 text-xs text-center py-2">{t("admin.noAccess")}</p>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

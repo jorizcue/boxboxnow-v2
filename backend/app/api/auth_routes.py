@@ -28,7 +28,7 @@ from sqlalchemy import select, func, delete
 
 from app.config import get_settings
 from app.models.database import get_db
-from app.models.schemas import User, DeviceSession, UserTabAccess
+from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess
 from sqlalchemy.orm import selectinload
 from app.models.pydantic_models import (
     LoginRequest, LoginResponse, UserOut, DeviceSessionOut,
@@ -207,6 +207,22 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
 
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+
+    # Non-admin users must have at least one active circuit access
+    if not user.is_admin:
+        now = datetime.now(timezone.utc)
+        access_result = await db.execute(
+            select(UserCircuitAccess.id).where(
+                UserCircuitAccess.user_id == user.id,
+                UserCircuitAccess.valid_from <= now,
+                UserCircuitAccess.valid_until >= now,
+            ).limit(1)
+        )
+        if not access_result.scalar_one_or_none():
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "No tienes acceso a ningun circuito. Contacta con el administrador."
+            )
 
     # Cleanup stale sessions first
     await _cleanup_stale_sessions(db, user.id)
