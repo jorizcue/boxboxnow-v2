@@ -7,17 +7,16 @@ import { useRaceStore } from "@/hooks/useRaceState";
 import { LoginPage } from "@/components/auth/LoginPage";
 import { StatusBar } from "@/components/layout/StatusBar";
 import { Sidebar } from "@/components/layout/Sidebar";
+import type { Tab } from "@/components/layout/Sidebar";
 import { RaceTable } from "@/components/race/RaceTable";
 import { FifoQueue } from "@/components/pit/FifoQueue";
 import { ClassificationTable } from "@/components/classification/ClassificationTable";
 import { ConfigPanel } from "@/components/config/ConfigPanel";
-import { AdminPanel } from "@/components/admin/AdminPanel";
+import { AdminUsersPanel, AdminCircuitsPanel, AdminHubPanel } from "@/components/admin/AdminPanel";
 import { LiveTiming } from "@/components/live/LiveTiming";
 import { AdjustedClassification } from "@/components/classification/AdjustedClassification";
 import { ReplayTab } from "@/components/replay/ReplayTab";
 import { KartAnalyticsTab } from "@/components/analytics/KartAnalyticsTab";
-
-type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "config" | "replay" | "analytics" | "admin";
 
 export default function Home() {
   const { token, user, _hydrated } = useAuth();
@@ -75,7 +74,9 @@ function Dashboard({
           {activeTab === "config" && userTabs.includes("config") && <ConfigPanel />}
           {activeTab === "replay" && userTabs.includes("replay") && <ReplayTab />}
           {activeTab === "analytics" && userTabs.includes("analytics") && <KartAnalyticsTab />}
-          {activeTab === "admin" && user?.is_admin && <AdminPanel />}
+          {activeTab === "admin-users" && user?.is_admin && <AdminUsersPanel />}
+          {activeTab === "admin-circuits" && user?.is_admin && <AdminCircuitsPanel />}
+          {activeTab === "admin-hub" && user?.is_admin && <AdminHubPanel />}
         </main>
       </div>
     </div>

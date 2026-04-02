@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { useT } from "@/lib/i18n";
 import { useRaceStore } from "@/hooks/useRaceState";
 
-type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "config" | "replay" | "analytics" | "admin";
+export type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "config" | "replay" | "analytics" | "admin-users" | "admin-circuits" | "admin-hub";
 
 interface SidebarProps {
   activeTab: Tab;
@@ -71,10 +71,26 @@ const TAB_ICONS: Record<string, JSX.Element> = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
     </svg>
   ),
+  "admin-users": (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+    </svg>
+  ),
+  "admin-circuits": (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
+    </svg>
+  ),
+  "admin-hub": (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0h.375a2.625 2.625 0 010 5.25H17.25m-13.5-5.25H3.375a2.625 2.625 0 000 5.25H5.25" />
+    </svg>
+  ),
 };
 
-// Persist sidebar collapsed state
+// Persist sidebar state
 let _sidebarCollapsed = false;
+let _adminExpanded = true;
 
 export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarProps) {
   const t = useT();
@@ -83,10 +99,17 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
   const raceActive = raceStarted || replayActive;
   const [collapsed, setCollapsed] = useState(_sidebarCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [adminExpanded, setAdminExpanded] = useState(_adminExpanded);
 
   useEffect(() => { _sidebarCollapsed = collapsed; }, [collapsed]);
+  useEffect(() => { _adminExpanded = adminExpanded; }, [adminExpanded]);
 
-  const tabs: { id: Tab; labelKey: string; adminOnly?: boolean; tabAccess?: string }[] = [
+  // Auto-expand admin when an admin sub-tab is active
+  useEffect(() => {
+    if (activeTab.startsWith("admin-")) setAdminExpanded(true);
+  }, [activeTab]);
+
+  const tabs: { id: Tab; labelKey: string; tabAccess?: string }[] = [
     { id: "race", labelKey: "nav.race", tabAccess: "race" },
     { id: "pit", labelKey: "nav.box", tabAccess: "pit" },
     { id: "live", labelKey: "nav.live", tabAccess: "live" },
@@ -94,11 +117,15 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
     { id: "config", labelKey: "nav.config", tabAccess: "config" },
     { id: "replay", labelKey: "nav.replay", tabAccess: "replay" },
     { id: "analytics", labelKey: "nav.analytics", tabAccess: "analytics" },
-    { id: "admin", labelKey: "nav.admin", adminOnly: true },
+  ];
+
+  const adminSubTabs: { id: Tab; labelKey: string }[] = [
+    { id: "admin-users", labelKey: "admin.users" },
+    { id: "admin-circuits", labelKey: "admin.circuits" },
+    { id: "admin-hub", labelKey: "admin.hub" },
   ];
 
   const visibleTabs = tabs.filter((tab) => {
-    if (tab.adminOnly) return isAdmin;
     if (tab.tabAccess) return userTabs.includes(tab.tabAccess);
     return true;
   });
@@ -107,6 +134,47 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
     onTabChange(tab);
     setMobileOpen(false);
   };
+
+  const isAdminTabActive = activeTab.startsWith("admin-");
+
+  const renderTabButton = (tab: { id: Tab; labelKey: string }, isSub = false) => (
+    <button
+      key={tab.id}
+      onClick={() => handleTabClick(tab.id)}
+      className={clsx(
+        "w-full flex items-center gap-3 transition-colors relative group",
+        collapsed && !isSub ? "justify-center px-2 py-2.5" : isSub ? "pl-9 pr-4 py-2" : "px-4 py-2.5",
+        activeTab === tab.id
+          ? "text-accent bg-accent/10"
+          : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03]"
+      )}
+    >
+      {/* Active indicator */}
+      {activeTab === tab.id && (
+        <span className="absolute left-0 top-1 bottom-1 w-[2px] bg-accent rounded-r" />
+      )}
+      <span className="shrink-0 relative">
+        {TAB_ICONS[tab.id]}
+        {tab.id === "race" && raceActive && (
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+        )}
+      </span>
+      {(!collapsed || isSub) && (
+        <span className={clsx("font-medium truncate", isSub ? "text-xs" : "text-sm")}>
+          {t(tab.labelKey)}
+          {tab.id === "race" && raceActive && (
+            <span className="ml-1.5 inline-block w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse align-middle" />
+          )}
+        </span>
+      )}
+      {/* Tooltip on collapsed (only for non-sub items) */}
+      {collapsed && !isSub && (
+        <span className="absolute left-full ml-2 px-2 py-1 bg-surface border border-border rounded text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+          {t(tab.labelKey)}
+        </span>
+      )}
+    </button>
+  );
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -150,44 +218,65 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
 
       {/* Tab list */}
       <nav className="flex-1 py-2 space-y-0.5 overflow-y-auto scrollbar-none">
-        {visibleTabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => handleTabClick(tab.id)}
-            className={clsx(
-              "w-full flex items-center gap-3 transition-colors relative group",
-              collapsed ? "justify-center px-2 py-2.5" : "px-4 py-2.5",
-              activeTab === tab.id
-                ? "text-accent bg-accent/10"
-                : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03]"
-            )}
-          >
-            {/* Active indicator */}
-            {activeTab === tab.id && (
-              <span className="absolute left-0 top-1 bottom-1 w-[2px] bg-accent rounded-r" />
-            )}
-            <span className="shrink-0 relative">
-              {TAB_ICONS[tab.id]}
-              {tab.id === "race" && raceActive && (
-                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+        {visibleTabs.map((tab) => renderTabButton(tab))}
+
+        {/* Admin section with sub-menu */}
+        {isAdmin && (
+          <>
+            {/* Separator */}
+            <div className="my-2 mx-3 border-t border-border" />
+
+            {/* Admin parent button */}
+            <button
+              onClick={() => {
+                if (collapsed) {
+                  // When collapsed, clicking admin goes to first sub-tab
+                  setCollapsed(false);
+                  setAdminExpanded(true);
+                  if (!activeTab.startsWith("admin-")) handleTabClick("admin-users");
+                } else {
+                  setAdminExpanded(!adminExpanded);
+                }
+              }}
+              className={clsx(
+                "w-full flex items-center gap-3 transition-colors relative group",
+                collapsed ? "justify-center px-2 py-2.5" : "px-4 py-2.5",
+                isAdminTabActive
+                  ? "text-accent"
+                  : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03]"
               )}
-            </span>
-            {!collapsed && (
-              <span className="text-sm font-medium truncate">
-                {t(tab.labelKey)}
-                {tab.id === "race" && raceActive && (
-                  <span className="ml-1.5 inline-block w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse align-middle" />
-                )}
-              </span>
+            >
+              <span className="shrink-0">{TAB_ICONS.admin}</span>
+              {!collapsed && (
+                <>
+                  <span className="text-sm font-medium truncate flex-1 text-left">{t("nav.admin")}</span>
+                  <svg
+                    className={clsx(
+                      "w-3.5 h-3.5 shrink-0 transition-transform duration-200",
+                      adminExpanded ? "rotate-180" : ""
+                    )}
+                    fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </>
+              )}
+              {/* Tooltip on collapsed */}
+              {collapsed && (
+                <span className="absolute left-full ml-2 px-2 py-1 bg-surface border border-border rounded text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                  {t("nav.admin")}
+                </span>
+              )}
+            </button>
+
+            {/* Admin sub-tabs */}
+            {!collapsed && adminExpanded && (
+              <div className="space-y-0.5">
+                {adminSubTabs.map((sub) => renderTabButton(sub, true))}
+              </div>
             )}
-            {/* Tooltip on collapsed */}
-            {collapsed && (
-              <span className="absolute left-full ml-2 px-2 py-1 bg-surface border border-border rounded text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                {t(tab.labelKey)}
-              </span>
-            )}
-          </button>
-        ))}
+          </>
+        )}
       </nav>
     </div>
   );

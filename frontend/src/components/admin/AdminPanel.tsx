@@ -37,34 +37,16 @@ interface AccessRow {
   valid_until: string;
 }
 
-export function AdminPanel() {
-  const t = useT();
-  const [tab, setTab] = useState<"users" | "circuits" | "hub">("users");
+export function AdminUsersPanel() {
+  return <UsersManager />;
+}
 
-  const tabBtn = (key: typeof tab, label: string) => (
-    <button
-      onClick={() => setTab(key)}
-      className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
-        tab === key ? "bg-accent text-black" : "bg-surface text-neutral-200 hover:text-neutral-300"
-      }`}
-    >
-      {label}
-    </button>
-  );
+export function AdminCircuitsPanel() {
+  return <CircuitsManager />;
+}
 
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-0.5">
-        {tabBtn("users", t("admin.users"))}
-        {tabBtn("circuits", t("admin.circuits"))}
-        {tabBtn("hub", t("admin.hub"))}
-      </div>
-
-      {tab === "users" && <UsersManager />}
-      {tab === "circuits" && <CircuitsManager />}
-      {tab === "hub" && <CircuitHubManager />}
-    </div>
-  );
+export function AdminHubPanel() {
+  return <CircuitHubManager />;
 }
 
 function UsersManager() {
