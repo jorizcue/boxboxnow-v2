@@ -111,6 +111,7 @@ function UsersManager() {
   };
 
   const loadAccess = async (userId: number) => {
+    if (selectedUser === userId) { setSelectedUser(null); return; }
     setSelectedUser(userId);
     setShowCreate(false);
     try { setAccess(await api.getUserAccess(userId)); } catch {}
@@ -476,6 +477,7 @@ function CircuitsManager() {
   };
 
   const startEdit = (c: CircuitRow) => {
+    if (editingId === c.id) { cancelEdit(); return; }
     setEditingId(c.id);
     setForm(circuitToForm(c));
     setShowCreate(false);
