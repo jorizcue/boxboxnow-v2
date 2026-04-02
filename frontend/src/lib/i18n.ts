@@ -312,6 +312,9 @@ const translations: Record<string, Record<Language, string>> = {
   "analytics.autoSaveHint": { es: "Los datos se guardan automaticamente al finalizar cada sesion de monitoreo.", en: "Data is saved automatically when each monitoring session ends.", it: "I dati vengono salvati automaticamente al termine di ogni sessione di monitoraggio.", de: "Daten werden automatisch gespeichert, wenn jede Uberwachungssitzung endet." },
   "analytics.retention": { es: "Retención", en: "Retention", it: "Conservazione", de: "Aufbewahrung" },
   "analytics.days": { es: "días", en: "days", it: "giorni", de: "Tage" },
+  "analytics.circuitsCol": { es: "Circuitos", en: "Circuits", it: "Circuiti", de: "Strecken" },
+  "analytics.racesShort": { es: "carreras", en: "races", it: "gare", de: "Rennen" },
+  "analytics.lapsShort": { es: "vueltas", en: "laps", it: "giri", de: "Runden" },
 
   // === Driver View ===
   "driver.title": { es: "Vista Piloto", en: "Driver View", it: "Vista Pilota", de: "Fahreransicht" },
