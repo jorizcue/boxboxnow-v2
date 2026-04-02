@@ -134,6 +134,10 @@ class KartState:
             "driverDifferentialMs": self.driver_differential_ms,
             "avgLapMs": self.avg_lap_ms,
             "bestAvgMs": self.best_avg_ms,
+            "recentLaps": [
+                {"lapTime": l["lapTime"], "totalLap": l["totalLap"], "driverName": l.get("driverName", "")}
+                for l in self.valid_laps[-5:]
+            ],
         }
 
 

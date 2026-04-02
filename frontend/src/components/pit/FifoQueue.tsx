@@ -7,7 +7,7 @@ import { useSimNow } from "@/hooks/useSimNow";
 import { tierHex, secondsToHMS, msToLapTime } from "@/lib/formatters";
 import { sendBoxCall } from "@/lib/driverChannel";
 import { api } from "@/lib/api";
-import type { FifoEntry } from "@/types/race";
+import type { FifoEntry, KartState } from "@/types/race";
 import clsx from "clsx";
 import { useT } from "@/lib/i18n";
 import { RainToggle } from "@/components/shared/RainToggle";
@@ -19,6 +19,7 @@ export function FifoQueue() {
   const raceClockMs = useRaceClock();
   const durationMs = useRaceStore((s) => s.durationMs);
   const raceStarted = useRaceStore((s) => s.raceStarted);
+  const [selectedKartNumber, setSelectedKartNumber] = useState<number | null>(null);
 
   const boxLines = config.boxLines || 2;
   const boxKarts = config.boxKarts || 4;
@@ -264,11 +265,13 @@ export function FifoQueue() {
                     const score = entryScore(entry);
                     const team = entryTeam(entry);
                     const driver = entryDriver(entry);
+                    const kartNum = typeof entry === "object" && entry ? entry.kartNumber : null;
                     const hasInfo = team || driver;
                     return (
-                      <div
+                      <button
                         key={colIdx}
-                        className="flex-1 min-w-[48px] sm:min-w-[80px] max-w-[140px] rounded-lg border-2 border-neutral-600 bg-neutral-800/50 flex flex-col items-center justify-center py-1 sm:py-1.5 px-1"
+                        onClick={() => kartNum && setSelectedKartNumber(kartNum)}
+                        className="flex-1 min-w-[48px] sm:min-w-[80px] max-w-[140px] rounded-lg border-2 border-neutral-600 bg-neutral-800/50 flex flex-col items-center justify-center py-1 sm:py-1.5 px-1 transition-all hover:border-accent/50 hover:bg-neutral-700/50 cursor-pointer active:scale-95"
                       >
                         <span
                           className="text-lg sm:text-2xl font-bold leading-tight"
@@ -288,7 +291,7 @@ export function FifoQueue() {
                         ) : (
                           <span className="text-[9px] sm:text-[10px] text-neutral-500 mt-0.5">Box</span>
                         )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -354,6 +357,16 @@ export function FifoQueue() {
           max={60}
         />
       </div>
+
+      {/* ── Kart detail modal ── */}
+      {selectedKartNumber !== null && (
+        <KartDetailModal
+          kartNumber={selectedKartNumber}
+          karts={karts}
+          sorted={sorted}
+          onClose={() => setSelectedKartNumber(null)}
+        />
+      )}
 
       {/* ── FIFO history ── */}
       {fifo.history.length > 0 && (
@@ -501,6 +514,117 @@ function AdjustableCard({ label, value, field, min, max }: {
         >
           +
         </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Kart detail modal ── */
+function KartDetailModal({ kartNumber, karts, sorted, onClose }: {
+  kartNumber: number;
+  karts: KartState[];
+  sorted: KartState[];
+  onClose: () => void;
+}) {
+  const t = useT();
+  const kart = karts.find((k) => k.kartNumber === kartNumber);
+  if (!kart) return null;
+
+  const avgPosition = sorted.findIndex((k) => k.kartNumber === kartNumber) + 1;
+  const recentLaps = kart.recentLaps ?? [];
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/70" />
+      <div
+        className="relative bg-surface border border-accent/40 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <span
+              className="w-10 h-10 rounded-lg flex items-center justify-center text-lg font-black text-black"
+              style={{ backgroundColor: tierHex(kart.tierScore) }}
+            >
+              {kart.kartNumber}
+            </span>
+            <div>
+              <div className="text-sm font-bold text-white leading-tight">{kart.teamName || `Kart ${kart.kartNumber}`}</div>
+              <div className="text-xs text-neutral-400 leading-tight">{kart.driverName || "-"}</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-neutral-500 hover:text-white transition-colors p-1">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Stats grid */}
+        <div className="grid grid-cols-2 gap-3 px-5 py-4">
+          <div className="bg-black/30 rounded-xl p-3 text-center">
+            <span className="text-[9px] text-neutral-400 uppercase tracking-wider font-bold block mb-1">{t("metric.avgPosition")}</span>
+            <span className={clsx(
+              "text-2xl font-black",
+              avgPosition <= 3 ? "text-accent" : avgPosition <= 10 ? "text-green-400" : "text-neutral-200"
+            )}>
+              {avgPosition > 0 ? `${avgPosition}°` : "-"}
+            </span>
+          </div>
+          <div className="bg-black/30 rounded-xl p-3 text-center">
+            <span className="text-[9px] text-neutral-400 uppercase tracking-wider font-bold block mb-1">{t("metric.avgLap")}</span>
+            <span className="text-2xl font-black font-mono text-neutral-200">
+              {kart.avgLapMs > 0 ? msToLapTime(Math.round(kart.avgLapMs)) : "-"}
+            </span>
+          </div>
+          <div className="bg-black/30 rounded-xl p-3 text-center">
+            <span className="text-[9px] text-neutral-400 uppercase tracking-wider font-bold block mb-1">{t("pit.pitCount")}</span>
+            <span className="text-2xl font-black text-neutral-200">{kart.pitCount}</span>
+          </div>
+          <div className="bg-black/30 rounded-xl p-3 text-center">
+            <span className="text-[9px] text-neutral-400 uppercase tracking-wider font-bold block mb-1">Score</span>
+            <span className="text-2xl font-black" style={{ color: tierHex(kart.tierScore) }}>{kart.tierScore}</span>
+          </div>
+        </div>
+
+        {/* Recent laps */}
+        {recentLaps.length > 0 && (
+          <div className="px-5 pb-4">
+            <h4 className="text-[10px] text-neutral-400 uppercase tracking-wider font-bold mb-2">
+              {t("pit.recentLaps")}
+            </h4>
+            <div className="bg-black/30 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[10px] text-neutral-500 uppercase tracking-wider">
+                    <th className="px-3 py-1.5 text-left">{t("pit.lapNumber")}</th>
+                    <th className="px-3 py-1.5 text-right">{t("pit.lapTime")}</th>
+                    <th className="px-3 py-1.5 text-left">{t("pit.lapDriver")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentLaps.map((lap, i) => {
+                    const best = Math.min(...recentLaps.map((l) => l.lapTime));
+                    const isBest = lap.lapTime === best;
+                    return (
+                      <tr key={i} className="border-t border-neutral-800">
+                        <td className="px-3 py-1.5 text-neutral-400 font-mono">{lap.totalLap}</td>
+                        <td className={clsx(
+                          "px-3 py-1.5 text-right font-mono font-bold",
+                          isBest ? "text-accent" : "text-neutral-200"
+                        )}>
+                          {msToLapTime(lap.lapTime)}
+                        </td>
+                        <td className="px-3 py-1.5 text-neutral-400 text-xs truncate max-w-[120px]">{lap.driverName || "-"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

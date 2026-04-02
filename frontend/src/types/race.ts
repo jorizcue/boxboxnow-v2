@@ -38,6 +38,7 @@ export interface KartState {
   avgLapMs: number;
   bestAvgMs: number;
   driverDifferentialMs: number;
+  recentLaps: { lapTime: number; totalLap: number; driverName: string }[];
 }
 
 export interface FifoEntry {

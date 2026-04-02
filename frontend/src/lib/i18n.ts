@@ -128,6 +128,10 @@ const translations: Record<string, Record<Language, string>> = {
   "pit.minPitCount": { es: "Numero minimo de pits", en: "Min pit count", it: "Numero minimo di pit", de: "Min Pit-Anzahl" },
   "pit.history": { es: "Historial de entradas en box", en: "Pit entry history", it: "Storico ingressi ai box", de: "Boxen-Einfahrts-Historie" },
   "pit.queue": { es: "Cola", en: "Queue", it: "Coda", de: "Warteschlange" },
+  "pit.recentLaps": { es: "Últimas vueltas", en: "Recent laps", it: "Ultimi giri", de: "Letzte Runden" },
+  "pit.lapNumber": { es: "Vuelta", en: "Lap", it: "Giro", de: "Runde" },
+  "pit.lapTime": { es: "Tiempo", en: "Time", it: "Tempo", de: "Zeit" },
+  "pit.lapDriver": { es: "Piloto", en: "Driver", it: "Pilota", de: "Fahrer" },
 
   // === Classification ===
   "class.noData": { es: "Sin datos de clasificacion", en: "No classification data", it: "Nessun dato di classifica", de: "Keine Klassifizierungsdaten" },
