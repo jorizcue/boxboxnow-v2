@@ -158,7 +158,7 @@ function UsersManager() {
               className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${
                 selectedUser === u.id
                   ? "bg-accent/10 border border-accent/40 shadow-[0_0_8px_rgba(var(--accent-rgb),0.15)]"
-                  : "bg-white/[0.02] hover:bg-white/[0.05] border border-neutral-700/50 hover:border-neutral-600"
+                  : "bg-white/[0.05] hover:bg-white/[0.08] border border-neutral-600/50 hover:border-accent/40"
               }`}
             >
               <button
