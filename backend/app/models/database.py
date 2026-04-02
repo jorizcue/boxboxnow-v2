@@ -85,6 +85,18 @@ async def init_db():
         """))
 
 
+        # Seed default tab access for all users (basic tabs)
+        # This ensures existing users get access to all standard tabs
+        basic_tabs = ["race", "pit", "live", "adjusted", "config", "replay", "analytics"]
+        for tab in basic_tabs:
+            await conn.execute(text("""
+                INSERT OR IGNORE INTO user_tab_access (user_id, tab)
+                SELECT id, :tab FROM users WHERE id NOT IN (
+                    SELECT user_id FROM user_tab_access WHERE tab = :tab
+                )
+            """), {"tab": tab})
+
+
 async def get_db():
     async with async_session() as session:
         yield session
