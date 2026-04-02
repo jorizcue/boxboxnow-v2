@@ -138,10 +138,18 @@ async def list_recordings(
     all_dirs = {}
     for circuit_dir in sorted(base.iterdir()):
         if circuit_dir.is_dir():
-            dates = sorted(
-                [f.stem for f in circuit_dir.glob("*.log") if re.match(r"\d{4}-\d{2}-\d{2}", f.stem)],
-                reverse=True,
-            )
+            date_set = set()
+            for f in circuit_dir.iterdir():
+                name = f.name
+                if name.endswith(".log.gz"):
+                    stem = name[:-7]  # remove .log.gz
+                elif name.endswith(".log"):
+                    stem = name[:-4]  # remove .log
+                else:
+                    continue
+                if re.match(r"\d{4}-\d{2}-\d{2}$", stem):
+                    date_set.add(stem)
+            dates = sorted(date_set, reverse=True)
             if dates:
                 all_dirs[circuit_dir.name] = dates
 
@@ -250,15 +258,18 @@ async def analyze_log(
 
     logs_dir = _resolve_logs_dir(user, owner_id, circuit_dir)
 
-    # Check file exists, fallback to legacy root dir
+    # Check file exists, fallback to .log.gz or legacy root dir
     filepath = os.path.join(logs_dir, filename)
     if not os.path.exists(filepath):
-        # Try root dir for legacy logs
-        root_path = os.path.join(LOGS_BASE_DIR, filename)
-        if user.is_admin and os.path.exists(root_path):
-            logs_dir = LOGS_BASE_DIR
+        gz_path = filepath + ".gz" if not filepath.endswith(".gz") else None
+        if gz_path and os.path.exists(gz_path):
+            filename = filename + ".gz"
         else:
-            raise HTTPException(404, f"Log file not found: {filename}")
+            root_path = os.path.join(LOGS_BASE_DIR, filename)
+            if user.is_admin and os.path.exists(root_path):
+                logs_dir = LOGS_BASE_DIR
+            else:
+                raise HTTPException(404, f"Log file not found: {filename}")
 
     engine = ReplayEngine(ApexMessageParser(), lambda e: None, logs_dir=logs_dir)
     try:
@@ -299,14 +310,18 @@ async def start_replay(
     else:
         logs_dir = os.path.join(LOGS_BASE_DIR, str(user.id))
 
-    # Check file exists (also check root for legacy)
+    # Check file exists (also check .log.gz fallback or root for legacy)
     filepath = os.path.join(logs_dir, data.filename)
     if not os.path.exists(filepath):
-        root_path = os.path.join(LOGS_BASE_DIR, data.filename)
-        if user.is_admin and os.path.exists(root_path):
-            logs_dir = LOGS_BASE_DIR
+        gz_path = filepath + ".gz" if not filepath.endswith(".gz") else None
+        if gz_path and os.path.exists(gz_path):
+            data.filename = data.filename + ".gz"
         else:
-            raise HTTPException(404, f"Log file not found: {data.filename}")
+            root_path = os.path.join(LOGS_BASE_DIR, data.filename)
+            if user.is_admin and os.path.exists(root_path):
+                logs_dir = LOGS_BASE_DIR
+            else:
+                raise HTTPException(404, f"Log file not found: {data.filename}")
 
     # Stop any existing replay for this user
     await replay_reg.stop_session(user.id)
