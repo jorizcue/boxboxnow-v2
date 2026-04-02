@@ -8,6 +8,7 @@ import { msToLapTime, secondsToStint, secondsToHMS, tierHex, formatDifferential 
 import { getDriverInfoForKart, DriverDetailsRow } from "@/components/shared/DriverDetails";
 import { sendBoxCall } from "@/lib/driverChannel";
 import { api } from "@/lib/api";
+import { RainToggle } from "@/components/shared/RainToggle";
 import clsx from "clsx";
 
 const COL_COUNT = 13; // number of <th> columns
@@ -36,8 +37,9 @@ export function RaceTable() {
 
   // Helper: compute stint seconds from race clock
   const durationMs = useRaceStore((s) => s.durationMs);
+  const raceFinished = useRaceStore((s) => s.raceFinished);
   const stintSecondsFor = (kart: typeof karts[0]) => {
-    if (raceClockMs === 0) return 0;
+    if (raceClockMs === 0 || raceFinished) return 0;
     const stintStart = kart.stintStartCountdownMs || durationMs || raceClockMs;
     return Math.max(0, stintStart - raceClockMs) / 1000;
   };
@@ -367,39 +369,4 @@ function BoxCallButton() {
   );
 }
 
-/* ── Rain mode toggle ── */
-function RainToggle() {
-  const t = useT();
-  const rain = useRaceStore((s) => s.config.rain);
-
-  const toggle = useCallback(() => {
-    const newVal = !rain;
-    // Optimistic update
-    useRaceStore.setState((s) => ({ config: { ...s.config, rain: newVal } }));
-    // Persist to backend (fire and forget)
-    api.updateSession({ rain: newVal }).catch(() => {
-      // Revert on error
-      useRaceStore.setState((s) => ({ config: { ...s.config, rain: !newVal } }));
-    });
-  }, [rain]);
-
-  return (
-    <button
-      onClick={toggle}
-      className={clsx(
-        "bg-surface rounded-xl border p-2 sm:p-3 flex flex-col items-center justify-center transition-all active:scale-95",
-        rain ? "border-blue-400/60 bg-blue-500/15" : "border-border hover:border-neutral-600"
-      )}
-    >
-      <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
-        {t("config.rainMode")}
-      </span>
-      <span className={clsx(
-        "text-lg sm:text-xl font-black leading-none",
-        rain ? "text-blue-400" : "text-neutral-500"
-      )}>
-        {rain ? "ON" : "OFF"}
-      </span>
-    </button>
-  );
-}
+/* RainToggle imported from @/components/shared/RainToggle */

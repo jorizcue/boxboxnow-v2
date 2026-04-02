@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import type { FifoEntry } from "@/types/race";
 import clsx from "clsx";
 import { useT } from "@/lib/i18n";
+import { RainToggle } from "@/components/shared/RainToggle";
 
 export function FifoQueue() {
   const { fifo, config, karts } = useRaceStore();
@@ -56,8 +57,9 @@ export function FifoQueue() {
     : undefined;
 
   // Stint calc using race clock (same as RaceTable)
+  const raceFinished = useRaceStore((s) => s.raceFinished);
   const stintSecondsFor = (kart: typeof karts[0]) => {
-    if (raceClockMs === 0) return 0;
+    if (raceClockMs === 0 || raceFinished) return 0;
     const stintStart = kart.stintStartCountdownMs || durationMs || raceClockMs;
     return Math.max(0, stintStart - raceClockMs) / 1000;
   };
@@ -225,6 +227,9 @@ export function FifoQueue() {
 
           {/* BOX call button */}
           <BoxCallButton />
+
+          {/* Rain toggle */}
+          <RainToggle />
         </div>
       </div>
 
