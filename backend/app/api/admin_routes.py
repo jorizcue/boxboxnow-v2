@@ -7,12 +7,13 @@ from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 
 from app.models.database import get_db
-from app.models.schemas import User, Circuit, UserCircuitAccess, AppSetting, UserTabAccess
+from app.models.schemas import User, Circuit, UserCircuitAccess, AppSetting, UserTabAccess, DeviceSession
 from sqlalchemy.orm import selectinload
 from app.models.pydantic_models import (
     UserOut, UserCreate, UserUpdate,
     CircuitOut, CircuitCreate, CircuitUpdate,
     CircuitAccessOut, CircuitAccessCreate, CircuitAccessUpdate,
+    DeviceSessionOut,
 )
 from app.api.auth_routes import require_admin, hash_password, _user_out
 
@@ -92,6 +93,58 @@ async def delete_user(user_id: int, admin: User = Depends(require_admin), db: As
     await db.delete(user)
     await db.commit()
     return {"deleted": True}
+
+
+# --- User Device Sessions (admin) ---
+
+@router.get("/users/{user_id}/sessions", response_model=list[DeviceSessionOut])
+async def list_user_sessions(user_id: int, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """List all active device sessions for a specific user."""
+    result = await db.execute(
+        select(DeviceSession)
+        .where(DeviceSession.user_id == user_id)
+        .order_by(DeviceSession.last_active.desc())
+    )
+    sessions = result.scalars().all()
+    return [
+        DeviceSessionOut(
+            id=s.id,
+            session_token=s.session_token[:8] + "...",
+            device_name=s.device_name,
+            ip_address=s.ip_address,
+            created_at=s.created_at,
+            last_active=s.last_active,
+            is_current=False,
+        )
+        for s in sessions
+    ]
+
+
+@router.delete("/users/{user_id}/sessions/{session_id}")
+async def admin_kill_session(user_id: int, session_id: int, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """Admin: kill a specific device session for any user."""
+    result = await db.execute(
+        select(DeviceSession).where(
+            DeviceSession.id == session_id,
+            DeviceSession.user_id == user_id,
+        )
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(404, "Session not found")
+    await db.delete(session)
+    await db.commit()
+    return {"killed": True, "device": session.device_name}
+
+
+@router.delete("/users/{user_id}/sessions")
+async def admin_kill_all_sessions(user_id: int, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """Admin: kill all device sessions for a user."""
+    await db.execute(
+        delete(DeviceSession).where(DeviceSession.user_id == user_id)
+    )
+    await db.commit()
+    return {"killed_all": True}
 
 
 # --- Circuits ---

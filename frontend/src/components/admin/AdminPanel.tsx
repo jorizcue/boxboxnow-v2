@@ -73,6 +73,7 @@ function UsersManager() {
   const [newTabs, setNewTabs] = useState<string[]>(ALL_TAB_OPTIONS.map(([k]) => k));
   const [selectedUser, setSelectedUser] = useState<number | null>(null);
   const [access, setAccess] = useState<AccessRow[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [circuits, setCircuits] = useState<CircuitRow[]>([]);
   const [newCircuitId, setNewCircuitId] = useState<number>(0);
   const [newValidFrom, setNewValidFrom] = useState("");
@@ -118,6 +119,23 @@ function UsersManager() {
     setSelectedUser(userId);
     setShowCreate(false);
     try { setAccess(await api.getUserAccess(userId)); } catch {}
+    try { setSessions(await api.getAdminUserSessions(userId)); } catch { setSessions([]); }
+  };
+
+  const killSession = async (userId: number, sessionId: number) => {
+    try {
+      await api.adminKillSession(userId, sessionId);
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    } catch {}
+  };
+
+  const killAllSessions = async (userId: number) => {
+    const ok = await confirm({ message: t("admin.killAllSessionsConfirm"), danger: true, confirmText: t("admin.killAll") });
+    if (!ok) return;
+    try {
+      await api.adminKillAllSessions(userId);
+      setSessions([]);
+    } catch {}
   };
 
   const grantAccess = async () => {
@@ -393,6 +411,48 @@ function UsersManager() {
                   ))}
                   {access.length === 0 && (
                     <p className="text-neutral-600 text-xs text-center py-2">{t("admin.noAccess")}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Active sessions */}
+              <div className="border-t border-border pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-[10px] text-neutral-400 uppercase tracking-wider">
+                    {t("admin.activeSessions")} <span className="text-accent font-semibold">{sessions.length}</span>
+                  </label>
+                  {sessions.length > 0 && (
+                    <button
+                      onClick={() => selectedUser && killAllSessions(selectedUser)}
+                      className="text-red-400/60 hover:text-red-400 text-[10px] transition-colors"
+                    >
+                      {t("admin.killAll")}
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-1 max-h-40 overflow-y-auto scrollbar-none">
+                  {sessions.map((s: any) => (
+                    <div key={s.id} className="flex items-center gap-2 bg-black/30 rounded-lg px-3 py-2 text-xs">
+                      <button
+                        onClick={() => selectedUser && killSession(selectedUser, s.id)}
+                        className="text-red-500/50 hover:text-red-400 transition-colors flex-shrink-0"
+                        title={t("admin.killSession")}
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                          <path d="M4 4l8 8M12 4l-8 8" />
+                        </svg>
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-white font-medium">{s.device_name}</span>
+                        <span className="text-neutral-500 ml-2">IP: {s.ip_address}</span>
+                      </div>
+                      <span className="text-neutral-600 text-[10px] flex-shrink-0">
+                        {s.last_active ? new Date(s.last_active).toLocaleString() : ""}
+                      </span>
+                    </div>
+                  ))}
+                  {sessions.length === 0 && (
+                    <p className="text-neutral-600 text-xs text-center py-2">{t("admin.noSessions")}</p>
                   )}
                 </div>
               </div>

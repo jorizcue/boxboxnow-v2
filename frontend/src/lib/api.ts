@@ -184,6 +184,14 @@ export const api = {
       body: JSON.stringify({ tabs }),
     }),
 
+  // Admin: user device sessions
+  getAdminUserSessions: (userId: number) =>
+    fetchApi<any[]>(`/api/admin/users/${userId}/sessions`),
+  adminKillSession: (userId: number, sessionId: number) =>
+    fetchApi<any>(`/api/admin/users/${userId}/sessions/${sessionId}`, { method: "DELETE" }),
+  adminKillAllSessions: (userId: number) =>
+    fetchApi<any>(`/api/admin/users/${userId}/sessions`, { method: "DELETE" }),
+
   // Analytics
   getAnalyticsCircuits: () => fetchApi<any[]>("/api/analytics/circuits"),
   getKartStats: (circuitId: number, dateFrom?: string, dateTo?: string) => {
