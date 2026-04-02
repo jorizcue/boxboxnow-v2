@@ -388,19 +388,25 @@ export function FifoQueue() {
                             histRows[idx % boxLines].push(q[idx]);
                           }
                           return histRows.map((hr, ri) => (
-                            <div key={ri} className="flex gap-0.5 items-center">
+                            <div key={ri} className="flex gap-1 items-center">
                               <span className="text-[7px] text-neutral-600 w-3 flex-shrink-0">F{ri + 1}</span>
                               {hr.map((entry, j) => {
                                 const s = entryScore(entry);
                                 const tm = entryTeam(entry);
+                                const dr = entryDriver(entry);
+                                const kn = typeof entry === "object" && entry ? entry.kartNumber : null;
                                 return (
                                   <div
                                     key={j}
-                                    className="w-5 h-5 rounded-sm flex items-center justify-center text-[8px] font-bold text-black"
+                                    className="min-w-[70px] h-8 rounded flex items-center gap-1.5 px-1.5 text-black"
                                     style={{ backgroundColor: tierHex(s) }}
-                                    title={tm || undefined}
                                   >
-                                    {s}
+                                    <span className="text-[10px] font-black leading-none">{kn ?? s}</span>
+                                    <div className="flex flex-col min-w-0 flex-1">
+                                      {tm && <span className="text-[7px] font-bold leading-tight truncate">{tm}</span>}
+                                      {dr && <span className="text-[7px] leading-tight truncate opacity-80">{dr}</span>}
+                                    </div>
+                                    <span className="text-[8px] font-bold leading-none ml-auto flex-shrink-0">{s}</span>
                                   </div>
                                 );
                               })}
