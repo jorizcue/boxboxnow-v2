@@ -378,11 +378,9 @@ export function FifoQueue() {
                       <div className="space-y-0.5">
                         {(() => {
                           const q = snap.queue.slice(0, boxKarts);
-                          const histRows: (FifoEntry | number)[][] = [];
-                          for (let r = 0; r < boxLines; r++) {
-                            const start = r * kartsPerRow;
-                            const end = Math.min(start + kartsPerRow, q.length);
-                            if (start < q.length) histRows.push(q.slice(start, end));
+                          const histRows: (FifoEntry | number)[][] = Array.from({ length: boxLines }, () => []);
+                          for (let idx = 0; idx < q.length; idx++) {
+                            histRows[idx % boxLines].push(q[idx]);
                           }
                           return histRows.map((hr, ri) => (
                             <div key={ri} className="flex gap-0.5 items-center">
