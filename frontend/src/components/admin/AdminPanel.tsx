@@ -141,7 +141,7 @@ function UsersManager() {
   return (
     <div className="flex gap-4">
       {/* Left: user list */}
-      <div className={`bg-white/[0.03] rounded-xl p-4 border border-border transition-all ${panelOpen ? "flex-1 min-w-0" : "w-full"}`}>
+      <div className={`bg-white/[0.03] rounded-xl p-4 border border-border transition-all ${panelOpen ? "w-64 flex-shrink-0" : "w-full"}`}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">{t("admin.usersTitle")}</h3>
           <button onClick={() => { setShowCreate(true); setSelectedUser(null); }} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-sm">
@@ -149,18 +149,27 @@ function UsersManager() {
           </button>
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           {users.map((u) => (
             <div
               key={u.id}
               onClick={() => loadAccess(u.id)}
-              className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+              className={`flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
                 selectedUser === u.id
                   ? "bg-accent/10 border border-accent/30"
-                  : "hover:bg-black/50 border border-transparent"
+                  : "hover:bg-black/50 border border-border"
               }`}
             >
-              <div className="min-w-0">
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteUser(u.id); }}
+                className="text-red-400/30 hover:text-red-400 transition-colors flex-shrink-0"
+                title={t("admin.delete")}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 4h12M5.33 4V2.67a1.33 1.33 0 011.34-1.34h2.66a1.33 1.33 0 011.34 1.34V4M12.67 4v9.33a1.33 1.33 0 01-1.34 1.34H4.67a1.33 1.33 0 01-1.34-1.34V4h9.34z" />
+                </svg>
+              </button>
+              <div className="min-w-0 flex-1">
                 <div className={`text-sm font-medium truncate ${selectedUser === u.id ? "text-accent" : "text-white"}`}>
                   {u.username}
                   {u.is_admin && <span className="ml-1.5 text-[9px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-semibold uppercase">Admin</span>}
@@ -170,12 +179,6 @@ function UsersManager() {
                   <span>{t("admin.tabs")}: {u.is_admin ? t("admin.allTabs") : (u.tab_access?.length || 0)}</span>
                 </div>
               </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteUser(u.id); }}
-                className="text-red-400/40 hover:text-red-400 text-xs transition-colors ml-2 flex-shrink-0"
-              >
-                {t("admin.delete")}
-              </button>
             </div>
           ))}
           {users.length === 0 && (
@@ -184,41 +187,42 @@ function UsersManager() {
         </div>
       </div>
 
-      {/* Right: slide-in panel */}
+      {/* Right: detail panel */}
       {panelOpen && (
-        <div className="w-80 flex-shrink-0 bg-white/[0.03] rounded-xl border border-border p-4 space-y-3 animate-in slide-in-from-right-4 duration-200">
+        <div className="flex-1 min-w-0 bg-white/[0.03] rounded-xl border border-border p-5 space-y-4 animate-in slide-in-from-right-4 duration-200">
           {showCreate ? (
             /* === Create user form === */
             <>
               <div className="flex items-center justify-between">
-                <h4 className="text-xs text-neutral-200 font-medium uppercase tracking-wider">{t("admin.newUser")}</h4>
+                <h4 className="text-sm text-neutral-200 font-medium uppercase tracking-wider">{t("admin.newUser")}</h4>
                 <button onClick={() => setShowCreate(false)} className="text-neutral-500 hover:text-white text-lg leading-none transition-colors">&times;</button>
               </div>
 
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("admin.userPlaceholder")}</label>
-                  <input
-                    value={newUsername}
-                    onChange={(e) => setNewUsername(e.target.value)}
-                    placeholder={t("admin.userPlaceholder")}
-                    className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm"
-                    autoFocus
-                  />
+              <div className="space-y-4 max-w-xl">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("admin.userPlaceholder")}</label>
+                    <input
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      placeholder={t("admin.userPlaceholder")}
+                      className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("login.password")}</label>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder={t("login.password")}
+                      className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("login.password")}</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder={t("login.password")}
-                    className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-4 max-w-xs">
                   <div>
                     <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("admin.devicesTitle")}</label>
                     <input
@@ -241,9 +245,9 @@ function UsersManager() {
                 {!newIsAdmin && (
                   <div>
                     <label className="block text-[10px] text-neutral-400 mb-2 uppercase tracking-wider">{t("admin.tabs")}</label>
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="flex flex-wrap gap-1.5">
                       {ALL_TAB_OPTIONS.map(([tab, label]) => (
-                        <label key={tab} className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer bg-black/30 rounded-lg px-2.5 py-1.5 border border-border hover:border-neutral-600 transition-colors">
+                        <label key={tab} className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer bg-black/30 rounded-lg px-3 py-2 border border-border hover:border-neutral-600 transition-colors">
                           <input
                             type="checkbox"
                             checked={newTabs.includes(tab)}
@@ -258,7 +262,7 @@ function UsersManager() {
                 )}
               </div>
 
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2 pt-1 max-w-xs">
                 <button
                   onClick={createUser}
                   disabled={!newUsername || !newPassword}
@@ -275,7 +279,7 @@ function UsersManager() {
             /* === User detail: tabs + circuit access === */
             <>
               <div className="flex items-center justify-between">
-                <h4 className="text-xs text-neutral-200 font-medium uppercase tracking-wider">
+                <h4 className="text-sm text-neutral-200 font-medium uppercase tracking-wider">
                   {users.find((u) => u.id === selectedUser)?.username}
                 </h4>
                 <button onClick={() => setSelectedUser(null)} className="text-neutral-500 hover:text-white text-lg leading-none transition-colors">&times;</button>
@@ -290,9 +294,9 @@ function UsersManager() {
                 return (
                   <div>
                     <label className="block text-[10px] text-neutral-400 mb-2 uppercase tracking-wider">{t("admin.tabs")}</label>
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="flex flex-wrap gap-1.5">
                       {ALL_TAB_OPTIONS.map(([tab, label]) => (
-                        <label key={tab} className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer bg-black/30 rounded-lg px-2.5 py-1.5 border border-border hover:border-neutral-600 transition-colors">
+                        <label key={tab} className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer bg-black/30 rounded-lg px-3 py-2 border border-border hover:border-neutral-600 transition-colors">
                           <input
                             type="checkbox"
                             checked={su.tab_access?.includes(tab)}
@@ -341,10 +345,10 @@ function UsersManager() {
               })()}
 
               {/* Circuit access */}
-              <div className="border-t border-border pt-3">
+              <div className="border-t border-border pt-4">
                 <label className="block text-[10px] text-neutral-400 mb-2 uppercase tracking-wider">{t("admin.circuitAccess")}</label>
 
-                <div className="flex gap-1.5 mb-3 flex-wrap">
+                <div className="flex gap-2 mb-3 items-center flex-wrap">
                   <StyledSelect
                     value={newCircuitId}
                     onChange={(v) => setNewCircuitId(Number(v))}
@@ -352,17 +356,17 @@ function UsersManager() {
                     placeholder={t("admin.selectCircuitPlaceholder")}
                   />
                   <input type="date" value={newValidFrom} onChange={(e) => setNewValidFrom(e.target.value)}
-                    className="bg-black border border-border rounded-lg px-2 py-1 text-xs flex-1 min-w-0" />
+                    className="bg-black border border-border rounded-lg px-2 py-1.5 text-xs" />
                   <input type="date" value={newValidUntil} onChange={(e) => setNewValidUntil(e.target.value)}
-                    className="bg-black border border-border rounded-lg px-2 py-1 text-xs flex-1 min-w-0" />
-                  <button onClick={grantAccess} className="bg-accent text-black font-semibold px-2.5 py-1 rounded-lg text-xs">
+                    className="bg-black border border-border rounded-lg px-2 py-1.5 text-xs" />
+                  <button onClick={grantAccess} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-xs">
                     +
                   </button>
                 </div>
 
-                <div className="space-y-1 max-h-40 overflow-y-auto scrollbar-none">
+                <div className="space-y-1 max-h-60 overflow-y-auto scrollbar-none">
                   {access.map((a) => (
-                    <div key={a.id} className="flex items-center justify-between bg-black/30 rounded-lg px-2.5 py-1.5 text-xs">
+                    <div key={a.id} className="flex items-center justify-between bg-black/30 rounded-lg px-3 py-2 text-xs">
                       <div>
                         <span className="text-white font-medium">{a.circuit_name}</span>
                         <span className="text-neutral-500 ml-2">
