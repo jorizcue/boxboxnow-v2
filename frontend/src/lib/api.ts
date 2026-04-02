@@ -168,6 +168,8 @@ export const api = {
     fetchApi<any>("/api/replay/seek", { method: "POST", body: JSON.stringify({ block }) }),
   setReplaySpeed: (speed: number) =>
     fetchApi<any>("/api/replay/speed", { method: "POST", body: JSON.stringify({ speed }) }),
+  restartReplay: () =>
+    fetchApi<any>("/api/replay/seek", { method: "POST", body: JSON.stringify({ block: 0 }) }),
 
   // Admin: Settings
   getSetting: (key: string) => fetchApi<{ key: string; value: string }>(`/api/admin/settings/${key}`),
