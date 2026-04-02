@@ -50,6 +50,7 @@ const translations: Record<string, Record<Language, string>> = {
   "nav.replay": { es: "Replay", en: "Replay", it: "Replay", de: "Replay" },
   "nav.analytics": { es: "Kart Analytics", en: "Kart Analytics", it: "Kart Analytics", de: "Kart Analytics" },
   "nav.analyticsShort": { es: "Analytics", en: "Analytics", it: "Analytics", de: "Analytics" },
+  "nav.analysis": { es: "Análisis", en: "Analysis", it: "Analisi", de: "Analyse" },
 
   // === Login ===
   "login.username": { es: "Usuario", en: "Username", it: "Utente", de: "Benutzer" },

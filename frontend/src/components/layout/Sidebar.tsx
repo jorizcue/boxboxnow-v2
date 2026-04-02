@@ -66,6 +66,11 @@ const TAB_ICONS: Record<string, JSX.Element> = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
     </svg>
   ),
+  analysis: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9zm3.75 11.625a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+    </svg>
+  ),
   admin: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
@@ -91,6 +96,7 @@ const TAB_ICONS: Record<string, JSX.Element> = {
 // Persist sidebar state
 let _sidebarCollapsed = false;
 let _adminExpanded = true;
+let _analysisExpanded = true;
 
 export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarProps) {
   const t = useT();
@@ -100,23 +106,29 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
   const [collapsed, setCollapsed] = useState(_sidebarCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(_adminExpanded);
+  const [analysisExpanded, setAnalysisExpanded] = useState(_analysisExpanded);
 
   useEffect(() => { _sidebarCollapsed = collapsed; }, [collapsed]);
   useEffect(() => { _adminExpanded = adminExpanded; }, [adminExpanded]);
+  useEffect(() => { _analysisExpanded = analysisExpanded; }, [analysisExpanded]);
 
-  // Auto-expand admin when an admin sub-tab is active
+  // Auto-expand sections when a sub-tab is active
   useEffect(() => {
     if (activeTab.startsWith("admin-")) setAdminExpanded(true);
+    if (activeTab === "replay" || activeTab === "analytics") setAnalysisExpanded(true);
   }, [activeTab]);
 
-  const tabs: { id: Tab; labelKey: string; tabAccess?: string }[] = [
+  const mainTabs: { id: Tab; labelKey: string; tabAccess?: string }[] = [
     { id: "race", labelKey: "nav.race", tabAccess: "race" },
     { id: "pit", labelKey: "nav.box", tabAccess: "pit" },
     { id: "live", labelKey: "nav.live", tabAccess: "live" },
     { id: "adjusted", labelKey: "nav.adjusted", tabAccess: "adjusted" },
     { id: "config", labelKey: "nav.config", tabAccess: "config" },
+  ];
+
+  const analysisSubTabs: { id: Tab; labelKey: string; tabAccess: string }[] = [
     { id: "replay", labelKey: "nav.replay", tabAccess: "replay" },
-    { id: "analytics", labelKey: "nav.analytics", tabAccess: "analytics" },
+    { id: "analytics", labelKey: "nav.analyticsShort", tabAccess: "analytics" },
   ];
 
   const adminSubTabs: { id: Tab; labelKey: string }[] = [
@@ -125,10 +137,14 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
     { id: "admin-hub", labelKey: "admin.hub" },
   ];
 
-  const visibleTabs = tabs.filter((tab) => {
+  const visibleMainTabs = mainTabs.filter((tab) => {
     if (tab.tabAccess) return userTabs.includes(tab.tabAccess);
     return true;
   });
+
+  const visibleAnalysisTabs = analysisSubTabs.filter((tab) => userTabs.includes(tab.tabAccess));
+  const hasAnalysis = visibleAnalysisTabs.length > 0;
+  const isAnalysisTabActive = activeTab === "replay" || activeTab === "analytics";
 
   const handleTabClick = (tab: Tab) => {
     onTabChange(tab);
@@ -218,7 +234,64 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
 
       {/* Tab list */}
       <nav className="flex-1 py-2 space-y-0.5 overflow-y-auto scrollbar-none">
-        {visibleTabs.map((tab) => renderTabButton(tab))}
+        {visibleMainTabs.map((tab) => renderTabButton(tab))}
+
+        {/* Analysis section with sub-menu */}
+        {hasAnalysis && (
+          <>
+            {/* Separator */}
+            <div className="my-2 mx-3 border-t border-border" />
+
+            {/* Analysis parent button */}
+            <button
+              onClick={() => {
+                if (collapsed) {
+                  setCollapsed(false);
+                  setAnalysisExpanded(true);
+                  if (!isAnalysisTabActive) handleTabClick(visibleAnalysisTabs[0].id);
+                } else {
+                  setAnalysisExpanded(!analysisExpanded);
+                }
+              }}
+              className={clsx(
+                "w-full flex items-center gap-3 transition-colors relative group",
+                collapsed ? "justify-center px-2 py-2.5" : "px-4 py-2.5",
+                isAnalysisTabActive
+                  ? "text-accent"
+                  : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03]"
+              )}
+            >
+              <span className="shrink-0">{TAB_ICONS.analysis}</span>
+              {!collapsed && (
+                <>
+                  <span className="text-sm font-medium truncate flex-1 text-left">{t("nav.analysis")}</span>
+                  <svg
+                    className={clsx(
+                      "w-3.5 h-3.5 shrink-0 transition-transform duration-200",
+                      analysisExpanded ? "rotate-180" : ""
+                    )}
+                    fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </>
+              )}
+              {/* Tooltip on collapsed */}
+              {collapsed && (
+                <span className="absolute left-full ml-2 px-2 py-1 bg-surface border border-border rounded text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                  {t("nav.analysis")}
+                </span>
+              )}
+            </button>
+
+            {/* Analysis sub-tabs */}
+            {!collapsed && analysisExpanded && (
+              <div className="space-y-0.5">
+                {visibleAnalysisTabs.map((sub) => renderTabButton(sub, true))}
+              </div>
+            )}
+          </>
+        )}
 
         {/* Admin section with sub-menu */}
         {isAdmin && (
