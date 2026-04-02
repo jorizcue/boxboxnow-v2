@@ -50,6 +50,7 @@ export interface FifoEntry {
   avgPosition?: number;
   recentLaps?: { lapTime: number; totalLap: number; driverName: string }[];
   pitCount?: number;
+  line?: number;  // Assigned pit line (stable across queue shifts)
 }
 
 export interface FifoState {

@@ -33,16 +33,35 @@ export function FifoQueue() {
   const entryDriver = (e: FifoEntry | number): string =>
     typeof e === "object" && e ? (e.driverName || "") : "";
 
-  // Split queue into rows (round-robin: idx % boxLines)
+  // Split queue into rows using stable line assignment
   const rows = useMemo(() => {
-    const result: (FifoEntry | number)[][] = Array.from({ length: boxLines }, () => []);
     const queue = fifo.queue.slice(0, boxKarts);
-    for (let idx = 0; idx < queue.length; idx++) {
-      const row = idx % boxLines;
-      result[row].push(queue[idx]);
+    const result: (FifoEntry | number)[][] = Array.from({ length: boxLines }, () => []);
+    const realByLine: (FifoEntry)[][] = Array.from({ length: boxLines }, () => []);
+    const defaults: (FifoEntry | number)[] = [];
+
+    // Separate real entries (with line) from defaults
+    for (const entry of queue) {
+      const line = typeof entry === "object" && entry?.line !== undefined && entry.line >= 0 ? entry.line : -1;
+      if (line >= 0 && line < boxLines) {
+        realByLine[line].push(entry);
+      } else {
+        defaults.push(entry);
+      }
     }
+
+    // Build each row: defaults on the left, real entries on the right
+    for (let r = 0; r < boxLines; r++) {
+      const realCount = realByLine[r].length;
+      const defaultCount = kartsPerRow - realCount;
+      for (let i = 0; i < defaultCount && defaults.length > 0; i++) {
+        result[r].push(defaults.shift()!);
+      }
+      result[r].push(...realByLine[r]);
+    }
+
     return result.filter((r) => r.length > 0);
-  }, [fifo.queue, boxLines, boxKarts]);
+  }, [fifo.queue, boxLines, boxKarts, kartsPerRow]);
 
   // Sort karts by avg for position calc
   const sorted = useMemo(() =>
@@ -395,8 +414,23 @@ export function FifoQueue() {
                         {(() => {
                           const q = snap.queue.slice(0, boxKarts);
                           const histRows: (FifoEntry | number)[][] = Array.from({ length: boxLines }, () => []);
-                          for (let idx = 0; idx < q.length; idx++) {
-                            histRows[idx % boxLines].push(q[idx]);
+                          const histReal: FifoEntry[][] = Array.from({ length: boxLines }, () => []);
+                          const histDefaults: (FifoEntry | number)[] = [];
+                          for (const entry of q) {
+                            const line = typeof entry === "object" && entry?.line !== undefined && entry.line >= 0 ? entry.line : -1;
+                            if (line >= 0 && line < boxLines) {
+                              histReal[line].push(entry);
+                            } else {
+                              histDefaults.push(entry);
+                            }
+                          }
+                          for (let r = 0; r < boxLines; r++) {
+                            const realCount = histReal[r].length;
+                            const defCount = kartsPerRow - realCount;
+                            for (let d = 0; d < defCount && histDefaults.length > 0; d++) {
+                              histRows[r].push(histDefaults.shift()!);
+                            }
+                            histRows[r].push(...histReal[r]);
                           }
                           return histRows.map((hr, ri) => (
                             <div key={ri} className="flex gap-1 items-center">

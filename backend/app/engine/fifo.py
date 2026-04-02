@@ -33,6 +33,7 @@ class FifoManager:
             [_default_entry() for _ in range(queue_size)], maxlen=queue_size
         )
         self._history: list[dict] = []
+        self._next_line: int = 0  # Round-robin line counter for stable row assignment
 
     def update_config(self, queue_size: int, box_lines: int):
         """Reinitialize the FIFO queue and clear history.
@@ -43,6 +44,7 @@ class FifoManager:
         )
         self.box_lines = box_lines
         self._history.clear()
+        self._next_line = 0
 
     def add_entry(self, tier_score: int, kart_number: int = 0,
                   team_name: str = "", driver_name: str = "",
@@ -51,6 +53,8 @@ class FifoManager:
                   pit_count: int = 0):
         """Add a kart's tier score when it enters the pit.
         Also records a history snapshot (only on actual pit entries)."""
+        assigned_line = self._next_line % self.box_lines
+        self._next_line += 1
         entry = {
             "score": tier_score,
             "kartNumber": kart_number,
@@ -60,6 +64,7 @@ class FifoManager:
             "avgPosition": avg_position,
             "recentLaps": recent_laps or [],
             "pitCount": pit_count,
+            "line": assigned_line,
         }
         self.fifo.append(entry)
         # Save history only when a kart actually enters pit
