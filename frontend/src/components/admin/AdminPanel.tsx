@@ -191,8 +191,16 @@ function UsersManager() {
                   {u.is_admin ? (
                     <span className="text-[10px] text-neutral-500">{t("admin.allTabs")}</span>
                   ) : (
-                    <div className="flex items-center gap-2 justify-center">
-                      {["replay", "analytics"].map((tab) => (
+                    <div className="flex items-center gap-1.5 justify-center flex-wrap">
+                      {([
+                        ["race", t("nav.race")],
+                        ["pit", t("nav.box")],
+                        ["live", t("nav.live")],
+                        ["adjusted", t("nav.adjustedShort")],
+                        ["config", t("nav.config")],
+                        ["replay", "Replay"],
+                        ["analytics", "Analytics"],
+                      ] as [string, string][]).map(([tab, label]) => (
                         <label key={tab} className="flex items-center gap-0.5 text-[10px] text-neutral-300 cursor-pointer">
                           <input
                             type="checkbox"
@@ -208,7 +216,7 @@ function UsersManager() {
                             }}
                             className="accent-accent"
                           />
-                          {tab === "replay" ? "Replay" : "Analytics"}
+                          {label}
                         </label>
                       ))}
                     </div>

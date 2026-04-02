@@ -6,7 +6,7 @@ import { useRaceWebSocket } from "@/hooks/useRaceWebSocket";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { LoginPage } from "@/components/auth/LoginPage";
 import { StatusBar } from "@/components/layout/StatusBar";
-import { Navbar } from "@/components/layout/Navbar";
+import { Sidebar } from "@/components/layout/Sidebar";
 import { RaceTable } from "@/components/race/RaceTable";
 import { FifoQueue } from "@/components/pit/FifoQueue";
 import { ClassificationTable } from "@/components/classification/ClassificationTable";
@@ -23,7 +23,6 @@ export default function Home() {
   const { token, user, _hydrated } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("race");
 
-  // Wait for zustand to rehydrate from localStorage before deciding
   if (!_hydrated) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -60,23 +59,25 @@ function Dashboard({
         countdownMs={countdownMs}
         username={user?.username || ""}
       />
-      <Navbar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        isAdmin={user?.is_admin ?? false}
-        userTabs={userTabs}
-      />
-      <main className="flex-1 overflow-auto p-2 sm:p-3">
-        {activeTab === "race" && <RaceTable />}
-        {activeTab === "pit" && <FifoQueue />}
-        {activeTab === "live" && <LiveTiming />}
-        {activeTab === "classification" && <ClassificationTable />}
-        {activeTab === "adjusted" && <AdjustedClassification />}
-        {activeTab === "config" && <ConfigPanel />}
-        {activeTab === "replay" && userTabs.includes("replay") && <ReplayTab />}
-        {activeTab === "analytics" && userTabs.includes("analytics") && <KartAnalyticsTab />}
-        {activeTab === "admin" && user?.is_admin && <AdminPanel />}
-      </main>
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          isAdmin={user?.is_admin ?? false}
+          userTabs={userTabs}
+        />
+        <main className="flex-1 overflow-auto p-2 sm:p-3">
+          {activeTab === "race" && userTabs.includes("race") && <RaceTable />}
+          {activeTab === "pit" && userTabs.includes("pit") && <FifoQueue />}
+          {activeTab === "live" && userTabs.includes("live") && <LiveTiming />}
+          {activeTab === "classification" && <ClassificationTable />}
+          {activeTab === "adjusted" && userTabs.includes("adjusted") && <AdjustedClassification />}
+          {activeTab === "config" && userTabs.includes("config") && <ConfigPanel />}
+          {activeTab === "replay" && userTabs.includes("replay") && <ReplayTab />}
+          {activeTab === "analytics" && userTabs.includes("analytics") && <KartAnalyticsTab />}
+          {activeTab === "admin" && user?.is_admin && <AdminPanel />}
+        </main>
+      </div>
     </div>
   );
 }

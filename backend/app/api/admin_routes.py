@@ -281,8 +281,9 @@ async def update_user_tabs(user_id: int, request: Request, admin: User = Depends
     # Delete existing
     await db.execute(delete(UserTabAccess).where(UserTabAccess.user_id == user_id))
     # Insert new
+    from app.api.auth_routes import ALL_TABS
     for tab in tabs:
-        if tab in ("replay", "analytics"):
+        if tab in ALL_TABS:
             db.add(UserTabAccess(user_id=user_id, tab=tab))
     await db.commit()
     return {"tabs": tabs}
