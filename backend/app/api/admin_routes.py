@@ -43,9 +43,20 @@ async def create_user(data: UserCreate, admin: User = Depends(require_admin), db
         max_devices=data.max_devices,
     )
     db.add(user)
+    await db.flush()  # get user.id
+
+    # Assign all default tabs to the new user
+    from app.api.auth_routes import ALL_TABS
+    for tab in ALL_TABS:
+        db.add(UserTabAccess(user_id=user.id, tab=tab))
     await db.commit()
-    await db.refresh(user)
-    return user
+
+    # Reload with tab_access relationship
+    result = await db.execute(
+        select(User).options(selectinload(User.tab_access)).where(User.id == user.id)
+    )
+    user = result.scalar_one()
+    return _user_out(user)
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
