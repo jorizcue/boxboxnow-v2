@@ -536,41 +536,44 @@ function CircuitsManager() {
   return (
     <div className="flex gap-4">
       {/* Left: circuit list */}
-      <div className={`bg-white/[0.03] rounded-xl p-4 border border-border transition-all ${panelOpen ? "flex-1 min-w-0" : "w-full"}`}>
-        <div className="flex items-center justify-between mb-3">
+      <div className={`bg-white/[0.03] rounded-xl p-4 border border-border transition-all ${panelOpen ? "w-64 flex-shrink-0" : "w-full"}`}>
+        <div className="flex items-center gap-2 mb-3">
           <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">{t("admin.circuitCatalog")}</h3>
-          <button onClick={startCreate} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-sm">
-            {t("admin.new")}
+          <button onClick={startCreate} className="bg-accent hover:bg-accent-hover text-black font-bold w-6 h-6 rounded-md text-sm flex items-center justify-center transition-colors" title={t("admin.newCircuit")}>
+            +
           </button>
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-2">
           {circuits.map((c) => (
             <div
               key={c.id}
               onClick={() => startEdit(c)}
-              className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${
                 editingId === c.id
-                  ? "bg-accent/10 border border-accent/30"
-                  : "hover:bg-black/50 border border-transparent"
+                  ? "bg-accent/10 border border-accent/40 shadow-[0_0_8px_rgba(var(--accent-rgb),0.15)]"
+                  : "bg-white/[0.05] hover:bg-white/[0.08] border border-neutral-600/50 hover:border-accent/40"
               }`}
             >
-              <div className="min-w-0">
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteCircuit(c.id); }}
+                className="text-red-500/50 hover:text-red-400 transition-colors flex-shrink-0"
+                title={t("admin.delete")}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M4 4l8 8M12 4l-8 8" />
+                </svg>
+              </button>
+              <div className="min-w-0 flex-1">
                 <div className={`text-sm font-medium truncate ${editingId === c.id ? "text-accent" : "text-white"}`}>
                   {c.name}
                 </div>
-                <div className="flex gap-3 text-[10px] text-neutral-500 mt-0.5">
+                <div className="flex gap-3 text-[10px] text-neutral-400 mt-0.5">
                   {c.length_m && <span>{c.length_m}m</span>}
                   <span>WSS:{c.ws_port}</span>
                   {c.pit_time_s && <span>Pit:{c.pit_time_s}s</span>}
                 </div>
               </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteCircuit(c.id); }}
-                className="text-red-400/40 hover:text-red-400 text-xs transition-colors ml-2 flex-shrink-0"
-              >
-                {t("admin.delete")}
-              </button>
             </div>
           ))}
           {circuits.length === 0 && (
@@ -579,11 +582,11 @@ function CircuitsManager() {
         </div>
       </div>
 
-      {/* Right: slide-in edit/create panel */}
+      {/* Right: detail panel */}
       {panelOpen && (
-        <div className="w-80 flex-shrink-0 bg-white/[0.03] rounded-xl border border-border p-4 space-y-3 animate-in slide-in-from-right-4 duration-200">
+        <div className="flex-1 min-w-0 bg-white/[0.03] rounded-xl border border-border p-5 space-y-4 animate-in slide-in-from-right-4 duration-200">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs text-neutral-200 font-medium uppercase tracking-wider">
+            <h4 className="text-sm text-neutral-200 font-medium uppercase tracking-wider">
               {editingId ? t("admin.editCircuit") : t("admin.newCircuit")}
             </h4>
             <button
@@ -594,25 +597,25 @@ function CircuitsManager() {
             </button>
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-3 max-w-xl">
             {fieldInput(t("admin.name"), "name", "text", t("admin.namePlaceholder"))}
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               {fieldInput(t("admin.wsPort"), "ws_port", "number", "Puerto WSS")}
               {fieldInput(t("admin.wsPortData"), "ws_port_data", "number", "Puerto WS")}
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               {fieldInput(t("admin.length"), "length_m", "number", "Metros")}
               {fieldInput(t("admin.pitTime"), "pit_time_s", "number", "Segundos")}
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               {fieldInput(t("admin.phpApiPort"), "php_api_port", "number", "Puerto")}
               {fieldInput(t("admin.lapsDiscard"), "laps_discard", "number", "2")}
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               {fieldInput(t("admin.lapDifferential"), "lap_differential", "number", "3000")}
               {fieldInput(t("admin.retentionDays"), "retention_days", "number", "30")}
             </div>
@@ -621,7 +624,7 @@ function CircuitsManager() {
             {fieldInput("Live Timing URL", "live_timing_url", "text", "https://...")}
           </div>
 
-          <div className="flex gap-2 pt-1">
+          <div className="flex gap-2 pt-1 max-w-xs">
             <button onClick={saveCircuit} className="flex-1 bg-accent hover:bg-accent-hover text-black font-semibold py-2 rounded-lg text-sm transition-colors">
               {editingId ? t("admin.save") : t("admin.create")}
             </button>
@@ -633,7 +636,7 @@ function CircuitsManager() {
           {editingId && (
             <button
               onClick={() => deleteCircuit(editingId)}
-              className="w-full text-red-400/60 hover:text-red-400 text-xs py-1.5 transition-colors"
+              className="w-full max-w-xs text-red-400/60 hover:text-red-400 text-xs py-1.5 transition-colors"
             >
               {t("admin.deleteCircuit")}
             </button>
