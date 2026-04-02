@@ -45,7 +45,10 @@ class FifoManager:
         self._history.clear()
 
     def add_entry(self, tier_score: int, kart_number: int = 0,
-                  team_name: str = "", driver_name: str = ""):
+                  team_name: str = "", driver_name: str = "",
+                  avg_lap_ms: float = 0, avg_position: int = 0,
+                  recent_laps: list[dict] | None = None,
+                  pit_count: int = 0):
         """Add a kart's tier score when it enters the pit.
         Also records a history snapshot (only on actual pit entries)."""
         entry = {
@@ -53,6 +56,10 @@ class FifoManager:
             "kartNumber": kart_number,
             "teamName": team_name,
             "driverName": driver_name,
+            "avgLapMs": avg_lap_ms,
+            "avgPosition": avg_position,
+            "recentLaps": recent_laps or [],
+            "pitCount": pit_count,
         }
         self.fifo.append(entry)
         # Save history only when a kart actually enters pit

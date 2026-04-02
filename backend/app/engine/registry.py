@@ -70,16 +70,32 @@ class UserSession:
                 except Exception as e:
                     logger.warning(f"Clustering before FIFO entry failed: {e}")
 
+                # Compute avg-position ranking once for all pit-in karts
+                sorted_by_avg = sorted(
+                    self.state.karts.values(),
+                    key=lambda k: k.avg_lap_ms if k.avg_lap_ms > 0 else float("inf"),
+                )
+                avg_pos_map = {k.kart_number: idx + 1 for idx, k in enumerate(sorted_by_avg)}
+
                 for kart in pit_in_karts:
                     logger.info(
                         f"FIFO entry: kart #{kart.kart_number} pit_in "
                         f"tier_score={kart.tier_score}"
                     )
+                    recent = [
+                        {"lapTime": l["lapTime"], "totalLap": l["totalLap"],
+                         "driverName": l.get("driverName", "")}
+                        for l in kart.valid_laps[-5:]
+                    ]
                     self.fifo.add_entry(
                         kart.tier_score,
                         kart_number=kart.kart_number,
                         team_name=kart.team_name,
                         driver_name=kart.driver_name,
+                        avg_lap_ms=kart.avg_lap_ms,
+                        avg_position=avg_pos_map.get(kart.kart_number, 0),
+                        recent_laps=recent,
+                        pit_count=kart.pit_count,
                     )
 
                 # Broadcast FIFO immediately so the box tab updates in real-time
@@ -575,12 +591,27 @@ class ReplaySession:
                 except Exception as e:
                     logger.warning(f"Replay clustering before FIFO entry failed: {e}")
 
+                sorted_by_avg = sorted(
+                    self.state.karts.values(),
+                    key=lambda k: k.avg_lap_ms if k.avg_lap_ms > 0 else float("inf"),
+                )
+                avg_pos_map = {k.kart_number: idx + 1 for idx, k in enumerate(sorted_by_avg)}
+
                 for kart in pit_in_karts:
+                    recent = [
+                        {"lapTime": l["lapTime"], "totalLap": l["totalLap"],
+                         "driverName": l.get("driverName", "")}
+                        for l in kart.valid_laps[-5:]
+                    ]
                     self.fifo.add_entry(
                         kart.tier_score,
                         kart_number=kart.kart_number,
                         team_name=kart.team_name,
                         driver_name=kart.driver_name,
+                        avg_lap_ms=kart.avg_lap_ms,
+                        avg_position=avg_pos_map.get(kart.kart_number, 0),
+                        recent_laps=recent,
+                        pit_count=kart.pit_count,
                     )
 
                 self.fifo.apply_to_state(self.state)

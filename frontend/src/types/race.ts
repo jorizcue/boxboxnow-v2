@@ -46,6 +46,10 @@ export interface FifoEntry {
   kartNumber: number;
   teamName: string;
   driverName: string;
+  avgLapMs?: number;
+  avgPosition?: number;
+  recentLaps?: { lapTime: number; totalLap: number; driverName: string }[];
+  pitCount?: number;
 }
 
 export interface FifoState {

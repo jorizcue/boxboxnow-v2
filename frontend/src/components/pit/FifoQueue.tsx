@@ -7,7 +7,7 @@ import { useSimNow } from "@/hooks/useSimNow";
 import { tierHex, secondsToHMS, msToLapTime } from "@/lib/formatters";
 import { sendBoxCall } from "@/lib/driverChannel";
 import { api } from "@/lib/api";
-import type { FifoEntry, KartState } from "@/types/race";
+import type { FifoEntry } from "@/types/race";
 import clsx from "clsx";
 import { useT } from "@/lib/i18n";
 import { RainToggle } from "@/components/shared/RainToggle";
@@ -19,7 +19,7 @@ export function FifoQueue() {
   const raceClockMs = useRaceClock();
   const durationMs = useRaceStore((s) => s.durationMs);
   const raceStarted = useRaceStore((s) => s.raceStarted);
-  const [selectedKartNumber, setSelectedKartNumber] = useState<number | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<FifoEntry | null>(null);
 
   const boxLines = config.boxLines || 2;
   const boxKarts = config.boxKarts || 4;
@@ -270,7 +270,7 @@ export function FifoQueue() {
                     return (
                       <button
                         key={colIdx}
-                        onClick={() => kartNum && setSelectedKartNumber(kartNum)}
+                        onClick={() => typeof entry === "object" && entry && setSelectedEntry(entry)}
                         className="flex-1 min-w-[48px] sm:min-w-[80px] max-w-[140px] rounded-lg border-2 border-neutral-600 bg-neutral-800/50 flex flex-col items-center justify-center py-1 sm:py-1.5 px-1 transition-all hover:border-accent/50 hover:bg-neutral-700/50 cursor-pointer active:scale-95"
                       >
                         <span
@@ -359,12 +359,10 @@ export function FifoQueue() {
       </div>
 
       {/* ── Kart detail modal ── */}
-      {selectedKartNumber !== null && (
+      {selectedEntry !== null && (
         <KartDetailModal
-          kartNumber={selectedKartNumber}
-          karts={karts}
-          sorted={sorted}
-          onClose={() => setSelectedKartNumber(null)}
+          entry={selectedEntry}
+          onClose={() => setSelectedEntry(null)}
         />
       )}
 
@@ -519,19 +517,16 @@ function AdjustableCard({ label, value, field, min, max }: {
   );
 }
 
-/* ── Kart detail modal ── */
-function KartDetailModal({ kartNumber, karts, sorted, onClose }: {
-  kartNumber: number;
-  karts: KartState[];
-  sorted: KartState[];
+/* ── Kart detail modal (snapshot at pit entry) ── */
+function KartDetailModal({ entry, onClose }: {
+  entry: FifoEntry;
   onClose: () => void;
 }) {
   const t = useT();
-  const kart = karts.find((k) => k.kartNumber === kartNumber);
-  if (!kart) return null;
-
-  const avgPosition = sorted.findIndex((k) => k.kartNumber === kartNumber) + 1;
-  const recentLaps = kart.recentLaps ?? [];
+  const avgPosition = entry.avgPosition ?? 0;
+  const avgLapMs = entry.avgLapMs ?? 0;
+  const recentLaps = entry.recentLaps ?? [];
+  const pitCount = entry.pitCount ?? 0;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
@@ -545,13 +540,13 @@ function KartDetailModal({ kartNumber, karts, sorted, onClose }: {
           <div className="flex items-center gap-3">
             <span
               className="w-10 h-10 rounded-lg flex items-center justify-center text-lg font-black text-black"
-              style={{ backgroundColor: tierHex(kart.tierScore) }}
+              style={{ backgroundColor: tierHex(entry.score) }}
             >
-              {kart.kartNumber}
+              {entry.kartNumber}
             </span>
             <div>
-              <div className="text-sm font-bold text-white leading-tight">{kart.teamName || `Kart ${kart.kartNumber}`}</div>
-              <div className="text-xs text-neutral-400 leading-tight">{kart.driverName || "-"}</div>
+              <div className="text-sm font-bold text-white leading-tight">{entry.teamName || `Kart ${entry.kartNumber}`}</div>
+              <div className="text-xs text-neutral-400 leading-tight">{entry.driverName || "-"}</div>
             </div>
           </div>
           <button onClick={onClose} className="text-neutral-500 hover:text-white transition-colors p-1">
@@ -575,20 +570,20 @@ function KartDetailModal({ kartNumber, karts, sorted, onClose }: {
           <div className="bg-black/30 rounded-xl p-3 text-center">
             <span className="text-[9px] text-neutral-400 uppercase tracking-wider font-bold block mb-1">{t("metric.avgLap")}</span>
             <span className="text-2xl font-black font-mono text-neutral-200">
-              {kart.avgLapMs > 0 ? msToLapTime(Math.round(kart.avgLapMs)) : "-"}
+              {avgLapMs > 0 ? msToLapTime(Math.round(avgLapMs)) : "-"}
             </span>
           </div>
           <div className="bg-black/30 rounded-xl p-3 text-center">
             <span className="text-[9px] text-neutral-400 uppercase tracking-wider font-bold block mb-1">{t("pit.pitCount")}</span>
-            <span className="text-2xl font-black text-neutral-200">{kart.pitCount}</span>
+            <span className="text-2xl font-black text-neutral-200">{pitCount}</span>
           </div>
           <div className="bg-black/30 rounded-xl p-3 text-center">
             <span className="text-[9px] text-neutral-400 uppercase tracking-wider font-bold block mb-1">Score</span>
-            <span className="text-2xl font-black" style={{ color: tierHex(kart.tierScore) }}>{kart.tierScore}</span>
+            <span className="text-2xl font-black" style={{ color: tierHex(entry.score) }}>{entry.score}</span>
           </div>
         </div>
 
-        {/* Recent laps */}
+        {/* Recent laps (at time of pit entry) */}
         {recentLaps.length > 0 && (
           <div className="px-5 pb-4">
             <h4 className="text-[10px] text-neutral-400 uppercase tracking-wider font-bold mb-2">
