@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import clsx from "clsx";
 import { useT } from "@/lib/i18n";
+import { useRaceStore } from "@/hooks/useRaceState";
 
 type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "config" | "replay" | "analytics" | "admin";
 
@@ -15,13 +16,28 @@ interface SidebarProps {
 
 const TAB_ICONS: Record<string, JSX.Element> = {
   race: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      {/* Checkered flag */}
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v16" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4c2 0 3 1 5 1s3.5-1 5.5-1 3.5 1 5.5 1v10c-2 0-3.5-1-5.5-1s-3.5 1-5.5 1-3-1-5-1" />
+      {/* Checker pattern */}
+      <rect x="4" y="4" width="4" height="3.3" fill="currentColor" opacity="0.5" stroke="none" />
+      <rect x="12" y="4" width="4" height="3.3" fill="currentColor" opacity="0.5" stroke="none" />
+      <rect x="8" y="7.3" width="4" height="3.3" fill="currentColor" opacity="0.5" stroke="none" />
+      <rect x="16" y="7.3" width="4" height="3.3" fill="currentColor" opacity="0.5" stroke="none" />
+      <rect x="4" y="10.6" width="4" height="3.4" fill="currentColor" opacity="0.5" stroke="none" />
+      <rect x="12" y="10.6" width="4" height="3.4" fill="currentColor" opacity="0.5" stroke="none" />
     </svg>
   ),
   pit: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
+      {/* Screen/sign */}
+      <rect x="3" y="3" width="18" height="13" rx="2" />
+      {/* PIT text */}
+      <text x="12" y="12.5" textAnchor="middle" fill="currentColor" stroke="none" fontSize="7" fontWeight="bold" fontFamily="sans-serif">PIT</text>
+      {/* Pin/stand below */}
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v3" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 21c1.5-1 2.5-2 4-2s2.5 1 4 2" />
     </svg>
   ),
   live: (
@@ -62,6 +78,9 @@ let _sidebarCollapsed = false;
 
 export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarProps) {
   const t = useT();
+  const raceStarted = useRaceStore((s) => s.raceStarted);
+  const replayActive = useRaceStore((s) => s.replayActive);
+  const raceActive = raceStarted || replayActive;
   const [collapsed, setCollapsed] = useState(_sidebarCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -147,9 +166,19 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
             {activeTab === tab.id && (
               <span className="absolute left-0 top-1 bottom-1 w-[2px] bg-accent rounded-r" />
             )}
-            <span className="shrink-0">{TAB_ICONS[tab.id]}</span>
+            <span className="shrink-0 relative">
+              {TAB_ICONS[tab.id]}
+              {tab.id === "race" && raceActive && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              )}
+            </span>
             {!collapsed && (
-              <span className="text-sm font-medium truncate">{t(tab.labelKey)}</span>
+              <span className="text-sm font-medium truncate">
+                {t(tab.labelKey)}
+                {tab.id === "race" && raceActive && (
+                  <span className="ml-1.5 inline-block w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse align-middle" />
+                )}
+              </span>
             )}
             {/* Tooltip on collapsed */}
             {collapsed && (
