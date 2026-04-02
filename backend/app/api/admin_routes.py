@@ -172,16 +172,21 @@ async def list_all_circuits(admin: User = Depends(require_admin), db: AsyncSessi
 
 
 @router.post("/circuits", response_model=CircuitOut)
-async def create_circuit(data: CircuitCreate, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+async def create_circuit(data: CircuitCreate, request: Request, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     circuit = Circuit(**data.model_dump())
     db.add(circuit)
     await db.commit()
     await db.refresh(circuit)
+
+    # Auto-register in CircuitHub so it connects immediately
+    circuit_hub = request.app.state.circuit_hub
+    await circuit_hub.start_connection(circuit.id)
+
     return circuit
 
 
 @router.patch("/circuits/{circuit_id}", response_model=CircuitOut)
-async def update_circuit(circuit_id: int, data: CircuitUpdate, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+async def update_circuit(circuit_id: int, data: CircuitUpdate, request: Request, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Circuit).where(Circuit.id == circuit_id))
     circuit = result.scalar_one_or_none()
     if not circuit:
@@ -192,15 +197,24 @@ async def update_circuit(circuit_id: int, data: CircuitUpdate, admin: User = Dep
 
     await db.commit()
     await db.refresh(circuit)
+
+    # Restart connection in hub with updated config (ports may have changed)
+    circuit_hub = request.app.state.circuit_hub
+    await circuit_hub.start_connection(circuit.id)
+
     return circuit
 
 
 @router.delete("/circuits/{circuit_id}")
-async def delete_circuit(circuit_id: int, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+async def delete_circuit(circuit_id: int, request: Request, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Circuit).where(Circuit.id == circuit_id))
     circuit = result.scalar_one_or_none()
     if not circuit:
         raise HTTPException(404, "Circuit not found")
+
+    # Stop hub connection before deleting
+    circuit_hub = request.app.state.circuit_hub
+    await circuit_hub.stop_connection(circuit.id)
 
     await db.delete(circuit)
     await db.commit()
