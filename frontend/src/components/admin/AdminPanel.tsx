@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { StyledSelect } from "@/components/shared/StyledSelect";
 import { CalendarPicker } from "@/components/shared/CalendarPicker";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 
 interface UserRow {
   id: number;
@@ -62,6 +63,7 @@ const ALL_TAB_OPTIONS: [string, string][] = [
 
 function UsersManager() {
   const t = useT();
+  const confirm = useConfirm();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [newUsername, setNewUsername] = useState("");
@@ -102,7 +104,8 @@ function UsersManager() {
   };
 
   const deleteUser = async (id: number) => {
-    if (!confirm(t("admin.deleteUser"))) return;
+    const ok = await confirm({ message: t("admin.deleteUser"), danger: true, confirmText: t("admin.delete") });
+    if (!ok) return;
     try {
       await api.deleteUser(id);
       loadUsers();
@@ -463,6 +466,7 @@ function formToPayload(f: CircuitForm) {
 
 function CircuitsManager() {
   const t = useT();
+  const confirm = useConfirm();
   const [circuits, setCircuits] = useState<CircuitRow[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -509,7 +513,8 @@ function CircuitsManager() {
   };
 
   const deleteCircuit = async (id: number) => {
-    if (!confirm(t("admin.confirmDeleteCircuit"))) return;
+    const ok = await confirm({ message: t("admin.confirmDeleteCircuit"), danger: true, confirmText: t("admin.delete") });
+    if (!ok) return;
     try {
       await api.deleteCircuit(id);
       loadCircuits();

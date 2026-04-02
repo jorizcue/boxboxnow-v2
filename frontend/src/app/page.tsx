@@ -17,6 +17,7 @@ import { LiveTiming } from "@/components/live/LiveTiming";
 import { AdjustedClassification } from "@/components/classification/AdjustedClassification";
 import { ReplayTab } from "@/components/replay/ReplayTab";
 import { KartAnalyticsTab } from "@/components/analytics/KartAnalyticsTab";
+import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
 
 export default function Home() {
   const { token, user, _hydrated } = useAuth();
@@ -31,10 +32,10 @@ export default function Home() {
   }
 
   if (!token) {
-    return <LoginPage />;
+    return <ConfirmProvider><LoginPage /></ConfirmProvider>;
   }
 
-  return <Dashboard activeTab={activeTab} setActiveTab={setActiveTab} />;
+  return <ConfirmProvider><Dashboard activeTab={activeTab} setActiveTab={setActiveTab} /></ConfirmProvider>;
 }
 
 function Dashboard({
