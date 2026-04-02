@@ -63,6 +63,12 @@ async def init_db():
         except Exception:
             pass
 
+        # Add retention_days to circuits
+        try:
+            await conn.execute(text("ALTER TABLE circuits ADD COLUMN retention_days INTEGER DEFAULT 30 NOT NULL"))
+        except Exception:
+            pass
+
         # Seed default app settings
         await conn.execute(text("""
             INSERT OR IGNORE INTO app_settings (key, value) VALUES ('kart_analytics_retention_days', '30')

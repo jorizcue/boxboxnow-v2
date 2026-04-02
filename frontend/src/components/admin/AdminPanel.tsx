@@ -2,16 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import { useRaceStore } from "@/hooks/useRaceState";
 import { useT } from "@/lib/i18n";
 import { StyledSelect } from "@/components/shared/StyledSelect";
-import { CalendarPicker } from "@/components/shared/CalendarPicker";
 
 interface UserRow {
   id: number;
   username: string;
   is_admin: boolean;
   max_devices: number;
+  tab_access: string[];
 }
 
 interface CircuitRow {
@@ -26,6 +25,7 @@ interface CircuitRow {
   lap_differential: number;
   php_api_url: string | null;
   live_timing_url: string | null;
+  retention_days: number;
 }
 
 interface AccessRow {
@@ -39,7 +39,7 @@ interface AccessRow {
 
 export function AdminPanel() {
   const t = useT();
-  const [tab, setTab] = useState<"users" | "circuits" | "hub" | "replay" | "analytics">("users");
+  const [tab, setTab] = useState<"users" | "circuits" | "hub">("users");
 
   const tabBtn = (key: typeof tab, label: string) => (
     <button
@@ -58,15 +58,11 @@ export function AdminPanel() {
         {tabBtn("users", t("admin.users"))}
         {tabBtn("circuits", t("admin.circuits"))}
         {tabBtn("hub", t("admin.hub"))}
-        {tabBtn("replay", t("admin.replay"))}
-        {tabBtn("analytics", t("admin.analytics"))}
       </div>
 
       {tab === "users" && <UsersManager />}
       {tab === "circuits" && <CircuitsManager />}
       {tab === "hub" && <CircuitHubManager />}
-      {tab === "replay" && <ReplayControls />}
-      {tab === "analytics" && <KartAnalytics />}
     </div>
   );
 }
@@ -162,6 +158,7 @@ function UsersManager() {
               <th className="text-left px-2 py-1">{t("admin.userPlaceholder")}</th>
               <th className="text-center px-2 py-1">{t("admin.devicesShort")}</th>
               <th className="text-center px-2 py-1">Admin</th>
+              <th className="text-center px-2 py-1">{t("admin.tabs")}</th>
               <th className="text-right px-2 py-1"></th>
             </tr>
           </thead>
@@ -189,6 +186,33 @@ function UsersManager() {
                 </td>
                 <td className="px-2 py-1.5 text-center">
                   {u.is_admin ? <span className="text-accent text-xs font-medium">{t("common.yes")}</span> : <span className="text-neutral-700">-</span>}
+                </td>
+                <td className="px-2 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                  {u.is_admin ? (
+                    <span className="text-[10px] text-neutral-500">{t("admin.allTabs")}</span>
+                  ) : (
+                    <div className="flex items-center gap-2 justify-center">
+                      {["replay", "analytics"].map((tab) => (
+                        <label key={tab} className="flex items-center gap-0.5 text-[10px] text-neutral-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={u.tab_access?.includes(tab)}
+                            onChange={async (e) => {
+                              const newTabs = e.target.checked
+                                ? [...(u.tab_access || []), tab]
+                                : (u.tab_access || []).filter((t) => t !== tab);
+                              try {
+                                await api.updateUserTabs(u.id, newTabs);
+                                loadUsers();
+                              } catch {}
+                            }}
+                            className="accent-accent"
+                          />
+                          {tab === "replay" ? "Replay" : "Analytics"}
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </td>
                 <td className="px-2 py-1.5 text-right">
                   <button onClick={(e) => { e.stopPropagation(); deleteUser(u.id); }}
@@ -269,6 +293,7 @@ interface CircuitForm {
   lap_differential: string;
   php_api_url: string;
   live_timing_url: string;
+  retention_days: string;
 }
 
 const emptyForm: CircuitForm = {
@@ -282,6 +307,7 @@ const emptyForm: CircuitForm = {
   lap_differential: "3000",
   php_api_url: "",
   live_timing_url: "",
+  retention_days: "30",
 };
 
 function circuitToForm(c: CircuitRow): CircuitForm {
@@ -296,6 +322,7 @@ function circuitToForm(c: CircuitRow): CircuitForm {
     lap_differential: c.lap_differential.toString(),
     php_api_url: c.php_api_url ?? "",
     live_timing_url: c.live_timing_url ?? "",
+    retention_days: (c.retention_days ?? 30).toString(),
   };
 }
 
@@ -311,6 +338,7 @@ function formToPayload(f: CircuitForm) {
     lap_differential: Number(f.lap_differential) || 3000,
     php_api_url: f.php_api_url || null,
     live_timing_url: f.live_timing_url || null,
+    retention_days: Number(f.retention_days) || 30,
   };
 }
 
@@ -466,7 +494,11 @@ function CircuitsManager() {
               {fieldInput(t("admin.lapsDiscard"), "laps_discard", "number", "2")}
             </div>
 
-            {fieldInput(t("admin.lapDifferential"), "lap_differential", "number", "3000")}
+            <div className="grid grid-cols-2 gap-2">
+              {fieldInput(t("admin.lapDifferential"), "lap_differential", "number", "3000")}
+              {fieldInput(t("admin.retentionDays"), "retention_days", "number", "30")}
+            </div>
+
             {fieldInput("PHP API URL", "php_api_url", "text", "http://...")}
             {fieldInput("Live Timing URL", "live_timing_url", "text", "https://...")}
           </div>
@@ -633,611 +665,6 @@ function CircuitHubManager() {
               ))}
             </tbody>
           </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-// --- Replay Controls ---
-
-// Module-level state for replay — survives tab changes (component re-mounts)
-let _replaySelectedLog = "";
-let _replaySelectedOwnerId: number | null = null;
-let _replaySelectedCircuitDir: string | null = null;
-let _replaySpeed = 10;
-
-interface RaceStartMarker {
-  block: number;
-  progress: number;
-  timestamp: string;
-  title: string;
-}
-
-interface LogAnalysis {
-  totalBlocks: number;
-  raceStarts: RaceStartMarker[];
-  startTime: string | null;
-  endTime: string | null;
-}
-
-interface RecordingCircuit {
-  circuit_dir: string;
-  circuit_name: string;
-  circuit_id: number | null;
-  dates: string[];
-}
-
-interface LogEntry {
-  filename: string;
-  owner_id?: number | null;
-  owner?: string;
-  circuit_dir?: string;
-}
-
-function ReplayControls() {
-  const t = useT();
-  // Recording circuits (circuit+date selector)
-  const [recordingCircuits, setRecordingCircuits] = useState<RecordingCircuit[]>([]);
-  const [selectedRecCircuit, setSelectedRecCircuitState] = useState(_replaySelectedCircuitDir || "");
-  const [selectedDate, setSelectedDateState] = useState("");
-
-  // Legacy logs (flat file list)
-  const [legacyLogs, setLegacyLogs] = useState<LogEntry[]>([]);
-  const [showLegacy, setShowLegacy] = useState(false);
-
-  // Module-level state for replay params
-  const [selectedLog, setSelectedLogState] = useState(_replaySelectedLog);
-  const [selectedOwnerId, setSelectedOwnerIdState] = useState<number | null>(_replaySelectedOwnerId);
-  const [selectedCircuitDir, setSelectedCircuitDirState] = useState<string | null>(_replaySelectedCircuitDir);
-  const [speed, setSpeedState] = useState(_replaySpeed);
-  const [loading, setLoading] = useState(false);
-  const [analysis, setAnalysis] = useState<LogAnalysis | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
-
-  const {
-    requestWsReconnect,
-    replayActive, replayPaused, replayProgress, replayTime, setReplayStatus,
-  } = useRaceStore();
-
-  // Setters that persist to module-level
-  const setSelectedLog = (v: string, ownerId: number | null = null, circuitDir: string | null = null) => {
-    _replaySelectedLog = v;
-    _replaySelectedOwnerId = ownerId;
-    _replaySelectedCircuitDir = circuitDir;
-    setSelectedLogState(v);
-    setSelectedOwnerIdState(ownerId);
-    setSelectedCircuitDirState(circuitDir);
-  };
-  const setSpeed = (v: number) => { _replaySpeed = v; setSpeedState(v); };
-  const setSelectedRecCircuit = (v: string) => { _replaySelectedCircuitDir = v || null; setSelectedRecCircuitState(v); };
-
-  // Sync replay status
-  const syncStatus = async () => {
-    try {
-      const st = await api.getReplayStatus();
-      setReplayStatus(st.active, st.paused, st.filename || "", st.progress || 0, st.currentTime || "");
-    } catch {}
-  };
-
-  // Load recording circuits + legacy logs on mount
-  useEffect(() => {
-    api.getRecordings()
-      .then((data) => setRecordingCircuits(data.circuits || []))
-      .catch(() => {});
-    api.getReplayLogs()
-      .then((data) => setLegacyLogs((data.logs || []).filter((l: LogEntry) => !l.circuit_dir)))
-      .catch(() => {});
-    syncStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Get dates for selected circuit
-  const selectedCircuitData = recordingCircuits.find((c) => c.circuit_dir === selectedRecCircuit);
-  const availableDates = selectedCircuitData?.dates || [];
-
-  // When circuit or date changes, update the replay selection
-  useEffect(() => {
-    if (selectedRecCircuit && selectedDate) {
-      const filename = `${selectedDate}.log`;
-      setSelectedLog(filename, null, selectedRecCircuit);
-    } else if (!selectedRecCircuit) {
-      if (selectedCircuitDir && !selectedOwnerId) {
-        setSelectedLog("", null, null);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedRecCircuit, selectedDate]);
-
-  // Analyze log when selected
-  useEffect(() => {
-    if (!selectedLog) { setAnalysis(null); return; }
-    setAnalyzing(true);
-    api.analyzeLog(selectedLog, selectedOwnerId, selectedCircuitDir)
-      .then(setAnalysis)
-      .catch(() => setAnalysis(null))
-      .finally(() => setAnalyzing(false));
-  }, [selectedLog, selectedOwnerId, selectedCircuitDir]);
-
-  // Poll status while replay is active
-  useEffect(() => {
-    if (!replayActive) return;
-    const interval = setInterval(syncStatus, 2000);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [replayActive]);
-
-  const startFromBlock = async (block: number = 0) => {
-    if (!selectedLog) return;
-    setLoading(true);
-    try {
-      await api.startReplay(selectedLog, speed, block, selectedOwnerId, selectedCircuitDir);
-      requestWsReconnect();
-      await syncStatus();
-    } catch (e: any) {
-      alert("Error: " + e.message);
-    }
-    setLoading(false);
-  };
-
-  const handleSeek = async (block: number) => {
-    if (!replayActive) return;
-    try {
-      await api.seekReplay(block);
-      await syncStatus();
-    } catch (e: any) {
-      alert("Error: " + e.message);
-    }
-  };
-
-  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!analysis || analysis.totalBlocks === 0) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const block = Math.round(pct * analysis.totalBlocks);
-    if (replayActive) {
-      handleSeek(block);
-    } else {
-      startFromBlock(block);
-    }
-  };
-
-  // Legacy log select handler
-  const handleLegacySelect = (val: string) => {
-    if (!val) { setSelectedLog(""); return; }
-    const colonIdx = val.indexOf(":");
-    if (colonIdx > 0) {
-      const oid = parseInt(val.substring(0, colonIdx), 10);
-      setSelectedLog(val.substring(colonIdx + 1), isNaN(oid) ? null : oid, null);
-    } else {
-      setSelectedLog(val, null, null);
-    }
-    setSelectedRecCircuit("");
-    setSelectedDateState("");
-  };
-
-  return (
-    <div className="bg-white/[0.03] rounded-xl p-6 border border-border">
-      <h2 className="text-[11px] text-neutral-200 mb-4 uppercase tracking-wider">{t("replay.title")}</h2>
-
-      <div className="space-y-3">
-        {/* Circuit + Date selectors */}
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("replay.circuit")}</label>
-            <StyledSelect
-              value={selectedRecCircuit}
-              onChange={(v) => {
-                setSelectedRecCircuit(v);
-                setSelectedDateState("");
-                if (!v) setSelectedLog("", null, null);
-              }}
-              options={recordingCircuits.map((c) => ({
-                value: c.circuit_dir,
-                label: `${c.circuit_name} (${c.dates.length}d)`,
-              }))}
-              placeholder={t("replay.select")}
-              disabled={replayActive}
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("replay.date")}</label>
-            <CalendarPicker
-              value={selectedDate}
-              onChange={(d) => setSelectedDateState(d)}
-              availableDates={availableDates}
-              disabled={replayActive || !selectedRecCircuit}
-              placeholder={t("replay.select")}
-            />
-          </div>
-        </div>
-
-        {/* Legacy logs toggle */}
-        {legacyLogs.length > 0 && (
-          <div>
-            <button
-              onClick={() => setShowLegacy(!showLegacy)}
-              className="text-[10px] text-neutral-500 hover:text-neutral-300 transition-colors"
-            >
-              {showLegacy ? t("replay.hideLegacy") : t("replay.showLegacy")} {t("replay.oldRecordings")} ({legacyLogs.length})
-            </button>
-            {showLegacy && (
-              <div className="mt-1">
-                <StyledSelect
-                  value={selectedOwnerId != null ? `${selectedOwnerId}:${selectedLog}` : selectedLog}
-                  onChange={handleLegacySelect}
-                  options={legacyLogs.map((log, idx) => {
-                    const val = log.owner_id != null ? `${log.owner_id}:${log.filename}` : log.filename;
-                    const label = log.owner ? `[${log.owner}] ${log.filename}` : log.filename;
-                    return { value: val, label };
-                  })}
-                  placeholder={t("replay.selectOldLog")}
-                  disabled={replayActive}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Timeline bar */}
-        {analysis && analysis.totalBlocks > 0 && (
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-[10px] text-neutral-500">
-              <span>{analysis.startTime}</span>
-              <span>{analysis.totalBlocks} {t("replay.blocks")}</span>
-              <span>{analysis.endTime}</span>
-            </div>
-            <div
-              className="relative w-full h-6 bg-black rounded-lg cursor-pointer border border-border group"
-              onClick={handleTimelineClick}
-              title={t("replay.clickToSeek")}
-            >
-              {replayActive && (
-                <div
-                  className="absolute top-0 left-0 h-full bg-accent/20 rounded-lg transition-all"
-                  style={{ width: `${replayProgress * 100}%` }}
-                />
-              )}
-              {replayActive && (
-                <div
-                  className="absolute top-0 h-full w-0.5 bg-accent transition-all"
-                  style={{ left: `${replayProgress * 100}%` }}
-                />
-              )}
-              {analysis.raceStarts.map((rs, idx) => (
-                <div
-                  key={idx}
-                  className="absolute top-0 h-full flex flex-col items-center group/marker"
-                  style={{ left: `${rs.progress * 100}%` }}
-                >
-                  <div className="w-0.5 h-full bg-green-500" />
-                  <div className="absolute -top-5 text-[9px] text-green-400 font-mono whitespace-nowrap opacity-0 group-hover/marker:opacity-100 transition-opacity pointer-events-none">
-                    {rs.title ? `${rs.title} ${rs.timestamp}` : rs.timestamp}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {analysis.raceStarts.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {analysis.raceStarts.map((rs, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => replayActive ? handleSeek(rs.block) : startFromBlock(rs.block)}
-                    disabled={loading}
-                    className="flex items-center gap-1.5 bg-green-900/30 hover:bg-green-900/50 disabled:opacity-40 text-green-400 text-[10px] font-medium px-2 py-1 rounded border border-green-900/30 transition-colors"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
-                    <span className="truncate">{rs.title || `${t("replay.raceN")} ${idx + 1}`}</span>
-                    <span className="text-green-600 flex-shrink-0">{rs.timestamp}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {analyzing && (
-          <p className="text-[10px] text-neutral-500">{t("replay.analyzing")}</p>
-        )}
-
-        <div>
-          <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">
-            {t("replay.speed")}: {speed}x
-          </label>
-          <input
-            type="range" min="1" max="100" value={speed}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              setSpeed(v);
-              if (replayActive) api.setReplaySpeed(v);
-            }}
-            className="w-full accent-accent"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => startFromBlock(0)}
-            disabled={!selectedLog || loading || replayActive}
-            className="w-10 h-10 flex items-center justify-center bg-accent hover:bg-accent-hover disabled:opacity-40 text-black rounded-lg transition-colors"
-            title={t("replay.start")}
-          >
-            {loading ? (
-              <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeLinecap="round"/></svg>
-            ) : (
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-            )}
-          </button>
-          <button
-            onClick={async () => {
-              await api.pauseReplay();
-              await syncStatus();
-            }}
-            disabled={!replayActive}
-            className="w-10 h-10 flex items-center justify-center bg-black hover:bg-surface disabled:opacity-40 text-neutral-300 rounded-lg border border-border transition-colors"
-            title={replayPaused ? t("replay.resume") : t("replay.pause")}
-          >
-            {replayPaused ? (
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-            ) : (
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-            )}
-          </button>
-          <button
-            onClick={async () => {
-              await api.stopReplay();
-              await syncStatus();
-              requestWsReconnect();
-            }}
-            disabled={!replayActive}
-            className="w-10 h-10 flex items-center justify-center bg-red-900/50 hover:bg-red-800 disabled:opacity-40 text-red-300 rounded-lg transition-colors"
-            title={t("replay.stopBtn")}
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
-          </button>
-
-          {replayActive && (
-            <div className="flex-1 flex items-center justify-end gap-3 text-[11px] font-mono">
-              {replayTime && (
-                <span className="text-accent font-semibold">{replayTime}</span>
-              )}
-              <span className="text-neutral-400">{(replayProgress * 100).toFixed(1)}%</span>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-// --- Kart Analytics ---
-
-interface KartStat {
-  kart_number: number;
-  races: number;
-  total_laps: number;
-  valid_laps: number;
-  avg_lap_ms: number;
-  best5_avg_ms: number;
-  best_lap_ms: number;
-  teams: string[];
-}
-
-function msToLapTime(ms: number): string {
-  if (ms <= 0) return "-";
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  const millis = Math.floor(ms % 1000);
-  if (minutes > 0) {
-    return `${minutes}:${seconds.toString().padStart(2, "0")}.${millis.toString().padStart(3, "0")}`;
-  }
-  return `${seconds}.${millis.toString().padStart(3, "0")}`;
-}
-
-function KartAnalytics() {
-  const t = useT();
-  const [circuits, setCircuits] = useState<CircuitRow[]>([]);
-  const [selectedCircuit, setSelectedCircuit] = useState<number>(0);
-  const [dateFrom, setDateFrom] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return d.toISOString().split("T")[0];
-  });
-  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split("T")[0]);
-  const [stats, setStats] = useState<KartStat[]>([]);
-  const [raceLogs, setRaceLogs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [retentionDays, setRetentionDays] = useState<number>(30);
-  const [retentionSaved, setRetentionSaved] = useState(false);
-
-  useEffect(() => {
-    api.getAllCircuits().then(setCircuits).catch(() => {});
-    api.getSetting("kart_analytics_retention_days").then((r) => {
-      setRetentionDays(Number(r.value) || 30);
-    }).catch(() => {});
-  }, []);
-
-  const saveRetention = async (days: number) => {
-    setRetentionDays(days);
-    try {
-      await api.updateSetting("kart_analytics_retention_days", String(days));
-      setRetentionSaved(true);
-      setTimeout(() => setRetentionSaved(false), 2000);
-    } catch {}
-  };
-
-  const loadStats = async () => {
-    if (!selectedCircuit) return;
-    setLoading(true);
-    try {
-      const [statsData, logsData] = await Promise.all([
-        api.getKartStats(selectedCircuit, dateFrom, dateTo),
-        api.getRaceLogs(selectedCircuit, dateFrom, dateTo),
-      ]);
-      setStats(statsData);
-      setRaceLogs(logsData);
-    } catch (e: any) {
-      alert("Error: " + e.message);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    if (selectedCircuit) loadStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCircuit, dateFrom, dateTo]);
-
-  // Find best values for color coding
-  const bestBest5 = stats.length > 0 ? Math.min(...stats.map((s) => s.best5_avg_ms)) : 0;
-  const worstBest5 = stats.length > 0 ? Math.max(...stats.map((s) => s.best5_avg_ms)) : 0;
-  const range = worstBest5 - bestBest5;
-
-  const getSpeedColor = (ms: number): string => {
-    if (range === 0) return "text-white";
-    const pct = (ms - bestBest5) / range;
-    if (pct < 0.15) return "text-green-400";
-    if (pct < 0.35) return "text-accent";
-    if (pct < 0.65) return "text-white";
-    if (pct < 0.85) return "text-orange-400";
-    return "text-red-400";
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
-        <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">{t("analytics.title")}</h3>
-
-        <div className="flex gap-3 items-end flex-wrap">
-          <div>
-            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("analytics.circuit")}</label>
-            <StyledSelect
-              value={selectedCircuit}
-              onChange={(v) => setSelectedCircuit(Number(v))}
-              options={circuits.map((c) => ({ value: c.id, label: c.name }))}
-              placeholder={t("analytics.select")}
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("analytics.from")}</label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="bg-black border border-border rounded-lg px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("analytics.to")}</label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="bg-black border border-border rounded-lg px-3 py-2 text-sm"
-            />
-          </div>
-          <button
-            onClick={loadStats}
-            disabled={!selectedCircuit || loading}
-            className="bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold px-4 py-2 rounded-lg text-sm"
-          >
-            {loading ? t("analytics.loading") : t("analytics.search")}
-          </button>
-        </div>
-
-        <div className="mt-3 flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <label className="text-[10px] text-neutral-400 uppercase tracking-wider whitespace-nowrap">{t("analytics.retention")}</label>
-            <input
-              type="number"
-              min={1}
-              max={365}
-              value={retentionDays}
-              onChange={(e) => setRetentionDays(Number(e.target.value))}
-              onBlur={() => saveRetention(retentionDays)}
-              onKeyDown={(e) => { if (e.key === "Enter") saveRetention(retentionDays); }}
-              className="w-16 bg-black border border-border rounded-lg px-2 py-1 text-sm text-center font-mono"
-            />
-            <span className="text-[10px] text-neutral-500">{t("analytics.days")}</span>
-            {retentionSaved && <span className="text-[10px] text-accent">✓</span>}
-          </div>
-        </div>
-
-        {raceLogs.length > 0 && (
-          <div className="mt-3 flex items-center gap-3 text-[10px] text-neutral-400">
-            <span className="text-accent font-semibold">{raceLogs.length}</span> {t("analytics.racesFound")}
-            <span className="text-neutral-600">|</span>
-            <span className="text-accent font-semibold">{stats.length}</span> {t("analytics.karts")}
-            <span className="text-neutral-600">|</span>
-            <span className="text-accent font-semibold">{stats.reduce((a, s) => a + s.valid_laps, 0).toLocaleString()}</span> {t("analytics.validLaps")}
-          </div>
-        )}
-      </div>
-
-      {stats.length > 0 && (
-        <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
-          <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider">
-            {t("analytics.performance")}
-            <span className="text-neutral-500 ml-2 normal-case">{t("analytics.sortedByTop5")}</span>
-          </h3>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-[10px] text-neutral-400 uppercase tracking-wider">
-                <tr>
-                  <th className="text-center px-2 py-1.5 w-8">#</th>
-                  <th className="text-center px-2 py-1.5">{t("race.kart")}</th>
-                  <th className="text-right px-2 py-1.5">{t("analytics.top5Avg")}</th>
-                  <th className="text-right px-2 py-1.5">{t("analytics.generalAvg")}</th>
-                  <th className="text-right px-2 py-1.5">{t("analytics.bestLap")}</th>
-                  <th className="text-right px-2 py-1.5">{t("analytics.races")}</th>
-                  <th className="text-right px-2 py-1.5">{t("analytics.lapsCol")}</th>
-                  <th className="text-left px-2 py-1.5">{t("analytics.teams")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.map((s, idx) => (
-                  <tr key={s.kart_number} className="border-t border-border hover:bg-black/30 transition-colors">
-                    <td className="px-2 py-1.5 text-center text-neutral-500 text-xs">{idx + 1}</td>
-                    <td className="px-2 py-1.5 text-center font-bold text-white text-base">{s.kart_number}</td>
-                    <td className={`px-2 py-1.5 text-right font-mono font-semibold ${getSpeedColor(s.best5_avg_ms)}`}>
-                      {msToLapTime(s.best5_avg_ms)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right font-mono text-neutral-300">
-                      {msToLapTime(s.avg_lap_ms)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right font-mono text-purple-400">
-                      {msToLapTime(s.best_lap_ms)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right text-neutral-400">{s.races}</td>
-                    <td className="px-2 py-1.5 text-right text-neutral-400">{s.valid_laps}</td>
-                    <td className="px-2 py-1.5 text-left text-[11px] text-neutral-500 truncate max-w-[200px]">
-                      {s.teams.join(", ") || "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {stats.length > 0 && (
-            <div className="mt-3 flex items-center gap-4 text-[10px]">
-              <span className="text-green-400">{t("analytics.fast")}</span>
-              <span className="text-accent">{t("analytics.goodPace")}</span>
-              <span className="text-white">{t("analytics.normal")}</span>
-              <span className="text-orange-400">{t("analytics.slow")}</span>
-              <span className="text-red-400">{t("analytics.verySlow")}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {!loading && selectedCircuit > 0 && stats.length === 0 && raceLogs.length === 0 && (
-        <div className="bg-white/[0.03] rounded-xl p-8 border border-border text-center">
-          <p className="text-neutral-500 text-sm">{t("analytics.noData")}</p>
-          <p className="text-neutral-600 text-xs mt-2">{t("analytics.autoSaveHint")}</p>
         </div>
       )}
     </div>

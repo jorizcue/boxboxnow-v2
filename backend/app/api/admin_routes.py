@@ -7,13 +7,14 @@ from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 
 from app.models.database import get_db
-from app.models.schemas import User, Circuit, UserCircuitAccess, AppSetting
+from app.models.schemas import User, Circuit, UserCircuitAccess, AppSetting, UserTabAccess
+from sqlalchemy.orm import selectinload
 from app.models.pydantic_models import (
     UserOut, UserCreate, UserUpdate,
     CircuitOut, CircuitCreate, CircuitUpdate,
     CircuitAccessOut, CircuitAccessCreate, CircuitAccessUpdate,
 )
-from app.api.auth_routes import require_admin, hash_password
+from app.api.auth_routes import require_admin, hash_password, _user_out
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -22,8 +23,10 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 @router.get("/users", response_model=list[UserOut])
 async def list_users(admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).order_by(User.username))
-    return result.scalars().all()
+    result = await db.execute(
+        select(User).options(selectinload(User.tab_access)).order_by(User.username)
+    )
+    return [_user_out(u) for u in result.scalars().all()]
 
 
 @router.post("/users", response_model=UserOut)
@@ -267,6 +270,22 @@ async def hub_stop_circuit(circuit_id: int, request: Request, admin: User = Depe
     if not ok:
         raise HTTPException(404, "Circuit connection not found")
     return {"status": "stopped", "circuit_id": circuit_id}
+
+
+# --- User Tab Access ---
+
+@router.put("/users/{user_id}/tabs")
+async def update_user_tabs(user_id: int, request: Request, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    body = await request.json()
+    tabs = body.get("tabs", [])
+    # Delete existing
+    await db.execute(delete(UserTabAccess).where(UserTabAccess.user_id == user_id))
+    # Insert new
+    for tab in tabs:
+        if tab in ("replay", "analytics"):
+            db.add(UserTabAccess(user_id=user_id, tab=tab))
+    await db.commit()
+    return {"tabs": tabs}
 
 
 # --- App Settings ---

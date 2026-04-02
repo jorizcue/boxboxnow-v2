@@ -28,7 +28,8 @@ from sqlalchemy import select, func, delete
 
 from app.config import get_settings
 from app.models.database import get_db
-from app.models.schemas import User, DeviceSession
+from app.models.schemas import User, DeviceSession, UserTabAccess
+from sqlalchemy.orm import selectinload
 from app.models.pydantic_models import (
     LoginRequest, LoginResponse, UserOut, DeviceSessionOut,
 )
@@ -138,8 +139,10 @@ async def get_current_user(
     device_session.last_active = datetime.now(timezone.utc)
     await db.commit()
 
-    # Get user
-    result = await db.execute(select(User).where(User.id == user_id))
+    # Get user with tab_access
+    result = await db.execute(
+        select(User).where(User.id == user_id).options(selectinload(User.tab_access))
+    )
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
@@ -148,6 +151,25 @@ async def get_current_user(
     request.state.session_token = session_token
 
     return user
+
+
+ALL_TABS = ["replay", "analytics"]
+
+
+def _user_out(user: User) -> UserOut:
+    """Build UserOut with tab_access. Admins always get all tabs."""
+    if user.is_admin:
+        tabs = ALL_TABS
+    else:
+        tabs = [ta.tab for ta in (user.tab_access or [])]
+    return UserOut(
+        id=user.id,
+        username=user.username,
+        is_admin=user.is_admin,
+        max_devices=user.max_devices,
+        tab_access=tabs,
+        created_at=user.created_at,
+    )
 
 
 async def require_admin(
@@ -178,7 +200,9 @@ async def _cleanup_stale_sessions(db: AsyncSession, user_id: int):
 @router.post("/login", response_model=LoginResponse)
 async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     # Validate credentials
-    result = await db.execute(select(User).where(User.username == data.username))
+    result = await db.execute(
+        select(User).where(User.username == data.username).options(selectinload(User.tab_access))
+    )
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(data.password, user.password_hash):
@@ -254,7 +278,7 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
     return LoginResponse(
         access_token=access_token,
         session_token=session_token,
-        user=UserOut.model_validate(user),
+        user=_user_out(user),
     )
 
 
@@ -262,7 +286,7 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
 
 @router.get("/me", response_model=UserOut)
 async def get_me(user: User = Depends(get_current_user)):
-    return UserOut.model_validate(user)
+    return _user_out(user)
 
 
 @router.get("/sessions", response_model=list[DeviceSessionOut])

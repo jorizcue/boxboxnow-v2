@@ -1,20 +1,61 @@
-"""REST API routes for kart analytics (admin-only)."""
+"""REST API routes for kart analytics."""
 
 import logging
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func as sqlfunc
 
 from app.models.database import get_db
-from app.models.schemas import User, RaceLog, KartLap
-from app.models.pydantic_models import KartStatsOut, RaceLogOut
+from app.models.schemas import User, RaceLog, KartLap, Circuit, UserCircuitAccess
+from app.models.pydantic_models import KartStatsOut, RaceLogOut, CircuitOut
 from app.api.auth_routes import get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
+
+
+async def _check_circuit_access(user: User, circuit_id: int, db: AsyncSession):
+    """Raise 403 if non-admin user has no access to circuit."""
+    if user.is_admin:
+        return
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(UserCircuitAccess.id).where(
+            UserCircuitAccess.user_id == user.id,
+            UserCircuitAccess.circuit_id == circuit_id,
+            UserCircuitAccess.valid_from <= now,
+            UserCircuitAccess.valid_until >= now,
+        )
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(403, "No access to this circuit")
+
+
+@router.get("/circuits", response_model=list[CircuitOut])
+async def list_analytics_circuits(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List circuits available to the user for analytics."""
+    if user.is_admin:
+        result = await db.execute(select(Circuit).order_by(Circuit.name))
+        return result.scalars().all()
+
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(Circuit)
+        .join(UserCircuitAccess, Circuit.id == UserCircuitAccess.circuit_id)
+        .where(
+            UserCircuitAccess.user_id == user.id,
+            UserCircuitAccess.valid_from <= now,
+            UserCircuitAccess.valid_until >= now,
+        )
+        .order_by(Circuit.name)
+    )
+    return result.scalars().all()
 
 
 @router.get("/kart-stats", response_model=list[KartStatsOut])
@@ -26,6 +67,7 @@ async def get_kart_stats(
     db: AsyncSession = Depends(get_db),
 ):
     """Get aggregated kart performance stats for a circuit within a date range."""
+    await _check_circuit_access(user, circuit_id, db)
     # Default: last 7 days
     now = datetime.now(timezone.utc)
     if date_from:
@@ -109,6 +151,7 @@ async def list_race_logs(
     db: AsyncSession = Depends(get_db),
 ):
     """List historical race logs for a circuit."""
+    await _check_circuit_access(user, circuit_id, db)
     now = datetime.now(timezone.utc)
     if date_from:
         dt_from = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc)

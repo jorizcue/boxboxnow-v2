@@ -14,8 +14,10 @@ import { ConfigPanel } from "@/components/config/ConfigPanel";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { LiveTiming } from "@/components/live/LiveTiming";
 import { AdjustedClassification } from "@/components/classification/AdjustedClassification";
+import { ReplayTab } from "@/components/replay/ReplayTab";
+import { KartAnalyticsTab } from "@/components/analytics/KartAnalyticsTab";
 
-type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "config" | "admin";
+type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "config" | "replay" | "analytics" | "admin";
 
 export default function Home() {
   const { token, user, _hydrated } = useAuth();
@@ -48,6 +50,8 @@ function Dashboard({
   const { connected, trackName, countdownMs } = useRaceStore();
   const { user } = useAuth();
 
+  const userTabs = user?.tab_access ?? [];
+
   return (
     <div className="flex flex-col h-screen">
       <StatusBar
@@ -60,6 +64,7 @@ function Dashboard({
         activeTab={activeTab}
         onTabChange={setActiveTab}
         isAdmin={user?.is_admin ?? false}
+        userTabs={userTabs}
       />
       <main className="flex-1 overflow-auto p-2 sm:p-3">
         {activeTab === "race" && <RaceTable />}
@@ -68,6 +73,8 @@ function Dashboard({
         {activeTab === "classification" && <ClassificationTable />}
         {activeTab === "adjusted" && <AdjustedClassification />}
         {activeTab === "config" && <ConfigPanel />}
+        {activeTab === "replay" && userTabs.includes("replay") && <ReplayTab />}
+        {activeTab === "analytics" && userTabs.includes("analytics") && <KartAnalyticsTab />}
         {activeTab === "admin" && user?.is_admin && <AdminPanel />}
       </main>
     </div>

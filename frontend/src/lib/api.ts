@@ -177,7 +177,15 @@ export const api = {
       body: JSON.stringify({ value }),
     }),
 
+  // Admin: User tab access
+  updateUserTabs: (userId: number, tabs: string[]) =>
+    fetchApi<{ tabs: string[] }>(`/api/admin/users/${userId}/tabs`, {
+      method: "PUT",
+      body: JSON.stringify({ tabs }),
+    }),
+
   // Analytics
+  getAnalyticsCircuits: () => fetchApi<any[]>("/api/analytics/circuits"),
   getKartStats: (circuitId: number, dateFrom?: string, dateTo?: string) => {
     const params = new URLSearchParams({ circuit_id: String(circuitId) });
     if (dateFrom) params.set("date_from", dateFrom);

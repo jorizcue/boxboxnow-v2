@@ -47,6 +47,9 @@ const translations: Record<string, Record<Language, string>> = {
   "nav.admin": { es: "Admin", en: "Admin", it: "Admin", de: "Admin" },
   "nav.adjusted": { es: "Clasif. Real", en: "Real Class.", it: "Class. Reale", de: "Echte Klass." },
   "nav.adjustedShort": { es: "C.Real", en: "Real", it: "Reale", de: "Echt" },
+  "nav.replay": { es: "Replay", en: "Replay", it: "Replay", de: "Replay" },
+  "nav.analytics": { es: "Kart Analytics", en: "Kart Analytics", it: "Kart Analytics", de: "Kart Analytics" },
+  "nav.analyticsShort": { es: "Analytics", en: "Analytics", it: "Analytics", de: "Analytics" },
 
   // === Login ===
   "login.username": { es: "Usuario", en: "Username", it: "Utente", de: "Benutzer" },
@@ -222,6 +225,8 @@ const translations: Record<string, Record<Language, string>> = {
   "admin.revoke": { es: "Revocar", en: "Revoke", it: "Revoca", de: "Widerrufen" },
   "admin.noAccess": { es: "Sin acceso a circuitos", en: "No circuit access", it: "Nessun accesso ai circuiti", de: "Kein Streckenzugang" },
   "admin.selectUserHint": { es: "Selecciona un usuario para gestionar su acceso", en: "Select a user to manage access", it: "Seleziona un utente per gestire l'accesso", de: "Wahle einen Benutzer um den Zugang zu verwalten" },
+  "admin.tabs": { es: "Pestanas", en: "Tabs", it: "Schede", de: "Tabs" },
+  "admin.allTabs": { es: "Todas", en: "All", it: "Tutte", de: "Alle" },
 
   // === Admin: Circuits ===
   "admin.circuitCatalog": { es: "Catalogo de Circuitos", en: "Circuit Catalog", it: "Catalogo Circuiti", de: "Streckenkatalog" },
@@ -237,6 +242,7 @@ const translations: Record<string, Record<Language, string>> = {
   "admin.phpApiPort": { es: "PHP API Port", en: "PHP API Port", it: "PHP API Port", de: "PHP API Port" },
   "admin.lapsDiscard": { es: "Vtas. descarte", en: "Discard laps", it: "Giri scarto", de: "Verwerf. Runden" },
   "admin.lapDifferential": { es: "Diferencial (ms)", en: "Differential (ms)", it: "Differenziale (ms)", de: "Differential (ms)" },
+  "admin.retentionDays": { es: "Retención (días)", en: "Retention (days)", it: "Conservazione (gg)", de: "Aufbewahrung (Tage)" },
   "admin.save": { es: "Guardar", en: "Save", it: "Salva", de: "Speichern" },
   "admin.cancel": { es: "Cancelar", en: "Cancel", it: "Annulla", de: "Abbrechen" },
   "admin.deleteCircuit": { es: "Eliminar este circuito", en: "Delete this circuit", it: "Elimina questo circuito", de: "Diese Strecke loschen" },

@@ -15,6 +15,7 @@ class User(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     circuit_access = relationship("UserCircuitAccess", back_populates="user", cascade="all, delete-orphan")
+    tab_access = relationship("UserTabAccess", back_populates="user", cascade="all, delete-orphan")
     race_sessions = relationship("RaceSession", back_populates="user", cascade="all, delete-orphan")
     device_sessions = relationship("DeviceSession", back_populates="user", cascade="all, delete-orphan")
 
@@ -33,6 +34,7 @@ class Circuit(Base):
     lap_differential = Column(Integer, default=3000)
     php_api_url = Column(String(255), default="")
     live_timing_url = Column(String(255), default="")
+    retention_days = Column(Integer, default=30, nullable=False)
 
     user_access = relationship("UserCircuitAccess", back_populates="circuit", cascade="all, delete-orphan")
 
@@ -48,6 +50,17 @@ class UserCircuitAccess(Base):
 
     user = relationship("User", back_populates="circuit_access")
     circuit = relationship("Circuit", back_populates="user_access")
+
+
+class UserTabAccess(Base):
+    """Controls which optional tabs a user can see (replay, analytics)."""
+    __tablename__ = "user_tab_access"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    tab = Column(String(50), nullable=False)  # "replay" | "analytics"
+
+    user = relationship("User", back_populates="tab_access")
 
 
 class RaceSession(Base):

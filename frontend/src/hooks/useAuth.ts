@@ -8,6 +8,7 @@ interface AuthUser {
   username: string;
   is_admin: boolean;
   max_devices: number;
+  tab_access: string[];
 }
 
 interface AuthStore {

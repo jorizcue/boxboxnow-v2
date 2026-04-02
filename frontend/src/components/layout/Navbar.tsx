@@ -3,30 +3,37 @@
 import clsx from "clsx";
 import { useT } from "@/lib/i18n";
 
-type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "config" | "admin";
+type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "config" | "replay" | "analytics" | "admin";
 
 interface NavbarProps {
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
   isAdmin: boolean;
+  userTabs: string[];
 }
 
-export function Navbar({ activeTab, onTabChange, isAdmin }: NavbarProps) {
+export function Navbar({ activeTab, onTabChange, isAdmin, userTabs }: NavbarProps) {
   const t = useT();
-  const tabs: { id: Tab; labelKey: string; shortLabelKey: string; adminOnly?: boolean }[] = [
+  const tabs: { id: Tab; labelKey: string; shortLabelKey: string; adminOnly?: boolean; tabAccess?: string }[] = [
     { id: "race", labelKey: "nav.race", shortLabelKey: "nav.race" },
     { id: "pit", labelKey: "nav.box", shortLabelKey: "nav.box" },
     { id: "live", labelKey: "nav.live", shortLabelKey: "nav.live" },
     // { id: "classification", labelKey: "nav.classification", shortLabelKey: "nav.classification" },
     { id: "adjusted", labelKey: "nav.adjusted", shortLabelKey: "nav.adjustedShort" },
     { id: "config", labelKey: "nav.config", shortLabelKey: "nav.config" },
+    { id: "replay", labelKey: "nav.replay", shortLabelKey: "nav.replay", tabAccess: "replay" },
+    { id: "analytics", labelKey: "nav.analytics", shortLabelKey: "nav.analyticsShort", tabAccess: "analytics" },
     { id: "admin", labelKey: "nav.admin", shortLabelKey: "nav.admin", adminOnly: true },
   ];
 
   return (
     <nav className="flex overflow-x-auto scrollbar-none gap-0.5 px-2 sm:px-4 bg-black border-b border-border">
       {tabs
-        .filter((tab) => !tab.adminOnly || isAdmin)
+        .filter((tab) => {
+          if (tab.adminOnly) return isAdmin;
+          if (tab.tabAccess) return userTabs.includes(tab.tabAccess);
+          return true;
+        })
         .map((tab) => (
           <button
             key={tab.id}

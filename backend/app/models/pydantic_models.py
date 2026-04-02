@@ -20,6 +20,7 @@ class UserOut(BaseModel):
     username: str
     is_admin: bool
     max_devices: int = 1
+    tab_access: list[str] = []
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
@@ -74,6 +75,7 @@ class CircuitOut(BaseModel):
     lap_differential: int
     php_api_url: str | None = None
     live_timing_url: str | None = None
+    retention_days: int = 30
 
     model_config = {"from_attributes": True}
 
@@ -89,6 +91,7 @@ class CircuitCreate(BaseModel):
     lap_differential: int = 3000
     php_api_url: str | None = None
     live_timing_url: str | None = None
+    retention_days: int = 30
 
 
 class CircuitUpdate(BaseModel):
@@ -102,6 +105,7 @@ class CircuitUpdate(BaseModel):
     lap_differential: int | None = None
     php_api_url: str | None = None
     live_timing_url: str | None = None
+    retention_days: int | None = None
 
 
 # --- User Circuit Access ---
