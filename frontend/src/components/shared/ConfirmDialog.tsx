@@ -46,8 +46,12 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             onClick={() => handleClose(false)}
           />
           {/* Dialog */}
-          <div className="relative bg-surface border border-border rounded-2xl shadow-2xl shadow-black/50 w-full max-w-sm mx-4 animate-in fade-in zoom-in-95 duration-150">
+          <div className="relative bg-surface border border-accent/40 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-sm mx-4 animate-in fade-in zoom-in-95 duration-150">
             <div className="p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-base font-bold tracking-wide"><span className="text-white">BB</span><span className="text-accent">N</span></span>
+                <div className="h-px flex-1 bg-accent/20" />
+              </div>
               {state.title && (
                 <h3 className="text-white font-semibold text-base mb-1">{state.title}</h3>
               )}
