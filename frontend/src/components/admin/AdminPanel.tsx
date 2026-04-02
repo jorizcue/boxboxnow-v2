@@ -142,31 +142,31 @@ function UsersManager() {
     <div className="flex gap-4">
       {/* Left: user list */}
       <div className={`bg-white/[0.03] rounded-xl p-4 border border-border transition-all ${panelOpen ? "w-64 flex-shrink-0" : "w-full"}`}>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 mb-3">
           <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider">{t("admin.usersTitle")}</h3>
-          <button onClick={() => { setShowCreate(true); setSelectedUser(null); }} className="bg-accent text-black font-semibold px-3 py-1.5 rounded-lg text-sm">
-            {t("admin.new")}
+          <button onClick={() => { setShowCreate(true); setSelectedUser(null); }} className="bg-accent hover:bg-accent-hover text-black font-bold w-6 h-6 rounded-md text-sm flex items-center justify-center transition-colors" title={t("admin.newUser")}>
+            +
           </button>
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {users.map((u) => (
             <div
               key={u.id}
               onClick={() => loadAccess(u.id)}
-              className={`flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${
                 selectedUser === u.id
-                  ? "bg-accent/10 border border-accent/30"
-                  : "hover:bg-black/50 border border-border"
+                  ? "bg-accent/10 border border-accent/40 shadow-[0_0_8px_rgba(var(--accent-rgb),0.15)]"
+                  : "bg-white/[0.02] hover:bg-white/[0.05] border border-neutral-700/50 hover:border-neutral-600"
               }`}
             >
               <button
                 onClick={(e) => { e.stopPropagation(); deleteUser(u.id); }}
-                className="text-red-400/30 hover:text-red-400 transition-colors flex-shrink-0"
+                className="text-red-500/50 hover:text-red-400 transition-colors flex-shrink-0"
                 title={t("admin.delete")}
               >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M2 4h12M5.33 4V2.67a1.33 1.33 0 011.34-1.34h2.66a1.33 1.33 0 011.34 1.34V4M12.67 4v9.33a1.33 1.33 0 01-1.34 1.34H4.67a1.33 1.33 0 01-1.34-1.34V4h9.34z" />
+                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M4 4l8 8M12 4l-8 8" />
                 </svg>
               </button>
               <div className="min-w-0 flex-1">
@@ -174,7 +174,7 @@ function UsersManager() {
                   {u.username}
                   {u.is_admin && <span className="ml-1.5 text-[9px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-semibold uppercase">Admin</span>}
                 </div>
-                <div className="flex gap-2 text-[10px] text-neutral-500 mt-0.5">
+                <div className="flex gap-2 text-[10px] text-neutral-400 mt-0.5">
                   <span>{t("admin.devicesShort")} {u.max_devices}</span>
                   <span>{t("admin.tabs")}: {u.is_admin ? t("admin.allTabs") : (u.tab_access?.length || 0)}</span>
                 </div>
@@ -366,15 +366,17 @@ function UsersManager() {
 
                 <div className="space-y-1 max-h-60 overflow-y-auto scrollbar-none">
                   {access.map((a) => (
-                    <div key={a.id} className="flex items-center justify-between bg-black/30 rounded-lg px-3 py-2 text-xs">
-                      <div>
-                        <span className="text-white font-medium">{a.circuit_name}</span>
-                        <span className="text-neutral-500 ml-2">
-                          {new Date(a.valid_from).toLocaleDateString()} - {new Date(a.valid_until).toLocaleDateString()}
-                        </span>
-                      </div>
+                    <div key={a.id} className="flex items-center gap-2 bg-black/30 rounded-lg px-3 py-2 text-xs">
                       <button onClick={() => revokeAccess(a.id)}
-                        className="text-red-400/60 hover:text-red-400 text-[10px] transition-colors ml-2">{t("admin.revoke")}</button>
+                        className="text-red-500/50 hover:text-red-400 transition-colors flex-shrink-0" title={t("admin.revoke")}>
+                        <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                          <path d="M4 4l8 8M12 4l-8 8" />
+                        </svg>
+                      </button>
+                      <span className="text-white font-medium">{a.circuit_name}</span>
+                      <span className="text-neutral-500">
+                        {new Date(a.valid_from).toLocaleDateString()} - {new Date(a.valid_until).toLocaleDateString()}
+                      </span>
                     </div>
                   ))}
                   {access.length === 0 && (
