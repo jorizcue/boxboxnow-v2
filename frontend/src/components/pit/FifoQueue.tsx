@@ -31,19 +31,16 @@ export function FifoQueue() {
   const entryDriver = (e: FifoEntry | number): string =>
     typeof e === "object" && e ? (e.driverName || "") : "";
 
-  // Split queue into rows
+  // Split queue into rows (round-robin: idx % boxLines)
   const rows = useMemo(() => {
-    const result: (FifoEntry | number)[][] = [];
+    const result: (FifoEntry | number)[][] = Array.from({ length: boxLines }, () => []);
     const queue = fifo.queue.slice(0, boxKarts);
-    for (let r = 0; r < boxLines; r++) {
-      const start = r * kartsPerRow;
-      const end = Math.min(start + kartsPerRow, queue.length);
-      if (start < queue.length) {
-        result.push(queue.slice(start, end));
-      }
+    for (let idx = 0; idx < queue.length; idx++) {
+      const row = idx % boxLines;
+      result[row].push(queue[idx]);
     }
-    return result;
-  }, [fifo.queue, boxLines, boxKarts, kartsPerRow]);
+    return result.filter((r) => r.length > 0);
+  }, [fifo.queue, boxLines, boxKarts]);
 
   // Sort karts by avg for position calc
   const sorted = useMemo(() =>
