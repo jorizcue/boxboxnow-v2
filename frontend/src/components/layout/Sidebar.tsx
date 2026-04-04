@@ -101,8 +101,9 @@ let _analysisExpanded = true;
 export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarProps) {
   const t = useT();
   const raceStarted = useRaceStore((s) => s.raceStarted);
+  const raceFinished = useRaceStore((s) => s.raceFinished);
   const replayActive = useRaceStore((s) => s.replayActive);
-  const raceActive = raceStarted || replayActive;
+  const raceActive = (raceStarted && !raceFinished) || replayActive;
   const [collapsed, setCollapsed] = useState(_sidebarCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(_adminExpanded);
