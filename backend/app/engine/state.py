@@ -164,6 +164,8 @@ class RaceStateManager:
         # Session metadata (auto-detected from Apex signals)
         self.session_title: str = ""
         self.real_start_time: str = ""  # HH:MM from green flag com|| message
+        self.race_current_lap: int = 0  # Current lap in lap-based races
+        self.race_total_laps: int = 0   # Total laps in lap-based races
 
         # Config (loaded at runtime)
         self.circuit_length_m: int = 1100
@@ -199,6 +201,8 @@ class RaceStateManager:
         self.classification.clear()
         self._first_countdown_ms = 0
         self._needs_snapshot = False
+        self.race_current_lap = 0
+        self.race_total_laps = 0
 
     def update_duration(self, new_duration_min: int):
         """Update duration_min and recalculate stint_start_countdown_ms
@@ -516,6 +520,28 @@ class RaceStateManager:
                 self._trigger_race_start(trigger="count_up")
             return {"event": "countdown", "ms": self.countdown_ms}
 
+        elif event.type == EventType.LAP_COUNT:
+            # Lap-based races: "X/Y" (current lap / total laps)
+            parts = event.value.split("/")
+            current_lap = int(parts[0])
+            total_laps = int(parts[1])
+            self.race_current_lap = current_lap
+            self.race_total_laps = total_laps
+
+            if not self.race_started:
+                self._trigger_race_start(trigger="lap_count")
+
+            # Simulate countdown using elapsed wall time so stint timers work
+            if self.start_time > 0:
+                wall_elapsed_ms = int((time.time() - self.start_time) * 1000)
+                speed = getattr(self, '_replay_speed', 1.0)
+                elapsed_ms = int(wall_elapsed_ms * speed)
+                race_duration_ms = self.duration_min * 60 * 1000
+                self.countdown_ms = max(0, race_duration_ms - elapsed_ms)
+
+            return {"event": "countdown", "ms": self.countdown_ms,
+                    "lapCount": current_lap, "totalLaps": total_laps}
+
         elif event.type == EventType.LIGHT:
             light = event.value  # "lg"=green, "lr"=red, "lf"=finish
             logger.info(f"Light signal: {light}")
@@ -619,10 +645,14 @@ class RaceStateManager:
             logger.info(f"Auto-detected race duration from countdown: "
                         f"{self.countdown_ms}ms → {detected_min}min ({detected_ms}ms)")
         else:
-            # COUNT_UP or green light: use configured duration
+            # COUNT_UP, green light, or lap_count: use configured duration
             race_start_ms = self.duration_min * 60 * 1000
 
         self._race_start_ms = race_start_ms
+
+        # For lap-based races, set initial countdown to full duration
+        if trigger == "lap_count":
+            self.countdown_ms = race_start_ms
         # _first_countdown_ms tracks the ACTUAL first countdown value.
         # For green_light trigger, leave it at 0 so _recalibrate_from_countdown
         # fires when the real countdown arrives moments later.
@@ -710,6 +740,8 @@ class RaceStateManager:
                     "rain": self.rain_mode,
                 },
                 "durationMs": getattr(self, '_first_countdown_ms', 0) or self.duration_min * 60 * 1000,
+                "raceCurrentLap": self.race_current_lap,
+                "raceTotalLaps": self.race_total_laps,
             },
         }
 

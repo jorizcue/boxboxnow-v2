@@ -48,6 +48,7 @@ class EventType(Enum):
     SESSION_TITLE = "session_title"  # title2||...
     TRACK_INFO = "track_info"    # track||... (with circuit length)
     PRE_RACE_DURATION = "pre_race_duration"  # dyn1|text|HH:MM:SS
+    LAP_COUNT = "lap_count"          # dyn1|text|Vuelta X/Y (lap-based races)
 
 
 @dataclass
@@ -150,11 +151,15 @@ class ApexMessageParser:
         if line.startswith("msg||"):
             return [RaceEvent(type=EventType.MESSAGE, value=line[5:])]
 
-        # Pre-race duration: dyn1|text|HH:MM:SS or dyn1|text|
+        # Pre-race duration or lap count: dyn1|text|...
         if line.startswith("dyn1|text|"):
             text_val = line.split("|", 2)[2] if len(line.split("|")) > 2 else ""
             if text_val and re.match(r'^\d{1,2}:\d{2}:\d{2}$', text_val):
                 return [RaceEvent(type=EventType.PRE_RACE_DURATION, value=text_val)]
+            # Lap-based races: "Vuelta X/Y", "Lap X/Y", "Tour X/Y", "Giro X/Y" etc.
+            lap_match = re.match(r'^(?:Vuelta|Lap|Tour|Giro|Ronde)\s+(\d+)/(\d+)$', text_val, re.IGNORECASE)
+            if lap_match:
+                return [RaceEvent(type=EventType.LAP_COUNT, value=f"{lap_match.group(1)}/{lap_match.group(2)}")]
             return []
 
         # Track info, CSS, title, etc.

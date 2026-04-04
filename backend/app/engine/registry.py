@@ -540,6 +540,9 @@ class ReplaySession:
         from app.apex.replay import ReplayEngine
 
         async def on_events(events):
+            # Keep state aware of replay speed for lap-based race countdown simulation
+            self.state._replay_speed = getattr(self.engine, '_speed', 1.0)
+
             # Broadcast replay status (time + progress) to clients
             if self.state._ws_clients:
                 status = self.engine.status
