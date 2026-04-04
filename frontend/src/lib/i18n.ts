@@ -330,6 +330,13 @@ const translations: Record<string, Record<Language, string>> = {
   "analytics.circuitsCol": { es: "Circuitos", en: "Circuits", it: "Circuiti", de: "Strecken" },
   "analytics.racesShort": { es: "carreras", en: "races", it: "gare", de: "Rennen" },
   "analytics.lapsShort": { es: "vueltas", en: "laps", it: "giri", de: "Runden" },
+  "analytics.filterOutliers": { es: "Filtrar outliers (>10%)", en: "Filter outliers (>10%)", it: "Filtra outlier (>10%)", de: "Ausreißer filtern (>10%)" },
+  "analytics.best5Laps": { es: "Top 5 mejores vueltas", en: "Top 5 best laps", it: "Top 5 migliori giri", de: "Top 5 beste Runden" },
+  "analytics.date": { es: "Fecha", en: "Date", it: "Data", de: "Datum" },
+  "analytics.team": { es: "Equipo", en: "Team", it: "Squadra", de: "Team" },
+  "analytics.driver": { es: "Piloto", en: "Driver", it: "Pilota", de: "Fahrer" },
+  "analytics.time": { es: "Tiempo", en: "Time", it: "Tempo", de: "Zeit" },
+  "analytics.lapNum": { es: "Vuelta", en: "Lap", it: "Giro", de: "Runde" },
 
   // === Driver View ===
   "driver.title": { es: "Vista Piloto", en: "Driver View", it: "Vista Pilota", de: "Fahreransicht" },

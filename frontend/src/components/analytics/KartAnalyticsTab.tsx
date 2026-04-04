@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { api } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { CalendarPicker } from "@/components/shared/CalendarPicker";
@@ -21,6 +21,14 @@ interface KartStat {
   teams: string[];
 }
 
+interface BestLap {
+  lap_time_ms: number;
+  lap_number: number;
+  team_name: string;
+  driver_name: string;
+  race_date: string;
+}
+
 interface CircuitSummary {
   circuit: CircuitRow;
   races: number;
@@ -28,6 +36,9 @@ interface CircuitSummary {
   validLaps: number;
   stats: KartStat[];
 }
+
+type SortField = "best5_avg_ms" | "avg_lap_ms" | "best_lap_ms";
+type SortDir = "asc" | "desc";
 
 function msToLapTime(ms: number): string {
   if (ms <= 0) return "-";
@@ -51,6 +62,14 @@ export function KartAnalyticsTab() {
   const [summaries, setSummaries] = useState<CircuitSummary[]>([]);
   const [selectedCircuitId, setSelectedCircuitId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [filterOutliers, setFilterOutliers] = useState(true);
+  const [sortBy, setSortBy] = useState<SortField>("best5_avg_ms");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  // Best laps modal
+  const [modalKart, setModalKart] = useState<number | null>(null);
+  const [bestLaps, setBestLaps] = useState<BestLap[]>([]);
+  const [loadingBestLaps, setLoadingBestLaps] = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -60,7 +79,7 @@ export function KartAnalyticsTab() {
         circuits.map(async (circuit) => {
           try {
             const [stats, logs] = await Promise.all([
-              api.getKartStats(circuit.id, dateFrom, dateTo),
+              api.getKartStats(circuit.id, dateFrom, dateTo, filterOutliers),
               api.getRaceLogs(circuit.id, dateFrom, dateTo),
             ]);
             return {
@@ -78,7 +97,7 @@ export function KartAnalyticsTab() {
       setSummaries(results);
     } catch {}
     setLoading(false);
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, filterOutliers]);
 
   useEffect(() => {
     loadAll();
@@ -88,12 +107,32 @@ export function KartAnalyticsTab() {
     setSelectedCircuitId((prev) => (prev === id ? null : id));
   };
 
+  const handleSort = (field: SortField) => {
+    if (sortBy === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir("asc");
+    }
+  };
+
   const selected = summaries.find((s) => s.circuit.id === selectedCircuitId);
   const panelOpen = selected !== undefined && selected.stats.length > 0;
 
+  // Sorted stats
+  const sortedStats = useMemo(() => {
+    if (!selected) return [];
+    const copy = [...selected.stats];
+    copy.sort((a, b) => {
+      const diff = a[sortBy] - b[sortBy];
+      return sortDir === "asc" ? diff : -diff;
+    });
+    return copy;
+  }, [selected, sortBy, sortDir]);
+
   // Color scale for kart performance
-  const bestBest5 = selected && selected.stats.length > 0 ? Math.min(...selected.stats.map((s) => s.best5_avg_ms)) : 0;
-  const worstBest5 = selected && selected.stats.length > 0 ? Math.max(...selected.stats.map((s) => s.best5_avg_ms)) : 0;
+  const bestBest5 = sortedStats.length > 0 ? Math.min(...sortedStats.map((s) => s.best5_avg_ms)) : 0;
+  const worstBest5 = sortedStats.length > 0 ? Math.max(...sortedStats.map((s) => s.best5_avg_ms)) : 0;
   const range = worstBest5 - bestBest5;
 
   const getSpeedColor = (ms: number): string => {
@@ -104,6 +143,23 @@ export function KartAnalyticsTab() {
     if (pct < 0.65) return "text-white";
     if (pct < 0.85) return "text-orange-400";
     return "text-red-400";
+  };
+
+  const openBestLapsModal = async (kartNumber: number) => {
+    if (!selectedCircuitId) return;
+    setModalKart(kartNumber);
+    setLoadingBestLaps(true);
+    setBestLaps([]);
+    try {
+      const laps = await api.getKartBestLaps(selectedCircuitId, kartNumber, dateFrom, dateTo, filterOutliers);
+      setBestLaps(laps);
+    } catch {}
+    setLoadingBestLaps(false);
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortBy !== field) return <span className="ml-1 text-neutral-600">↕</span>;
+    return <span className="ml-1 text-accent">{sortDir === "asc" ? "↑" : "↓"}</span>;
   };
 
   const totalRaces = summaries.reduce((a, s) => a + s.races, 0);
@@ -123,6 +179,16 @@ export function KartAnalyticsTab() {
             <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("analytics.to")}</label>
             <CalendarPicker value={dateTo} onChange={setDateTo} placeholder={t("analytics.to")} />
           </div>
+          {/* Filter outliers checkbox */}
+          <label className="flex items-center gap-2 pb-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={filterOutliers}
+              onChange={(e) => setFilterOutliers(e.target.checked)}
+              className="w-3.5 h-3.5 rounded border-neutral-600 bg-transparent accent-accent"
+            />
+            <span className="text-[11px] text-neutral-400">{t("analytics.filterOutliers")}</span>
+          </label>
           {loading && (
             <span className="text-neutral-500 text-xs animate-pulse pb-2">{t("analytics.loading")}</span>
           )}
@@ -196,20 +262,39 @@ export function KartAnalyticsTab() {
                   <tr>
                     <th className="text-center px-2 py-1.5 w-8">#</th>
                     <th className="text-center px-2 py-1.5">{t("race.kart")}</th>
-                    <th className="text-right px-2 py-1.5">{t("analytics.top5Avg")}</th>
-                    <th className="text-right px-2 py-1.5">{t("analytics.generalAvg")}</th>
-                    <th className="text-right px-2 py-1.5">{t("analytics.bestLap")}</th>
+                    <th
+                      className="text-right px-2 py-1.5 cursor-pointer hover:text-accent transition-colors select-none"
+                      onClick={() => handleSort("best5_avg_ms")}
+                    >
+                      {t("analytics.top5Avg")}<SortIcon field="best5_avg_ms" />
+                    </th>
+                    <th
+                      className="text-right px-2 py-1.5 cursor-pointer hover:text-accent transition-colors select-none"
+                      onClick={() => handleSort("avg_lap_ms")}
+                    >
+                      {t("analytics.generalAvg")}<SortIcon field="avg_lap_ms" />
+                    </th>
+                    <th
+                      className="text-right px-2 py-1.5 cursor-pointer hover:text-accent transition-colors select-none"
+                      onClick={() => handleSort("best_lap_ms")}
+                    >
+                      {t("analytics.bestLap")}<SortIcon field="best_lap_ms" />
+                    </th>
                     <th className="text-right px-2 py-1.5">{t("analytics.races")}</th>
                     <th className="text-right px-2 py-1.5">{t("analytics.lapsCol")}</th>
                     <th className="text-left px-2 py-1.5">{t("analytics.teams")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {selected.stats.map((s, idx) => (
+                  {sortedStats.map((s, idx) => (
                     <tr key={s.kart_number} className="border-t border-border hover:bg-black/30 transition-colors">
                       <td className="px-2 py-1.5 text-center text-neutral-500 text-xs">{idx + 1}</td>
                       <td className="px-2 py-1.5 text-center font-bold text-white text-base">{s.kart_number}</td>
-                      <td className={`px-2 py-1.5 text-right font-mono font-semibold ${getSpeedColor(s.best5_avg_ms)}`}>
+                      <td
+                        className={`px-2 py-1.5 text-right font-mono font-semibold cursor-pointer hover:underline ${getSpeedColor(s.best5_avg_ms)}`}
+                        onClick={() => openBestLapsModal(s.kart_number)}
+                        title={t("analytics.best5Laps")}
+                      >
                         {msToLapTime(s.best5_avg_ms)}
                       </td>
                       <td className="px-2 py-1.5 text-right font-mono text-neutral-300">
@@ -229,7 +314,7 @@ export function KartAnalyticsTab() {
               </table>
             </div>
 
-            {selected.stats.length > 0 && (
+            {sortedStats.length > 0 && (
               <div className="mt-3 flex items-center gap-4 text-[10px]">
                 <span className="text-green-400">{t("analytics.fast")}</span>
                 <span className="text-accent">{t("analytics.goodPace")}</span>
@@ -252,6 +337,55 @@ export function KartAnalyticsTab() {
           </div>
         )}
       </div>
+
+      {/* Best 5 Laps Modal */}
+      {modalKart !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setModalKart(null)}>
+          <div className="bg-[#1a1a2e] border border-border rounded-xl shadow-xl p-6 w-[480px] max-w-[90vw] animate-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
+                {t("analytics.best5Laps")} — Kart {modalKart}
+              </h3>
+              <button onClick={() => setModalKart(null)} className="text-neutral-500 hover:text-white text-lg leading-none transition-colors">&times;</button>
+            </div>
+
+            {loadingBestLaps ? (
+              <p className="text-neutral-500 text-xs animate-pulse py-4 text-center">{t("analytics.loading")}</p>
+            ) : bestLaps.length === 0 ? (
+              <p className="text-neutral-500 text-xs py-4 text-center">{t("analytics.noData")}</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="text-[10px] text-neutral-400 uppercase tracking-wider">
+                  <tr>
+                    <th className="text-center px-2 py-1.5 w-8">#</th>
+                    <th className="text-right px-2 py-1.5">{t("analytics.time")}</th>
+                    <th className="text-right px-2 py-1.5">{t("analytics.lapNum")}</th>
+                    <th className="text-left px-2 py-1.5">{t("analytics.team")}</th>
+                    <th className="text-left px-2 py-1.5">{t("analytics.driver")}</th>
+                    <th className="text-left px-2 py-1.5">{t("analytics.date")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bestLaps.map((lap, idx) => (
+                    <tr key={idx} className="border-t border-border">
+                      <td className="px-2 py-1.5 text-center text-neutral-500 text-xs">{idx + 1}</td>
+                      <td className="px-2 py-1.5 text-right font-mono font-semibold text-green-400">
+                        {msToLapTime(lap.lap_time_ms)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right text-neutral-400">{lap.lap_number}</td>
+                      <td className="px-2 py-1.5 text-left text-neutral-300 text-xs truncate max-w-[120px]">{lap.team_name || "-"}</td>
+                      <td className="px-2 py-1.5 text-left text-neutral-300 text-xs truncate max-w-[120px]">{lap.driver_name || "-"}</td>
+                      <td className="px-2 py-1.5 text-left text-neutral-500 text-xs">
+                        {lap.race_date ? new Date(lap.race_date).toLocaleDateString() : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

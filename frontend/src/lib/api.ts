@@ -196,11 +196,19 @@ export const api = {
 
   // Analytics
   getAnalyticsCircuits: () => fetchApi<any[]>("/api/analytics/circuits"),
-  getKartStats: (circuitId: number, dateFrom?: string, dateTo?: string) => {
+  getKartStats: (circuitId: number, dateFrom?: string, dateTo?: string, filterOutliers: boolean = true) => {
     const params = new URLSearchParams({ circuit_id: String(circuitId) });
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
+    params.set("filter_outliers", String(filterOutliers));
     return fetchApi<any[]>(`/api/analytics/kart-stats?${params}`);
+  },
+  getKartBestLaps: (circuitId: number, kartNumber: number, dateFrom?: string, dateTo?: string, filterOutliers: boolean = true) => {
+    const params = new URLSearchParams({ circuit_id: String(circuitId), kart_number: String(kartNumber) });
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    params.set("filter_outliers", String(filterOutliers));
+    return fetchApi<any[]>(`/api/analytics/kart-best-laps?${params}`);
   },
   getRaceLogs: (circuitId: number, dateFrom?: string, dateTo?: string) => {
     const params = new URLSearchParams({ circuit_id: String(circuitId) });
