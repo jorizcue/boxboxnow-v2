@@ -123,15 +123,23 @@ async def get_kart_stats(
         if not valid:
             continue
 
-        sorted_valid = sorted(valid)
+        # Filter outliers: remove laps >10% away from the mean
+        # (rain, spins, off-tracks, safety cars, etc.)
+        raw_mean = sum(valid) / len(valid)
+        threshold = raw_mean * 0.10
+        filtered = [t for t in valid if abs(t - raw_mean) <= threshold]
+        if not filtered:
+            filtered = valid  # fallback if everything got filtered
+
+        sorted_valid = sorted(filtered)
         best5 = sorted_valid[:5]
 
         stats.append(KartStatsOut(
             kart_number=kart_number,
             races=len(d["race_ids"]),
             total_laps=len(all_l),
-            valid_laps=len(valid),
-            avg_lap_ms=sum(valid) / len(valid),
+            valid_laps=len(filtered),
+            avg_lap_ms=sum(filtered) / len(filtered),
             best5_avg_ms=sum(best5) / len(best5),
             best_lap_ms=sorted_valid[0],
             teams=sorted(d["teams"]),
