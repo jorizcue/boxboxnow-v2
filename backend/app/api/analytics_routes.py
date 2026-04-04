@@ -58,28 +58,15 @@ async def list_analytics_circuits(
     return result.scalars().all()
 
 
-@router.get("/kart-stats", response_model=list[KartStatsOut])
-async def get_kart_stats(
-    circuit_id: int,
-    date_from: str | None = Query(None, description="ISO date YYYY-MM-DD"),
-    date_to: str | None = Query(None, description="ISO date YYYY-MM-DD"),
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get aggregated kart performance stats for a circuit within a date range."""
-    await _check_circuit_access(user, circuit_id, db)
-    # Default: last 7 days
+def _parse_date_range(date_from: str | None, date_to: str | None):
+    """Parse date range params, defaulting to last 7 days."""
     now = datetime.now(timezone.utc)
-    if date_from:
-        dt_from = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc)
-    else:
-        dt_from = now - timedelta(days=7)
-    if date_to:
-        dt_to = datetime.fromisoformat(date_to).replace(tzinfo=timezone.utc, hour=23, minute=59, second=59)
-    else:
-        dt_to = now
+    dt_from = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc) if date_from else now - timedelta(days=7)
+    dt_to = datetime.fromisoformat(date_to).replace(tzinfo=timezone.utc, hour=23, minute=59, second=59) if date_to else now
+    return dt_from, dt_to
 
-    # Get race_log ids in range for this circuit
+
+async def _get_race_log_ids(db: AsyncSession, circuit_id: int, dt_from, dt_to) -> list[int]:
     result = await db.execute(
         select(RaceLog.id).where(
             RaceLog.circuit_id == circuit_id,
@@ -87,7 +74,22 @@ async def get_kart_stats(
             RaceLog.race_date <= dt_to,
         )
     )
-    race_log_ids = [r[0] for r in result.all()]
+    return [r[0] for r in result.all()]
+
+
+@router.get("/kart-stats", response_model=list[KartStatsOut])
+async def get_kart_stats(
+    circuit_id: int,
+    date_from: str | None = Query(None, description="ISO date YYYY-MM-DD"),
+    date_to: str | None = Query(None, description="ISO date YYYY-MM-DD"),
+    filter_outliers: bool = Query(True, description="Filter laps >10% from mean"),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get aggregated kart performance stats for a circuit within a date range."""
+    await _check_circuit_access(user, circuit_id, db)
+    dt_from, dt_to = _parse_date_range(date_from, date_to)
+    race_log_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)
 
     if not race_log_ids:
         return []
@@ -123,13 +125,15 @@ async def get_kart_stats(
         if not valid:
             continue
 
-        # Filter outliers: remove laps >10% away from the mean
-        # (rain, spins, off-tracks, safety cars, etc.)
-        raw_mean = sum(valid) / len(valid)
-        threshold = raw_mean * 0.10
-        filtered = [t for t in valid if abs(t - raw_mean) <= threshold]
-        if not filtered:
-            filtered = valid  # fallback if everything got filtered
+        if filter_outliers:
+            # Filter outliers: remove laps >10% away from the mean
+            raw_mean = sum(valid) / len(valid)
+            threshold = raw_mean * 0.10
+            filtered = [t for t in valid if abs(t - raw_mean) <= threshold]
+            if not filtered:
+                filtered = valid  # fallback
+        else:
+            filtered = valid
 
         sorted_valid = sorted(filtered)
         best5 = sorted_valid[:5]
@@ -148,6 +152,65 @@ async def get_kart_stats(
     # Sort by best5_avg_ms (fastest first)
     stats.sort(key=lambda s: s.best5_avg_ms)
     return stats
+
+
+@router.get("/kart-best-laps")
+async def get_kart_best_laps(
+    circuit_id: int,
+    kart_number: int,
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    filter_outliers: bool = Query(True),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the 5 best laps for a specific kart with race date, team, driver."""
+    await _check_circuit_access(user, circuit_id, db)
+    dt_from, dt_to = _parse_date_range(date_from, date_to)
+    race_log_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)
+
+    if not race_log_ids:
+        return []
+
+    # Fetch laps with race_log date
+    result = await db.execute(
+        select(KartLap, RaceLog.race_date).join(
+            RaceLog, KartLap.race_log_id == RaceLog.id
+        ).where(
+            KartLap.race_log_id.in_(race_log_ids),
+            KartLap.kart_number == kart_number,
+            KartLap.is_valid == True,
+        )
+    )
+    rows = result.all()
+
+    if not rows:
+        return []
+
+    laps = [(lap, race_date) for lap, race_date in rows]
+
+    if filter_outliers:
+        times = [lap.lap_time_ms for lap, _ in laps]
+        raw_mean = sum(times) / len(times)
+        threshold = raw_mean * 0.10
+        laps = [(lap, rd) for lap, rd in laps if abs(lap.lap_time_ms - raw_mean) <= threshold]
+        if not laps:
+            laps = [(lap, race_date) for lap, race_date in rows]  # fallback
+
+    # Sort by lap time, take best 5
+    laps.sort(key=lambda x: x[0].lap_time_ms)
+    best5 = laps[:5]
+
+    return [
+        {
+            "lap_time_ms": lap.lap_time_ms,
+            "lap_number": lap.lap_number,
+            "team_name": lap.team_name or "",
+            "driver_name": lap.driver_name or "",
+            "race_date": rd.isoformat() if rd else "",
+        }
+        for lap, rd in best5
+    ]
 
 
 @router.get("/race-logs", response_model=list[RaceLogOut])
