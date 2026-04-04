@@ -27,6 +27,7 @@ interface BestLap {
   team_name: string;
   driver_name: string;
   race_date: string;
+  recorded_at: string;
 }
 
 interface CircuitSummary {
@@ -375,8 +376,12 @@ export function KartAnalyticsTab() {
                       <td className="px-2 py-1.5 text-right text-neutral-400">{lap.lap_number}</td>
                       <td className="px-2 py-1.5 text-left text-neutral-300 text-xs truncate max-w-[120px]">{lap.team_name || "-"}</td>
                       <td className="px-2 py-1.5 text-left text-neutral-300 text-xs truncate max-w-[120px]">{lap.driver_name || "-"}</td>
-                      <td className="px-2 py-1.5 text-left text-neutral-500 text-xs">
-                        {lap.race_date ? new Date(lap.race_date).toLocaleDateString() : "-"}
+                      <td className="px-2 py-1.5 text-left text-neutral-500 text-xs whitespace-nowrap">
+                        {lap.recorded_at
+                          ? new Date(lap.recorded_at).toLocaleString(undefined, { dateStyle: "short", timeStyle: "medium" })
+                          : lap.race_date
+                            ? new Date(lap.race_date).toLocaleDateString()
+                            : "-"}
                       </td>
                     </tr>
                   ))}

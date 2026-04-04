@@ -170,6 +170,7 @@ class KartLap(Base):
     lap_number = Column(Integer, nullable=False)
     lap_time_ms = Column(Integer, nullable=False)
     is_valid = Column(Boolean, default=True)
+    recorded_at = Column(DateTime, nullable=True)  # exact time this lap was recorded
 
     race_log = relationship("RaceLog", back_populates="laps")
 

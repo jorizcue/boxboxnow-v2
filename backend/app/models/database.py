@@ -69,6 +69,12 @@ async def init_db():
         except Exception:
             pass
 
+        # Add recorded_at to kart_laps
+        try:
+            await conn.execute(text("ALTER TABLE kart_laps ADD COLUMN recorded_at DATETIME"))
+        except Exception:
+            pass
+
         # Seed default app settings
         await conn.execute(text("""
             INSERT OR IGNORE INTO app_settings (key, value) VALUES ('kart_analytics_retention_days', '30')

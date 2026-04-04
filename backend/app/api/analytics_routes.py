@@ -208,6 +208,7 @@ async def get_kart_best_laps(
             "team_name": lap.team_name or "",
             "driver_name": lap.driver_name or "",
             "race_date": rd.isoformat() if rd else "",
+            "recorded_at": lap.recorded_at.isoformat() if lap.recorded_at else "",
         }
         for lap, rd in best5
     ]

@@ -184,6 +184,7 @@ class UserSession:
                                 lap_number=lap["totalLap"],
                                 lap_time_ms=lap["lapTime"],
                                 is_valid=(lap["totalLap"], lap["lapTime"]) in valid_set,
+                                recorded_at=datetime.now(timezone.utc),
                             )
                             db.add(kart_lap)
                             new_count += 1
@@ -256,6 +257,7 @@ class UserSession:
                         lap_number=lap["totalLap"],
                         lap_time_ms=lap["lapTime"],
                         is_valid=(lap["totalLap"], lap["lapTime"]) in valid_lap_set,
+                        recorded_at=datetime.now(timezone.utc),
                     )
                     db.add(kart_lap)
 
