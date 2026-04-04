@@ -26,6 +26,7 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   const apexConnected = useRaceStore((s) => s.apexConnected);
   const apexStatusMsg = useRaceStore((s) => s.apexStatusMsg);
   const raceStarted = useRaceStore((s) => s.raceStarted);
+  const raceFinished = useRaceStore((s) => s.raceFinished);
   const durationMs = useRaceStore((s) => s.durationMs);
   const pitClosedStartMin = useRaceStore((s) => s.config.pitClosedStartMin);
   const pitClosedEndMin = useRaceStore((s) => s.config.pitClosedEndMin);
@@ -226,10 +227,14 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
                 {raceStartTime}
               </span>
             )}
-            <span className="text-base font-bold tabular-nums text-white">
-              {timerDisplay}
-            </span>
-            {hasPitWindow && (
+            {raceFinished ? (
+              <span className="text-base font-bold text-white">🏁</span>
+            ) : (
+              <span className="text-base font-bold tabular-nums text-white">
+                {timerDisplay}
+              </span>
+            )}
+            {hasPitWindow && !raceFinished && (
               <span
                 className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                   pitIsClosed
@@ -298,7 +303,7 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
             {trackName || t("status.noCircuit")}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
-            {hasPitWindow && (
+            {hasPitWindow && !raceFinished && (
               <span
                 className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
                   pitIsClosed
@@ -314,9 +319,13 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
                 {raceStartTime}
               </span>
             )}
-            <span className="text-sm font-bold tabular-nums text-white">
-              {timerDisplay}
-            </span>
+            {raceFinished ? (
+              <span className="text-sm font-bold text-white">🏁</span>
+            ) : (
+              <span className="text-sm font-bold tabular-nums text-white">
+                {timerDisplay}
+              </span>
+            )}
           </div>
         </div>
 
