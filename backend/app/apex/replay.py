@@ -79,10 +79,19 @@ class ReplayEngine:
 
         race_starts = []
         seen_titles = set()  # Deduplicate init blocks from reconnections
+        current_title2 = ""
+        race_finished = True  # Start true so first title2 change can be detected
+
         for i, (timestamp, message) in enumerate(blocks):
-            # Detect init blocks (new race session)
+            # Extract title2 from every block to detect mid-session race changes
+            block_title2 = None
+            for line in message.split("\n"):
+                if line.startswith("title2||"):
+                    block_title2 = line[8:].strip()
+                    break
+
+            # Detect init blocks (new race session from WS connect/reconnect)
             if "grid||" in message and "init|" in message:
-                # Extract title1 and title2
                 title1 = ""
                 title2 = ""
                 has_countdown = False
@@ -95,22 +104,19 @@ class ReplayEngine:
                     elif line.startswith("dyn1|countdown|") or line.startswith("dyn1|count|"):
                         has_countdown = True
 
-                # Build combined title
                 parts = [p for p in (title1, title2) if p]
                 title = " - ".join(parts) if parts else ""
 
-                # If init block itself has a chequered flag, race already ended — skip
                 if has_chequered and not has_countdown:
-                    # New race ended => clear seen titles so next race with same name is detected
                     seen_titles.discard(title)
+                    current_title2 = title2
+                    race_finished = True
                     continue
 
-                # Skip duplicate init blocks (reconnections during same race)
                 if title in seen_titles:
                     continue
 
                 if has_countdown:
-                    # Init with countdown = race already running
                     race_starts.append({
                         "block": i,
                         "progress": i / total,
@@ -118,13 +124,12 @@ class ReplayEngine:
                         "title": title,
                     })
                     seen_titles.add(title)
+                    race_finished = False
                 else:
-                    # Init without countdown = find the first countdown after
-                    # But if a chequered flag appears first, race ended — skip
                     for j in range(i + 1, min(i + 200, len(blocks))):
                         block_msg = blocks[j][1]
                         if 'data-flag="chequered"' in block_msg:
-                            break  # Race ended, no start to mark
+                            break
                         if "dyn1|countdown|" in block_msg or "dyn1|count|" in block_msg:
                             race_starts.append({
                                 "block": j,
@@ -133,14 +138,59 @@ class ReplayEngine:
                                 "title": title,
                             })
                             seen_titles.add(title)
+                            race_finished = False
                             break
 
-                # If a chequered flag comes later, clear this title so it can appear again
-                # (handled by checking chequered blocks separately)
+                current_title2 = title2
 
             elif 'data-flag="chequered"' in message:
-                # Race finished — allow same title to appear again for a new race
                 seen_titles.clear()
+                race_finished = True
+
+            # Detect mid-session race starts via title2 change after a chequered flag
+            elif block_title2 is not None and block_title2 != current_title2 and race_finished:
+                # title2 changed after a race ended — new race starting without init block
+                # Look for a countdown in this or nearby blocks to confirm
+                title1_here = ""
+                for line in message.split("\n"):
+                    if line.startswith("title1||"):
+                        title1_here = line[8:].strip()
+                        break
+                parts = [p for p in (title1_here, block_title2) if p]
+                title = " - ".join(parts) if parts else block_title2
+
+                if title not in seen_titles:
+                    # Find the first countdown from this block onward
+                    start_block_idx = i
+                    if "dyn1|countdown|" in message or "dyn1|count|" in message:
+                        start_block_idx = i
+                    else:
+                        for j in range(i + 1, min(i + 200, len(blocks))):
+                            block_msg = blocks[j][1]
+                            if 'data-flag="chequered"' in block_msg:
+                                start_block_idx = None
+                                break
+                            if "dyn1|countdown|" in block_msg or "dyn1|count|" in block_msg:
+                                start_block_idx = j
+                                break
+                        else:
+                            # No countdown found, use this block as start
+                            start_block_idx = i
+
+                    if start_block_idx is not None:
+                        race_starts.append({
+                            "block": start_block_idx,
+                            "progress": start_block_idx / total,
+                            "timestamp": blocks[start_block_idx][0].strftime("%H:%M:%S"),
+                            "title": title,
+                        })
+                        seen_titles.add(title)
+                        race_finished = False
+
+                current_title2 = block_title2
+
+            elif block_title2 is not None:
+                current_title2 = block_title2
 
         return {
             "totalBlocks": total,
