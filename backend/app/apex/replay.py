@@ -150,7 +150,6 @@ class ReplayEngine:
             # Detect mid-session race starts via title2 change after a chequered flag
             elif block_title2 is not None and block_title2 != current_title2 and race_finished:
                 # title2 changed after a race ended — new race starting without init block
-                # Look for a countdown in this or nearby blocks to confirm
                 title1_here = ""
                 for line in message.split("\n"):
                     if line.startswith("title1||"):
@@ -160,32 +159,15 @@ class ReplayEngine:
                 title = " - ".join(parts) if parts else block_title2
 
                 if title not in seen_titles:
-                    # Find the first countdown from this block onward
-                    start_block_idx = i
-                    if "dyn1|countdown|" in message or "dyn1|count|" in message:
-                        start_block_idx = i
-                    else:
-                        for j in range(i + 1, min(i + 200, len(blocks))):
-                            block_msg = blocks[j][1]
-                            if 'data-flag="chequered"' in block_msg:
-                                start_block_idx = None
-                                break
-                            if "dyn1|countdown|" in block_msg or "dyn1|count|" in block_msg:
-                                start_block_idx = j
-                                break
-                        else:
-                            # No countdown found, use this block as start
-                            start_block_idx = i
-
-                    if start_block_idx is not None:
-                        race_starts.append({
-                            "block": start_block_idx,
-                            "progress": start_block_idx / total,
-                            "timestamp": blocks[start_block_idx][0].strftime("%H:%M:%S"),
-                            "title": title,
-                        })
-                        seen_titles.add(title)
-                        race_finished = False
+                    # Use this block as race start; some races have no countdown at all
+                    race_starts.append({
+                        "block": i,
+                        "progress": i / total,
+                        "timestamp": timestamp.strftime("%H:%M:%S"),
+                        "title": title,
+                    })
+                    seen_titles.add(title)
+                    race_finished = False
 
                 current_title2 = block_title2
 
