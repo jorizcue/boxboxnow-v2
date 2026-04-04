@@ -171,6 +171,8 @@ class ReplayEngine:
 
                 current_title2 = block_title2
 
+                current_title2 = block_title2
+
             elif block_title2 is not None:
                 current_title2 = block_title2
 
