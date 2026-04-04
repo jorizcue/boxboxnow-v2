@@ -126,6 +126,8 @@ class ReplayEngine:
                     seen_titles.add(title)
                     race_finished = False
                 else:
+                    # Init without countdown: look for first countdown nearby
+                    found_start = False
                     for j in range(i + 1, min(i + 200, len(blocks))):
                         block_msg = blocks[j][1]
                         if 'data-flag="chequered"' in block_msg:
@@ -139,7 +141,19 @@ class ReplayEngine:
                             })
                             seen_titles.add(title)
                             race_finished = False
+                            found_start = True
                             break
+
+                    if not found_start:
+                        # No countdown found — race starts without countdown (e.g. heats/finals)
+                        race_starts.append({
+                            "block": i,
+                            "progress": i / total,
+                            "timestamp": timestamp.strftime("%H:%M:%S"),
+                            "title": title,
+                        })
+                        seen_titles.add(title)
+                        race_finished = False
 
                 current_title2 = title2
 
