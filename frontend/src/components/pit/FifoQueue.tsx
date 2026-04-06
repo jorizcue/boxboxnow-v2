@@ -24,9 +24,8 @@ export function FifoQueue() {
   const boxLines = config.boxLines || 2;
   const boxKarts = config.boxKarts || 4;
 
-  // Build a set of kart numbers that have been in pit > 15 min (frozen)
-  // Use config.durationMin to match backend's race_time_ms = duration_min*60*1000 - countdown_ms
-  // Don't require pitStatus === "in_pit" — rely on pitHistory (pitTimeMs===0 = never exited)
+  // Build a set of kart numbers whose last pit entry was > 15 min ago
+  // Shows snowflake on FIFO cards for karts that entered pit a long time ago
   const frozenKarts = useMemo(() => {
     const raceElapsedMs = config.durationMin * 60 * 1000 - raceClockMs;
     if (raceElapsedMs <= 0) return new Set<number>();
@@ -35,10 +34,9 @@ export function FifoQueue() {
       const history = kart.pitHistory;
       if (history.length === 0) continue;
       const last = history[history.length - 1];
-      // pitTimeMs === 0 means kart entered pit but never exited
-      if (last.pitTimeMs === 0 && last.raceTimeMs > 0) {
-        const pitSec = (raceElapsedMs - last.raceTimeMs) / 1000;
-        if (pitSec > 15 * 60) frozen.add(kart.kartNumber);
+      if (last.raceTimeMs > 0) {
+        const sinceEntryMin = (raceElapsedMs - last.raceTimeMs) / 1000 / 60;
+        if (sinceEntryMin > 15) frozen.add(kart.kartNumber);
       }
     }
     return frozen;
