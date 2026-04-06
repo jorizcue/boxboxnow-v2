@@ -302,13 +302,11 @@ class RaceStateManager:
         # Accumulate stint elapsed time
         kart.stint_elapsed_ms += lap_ms
 
-        lap_evt = {"event": "lap", "rowId": row_id,
+        return {"event": "lap", "rowId": row_id,
                 "kartNumber": kart.kart_number,
                 "lapTimeMs": lap_ms,
                 "lapClass": lap_class,
                 "totalLaps": kart.total_laps}
-        logger.info(f"LAP kart={kart.kart_number} totalLaps={kart.total_laps} lapMs={lap_ms}")
-        return lap_evt
 
     def _apply_event(self, event: RaceEvent) -> dict | None:
         """Apply a single event to state. Returns update dict for broadcast."""
@@ -499,7 +497,10 @@ class RaceStateManager:
                     result = self._record_lap(kart, row_id, kart.last_lap_ms, "tn")
 
             kart.apex_total_laps = new_total
-            return result
+            # Always send the Apex total_laps value to frontend so the column
+            # updates even if the LAP event hasn't arrived yet in this block.
+            return result or {"event": "totalLaps", "rowId": row_id,
+                              "value": new_total}
 
         elif event.type == EventType.PIT_TIME and kart:
             kart.pit_time = event.value
