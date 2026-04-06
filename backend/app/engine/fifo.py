@@ -55,8 +55,12 @@ class FifoManager:
         self.fifo = deque(new_queue, maxlen=queue_size)
         # Keep _next_line and _history intact so history is preserved
 
-    def reset(self):
+    def reset(self, queue_size: int | None = None, box_lines: int | None = None):
         """Full reset — used when starting a new replay or new race."""
+        if queue_size is not None:
+            self.queue_size = queue_size
+        if box_lines is not None:
+            self.box_lines = box_lines
         self.fifo = deque(
             [_default_entry() for _ in range(self.queue_size)], maxlen=self.queue_size
         )
