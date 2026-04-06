@@ -302,11 +302,13 @@ class RaceStateManager:
         # Accumulate stint elapsed time
         kart.stint_elapsed_ms += lap_ms
 
-        return {"event": "lap", "rowId": row_id,
+        lap_evt = {"event": "lap", "rowId": row_id,
                 "kartNumber": kart.kart_number,
                 "lapTimeMs": lap_ms,
                 "lapClass": lap_class,
                 "totalLaps": kart.total_laps}
+        logger.debug(f"LAP kart={kart.kart_number} totalLaps={kart.total_laps} lapMs={lap_ms}")
+        return lap_evt
 
     def _apply_event(self, event: RaceEvent) -> dict | None:
         """Apply a single event to state. Returns update dict for broadcast."""
