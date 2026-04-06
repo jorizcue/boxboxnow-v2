@@ -420,6 +420,7 @@ export function FifoQueue() {
               <thead className="text-neutral-400 text-[11px] uppercase tracking-wider">
                 <tr>
                   <th className="px-2 py-1 text-left">#</th>
+                  <th className="px-2 py-1 text-center">{t("pit.time")}</th>
                   <th className="px-2 py-1 text-right">Score</th>
                   <th className="px-2 py-1 text-left">{t("pit.queue")}</th>
                 </tr>
@@ -428,6 +429,11 @@ export function FifoQueue() {
                 {[...fifo.history].reverse().slice(0, 15).map((snap, i) => (
                   <tr key={i} className="border-t border-border">
                     <td className="px-2 py-1 text-neutral-400">{fifo.history.length - i}</td>
+                    <td className="px-2 py-1 text-center font-mono text-neutral-500 text-[11px]">
+                      {snap.timestamp > 0
+                        ? new Date(snap.timestamp * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+                        : "-"}
+                    </td>
                     <td className="px-2 py-1 text-right font-mono font-bold">
                       <span style={{ color: tierHex(snap.score) }}>
                         {snap.score.toFixed(1)}

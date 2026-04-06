@@ -308,10 +308,29 @@ export function RaceTable() {
                       </span>
                     </td>
                     <td className="px-2 py-1.5 text-center">
-                      <span
-                        className={`pit-indicator ${kart.pitStatus}`}
-                        title={kart.pitStatus === "in_pit" ? t("race.inPit") : t("race.onTrack")}
-                      />
+                      {(() => {
+                        if (kart.pitStatus !== "in_pit") {
+                          return (
+                            <span
+                              className="pit-indicator racing"
+                              title={t("race.onTrack")}
+                            />
+                          );
+                        }
+                        // Check if kart has been in pit > 15 min
+                        const raceElapsedMs = durationMs > 0 ? Math.max(0, durationMs - raceClockMs) : 0;
+                        const lastPit = kart.pitHistory.length > 0 ? kart.pitHistory[kart.pitHistory.length - 1] : null;
+                        const pitInSec = lastPit && lastPit.pitTimeMs === 0 && lastPit.raceTimeMs > 0
+                          ? (raceElapsedMs - lastPit.raceTimeMs) / 1000
+                          : 0;
+                        const frozen = pitInSec > 15 * 60;
+                        return (
+                          <span title={t("race.inPit")}>
+                            <span className="pit-indicator in_pit" />
+                            {frozen && <span className="ml-0.5 text-[11px]" title={`>${Math.round(pitInSec / 60)}min in pit`}>&#10052;</span>}
+                          </span>
+                        );
+                      })()}
                     </td>
                   </tr>
 

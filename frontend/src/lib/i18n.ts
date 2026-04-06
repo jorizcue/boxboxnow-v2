@@ -128,6 +128,7 @@ const translations: Record<string, Record<Language, string>> = {
   "pit.minPitCount": { es: "Numero minimo de pits", en: "Min pit count", it: "Numero minimo di pit", de: "Min Pit-Anzahl" },
   "pit.avgFutureStint": { es: "Media stint futuro", en: "Avg future stint", it: "Media stint futuro", de: "Durchschn. Stint" },
   "pit.history": { es: "Historial de entradas en box", en: "Pit entry history", it: "Storico ingressi ai box", de: "Boxen-Einfahrts-Historie" },
+  "pit.time": { es: "Hora", en: "Time", it: "Ora", de: "Zeit" },
   "pit.queue": { es: "Cola", en: "Queue", it: "Coda", de: "Warteschlange" },
   "pit.recentLaps": { es: "Últimas vueltas", en: "Recent laps", it: "Ultimi giri", de: "Letzte Runden" },
   "pit.lapNumber": { es: "Vuelta", en: "Lap", it: "Giro", de: "Runde" },
