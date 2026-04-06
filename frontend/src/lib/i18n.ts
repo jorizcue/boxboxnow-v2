@@ -298,6 +298,8 @@ const translations: Record<string, Record<Language, string>> = {
   "replay.noRecordings": { es: "No hay grabaciones disponibles", en: "No recordings available", it: "Nessuna registrazione disponibile", de: "Keine Aufnahmen verfugbar" },
   "replay.noDaysInRange": { es: "No hay grabaciones en el rango seleccionado", en: "No recordings in the selected range", it: "Nessuna registrazione nell'intervallo selezionato", de: "Keine Aufnahmen im ausgewahlten Zeitraum" },
   "replay.noData": { es: "Sin datos", en: "No data", it: "Nessun dato", de: "Keine Daten" },
+  "replay.play": { es: "Reproducir", en: "Play", it: "Riproduci", de: "Abspielen" },
+  "replay.download": { es: "Descargar", en: "Download", it: "Scarica", de: "Herunterladen" },
 
   // === Admin: Kart Analytics ===
   "analytics.title": { es: "Analisis de Karts por Circuito", en: "Kart Analysis by Circuit", it: "Analisi Kart per Circuito", de: "Kart-Analyse nach Strecke" },

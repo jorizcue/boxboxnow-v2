@@ -23,6 +23,14 @@ interface LogAnalysis {
   endTime: string | null;
 }
 
+interface SessionModalData {
+  raceStart: RaceStartMarker;
+  raceStartIdx: number;
+  dayFilename: string;
+  allStarts: RaceStartMarker[];
+  totalBlocks: number;
+}
+
 interface RecordingCircuit {
   circuit_dir: string;
   circuit_name: string;
@@ -51,6 +59,8 @@ export function ReplayTab() {
   const [dayAnalyses, setDayAnalyses] = useState<DayAnalysis[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [sessionModal, setSessionModal] = useState<SessionModalData | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const {
     requestWsReconnect,
@@ -308,8 +318,14 @@ export function ReplayTab() {
                               onClick={() => {
                                 if (replayActive) {
                                   handleSeek(rs.block);
-                                } else if (selectedCircuitDir) {
-                                  startFromBlock(day.filename, selectedCircuitDir, rs.block);
+                                } else {
+                                  setSessionModal({
+                                    raceStart: rs,
+                                    raceStartIdx: idx,
+                                    dayFilename: day.filename,
+                                    allStarts: day.analysis!.raceStarts,
+                                    totalBlocks: day.analysis!.totalBlocks,
+                                  });
                                 }
                               }}
                               disabled={actionLoading}
@@ -338,6 +354,94 @@ export function ReplayTab() {
           </div>
         )}
       </div>
+      {/* Session action modal */}
+      {sessionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSessionModal(null)}>
+          <div className="bg-[#1a1a1a] border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <h3 className="text-base font-semibold text-white">
+                  {sessionModal.raceStart.title || `${t("replay.raceN")} ${sessionModal.raceStartIdx + 1}`}
+                </h3>
+                <p className="text-xs text-neutral-400 mt-1">
+                  {sessionModal.raceStart.timestamp}
+                </p>
+              </div>
+              <button
+                onClick={() => setSessionModal(null)}
+                className="text-neutral-500 hover:text-white text-xl leading-none transition-colors -mt-1"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Buttons */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Play button */}
+              <button
+                onClick={() => {
+                  const sm = sessionModal;
+                  setSessionModal(null);
+                  if (selectedCircuitDir) {
+                    startFromBlock(sm.dayFilename, selectedCircuitDir, sm.raceStart.block);
+                  }
+                }}
+                disabled={actionLoading || !selectedCircuitDir}
+                className="flex flex-col items-center justify-center gap-2 py-6 rounded-xl bg-green-900/30 hover:bg-green-900/50 border border-green-800/40 hover:border-green-600/50 text-green-400 transition-all disabled:opacity-40"
+              >
+                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                <span className="text-sm font-semibold">{t("replay.play")}</span>
+              </button>
+
+              {/* Download button */}
+              <button
+                onClick={async () => {
+                  if (!selectedCircuitDir || !sessionModal) return;
+                  setDownloading(true);
+                  try {
+                    const sm = sessionModal;
+                    const startBlock = sm.raceStart.block;
+                    // End at next session start or end of file
+                    const nextIdx = sm.raceStartIdx + 1;
+                    const endBlock = nextIdx < sm.allStarts.length
+                      ? sm.allStarts[nextIdx].block
+                      : sm.totalBlocks;
+
+                    await api.downloadSession(
+                      sm.dayFilename,
+                      startBlock,
+                      endBlock,
+                      selectedCircuitDir,
+                      sm.raceStart.title || `${t("replay.raceN")}_${sm.raceStartIdx + 1}`,
+                    );
+                  } catch (e: any) {
+                    alert("Error: " + e.message);
+                  }
+                  setDownloading(false);
+                  setSessionModal(null);
+                }}
+                disabled={downloading || !selectedCircuitDir}
+                className="flex flex-col items-center justify-center gap-2 py-6 rounded-xl bg-blue-900/30 hover:bg-blue-900/50 border border-blue-800/40 hover:border-blue-600/50 text-blue-400 transition-all disabled:opacity-40"
+              >
+                {downloading ? (
+                  <svg className="w-8 h-8 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                ) : (
+                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                )}
+                <span className="text-sm font-semibold">{t("replay.download")}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import logging
 import os
 from pathlib import Path
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -437,6 +438,65 @@ async def seek_replay(
 
     await replay_session.engine.seek(data.block)
     return replay_session.engine.status
+
+
+@router.get("/download-session")
+async def download_session(
+    filename: str = Query(...),
+    start_block: int = Query(...),
+    end_block: int = Query(-1),
+    circuit_dir: str | None = Query(None),
+    owner_id: int | None = Query(None),
+    user: User = Depends(get_current_user),
+):
+    """Download raw log lines for a specific session (block range) as a text file."""
+    from app.apex.parser import ApexMessageParser
+
+    logs_dir = _resolve_logs_dir(user, owner_id, circuit_dir)
+
+    # Check file exists with fallbacks
+    filepath = os.path.join(logs_dir, filename)
+    if not os.path.exists(filepath):
+        gz_path = filepath + ".gz" if not filepath.endswith(".gz") else None
+        if gz_path and os.path.exists(gz_path):
+            filename = filename + ".gz"
+            filepath = gz_path
+        else:
+            root_path = os.path.join(LOGS_BASE_DIR, filename)
+            if user.is_admin and os.path.exists(root_path):
+                logs_dir = LOGS_BASE_DIR
+                filepath = root_path
+            else:
+                raise HTTPException(404, f"Log file not found: {filename}")
+
+    engine = ReplayEngine(ApexMessageParser(), lambda e: None, logs_dir=logs_dir)
+    blocks = engine._parse_log_file(filepath)
+
+    if not blocks:
+        raise HTTPException(404, "Log file is empty")
+
+    total = len(blocks)
+    start = max(0, min(start_block, total - 1))
+    end = end_block if 0 < end_block <= total else total
+
+    # Build the text output
+    lines = []
+    for i in range(start, end):
+        ts, message = blocks[i]
+        lines.append(ts.strftime("%Y-%m-%d %H:%M:%S"))
+        lines.append(message)
+        lines.append("")  # blank line separator
+
+    content = "\n".join(lines)
+
+    # Build a nice filename for the download
+    session_name = filename.replace(".log.gz", "").replace(".log", "")
+    download_name = f"{session_name}_block{start}-{end}.log"
+
+    return PlainTextResponse(
+        content=content,
+        headers={"Content-Disposition": f'attachment; filename="{download_name}"'},
+    )
 
 
 @router.post("/speed")
