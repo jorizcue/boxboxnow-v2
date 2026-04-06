@@ -161,6 +161,7 @@ export const useRaceStore = create<RaceStore>((set) => ({
           case "lap":
           case "lapMs":
             if (typeof ev.lapTimeMs === "number") kart.lastLapMs = ev.lapTimeMs;
+            if (typeof ev.totalLaps === "number") kart.totalLaps = ev.totalLaps;
             break;
           case "bestLap":
             if (typeof ev.lapTimeMs === "number") kart.bestLapMs = ev.lapTimeMs;

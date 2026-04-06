@@ -305,7 +305,8 @@ class RaceStateManager:
         return {"event": "lap", "rowId": row_id,
                 "kartNumber": kart.kart_number,
                 "lapTimeMs": lap_ms,
-                "lapClass": lap_class}
+                "lapClass": lap_class,
+                "totalLaps": kart.total_laps}
 
     def _apply_event(self, event: RaceEvent) -> dict | None:
         """Apply a single event to state. Returns update dict for broadcast."""
