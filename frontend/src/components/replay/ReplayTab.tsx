@@ -265,7 +265,7 @@ export function ReplayTab() {
               />
               {replayActive && (
                 <div className="flex items-center gap-2 text-[11px] font-mono">
-                  {replayTime && <span className="text-accent font-semibold">{replayTime}</span>}
+                  {replayTime && <span className="text-accent font-semibold">{toLocalTime(replayTime)}</span>}
                   <span className="text-neutral-400">{(replayProgress * 100).toFixed(1)}%</span>
                   <button
                     onClick={async () => {
