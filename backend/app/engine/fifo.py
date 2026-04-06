@@ -50,9 +50,12 @@ class FifoManager:
                   team_name: str = "", driver_name: str = "",
                   avg_lap_ms: float = 0, avg_position: int = 0,
                   recent_laps: list[dict] | None = None,
-                  pit_count: int = 0):
+                  pit_count: int = 0,
+                  timestamp: float | None = None):
         """Add a kart's tier score when it enters the pit.
-        Also records a history snapshot (only on actual pit entries)."""
+        Also records a history snapshot (only on actual pit entries).
+        timestamp: epoch seconds. Defaults to time.time() (wall clock).
+                   For replay, pass the replay block's actual datetime."""
         assigned_line = self._next_line % self.box_lines
         self._next_line += 1
         entry = {
@@ -70,7 +73,7 @@ class FifoManager:
         # Save history only when a kart actually enters pit
         score = self.get_weighted_score()
         self._history.append({
-            "timestamp": time.time(),
+            "timestamp": timestamp if timestamp is not None else time.time(),
             "queue": list(self.fifo),
             "score": round(score, 2),
         })

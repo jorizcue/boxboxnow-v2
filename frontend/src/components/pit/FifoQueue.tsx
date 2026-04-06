@@ -23,6 +23,25 @@ export function FifoQueue() {
 
   const boxLines = config.boxLines || 2;
   const boxKarts = config.boxKarts || 4;
+
+  // Build a set of kart numbers that have been in pit > 15 min (frozen)
+  const frozenKarts = useMemo(() => {
+    const raceElapsedMs = durationMs > 0 ? Math.max(0, durationMs - raceClockMs) : 0;
+    if (raceElapsedMs === 0) return new Set<number>();
+    const frozen = new Set<number>();
+    for (const kart of karts) {
+      if (kart.pitStatus !== "in_pit") continue;
+      const history = kart.pitHistory;
+      if (history.length > 0) {
+        const last = history[history.length - 1];
+        if (last.pitTimeMs === 0 && last.raceTimeMs > 0) {
+          const pitSec = (raceElapsedMs - last.raceTimeMs) / 1000;
+          if (pitSec > 15 * 60) frozen.add(kart.kartNumber);
+        }
+      }
+    }
+    return frozen;
+  }, [karts, durationMs, raceClockMs]);
   const kartsPerRow = Math.max(1, Math.ceil(boxKarts / boxLines));
 
   // Entry helpers (handles old number[] and new FifoEntry[] formats)
@@ -307,13 +326,17 @@ export function FifoQueue() {
                     const team = entryTeam(entry);
                     const driver = entryDriver(entry);
                     const kartNum = typeof entry === "object" && entry ? entry.kartNumber : null;
+                    const isFrozen = kartNum !== null && frozenKarts.has(kartNum);
                     const hasInfo = team || driver;
                     return (
                       <button
                         key={colIdx}
                         onClick={() => typeof entry === "object" && entry && setSelectedEntry(entry)}
-                        className="flex-1 min-w-[48px] sm:min-w-[80px] max-w-[140px] rounded-lg border-2 border-neutral-600 bg-neutral-800/50 flex flex-col items-center justify-center py-1 sm:py-1.5 px-1 transition-all hover:border-accent/50 hover:bg-neutral-700/50 cursor-pointer active:scale-95"
+                        className="flex-1 min-w-[48px] sm:min-w-[80px] max-w-[140px] rounded-lg border-2 border-neutral-600 bg-neutral-800/50 flex flex-col items-center justify-center py-1 sm:py-1.5 px-1 transition-all hover:border-accent/50 hover:bg-neutral-700/50 cursor-pointer active:scale-95 relative"
                       >
+                        {isFrozen && (
+                          <span className="absolute -top-1 -right-1 text-[10px] sm:text-xs" title=">15min in pit">&#10052;</span>
+                        )}
                         <span
                           className="text-lg sm:text-2xl font-bold leading-tight"
                           style={{ color: tierHex(score) }}

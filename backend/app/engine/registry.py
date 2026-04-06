@@ -663,6 +663,11 @@ class ReplaySession:
                 )
                 avg_pos_map = {k.kart_number: idx + 1 for idx, k in enumerate(sorted_by_avg)}
 
+                # Use the replay block's actual timestamp for FIFO history
+                block_ts = None
+                if hasattr(self, 'engine') and self.engine and self.engine.current_block_timestamp:
+                    block_ts = self.engine.current_block_timestamp.timestamp()
+
                 for kart in pit_in_karts:
                     recent = [
                         {"lapTime": l["lapTime"], "totalLap": l["totalLap"],
@@ -678,6 +683,7 @@ class ReplaySession:
                         avg_position=avg_pos_map.get(kart.kart_number, 0),
                         recent_laps=recent,
                         pit_count=kart.pit_count,
+                        timestamp=block_ts,
                     )
 
                 self.fifo.apply_to_state(self.state)

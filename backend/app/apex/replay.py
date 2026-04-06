@@ -39,6 +39,7 @@ class ReplayEngine:
         self._total_blocks = 0
         self._current_block = 0
         self._blocks: list[tuple[datetime, str]] = []
+        self.current_block_timestamp: datetime | None = None  # Accessible by callback
 
     @property
     def status(self) -> dict:
@@ -304,6 +305,7 @@ class ReplayEngine:
             for i in range(init_block, min(start_block, len(blocks))):
                 if not self._active:
                     return
+                self.current_block_timestamp = blocks[i][0]
                 try:
                     events = self.parser.parse(blocks[i][1])
                     if events:
@@ -336,6 +338,7 @@ class ReplayEngine:
             prev_time = timestamp
             self._current_block = i + 1
             self._progress = (i + 1) / self._total_blocks
+            self.current_block_timestamp = timestamp
 
             try:
                 events = self.parser.parse(message)
