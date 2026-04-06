@@ -25,23 +25,24 @@ export function FifoQueue() {
   const boxKarts = config.boxKarts || 4;
 
   // Build a set of kart numbers that have been in pit > 15 min (frozen)
+  // Use config.durationMin to match backend's race_time_ms = duration_min*60*1000 - countdown_ms
+  // Don't require pitStatus === "in_pit" — rely on pitHistory (pitTimeMs===0 = never exited)
   const frozenKarts = useMemo(() => {
-    const raceElapsedMs = durationMs > 0 ? Math.max(0, durationMs - raceClockMs) : 0;
-    if (raceElapsedMs === 0) return new Set<number>();
+    const raceElapsedMs = config.durationMin * 60 * 1000 - raceClockMs;
+    if (raceElapsedMs <= 0) return new Set<number>();
     const frozen = new Set<number>();
     for (const kart of karts) {
-      if (kart.pitStatus !== "in_pit") continue;
       const history = kart.pitHistory;
-      if (history.length > 0) {
-        const last = history[history.length - 1];
-        if (last.pitTimeMs === 0 && last.raceTimeMs > 0) {
-          const pitSec = (raceElapsedMs - last.raceTimeMs) / 1000;
-          if (pitSec > 15 * 60) frozen.add(kart.kartNumber);
-        }
+      if (history.length === 0) continue;
+      const last = history[history.length - 1];
+      // pitTimeMs === 0 means kart entered pit but never exited
+      if (last.pitTimeMs === 0 && last.raceTimeMs > 0) {
+        const pitSec = (raceElapsedMs - last.raceTimeMs) / 1000;
+        if (pitSec > 15 * 60) frozen.add(kart.kartNumber);
       }
     }
     return frozen;
-  }, [karts, durationMs, raceClockMs]);
+  }, [karts, config.durationMin, raceClockMs]);
   const kartsPerRow = Math.max(1, Math.ceil(boxKarts / boxLines));
 
   // Entry helpers (handles old number[] and new FifoEntry[] formats)
@@ -143,19 +144,20 @@ export function FifoQueue() {
 
   // Compute actual pit-in elapsed time (independent of stint timer)
   const pitElapsedSec = useMemo(() => {
-    if (!ourKart || ourKart.pitStatus !== "in_pit" || durationMs === 0 || raceClockMs === 0) return 0;
+    if (!ourKart || ourKart.pitStatus !== "in_pit" || raceClockMs === 0) return 0;
     // Find last pit record still in pit (pitTimeMs === 0)
     const history = ourKart.pitHistory;
     if (history.length > 0) {
       const last = history[history.length - 1];
       if (last.pitTimeMs === 0 && last.raceTimeMs > 0) {
-        const raceElapsedMs = durationMs - raceClockMs;
+        // Match backend: race_time_ms = duration_min * 60 * 1000 - countdown_ms
+        const raceElapsedMs = config.durationMin * 60 * 1000 - raceClockMs;
         return Math.max(0, (raceElapsedMs - last.raceTimeMs) / 1000);
       }
     }
     // Fallback: use stint timer
     return ourStintSec;
-  }, [ourKart, durationMs, raceClockMs, ourStintSec]);
+  }, [ourKart, config.durationMin, raceClockMs, ourStintSec]);
 
   // Lap delta tracking for last lap card
   const prevLastLapRef = useRef<number>(0);
