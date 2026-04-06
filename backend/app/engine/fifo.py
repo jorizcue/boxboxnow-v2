@@ -36,13 +36,30 @@ class FifoManager:
         self._next_line: int = 0  # Round-robin line counter for stable row assignment
 
     def update_config(self, queue_size: int, box_lines: int):
-        """Reinitialize the FIFO queue and clear history.
-        Always resets — needed when replaying the same config twice."""
+        """Update queue size and box lines, preserving existing kart entries.
+        Only resets fully when called with reset=True (e.g. replay start)."""
+        old_size = self.queue_size
         self.queue_size = queue_size
-        self.fifo = deque(
-            [_default_entry() for _ in range(queue_size)], maxlen=queue_size
-        )
         self.box_lines = box_lines
+
+        # Preserve real kart entries (kartNumber > 0)
+        real_entries = [e for e in self.fifo if isinstance(e, dict) and e.get("kartNumber", 0) > 0]
+
+        if queue_size == old_size and len(real_entries) > 0:
+            # Same size, just update box_lines — no queue change needed
+            return
+
+        # Rebuild: fill defaults first, then append real entries at the end
+        num_defaults = max(0, queue_size - len(real_entries))
+        new_queue = [_default_entry() for _ in range(num_defaults)] + real_entries[-queue_size:]
+        self.fifo = deque(new_queue, maxlen=queue_size)
+        # Keep _next_line and _history intact so history is preserved
+
+    def reset(self):
+        """Full reset — used when starting a new replay or new race."""
+        self.fifo = deque(
+            [_default_entry() for _ in range(self.queue_size)], maxlen=self.queue_size
+        )
         self._history.clear()
         self._next_line = 0
 

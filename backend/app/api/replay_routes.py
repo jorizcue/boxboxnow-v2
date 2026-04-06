@@ -377,8 +377,7 @@ async def start_replay(
         replay_session.differentials["team_positions"] = {}
         replay_session.differentials["driver_differentials"] = {}
 
-    replay_session.fifo.update_config(replay_session.state.box_karts, replay_session.state.box_lines)
-    replay_session.fifo._history.clear()
+    replay_session.fifo.reset()
     replay_session.fifo.apply_to_state(replay_session.state)
 
     try:
@@ -470,9 +469,8 @@ async def seek_replay(
         replay_session.differentials["team_positions"] = {}
         replay_session.differentials["driver_differentials"] = {}
 
-    # Reset FIFO with current config
-    replay_session.fifo.update_config(replay_session.state.box_karts, replay_session.state.box_lines)
-    replay_session.fifo._history.clear()
+    # Reset FIFO for seek
+    replay_session.fifo.reset()
     replay_session.fifo.apply_to_state(replay_session.state)
 
     await replay_session.engine.seek(data.block)
