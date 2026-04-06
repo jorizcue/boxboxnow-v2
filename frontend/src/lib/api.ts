@@ -168,8 +168,8 @@ export const api = {
     fetchApi<any>("/api/replay/seek", { method: "POST", body: JSON.stringify({ block }) }),
   setReplaySpeed: (speed: number) =>
     fetchApi<any>("/api/replay/speed", { method: "POST", body: JSON.stringify({ speed }) }),
-  restartReplay: () =>
-    fetchApi<any>("/api/replay/seek", { method: "POST", body: JSON.stringify({ block: 0 }) }),
+  restartReplay: (block: number = 0) =>
+    fetchApi<any>("/api/replay/seek", { method: "POST", body: JSON.stringify({ block }) }),
   downloadSession: async (filename: string, startBlock: number, endBlock: number, circuitDir?: string | null, sessionTitle?: string) => {
     const params = new URLSearchParams({
       filename,

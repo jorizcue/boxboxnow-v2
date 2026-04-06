@@ -137,9 +137,12 @@ export function ReplayTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [replayActive]);
 
+  const setReplayStartBlock = useRaceStore((s) => s.setReplayStartBlock);
+
   const startFromBlock = async (filename: string, circuitDir: string, block: number = 0) => {
     setActionLoading(true);
     try {
+      setReplayStartBlock(block);
       await api.startReplay(filename, speed, block, null, circuitDir);
       requestWsReconnect();
       await syncStatus();

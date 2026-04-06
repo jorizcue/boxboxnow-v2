@@ -39,6 +39,7 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   const replayProgress = useRaceStore((s) => s.replayProgress);
   const replaySpeed = useRaceStore((s) => s.replaySpeed);
   const replayTotalBlocks = useRaceStore((s) => s.replayTotalBlocks);
+  const replayStartBlock = useRaceStore((s) => s.replayStartBlock);
   const requestWsReconnect = useRaceStore((s) => s.requestWsReconnect);
   const setReplayStatus = useRaceStore((s) => s.setReplayStatus);
   const replayTime = useReplayTime();
@@ -56,8 +57,8 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   }, [requestWsReconnect, setReplayStatus]);
 
   const handleRestart = useCallback(async () => {
-    try { await api.restartReplay(); } catch {}
-  }, []);
+    try { await api.restartReplay(replayStartBlock); } catch {}
+  }, [replayStartBlock]);
 
   const handleSpeedChange = useCallback(async (speed: number) => {
     try { await api.setReplaySpeed(speed); } catch {}
