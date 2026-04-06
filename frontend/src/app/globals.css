@@ -74,6 +74,28 @@ body {
   50% { opacity: 0.3; }
 }
 
+/* Frozen kart snow animation */
+@keyframes snowfall {
+  0% {
+    transform: translateY(-8px) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.7;
+  }
+  90% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateY(60px) rotate(180deg);
+    opacity: 0;
+  }
+}
+
+.frozen-flake {
+  animation: snowfall 2.5s linear infinite;
+}
+
 /* Our team highlight */
 .our-team {
   border-left: 3px solid #9fe556 !important;

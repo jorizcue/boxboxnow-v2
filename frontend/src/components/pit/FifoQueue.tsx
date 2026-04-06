@@ -24,15 +24,20 @@ export function FifoQueue() {
   const boxLines = config.boxLines || 2;
   const boxKarts = config.boxKarts || 4;
 
-  // Build a set of kart numbers whose last pit entry was > 15 min ago
-  // Shows snowflake on FIFO cards for karts that entered pit a long time ago
+  // Build a set of kart numbers that are "frozen" (cold):
+  // - Karts whose last pit entry was > 15 min ago
+  // - Karts with default score 25 and no pit history (race-start placeholders)
   const frozenKarts = useMemo(() => {
     const raceElapsedMs = config.durationMin * 60 * 1000 - raceClockMs;
-    if (raceElapsedMs <= 0) return new Set<number>();
     const frozen = new Set<number>();
     for (const kart of karts) {
       const history = kart.pitHistory;
-      if (history.length === 0) continue;
+      // Default karts (score 25, no pits) are always frozen
+      if (history.length === 0) {
+        frozen.add(kart.kartNumber);
+        continue;
+      }
+      if (raceElapsedMs <= 0) continue;
       const last = history[history.length - 1];
       if (last.raceTimeMs > 0) {
         const sinceEntryMin = (raceElapsedMs - last.raceTimeMs) / 1000 / 60;
@@ -326,17 +331,20 @@ export function FifoQueue() {
                     const team = entryTeam(entry);
                     const driver = entryDriver(entry);
                     const kartNum = typeof entry === "object" && entry ? entry.kartNumber : null;
-                    const isFrozen = kartNum !== null && frozenKarts.has(kartNum);
+                    const isFrozen = kartNum !== null ? frozenKarts.has(kartNum) : score === 25;
                     const hasInfo = team || driver;
                     return (
                       <button
                         key={colIdx}
                         onClick={() => typeof entry === "object" && entry && setSelectedEntry(entry)}
-                        className="flex-1 min-w-[48px] sm:min-w-[80px] max-w-[140px] rounded-lg border-2 border-neutral-600 bg-neutral-800/50 flex flex-col items-center justify-center py-1 sm:py-1.5 px-1 transition-all hover:border-accent/50 hover:bg-neutral-700/50 cursor-pointer active:scale-95 relative"
-                      >
-                        {isFrozen && (
-                          <span className="absolute -top-1 -right-1 text-[10px] sm:text-xs" title=">15min in pit">&#10052;</span>
+                        className={clsx(
+                          "flex-1 min-w-[48px] sm:min-w-[80px] max-w-[140px] rounded-lg border-2 flex flex-col items-center justify-center py-1 sm:py-1.5 px-1 transition-all hover:border-accent/50 cursor-pointer active:scale-95 relative overflow-hidden",
+                          isFrozen
+                            ? "border-blue-400/70 bg-blue-950/30 hover:bg-blue-900/40"
+                            : "border-neutral-600 bg-neutral-800/50 hover:bg-neutral-700/50"
                         )}
+                      >
+                        {isFrozen && <FrozenOverlay />}
                         <span
                           className="text-lg sm:text-2xl font-bold leading-tight"
                           style={{ color: tierHex(score) }}
@@ -520,6 +528,27 @@ export function FifoQueue() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Frozen snow overlay ── */
+function FrozenOverlay() {
+  return (
+    <div className="frozen-snow absolute inset-0 pointer-events-none overflow-hidden rounded-lg">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <span
+          key={i}
+          className="frozen-flake absolute text-blue-200/60"
+          style={{
+            left: `${12 + i * 16}%`,
+            animationDelay: `${i * 0.4}s`,
+            fontSize: `${8 + (i % 3) * 2}px`,
+          }}
+        >
+          &#10052;
+        </span>
+      ))}
     </div>
   );
 }
