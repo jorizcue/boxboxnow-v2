@@ -38,6 +38,7 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   const replayFilename = useRaceStore((s) => s.replayFilename);
   const replayProgress = useRaceStore((s) => s.replayProgress);
   const replaySpeed = useRaceStore((s) => s.replaySpeed);
+  const replayTotalBlocks = useRaceStore((s) => s.replayTotalBlocks);
   const requestWsReconnect = useRaceStore((s) => s.requestWsReconnect);
   const setReplayStatus = useRaceStore((s) => s.setReplayStatus);
   const replayTime = useReplayTime();
@@ -61,6 +62,14 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   const handleSpeedChange = useCallback(async (speed: number) => {
     try { await api.setReplaySpeed(speed); } catch {}
   }, []);
+
+  const handleProgressBarClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (replayTotalBlocks <= 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const block = Math.round(pct * replayTotalBlocks);
+    api.seekReplay(block).catch(() => {});
+  }, [replayTotalBlocks]);
 
   // Use interpolated race clock that ticks every second
   const raceClockMs = useRaceClock();
@@ -155,9 +164,13 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
                   </span>
                 )}
 
-                {/* Progress bar (desktop) */}
+                {/* Progress bar (desktop) — clickable to seek */}
                 <div className="hidden sm:flex items-center gap-1.5 min-w-0">
-                  <div className="w-20 lg:w-32 h-1.5 bg-neutral-700 rounded-full overflow-hidden">
+                  <div
+                    className="w-20 lg:w-32 h-1.5 bg-neutral-700 rounded-full overflow-hidden cursor-pointer hover:h-2.5 transition-all"
+                    onClick={handleProgressBarClick}
+                    title="Click to seek"
+                  >
                     <div
                       className="h-full bg-orange-400 rounded-full transition-all duration-500"
                       style={{ width: `${(replayProgress * 100).toFixed(1)}%` }}

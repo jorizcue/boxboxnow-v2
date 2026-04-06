@@ -91,6 +91,23 @@ export function FifoQueue() {
     ? timeToMaxStint / (ourKart.avgLapMs / 1000)
     : 0;
 
+  // Average future stint time calculation
+  const avgFutureStint = useMemo(() => {
+    if (!ourKart || raceClockMs === 0 || raceFinished) return null;
+    const pitsDone = ourKart.pitCount;
+    const remainingPits = Math.max(0, config.minPits - pitsDone);
+    const remainingStints = remainingPits + 1; // includes current stint
+    const remainingRaceMin = raceClockMs / 1000 / 60;
+    const futureTimeInPitMin = remainingPits * config.pitTimeS / 60;
+    const availableRaceMin = remainingRaceMin - futureTimeInPitMin;
+    if (availableRaceMin <= 0 || remainingStints <= 0) return null;
+    const avgMin = availableRaceMin / remainingStints;
+    // Warning: within 5 min of min or max stint
+    const nearMin = avgMin <= config.minStintMin + 5;
+    const nearMax = avgMin >= config.maxStintMin - 5;
+    return { avgMin, nearMin, nearMax };
+  }, [ourKart, raceClockMs, raceFinished, config.minPits, config.pitTimeS, config.minStintMin, config.maxStintMin]);
+
   const kartsNearPit = sorted.filter((k) => {
     const stintSec = stintSecondsFor(k);
     return stintSec / 60 >= config.maxStintMin - 5 && k.pitStatus !== "in_pit";
@@ -339,15 +356,11 @@ export function FifoQueue() {
           label={t("pit.minPitTime")}
           value={secondsToHMS(config.pitTimeS)}
         />
-        {/* Pit count */}
+        {/* Pit count: X/Y */}
         <PitCard
-          label={t("pit.pitCount")}
-          value={ourKart ? String(ourKart.pitCount) : "0"}
-        />
-        {/* Min pit count */}
-        <PitCard
-          label={t("pit.minPitCount")}
-          value={String(config.minPits)}
+          label="PITS"
+          value={`${ourKart ? ourKart.pitCount : 0}/${config.minPits}`}
+          accent={ourKart ? ourKart.pitCount < config.minPits : false}
         />
         {/* Min stint (before max) */}
         <PitCard
@@ -358,6 +371,12 @@ export function FifoQueue() {
         <PitCard
           label={t("metric.maxStint")}
           value={secondsToHMS(config.maxStintMin * 60)}
+        />
+        {/* Average future stint */}
+        <PitCard
+          label={t("pit.avgFutureStint")}
+          value={avgFutureStint ? secondsToHMS(Math.round(avgFutureStint.avgMin * 60)) : "-"}
+          warn={avgFutureStint ? (avgFutureStint.nearMin || avgFutureStint.nearMax) : false}
         />
         {/* Box lines (+/-) */}
         <AdjustableCard
@@ -660,18 +679,18 @@ function KartDetailModal({ entry, onClose }: {
 }
 
 /* ── Small pit info card ── */
-function PitCard({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function PitCard({ label, value, accent, warn }: { label: string; value: string; accent?: boolean; warn?: boolean }) {
   return (
     <div className={clsx(
       "bg-surface rounded-xl border p-2 sm:p-3 flex flex-col items-center justify-center",
-      accent ? "border-accent/40" : "border-border"
+      warn ? "border-red-500/50" : accent ? "border-accent/40" : "border-border"
     )}>
       <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1 text-center leading-tight">
         {label}
       </span>
       <span className={clsx(
         "text-lg sm:text-xl font-mono font-black leading-none",
-        accent ? "text-accent" : "text-white"
+        warn ? "text-red-400" : accent ? "text-accent" : "text-white"
       )}>
         {value}
       </span>

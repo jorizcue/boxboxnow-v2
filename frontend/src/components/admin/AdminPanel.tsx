@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useT } from "@/lib/i18n";
-import { StyledSelect } from "@/components/shared/StyledSelect";
 import { CalendarPicker } from "@/components/shared/CalendarPicker";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
 
@@ -75,7 +74,7 @@ function UsersManager() {
   const [access, setAccess] = useState<AccessRow[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
   const [circuits, setCircuits] = useState<CircuitRow[]>([]);
-  const [newCircuitId, setNewCircuitId] = useState<number>(0);
+  const [newCircuitIds, setNewCircuitIds] = useState<number[]>([]);
   const [newValidFrom, setNewValidFrom] = useState("");
   const [newValidUntil, setNewValidUntil] = useState("");
 
@@ -92,13 +91,26 @@ function UsersManager() {
     if (!newUsername || !newPassword) return;
     try {
       await api.createUser({ username: newUsername, password: newPassword, is_admin: newIsAdmin, max_devices: newMaxDevices });
-      // Set tab access for the new user
+      // Set tab access and circuit access for the new user
       const created = (await api.getUsers()).find((u: UserRow) => u.username === newUsername);
-      if (created && !newIsAdmin) {
-        await api.updateUserTabs(created.id, newTabs);
+      if (created) {
+        if (!newIsAdmin) {
+          await api.updateUserTabs(created.id, newTabs);
+        }
+        // Grant circuit access
+        if (newCircuitIds.length > 0 && newValidFrom && newValidUntil) {
+          for (const cid of newCircuitIds) {
+            await api.grantAccess({
+              user_id: created.id, circuit_id: cid,
+              valid_from: new Date(newValidFrom).toISOString(),
+              valid_until: new Date(newValidUntil).toISOString(),
+            });
+          }
+        }
       }
       setNewUsername(""); setNewPassword(""); setNewIsAdmin(false); setNewMaxDevices(1);
       setNewTabs(ALL_TAB_OPTIONS.map(([k]) => k));
+      setNewCircuitIds([]);
       setShowCreate(false);
       loadUsers();
     } catch (e: any) { alert(e.message); }
@@ -139,15 +151,18 @@ function UsersManager() {
   };
 
   const grantAccess = async () => {
-    if (!selectedUser || !newCircuitId || !newValidFrom || !newValidUntil) return;
+    if (!selectedUser || newCircuitIds.length === 0 || !newValidFrom || !newValidUntil) return;
     try {
-      await api.grantAccess({
-        user_id: selectedUser, circuit_id: newCircuitId,
-        valid_from: new Date(newValidFrom).toISOString(),
-        valid_until: new Date(newValidUntil).toISOString(),
-      });
-      loadAccess(selectedUser);
-      setNewCircuitId(0);
+      for (const cid of newCircuitIds) {
+        await api.grantAccess({
+          user_id: selectedUser, circuit_id: cid,
+          valid_from: new Date(newValidFrom).toISOString(),
+          valid_until: new Date(newValidUntil).toISOString(),
+        });
+      }
+      // Reload access to reflect newly granted items and deselect added circuits
+      setAccess(await api.getUserAccess(selectedUser));
+      setNewCircuitIds([]);
     } catch (e: any) { alert(e.message); }
   };
 
@@ -157,6 +172,14 @@ function UsersManager() {
 
   const toggleNewTab = (tab: string) => {
     setNewTabs((prev) => prev.includes(tab) ? prev.filter((t) => t !== tab) : [...prev, tab]);
+  };
+
+  const toggleCircuit = (cid: number) => {
+    setNewCircuitIds((prev) => prev.includes(cid) ? prev.filter((id) => id !== cid) : [...prev, cid]);
+  };
+
+  const toggleAllCircuits = () => {
+    setNewCircuitIds((prev) => prev.length === circuits.length ? [] : circuits.map((c) => c.id));
   };
 
   const panelOpen = showCreate || selectedUser !== null;
@@ -285,6 +308,45 @@ function UsersManager() {
                 )}
               </div>
 
+              {/* Circuit access (create) */}
+              <div>
+                <label className="block text-[10px] text-neutral-400 mb-2 uppercase tracking-wider">{t("admin.circuits")}</label>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  <label className="flex items-center gap-1.5 text-xs text-accent cursor-pointer bg-accent/10 rounded-lg px-3 py-2 border border-accent/30 hover:border-accent/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={newCircuitIds.length === circuits.length && circuits.length > 0}
+                      onChange={toggleAllCircuits}
+                      className="accent-accent"
+                    />
+                    {t("admin.selectAll")}
+                  </label>
+                  {circuits.map((c) => (
+                    <label key={c.id} className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer bg-black/30 rounded-lg px-3 py-2 border border-border hover:border-neutral-600 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={newCircuitIds.includes(c.id)}
+                        onChange={() => toggleCircuit(c.id)}
+                        className="accent-accent"
+                      />
+                      {c.name}
+                    </label>
+                  ))}
+                </div>
+                {newCircuitIds.length > 0 && (
+                  <div className="flex gap-2 items-end mb-2">
+                    <div className="w-[150px]">
+                      <label className="block text-[9px] text-neutral-500 mb-1 uppercase tracking-wider">{t("admin.from")}</label>
+                      <CalendarPicker value={newValidFrom} onChange={setNewValidFrom} placeholder={t("admin.from")} />
+                    </div>
+                    <div className="w-[150px]">
+                      <label className="block text-[9px] text-neutral-500 mb-1 uppercase tracking-wider">{t("admin.until")}</label>
+                      <CalendarPicker value={newValidUntil} onChange={setNewValidUntil} placeholder={t("admin.until")} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2 pt-1 max-w-xs">
                 <button
                   onClick={createUser}
@@ -371,48 +433,79 @@ function UsersManager() {
               <div className="border-t border-border pt-4">
                 <label className="block text-[10px] text-neutral-400 mb-2 uppercase tracking-wider">{t("admin.circuitAccess")}</label>
 
-                <div className="flex gap-2 mb-3 items-end flex-wrap">
-                  <div className="min-w-[140px]">
-                    <label className="block text-[9px] text-neutral-500 mb-1 uppercase tracking-wider">{t("config.circuit")}</label>
-                    <StyledSelect
-                      value={newCircuitId}
-                      onChange={(v) => setNewCircuitId(Number(v))}
-                      options={circuits.map((c) => ({ value: c.id, label: c.name }))}
-                      placeholder={t("admin.selectCircuitPlaceholder")}
+                {/* Circuit checkboxes — checked = already has access, unchecked = can grant */}
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  <label className="flex items-center gap-1.5 text-xs text-accent cursor-pointer bg-accent/10 rounded-lg px-3 py-2 border border-accent/30 hover:border-accent/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={newCircuitIds.length === circuits.filter((c) => !access.some((a) => a.circuit_id === c.id)).length && circuits.filter((c) => !access.some((a) => a.circuit_id === c.id)).length > 0}
+                      onChange={() => {
+                        const ungranted = circuits.filter((c) => !access.some((a) => a.circuit_id === c.id)).map((c) => c.id);
+                        setNewCircuitIds((prev) => prev.length === ungranted.length ? [] : ungranted);
+                      }}
+                      className="accent-accent"
                     />
-                  </div>
-                  <div className="w-[150px]">
-                    <label className="block text-[9px] text-neutral-500 mb-1 uppercase tracking-wider">{t("admin.from")}</label>
-                    <CalendarPicker value={newValidFrom} onChange={setNewValidFrom} placeholder={t("admin.from")} />
-                  </div>
-                  <div className="w-[150px]">
-                    <label className="block text-[9px] text-neutral-500 mb-1 uppercase tracking-wider">{t("admin.until")}</label>
-                    <CalendarPicker value={newValidUntil} onChange={setNewValidUntil} placeholder={t("admin.until")} />
-                  </div>
-                  <button onClick={grantAccess} className="bg-accent hover:bg-accent-hover text-black font-bold w-8 h-8 rounded-lg text-sm flex items-center justify-center transition-colors flex-shrink-0">
-                    +
-                  </button>
+                    {t("admin.selectAll")}
+                  </label>
+                  {circuits.map((c) => {
+                    const hasAccess = access.some((a) => a.circuit_id === c.id);
+                    return (
+                      <label key={c.id} className={`flex items-center gap-1.5 text-xs cursor-pointer rounded-lg px-3 py-2 border transition-colors ${
+                        hasAccess
+                          ? "text-green-400 bg-green-900/20 border-green-800/40"
+                          : newCircuitIds.includes(c.id)
+                            ? "text-accent bg-accent/10 border-accent/30"
+                            : "text-neutral-300 bg-black/30 border-border hover:border-neutral-600"
+                      }`}>
+                        <input
+                          type="checkbox"
+                          checked={hasAccess || newCircuitIds.includes(c.id)}
+                          onChange={() => {
+                            if (hasAccess) {
+                              // Revoke: find the access entry and revoke it
+                              const a = access.find((a) => a.circuit_id === c.id);
+                              if (a) revokeAccess(a.id);
+                            } else {
+                              toggleCircuit(c.id);
+                            }
+                          }}
+                          className="accent-accent"
+                        />
+                        {c.name}
+                      </label>
+                    );
+                  })}
                 </div>
 
-                <div className="space-y-1 max-h-60 overflow-y-auto scrollbar-none">
-                  {access.map((a) => (
-                    <div key={a.id} className="flex items-center gap-2 bg-black/30 rounded-lg px-3 py-2 text-xs">
-                      <button onClick={() => revokeAccess(a.id)}
-                        className="text-red-500/50 hover:text-red-400 transition-colors flex-shrink-0" title={t("admin.revoke")}>
-                        <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                          <path d="M4 4l8 8M12 4l-8 8" />
-                        </svg>
-                      </button>
-                      <span className="text-white font-medium">{a.circuit_name}</span>
-                      <span className="text-neutral-500">
-                        {new Date(a.valid_from).toLocaleDateString()} - {new Date(a.valid_until).toLocaleDateString()}
-                      </span>
+                {/* Date range + grant button for newly selected circuits */}
+                {newCircuitIds.length > 0 && (
+                  <div className="flex gap-2 mb-3 items-end flex-wrap">
+                    <div className="w-[150px]">
+                      <label className="block text-[9px] text-neutral-500 mb-1 uppercase tracking-wider">{t("admin.from")}</label>
+                      <CalendarPicker value={newValidFrom} onChange={setNewValidFrom} placeholder={t("admin.from")} />
                     </div>
-                  ))}
-                  {access.length === 0 && (
-                    <p className="text-neutral-600 text-xs text-center py-2">{t("admin.noAccess")}</p>
-                  )}
-                </div>
+                    <div className="w-[150px]">
+                      <label className="block text-[9px] text-neutral-500 mb-1 uppercase tracking-wider">{t("admin.until")}</label>
+                      <CalendarPicker value={newValidUntil} onChange={setNewValidUntil} placeholder={t("admin.until")} />
+                    </div>
+                    <button onClick={grantAccess} disabled={!newValidFrom || !newValidUntil}
+                      className="bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-bold px-4 h-8 rounded-lg text-sm flex items-center justify-center transition-colors flex-shrink-0">
+                      + {newCircuitIds.length}
+                    </button>
+                  </div>
+                )}
+
+                {/* Existing access list with dates */}
+                {access.length > 0 && (
+                  <div className="space-y-1 max-h-40 overflow-y-auto scrollbar-none">
+                    {access.map((a) => (
+                      <div key={a.id} className="flex items-center gap-2 text-[10px] text-neutral-500">
+                        <span className="text-neutral-300 font-medium">{a.circuit_name}</span>
+                        <span>{new Date(a.valid_from).toLocaleDateString()} - {new Date(a.valid_until).toLocaleDateString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Active sessions */}

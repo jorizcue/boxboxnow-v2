@@ -45,7 +45,7 @@ class ReplayEngine:
         # Current replay timestamp
         current_time = None
         if self._blocks and 0 < self._current_block <= len(self._blocks):
-            current_time = self._blocks[self._current_block - 1][0].strftime("%H:%M:%S")
+            current_time = self._blocks[self._current_block - 1][0].isoformat()
         return {
             "active": self._active,
             "filename": self._filename,
@@ -120,7 +120,7 @@ class ReplayEngine:
                     race_starts.append({
                         "block": i,
                         "progress": i / total,
-                        "timestamp": timestamp.strftime("%H:%M:%S"),
+                        "timestamp": timestamp.isoformat(),
                         "title": title,
                     })
                     seen_titles.add(title)
@@ -149,7 +149,7 @@ class ReplayEngine:
                         race_starts.append({
                             "block": i,
                             "progress": i / total,
-                            "timestamp": timestamp.strftime("%H:%M:%S"),
+                            "timestamp": timestamp.isoformat(),
                             "title": title,
                         })
                         seen_titles.add(title)
@@ -177,7 +177,7 @@ class ReplayEngine:
                     race_starts.append({
                         "block": i,
                         "progress": i / total,
-                        "timestamp": timestamp.strftime("%H:%M:%S"),
+                        "timestamp": timestamp.isoformat(),
                         "title": title,
                     })
                     seen_titles.add(title)
@@ -193,8 +193,8 @@ class ReplayEngine:
         return {
             "totalBlocks": total,
             "raceStarts": race_starts,
-            "startTime": blocks[0][0].strftime("%H:%M:%S"),
-            "endTime": blocks[-1][0].strftime("%H:%M:%S"),
+            "startTime": blocks[0][0].isoformat(),
+            "endTime": blocks[-1][0].isoformat(),
         }
 
     async def start(self, filename: str, speed: float = 1.0, start_block: int = 0):

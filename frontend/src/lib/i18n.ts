@@ -126,6 +126,7 @@ const translations: Record<string, Record<Language, string>> = {
   "pit.minPitTime": { es: "Tiempo minimo de pit", en: "Min pit time", it: "Tempo minimo di pit", de: "Min Pit-Zeit" },
   "pit.pitCount": { es: "Numero de pits", en: "Pit count", it: "Numero di pit", de: "Anzahl Pits" },
   "pit.minPitCount": { es: "Numero minimo de pits", en: "Min pit count", it: "Numero minimo di pit", de: "Min Pit-Anzahl" },
+  "pit.avgFutureStint": { es: "Media stint futuro", en: "Avg future stint", it: "Media stint futuro", de: "Durchschn. Stint" },
   "pit.history": { es: "Historial de entradas en box", en: "Pit entry history", it: "Storico ingressi ai box", de: "Boxen-Einfahrts-Historie" },
   "pit.queue": { es: "Cola", en: "Queue", it: "Coda", de: "Warteschlange" },
   "pit.recentLaps": { es: "Últimas vueltas", en: "Recent laps", it: "Ultimi giri", de: "Letzte Runden" },
@@ -225,6 +226,7 @@ const translations: Record<string, Record<Language, string>> = {
   // === Admin: Access ===
   "admin.circuitAccess": { es: "Acceso a Circuitos", en: "Circuit Access", it: "Accesso ai Circuiti", de: "Streckenzugang" },
   "admin.selectCircuitPlaceholder": { es: "Circuito...", en: "Circuit...", it: "Circuito...", de: "Strecke..." },
+  "admin.selectAll": { es: "Seleccionar todos", en: "Select all", it: "Seleziona tutti", de: "Alle ausw\u00e4hlen" },
   "admin.grantAccess": { es: "Dar acceso", en: "Grant access", it: "Concedi accesso", de: "Zugang gewahren" },
   "admin.from": { es: "Desde", en: "From", it: "Da", de: "Von" },
   "admin.until": { es: "Hasta", en: "Until", it: "A", de: "Bis" },

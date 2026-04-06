@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import { useRaceStore } from "@/hooks/useRaceState";
+import { useAuth } from "@/hooks/useAuth";
 import { useT } from "@/lib/i18n";
 import { CalendarPicker } from "@/components/shared/CalendarPicker";
 
@@ -47,6 +48,7 @@ interface DayAnalysis {
 
 export function ReplayTab() {
   const t = useT();
+  const { user } = useAuth();
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 7);
@@ -72,7 +74,7 @@ export function ReplayTab() {
   const syncStatus = async () => {
     try {
       const st = await api.getReplayStatus();
-      setReplayStatus(st.active, st.paused, st.filename || "", st.progress || 0, st.currentTime || "");
+      setReplayStatus(st.active, st.paused, st.filename || "", st.progress || 0, st.currentTime || "", undefined, st.totalBlocks || 0);
     } catch {}
   };
 
@@ -293,7 +295,7 @@ export function ReplayTab() {
                       <div className="flex justify-between text-[10px] text-neutral-500">
                         <span className="text-neutral-300 font-medium">{formatDateLabel(day.date)}</span>
                         <span>{day.analysis.totalBlocks} {t("replay.blocks")}</span>
-                        <span>{day.analysis.endTime}</span>
+                        <span>{toLocalTime(day.analysis.endTime)}</span>
                       </div>
                       <div
                         className="relative w-full h-6 bg-black rounded-lg cursor-pointer border border-border group hover:border-neutral-600 transition-colors"
@@ -333,7 +335,7 @@ export function ReplayTab() {
                             >
                               <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
                               <span className="truncate">{rs.title || `${t("replay.raceN")} ${idx + 1}`}</span>
-                              <span className="text-green-600 flex-shrink-0">{rs.timestamp}</span>
+                              <span className="text-green-600 flex-shrink-0">{toLocalTime(rs.timestamp)}</span>
                             </button>
                           ))}
                         </div>
@@ -365,7 +367,7 @@ export function ReplayTab() {
                   {sessionModal.raceStart.title || `${t("replay.raceN")} ${sessionModal.raceStartIdx + 1}`}
                 </h3>
                 <p className="text-xs text-neutral-400 mt-1">
-                  {sessionModal.raceStart.timestamp}
+                  {toLocalTime(sessionModal.raceStart.timestamp)}
                 </p>
               </div>
               <button
@@ -377,7 +379,7 @@ export function ReplayTab() {
             </div>
 
             {/* Buttons */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className={`grid ${user?.is_admin ? "grid-cols-2" : "grid-cols-1"} gap-3`}>
               {/* Play button */}
               <button
                 onClick={() => {
@@ -396,8 +398,8 @@ export function ReplayTab() {
                 <span className="text-sm font-semibold">{t("replay.play")}</span>
               </button>
 
-              {/* Download button */}
-              <button
+              {/* Download button — admin only */}
+              {user?.is_admin && <button
                 onClick={async () => {
                   if (!selectedCircuitDir || !sessionModal) return;
                   setDownloading(true);
@@ -437,7 +439,7 @@ export function ReplayTab() {
                   </svg>
                 )}
                 <span className="text-sm font-semibold">{t("replay.download")}</span>
-              </button>
+              </button>}
             </div>
           </div>
         </div>
@@ -452,4 +454,15 @@ function formatDateLabel(dateStr: string): string {
   const day = d.getDate();
   const month = d.toLocaleDateString("es", { month: "short" });
   return `${weekday} ${day} ${month}`;
+}
+
+/** Convert ISO datetime (or HH:MM:SS) to browser local time string */
+function toLocalTime(ts: string | null | undefined): string {
+  if (!ts) return "";
+  // If already HH:MM:SS (legacy), return as-is
+  if (/^\d{2}:\d{2}:\d{2}$/.test(ts)) return ts;
+  // ISO format: parse and convert to local time
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return ts;
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }

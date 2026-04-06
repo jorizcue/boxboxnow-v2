@@ -420,6 +420,7 @@ async def seek_replay(
     data: ReplaySeekRequest,
     request: Request,
     user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Seek to a specific block in the replay."""
     replay_reg = _get_replay_registry(request)
@@ -430,13 +431,53 @@ async def seek_replay(
     if not replay_session.engine._filename or not replay_session.engine._blocks:
         raise HTTPException(400, "No replay loaded")
 
-    # Reset state and FIFO before seeking
+    # Reset state
     replay_session.state.reset()
     replay_session._init_teams_loaded = False  # Allow teams to re-load from new init
-    replay_session.fifo.update_config(replay_session.fifo.queue_size, replay_session.fifo.box_lines)
+
+    # Re-apply user config from DB (same as start_replay)
+    session = (await db.execute(
+        select(RaceSession)
+        .options(
+            selectinload(RaceSession.team_positions).selectinload(TeamPosition.drivers),
+        )
+        .where(
+            RaceSession.user_id == user.id,
+            RaceSession.is_active == True,
+        )
+    )).scalar_one_or_none()
+
+    if session:
+        circuit = None
+        if session.circuit_id:
+            circuit = (await db.execute(
+                select(Circuit).where(Circuit.id == session.circuit_id)
+            )).scalar_one_or_none()
+        replay_session.apply_config(session, circuit)
+
+        team_positions = {}
+        driver_differentials = {}
+        for tp in session.team_positions:
+            team_positions[tp.kart] = tp.position
+            if tp.drivers:
+                driver_differentials[tp.kart] = {
+                    d.driver_name.strip().lower(): d.differential_ms
+                    for d in tp.drivers
+                }
+        replay_session.differentials["team_positions"] = team_positions
+        replay_session.differentials["driver_differentials"] = driver_differentials
+    else:
+        replay_session.differentials["team_positions"] = {}
+        replay_session.differentials["driver_differentials"] = {}
+
+    # Reset FIFO with current config
+    replay_session.fifo.update_config(replay_session.state.box_karts, replay_session.state.box_lines)
     replay_session.fifo._history.clear()
+    replay_session.fifo.apply_to_state(replay_session.state)
 
     await replay_session.engine.seek(data.block)
+    await replay_session.start_analytics()
+    await replay_session.state._broadcast(replay_session.state.get_snapshot())
     return replay_session.engine.status
 
 
