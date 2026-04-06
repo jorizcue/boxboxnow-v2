@@ -499,22 +499,53 @@ class CircuitConnection:
         try:
             from app.models.database import async_session
             from app.models.schemas import RaceLog, KartLap
+            from sqlalchemy import select, func
 
             async with self._lap_save_lock:
                 async with async_session() as db:
                     if self._lap_race_log_id is None:
-                        race_log = RaceLog(
-                            circuit_id=self.circuit_id,
-                            user_id=None,
-                            race_date=datetime.now(timezone.utc),
-                            session_name=f"Auto {self.circuit_name} {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-                            duration_min=self._lap_state.duration_min,
-                            total_karts=len(self._lap_state.karts),
-                        )
-                        db.add(race_log)
-                        await db.flush()
-                        self._lap_race_log_id = race_log.id
-                        logger.info(f"[{self.circuit_name}] Auto race_log #{race_log.id} created")
+                        # Use track_name as session identifier to avoid duplicates
+                        # from WS reconnections within the same race
+                        session_name = self._lap_state.track_name or f"Auto {self.circuit_name}"
+                        today_start = datetime.now(timezone.utc).replace(
+                            hour=0, minute=0, second=0, microsecond=0)
+
+                        # Check if a RaceLog already exists for this session today
+                        existing = (await db.execute(
+                            select(RaceLog).where(
+                                RaceLog.circuit_id == self.circuit_id,
+                                RaceLog.session_name == session_name,
+                                RaceLog.race_date >= today_start,
+                            )
+                        )).scalar_one_or_none()
+
+                        if existing:
+                            self._lap_race_log_id = existing.id
+                            # Rebuild saved counts from existing laps to avoid duplicates
+                            from sqlalchemy import func as sqlfunc
+                            rows = (await db.execute(
+                                select(KartLap.kart_number, sqlfunc.max(KartLap.lap_number))
+                                .where(KartLap.race_log_id == existing.id)
+                                .group_by(KartLap.kart_number)
+                            )).all()
+                            for kart_number, max_lap in rows:
+                                self._lap_saved_per_kart[kart_number] = max_lap
+                            logger.info(f"[{self.circuit_name}] Reusing race_log #{existing.id} "
+                                        f"for session '{session_name}'")
+                        else:
+                            race_log = RaceLog(
+                                circuit_id=self.circuit_id,
+                                user_id=None,
+                                race_date=datetime.now(timezone.utc),
+                                session_name=session_name,
+                                duration_min=self._lap_state.duration_min,
+                                total_karts=len(self._lap_state.karts),
+                            )
+                            db.add(race_log)
+                            await db.flush()
+                            self._lap_race_log_id = race_log.id
+                            logger.info(f"[{self.circuit_name}] Auto race_log #{race_log.id} "
+                                        f"created for session '{session_name}'")
 
                     new_count = 0
                     for kart in self._lap_state.karts.values():

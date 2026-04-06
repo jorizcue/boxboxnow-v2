@@ -149,24 +149,51 @@ class UserSession:
         from app.models.database import async_session
         from app.models.schemas import RaceLog, KartLap
         from datetime import datetime, timezone
+        from sqlalchemy import select
 
         try:
             async with self._save_lock:
                 async with async_session() as db:
-                    # Create race_log on first save
+                    # Create or reuse race_log
                     if self._race_log_id is None:
-                        race_log = RaceLog(
-                            circuit_id=self.circuit_id,
-                            user_id=self.user_id,
-                            race_date=datetime.now(timezone.utc),
-                            session_name=f"Race {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-                            duration_min=self.state.duration_min,
-                            total_karts=len(self.state.karts),
-                        )
-                        db.add(race_log)
-                        await db.flush()
-                        self._race_log_id = race_log.id
-                        logger.info(f"Created race_log #{race_log.id} for real-time saving (user={self.user_id})")
+                        session_name = self.state.track_name or f"Race {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                        today_start = datetime.now(timezone.utc).replace(
+                            hour=0, minute=0, second=0, microsecond=0)
+
+                        # Check for existing RaceLog with same session today
+                        existing = (await db.execute(
+                            select(RaceLog).where(
+                                RaceLog.circuit_id == self.circuit_id,
+                                RaceLog.user_id == self.user_id,
+                                RaceLog.session_name == session_name,
+                                RaceLog.race_date >= today_start,
+                            )
+                        )).scalar_one_or_none()
+
+                        if existing:
+                            self._race_log_id = existing.id
+                            from sqlalchemy import func as sqlfunc
+                            rows = (await db.execute(
+                                select(KartLap.kart_number, sqlfunc.max(KartLap.lap_number))
+                                .where(KartLap.race_log_id == existing.id)
+                                .group_by(KartLap.kart_number)
+                            )).all()
+                            for kart_number, max_lap in rows:
+                                self._saved_laps_per_kart[kart_number] = max_lap
+                            logger.info(f"Reusing race_log #{existing.id} for '{session_name}' (user={self.user_id})")
+                        else:
+                            race_log = RaceLog(
+                                circuit_id=self.circuit_id,
+                                user_id=self.user_id,
+                                race_date=datetime.now(timezone.utc),
+                                session_name=session_name,
+                                duration_min=self.state.duration_min,
+                                total_karts=len(self.state.karts),
+                            )
+                            db.add(race_log)
+                            await db.flush()
+                            self._race_log_id = race_log.id
+                            logger.info(f"Created race_log #{race_log.id} for '{session_name}' (user={self.user_id})")
 
                     # Save only NEW laps per kart (track count per kart_number)
                     new_count = 0
@@ -230,27 +257,59 @@ class UserSession:
             logger.info(f"Skipping race save: only {total_laps} laps (user={self.user_id})")
             return
 
+        from sqlalchemy import select, func as sqlfunc
+
         async with async_session() as db:
-            race_log = RaceLog(
-                circuit_id=self.circuit_id,
-                user_id=self.user_id,
-                race_date=datetime.now(timezone.utc),
-                session_name=f"Race {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-                duration_min=self.state.duration_min,
-                total_karts=len(self.state.karts),
-            )
-            db.add(race_log)
-            await db.flush()  # Get race_log.id
+            # Dedup: check for existing RaceLog with same session today
+            session_name = self.state.track_name or f"Race {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            today_start = datetime.now(timezone.utc).replace(
+                hour=0, minute=0, second=0, microsecond=0)
+
+            existing = (await db.execute(
+                select(RaceLog).where(
+                    RaceLog.circuit_id == self.circuit_id,
+                    RaceLog.user_id == self.user_id,
+                    RaceLog.session_name == session_name,
+                    RaceLog.race_date >= today_start,
+                )
+            )).scalar_one_or_none()
+
+            if existing:
+                race_log_id = existing.id
+                # Rebuild saved counts to know which laps already exist
+                rows = (await db.execute(
+                    select(KartLap.kart_number, sqlfunc.max(KartLap.lap_number))
+                    .where(KartLap.race_log_id == existing.id)
+                    .group_by(KartLap.kart_number)
+                )).all()
+                saved_per_kart = {kart_number: max_lap for kart_number, max_lap in rows}
+                logger.info(f"Reusing race_log #{existing.id} for fallback save '{session_name}' (user={self.user_id})")
+            else:
+                race_log = RaceLog(
+                    circuit_id=self.circuit_id,
+                    user_id=self.user_id,
+                    race_date=datetime.now(timezone.utc),
+                    session_name=session_name,
+                    duration_min=self.state.duration_min,
+                    total_karts=len(self.state.karts),
+                )
+                db.add(race_log)
+                await db.flush()
+                race_log_id = race_log.id
+                saved_per_kart = {}
+                logger.info(f"Created race_log #{race_log.id} for fallback save '{session_name}' (user={self.user_id})")
 
             # Collect valid lap times from valid_laps set for quick lookup
+            new_count = 0
             for kart in self.state.karts.values():
+                saved = saved_per_kart.get(kart.kart_number, 0)
                 valid_lap_set = set()
                 for vl in kart.valid_laps:
                     valid_lap_set.add((vl["totalLap"], vl["lapTime"]))
 
-                for lap in kart.all_laps:
+                for lap in kart.all_laps[saved:]:
                     kart_lap = KartLap(
-                        race_log_id=race_log.id,
+                        race_log_id=race_log_id,
                         kart_number=kart.kart_number,
                         team_name=kart.team_name,
                         driver_name=lap.get("driverName", ""),
@@ -260,9 +319,11 @@ class UserSession:
                         recorded_at=datetime.now(timezone.utc),
                     )
                     db.add(kart_lap)
+                    new_count += 1
 
-            await db.commit()
-            logger.info(f"Saved race log #{race_log.id}: {total_laps} laps, "
+            if new_count > 0:
+                await db.commit()
+            logger.info(f"Fallback save race_log #{race_log_id}: {new_count} new laps, "
                         f"{len(self.state.karts)} karts (user={self.user_id}, "
                         f"circuit={self.circuit_id})")
 
