@@ -87,6 +87,7 @@ class UserSession:
                          "driverName": l.get("driverName", "")}
                         for l in kart.valid_laps[-5:]
                     ]
+                    last_pit = kart.pit_history[-1] if kart.pit_history else None
                     self.fifo.add_entry(
                         kart.tier_score,
                         kart_number=kart.kart_number,
@@ -96,6 +97,7 @@ class UserSession:
                         avg_position=avg_pos_map.get(kart.kart_number, 0),
                         recent_laps=recent,
                         pit_count=kart.pit_count,
+                        stint_laps=last_pit.stint_laps if last_pit else 0,
                     )
 
                 # Broadcast FIFO immediately so the box tab updates in real-time
@@ -674,6 +676,7 @@ class ReplaySession:
                          "driverName": l.get("driverName", "")}
                         for l in kart.valid_laps[-5:]
                     ]
+                    last_pit = kart.pit_history[-1] if kart.pit_history else None
                     self.fifo.add_entry(
                         kart.tier_score,
                         kart_number=kart.kart_number,
@@ -683,6 +686,7 @@ class ReplaySession:
                         avg_position=avg_pos_map.get(kart.kart_number, 0),
                         recent_laps=recent,
                         pit_count=kart.pit_count,
+                        stint_laps=last_pit.stint_laps if last_pit else 0,
                         timestamp=block_ts,
                     )
 

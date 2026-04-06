@@ -72,6 +72,7 @@ class FifoManager:
                   avg_lap_ms: float = 0, avg_position: int = 0,
                   recent_laps: list[dict] | None = None,
                   pit_count: int = 0,
+                  stint_laps: int = 0,
                   timestamp: float | None = None):
         """Add a kart's tier score when it enters the pit.
         Also records a history snapshot (only on actual pit entries).
@@ -88,6 +89,7 @@ class FifoManager:
             "avgPosition": avg_position,
             "recentLaps": recent_laps or [],
             "pitCount": pit_count,
+            "stintLaps": stint_laps,
             "line": assigned_line,
         }
         self.fifo.append(entry)

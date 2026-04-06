@@ -643,6 +643,7 @@ function KartDetailModal({ entry, onClose }: {
   const avgLapMs = entry.avgLapMs ?? 0;
   const recentLaps = entry.recentLaps ?? [];
   const pitCount = entry.pitCount ?? 0;
+  const stintLaps = entry.stintLaps ?? 0;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
@@ -696,6 +697,10 @@ function KartDetailModal({ entry, onClose }: {
           <div className="bg-black/30 rounded-xl p-3 text-center">
             <span className="text-[9px] text-neutral-400 uppercase tracking-wider font-bold block mb-1">Score</span>
             <span className="text-2xl font-black" style={{ color: tierHex(entry.score) }}>{entry.score}</span>
+          </div>
+          <div className="bg-black/30 rounded-xl p-3 text-center col-span-2">
+            <span className="text-[9px] text-neutral-400 uppercase tracking-wider font-bold block mb-1">{t("pit.stintLaps")}</span>
+            <span className="text-2xl font-black text-neutral-200">{stintLaps > 0 ? stintLaps : "-"}</span>
           </div>
         </div>
 
