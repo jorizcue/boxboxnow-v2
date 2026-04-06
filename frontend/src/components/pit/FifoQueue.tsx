@@ -92,22 +92,26 @@ export function FifoQueue() {
     : 0;
 
   // Average future stint time calculation
-  // Formula: (remainingRaceTime - pitTimePending) / remainingPits
-  // This tells you how long each future stint AFTER the current one will last
+  // Formula: (configuredDuration - elapsed - pitTimePending) / remainingPits
+  // Uses config.durationMin (user-configured) as total race time, NOT the Apex
+  // countdown which may reflect a single heat rather than the full endurance race.
   const avgFutureStint = useMemo(() => {
     if (!ourKart || raceClockMs === 0 || raceFinished) return null;
     const remainingPits = Math.max(0, config.minPits - ourKart.pitCount);
     if (remainingPits <= 0) return null; // all pits done, no future stints
-    const remainingRaceMin = raceClockMs / 1000 / 60;
+    const totalRaceMin = config.durationMin;
+    // Elapsed = how far into the Apex countdown we are (durationMs is the initial countdown)
+    const elapsedMs = durationMs > 0 ? Math.max(0, durationMs - raceClockMs) : 0;
+    const elapsedMin = elapsedMs / 1000 / 60;
     const futureTimeInPitMin = remainingPits * config.pitTimeS / 60;
-    const availableRaceMin = remainingRaceMin - futureTimeInPitMin;
+    const availableRaceMin = totalRaceMin - elapsedMin - futureTimeInPitMin;
     if (availableRaceMin <= 0) return null;
     const avgMin = availableRaceMin / remainingPits;
     // Red: avg > maxStint (can't pit yet) or avg approaching minStint
     const tooEarly = avgMin > config.maxStintMin;
     const tooLate = avgMin <= config.minStintMin + 5;
     return { avgMin, warn: tooEarly || tooLate };
-  }, [ourKart, raceClockMs, raceFinished, config.minPits, config.pitTimeS, config.pitTimeS, config.minStintMin, config.maxStintMin]);
+  }, [ourKart, raceClockMs, durationMs, raceFinished, config.durationMin, config.minPits, config.pitTimeS, config.minStintMin, config.maxStintMin]);
 
   const kartsNearPit = sorted.filter((k) => {
     const stintSec = stintSecondsFor(k);
