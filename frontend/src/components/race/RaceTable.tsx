@@ -112,7 +112,7 @@ export function RaceTable() {
       <div className="sticky-cards sticky top-0 z-20 bg-black pb-2">
         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-1.5 sm:gap-2">
           {/* Driver / Last lap */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.driverLastLap")}
             </span>
@@ -135,7 +135,7 @@ export function RaceTable() {
           </div>
 
           {/* Avg 20 laps */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.avgLap")}
             </span>
@@ -145,7 +145,7 @@ export function RaceTable() {
           </div>
 
           {/* Position by avg */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.avgPosition")}
             </span>
@@ -158,7 +158,7 @@ export function RaceTable() {
           </div>
 
           {/* Stint time */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.currentStint")}
             </span>
@@ -168,7 +168,7 @@ export function RaceTable() {
           </div>
 
           {/* Time to max stint */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.timeToMaxStint")}
             </span>
@@ -178,7 +178,7 @@ export function RaceTable() {
           </div>
 
           {/* Laps to max stint */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.lapsToMaxStint")}
             </span>
@@ -188,7 +188,7 @@ export function RaceTable() {
           </div>
 
           {/* Karts near pit */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.kartsNearPit")}
             </span>

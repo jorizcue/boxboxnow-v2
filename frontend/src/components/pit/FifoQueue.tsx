@@ -203,7 +203,7 @@ export function FifoQueue() {
       <div className="sticky-cards sticky top-0 z-20 bg-black pb-2">
         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-1.5 sm:gap-2">
           {/* Driver / Last lap */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.driverLastLap")}
             </span>
@@ -226,7 +226,7 @@ export function FifoQueue() {
           </div>
 
           {/* Avg 20 laps */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.avgLap")}
             </span>
@@ -236,7 +236,7 @@ export function FifoQueue() {
           </div>
 
           {/* Position by avg */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.avgPosition")}
             </span>
@@ -249,7 +249,7 @@ export function FifoQueue() {
           </div>
 
           {/* Stint time */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.currentStint")}
             </span>
@@ -259,7 +259,7 @@ export function FifoQueue() {
           </div>
 
           {/* Time to max stint */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.timeToMaxStint")}
             </span>
@@ -269,7 +269,7 @@ export function FifoQueue() {
           </div>
 
           {/* Laps to max stint */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.lapsToMaxStint")}
             </span>
@@ -279,7 +279,7 @@ export function FifoQueue() {
           </div>
 
           {/* Karts near pit */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.kartsNearPit")}
             </span>
@@ -606,7 +606,7 @@ function AdjustableCard({ label, value, field, min, max }: {
   }, [value, field, configKey, min, max]);
 
   return (
-    <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-center">
+    <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
       <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1 text-center leading-tight">
         {label}
       </span>
@@ -745,7 +745,7 @@ function KartDetailModal({ entry, onClose }: {
 function PitCard({ label, value, accent, warn }: { label: string; value: string; accent?: boolean; warn?: boolean }) {
   return (
     <div className={clsx(
-      "bg-surface rounded-xl border p-2 sm:p-3 flex flex-col items-center justify-center",
+      "bg-surface rounded-xl border p-2 sm:p-3 flex flex-col items-center justify-between",
       warn ? "border-red-500/50" : accent ? "border-accent/40" : "border-border"
     )}>
       <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1 text-center leading-tight">
