@@ -418,7 +418,7 @@ class RaceStateManager:
             duration_total_ms = self.duration_min * 60 * 1000
             on_track_ms = kart.stint_start_countdown_ms - self.countdown_ms
             race_time_ms = duration_total_ms - self.countdown_ms if self.countdown_ms > 0 else abs(self.countdown_ms) + duration_total_ms
-            stint_laps = kart.stint_lap_count()
+            stint_laps = sum(1 for lap in kart.all_laps if lap.get("pitNumber") == kart.pit_count - 1)
 
             # Update per-driver cumulative time
             driver = kart.driver_name or "Unknown"
