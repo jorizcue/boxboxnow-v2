@@ -263,6 +263,50 @@ class RaceStateManager:
             elif updates:
                 await self._broadcast({"type": "update", "events": updates})
 
+    def _record_lap(self, kart: KartState, row_id: str, lap_ms: int,
+                    lap_class: str = "tn") -> dict:
+        """Record a lap for a kart. Handles counting, filtering, analytics.
+        Returns the lap event dict for broadcast."""
+        kart.total_laps += 1
+        now_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+        lap_record = {
+            "lapTime": lap_ms,
+            "totalLap": kart.total_laps,
+            "pitNumber": kart.pit_count,
+            "kartNumber": kart.kart_number,
+            "driverName": kart.driver_name,
+            "created_at": now_str,
+        }
+
+        # Always add to all_laps
+        kart.all_laps.append(lap_record)
+
+        # Outlier filter:
+        # 1. Skip if total_lap <= lastPitLap + num_vueltas_descarte
+        # 2. Skip if lap_time > lastLapTime + diferencial_vueltas AND not rain
+        is_valid = True
+        if kart.total_laps <= kart.last_pit_lap + self.laps_discard:
+            is_valid = False
+        elif kart.last_lap_ms > 0 and not self.rain_mode:
+            if lap_ms > kart.last_lap_ms + self.lap_differential:
+                is_valid = False
+
+        if is_valid:
+            kart.valid_laps.append(lap_record)
+
+        # Update lastLapTime AFTER filter check (matches original order)
+        kart.last_lap_ms = lap_ms
+        if kart.best_lap_ms <= 0 or lap_ms < kart.best_lap_ms:
+            kart.best_lap_ms = lap_ms
+
+        # Accumulate stint elapsed time
+        kart.stint_elapsed_ms += lap_ms
+
+        return {"event": "lap", "rowId": row_id,
+                "kartNumber": kart.kart_number,
+                "lapTimeMs": lap_ms,
+                "lapClass": lap_class}
+
     def _apply_event(self, event: RaceEvent) -> dict | None:
         """Apply a single event to state. Returns update dict for broadcast."""
         row_id = event.row_id
@@ -342,45 +386,8 @@ class RaceStateManager:
                 # already matches Apex, this c7 update is NOT a new lap.
                 if kart.apex_total_laps > 0 and kart.total_laps >= kart.apex_total_laps:
                     return None
-                kart.total_laps += 1
-                now_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
-                lap_record = {
-                    "lapTime": lap_ms,
-                    "totalLap": kart.total_laps,
-                    "pitNumber": kart.pit_count,
-                    "kartNumber": kart.kart_number,
-                    "driverName": kart.driver_name,
-                    "created_at": now_str,
-                }
-
-                # Always add to all_laps (stage_laps_clasif equivalent)
-                kart.all_laps.append(lap_record)
-
-                # Outlier filter - exact port of original:
-                # 1. Skip if total_lap <= lastPitLap + num_vueltas_descarte
-                # 2. Skip if lap_time > lastLapTime + diferencial_vueltas AND not rain
-                is_valid = True
-                if kart.total_laps <= kart.last_pit_lap + self.laps_discard:
-                    is_valid = False
-                elif kart.last_lap_ms > 0 and not self.rain_mode:
-                    if lap_ms > kart.last_lap_ms + self.lap_differential:
-                        is_valid = False
-
-                if is_valid:
-                    kart.valid_laps.append(lap_record)
-
-                # Update lastLapTime AFTER filter check (matches original order)
-                kart.last_lap_ms = lap_ms
-                if kart.best_lap_ms <= 0 or lap_ms < kart.best_lap_ms:
-                    kart.best_lap_ms = lap_ms
-
-                # Accumulate stint elapsed time (works for both live and replay)
-                kart.stint_elapsed_ms += lap_ms
-
-                return {"event": "lap", "rowId": row_id,
-                        "kartNumber": kart.kart_number,
-                        "lapTimeMs": lap_ms,
-                        "lapClass": event.extra.get("class", "tn")}
+                return self._record_lap(kart, row_id, lap_ms,
+                                        event.extra.get("class", "tn"))
 
         elif event.type == EventType.LAP_MS:
             # The r{id}|*|{ms}| pattern is NOT a lap event.
@@ -476,49 +483,20 @@ class RaceStateManager:
             new_total = int(event.value) if event.value.strip().isdigit() else 0
             if new_total <= 0:
                 return None
-            prev_apex = kart.apex_total_laps
+
+            # Before updating apex_total_laps, check if previous increment
+            # never got a corresponding LAP (c7). If so, generate the missed
+            # lap(s) now — before the new c6 value overtakes.
+            result = None
+            if (kart.apex_total_laps > 0
+                    and kart.total_laps < kart.apex_total_laps
+                    and kart.last_lap_ms > 0):
+                # Missed lap(s) from previous c6 increment — generate with last known time
+                while kart.total_laps < kart.apex_total_laps:
+                    result = self._record_lap(kart, row_id, kart.last_lap_ms, "tn")
+
             kart.apex_total_laps = new_total
-
-            # Detect missed laps: Apex c6 incremented but no LAP (c7) arrived.
-            # This happens when two consecutive laps have identical time + class,
-            # so Apex doesn't resend the c7 cell.
-            if new_total > prev_apex and kart.total_laps < new_total and kart.last_lap_ms > 0:
-                # Generate the missing lap(s) using the last known lap time
-                results = []
-                while kart.total_laps < new_total:
-                    kart.total_laps += 1
-                    lap_ms = kart.last_lap_ms
-                    now_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
-                    lap_record = {
-                        "lapTime": lap_ms,
-                        "totalLap": kart.total_laps,
-                        "pitNumber": kart.pit_count,
-                        "kartNumber": kart.kart_number,
-                        "driverName": kart.driver_name,
-                        "created_at": now_str,
-                    }
-                    kart.all_laps.append(lap_record)
-
-                    is_valid = True
-                    if kart.total_laps <= kart.last_pit_lap + self.laps_discard:
-                        is_valid = False
-                    elif not self.rain_mode:
-                        # Same lap time as previous → always valid (no differential spike)
-                        pass
-                    if is_valid:
-                        kart.valid_laps.append(lap_record)
-
-                    kart.stint_elapsed_ms += lap_ms
-
-                    results.append({"event": "lap", "rowId": row_id,
-                                    "kartNumber": kart.kart_number,
-                                    "lapTimeMs": lap_ms,
-                                    "lapClass": "tn"})
-
-                # Return the last generated lap event
-                return results[-1] if results else None
-
-            return None
+            return result
 
         elif event.type == EventType.PIT_TIME and kart:
             kart.pit_time = event.value
