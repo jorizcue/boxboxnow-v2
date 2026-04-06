@@ -92,21 +92,22 @@ export function FifoQueue() {
     : 0;
 
   // Average future stint time calculation
+  // Formula: (remainingRaceTime - pitTimePending) / remainingPits
+  // This tells you how long each future stint AFTER the current one will last
   const avgFutureStint = useMemo(() => {
     if (!ourKart || raceClockMs === 0 || raceFinished) return null;
-    const pitsDone = ourKart.pitCount;
-    const remainingPits = Math.max(0, config.minPits - pitsDone);
-    const remainingStints = remainingPits + 1; // includes current stint
+    const remainingPits = Math.max(0, config.minPits - ourKart.pitCount);
+    if (remainingPits <= 0) return null; // all pits done, no future stints
     const remainingRaceMin = raceClockMs / 1000 / 60;
     const futureTimeInPitMin = remainingPits * config.pitTimeS / 60;
     const availableRaceMin = remainingRaceMin - futureTimeInPitMin;
-    if (availableRaceMin <= 0 || remainingStints <= 0) return null;
-    const avgMin = availableRaceMin / remainingStints;
-    // Warning: within 5 min of min or max stint
-    const nearMin = avgMin <= config.minStintMin + 5;
-    const nearMax = avgMin >= config.maxStintMin - 5;
-    return { avgMin, nearMin, nearMax };
-  }, [ourKart, raceClockMs, raceFinished, config.minPits, config.pitTimeS, config.minStintMin, config.maxStintMin]);
+    if (availableRaceMin <= 0) return null;
+    const avgMin = availableRaceMin / remainingPits;
+    // Red: avg > maxStint (can't pit yet) or avg approaching minStint
+    const tooEarly = avgMin > config.maxStintMin;
+    const tooLate = avgMin <= config.minStintMin + 5;
+    return { avgMin, warn: tooEarly || tooLate };
+  }, [ourKart, raceClockMs, raceFinished, config.minPits, config.pitTimeS, config.pitTimeS, config.minStintMin, config.maxStintMin]);
 
   const kartsNearPit = sorted.filter((k) => {
     const stintSec = stintSecondsFor(k);
@@ -376,7 +377,7 @@ export function FifoQueue() {
         <PitCard
           label={t("pit.avgFutureStint")}
           value={avgFutureStint ? secondsToHMS(Math.round(avgFutureStint.avgMin * 60)) : "-"}
-          warn={avgFutureStint ? (avgFutureStint.nearMin || avgFutureStint.nearMax) : false}
+          warn={avgFutureStint ? avgFutureStint.warn : false}
         />
         {/* Box lines (+/-) */}
         <AdjustableCard
