@@ -307,7 +307,7 @@ class RaceStateManager:
                 "lapTimeMs": lap_ms,
                 "lapClass": lap_class,
                 "totalLaps": kart.total_laps}
-        logger.debug(f"LAP kart={kart.kart_number} totalLaps={kart.total_laps} lapMs={lap_ms}")
+        logger.info(f"LAP kart={kart.kart_number} totalLaps={kart.total_laps} lapMs={lap_ms}")
         return lap_evt
 
     def _apply_event(self, event: RaceEvent) -> dict | None:
