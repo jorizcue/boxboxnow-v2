@@ -331,7 +331,7 @@ export function FifoQueue() {
                     const team = entryTeam(entry);
                     const driver = entryDriver(entry);
                     const kartNum = typeof entry === "object" && entry ? entry.kartNumber : null;
-                    const isFrozen = kartNum !== null ? frozenKarts.has(kartNum) : score === 25;
+                    const isFrozen = kartNum ? frozenKarts.has(kartNum) : true;
                     const hasInfo = team || driver;
                     return (
                       <button
