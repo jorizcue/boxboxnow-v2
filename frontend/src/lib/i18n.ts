@@ -46,6 +46,7 @@ const translations: Record<string, Record<Language, string>> = {
   "nav.config": { es: "Config", en: "Config", it: "Config", de: "Config" },
   "nav.admin": { es: "Admin", en: "Admin", it: "Admin", de: "Admin" },
   "nav.adjusted": { es: "Clasif. Real", en: "Real Class.", it: "Class. Reale", de: "Echte Klass." },
+  "nav.driver": { es: "Vista Piloto", en: "Driver View", it: "Vista Pilota", de: "Fahreransicht" },
   "nav.adjustedShort": { es: "C.Real", en: "Real", it: "Reale", de: "Echt" },
   "nav.replay": { es: "Replay", en: "Replay", it: "Replay", de: "Replay" },
   "nav.analytics": { es: "Kart Analytics", en: "Kart Analytics", it: "Kart Analytics", de: "Kart Analytics" },

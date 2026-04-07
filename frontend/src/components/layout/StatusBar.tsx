@@ -264,24 +264,6 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
           {/* Right: user + actions */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <span className="text-[10px] sm:text-xs text-neutral-200 hidden sm:inline">{username}</span>
-            <button
-              onClick={() => {
-                window.open(
-                  "/driver",
-                  "bbn-driver",
-                  "width=800,height=400,menubar=no,toolbar=no,location=no,status=no"
-                );
-              }}
-              className="text-[10px] sm:text-[11px] text-neutral-400 hover:text-accent transition-colors"
-              title={t("driver.open")}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="9" />
-                <path strokeLinecap="round" d="M5.5 16.5c2-1.5 4.5-2 6.5-2s4.5.5 6.5 2" />
-                <path strokeLinecap="round" d="M7 8.5h2M15 8.5h2" />
-                <path strokeLinecap="round" d="M12 7v4" />
-              </svg>
-            </button>
             <select
               value={lang}
               onChange={(e) => setLang(e.target.value as any)}

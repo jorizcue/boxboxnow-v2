@@ -55,6 +55,7 @@ const ALL_TAB_OPTIONS: [string, string][] = [
   ["pit", "Box"],
   ["live", "Live"],
   ["adjusted", "C.Real"],
+  ["driver", "Piloto"],
   ["config", "Config"],
   ["replay", "Replay"],
   ["analytics", "Analytics"],

@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { useT } from "@/lib/i18n";
 import { useRaceStore } from "@/hooks/useRaceState";
 
-export type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "config" | "replay" | "analytics" | "admin-users" | "admin-circuits" | "admin-hub";
+export type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "driver" | "config" | "replay" | "analytics" | "admin-users" | "admin-circuits" | "admin-hub";
 
 interface SidebarProps {
   activeTab: Tab;
@@ -48,6 +48,14 @@ const TAB_ICONS: Record<string, JSX.Element> = {
   adjusted: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25" />
+    </svg>
+  ),
+  driver: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" />
+      <path strokeLinecap="round" d="M5.5 16.5c2-1.5 4.5-2 6.5-2s4.5.5 6.5 2" />
+      <path strokeLinecap="round" d="M7 8.5h2M15 8.5h2" />
+      <path strokeLinecap="round" d="M12 7v4" />
     </svg>
   ),
   config: (
@@ -124,6 +132,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
     { id: "pit", labelKey: "nav.box", tabAccess: "pit" },
     { id: "live", labelKey: "nav.live", tabAccess: "live" },
     { id: "adjusted", labelKey: "nav.adjusted", tabAccess: "adjusted" },
+    { id: "driver", labelKey: "nav.driver", tabAccess: "driver" },
     { id: "config", labelKey: "nav.config", tabAccess: "config" },
   ];
 
