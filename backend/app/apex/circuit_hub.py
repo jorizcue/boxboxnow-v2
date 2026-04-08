@@ -249,12 +249,12 @@ class CircuitConnection:
         try:
             events = self._lap_parser.parse(message)
             if events:
-                await self._lap_state.handle_events(events)
-                has_laps = any(e.type == EventType.LAP for e in events)
                 has_init = any(e.type == EventType.INIT and e.value == "init" for e in events)
                 if has_init:
-                    # New race: finalize previous race_log and reset
+                    # New race: finalize previous race_log and reset state
                     await self._finalize_lap_race_log()
+                await self._lap_state.handle_events(events)
+                has_laps = any(e.type == EventType.LAP for e in events)
                 if has_laps:
                     self._lap_save_counter += 1
                     if self._lap_save_counter >= 5:  # batch every 5 lap events
@@ -504,9 +504,13 @@ class CircuitConnection:
             async with self._lap_save_lock:
                 async with async_session() as db:
                     if self._lap_race_log_id is None:
-                        # Use track_name as session identifier to avoid duplicates
-                        # from WS reconnections within the same race
-                        session_name = self._lap_state.track_name or f"Auto {self.circuit_name}"
+                        # Use track_name + session_title to distinguish heats/races
+                        # within the same day at the same circuit
+                        parts = [p for p in (
+                            self._lap_state.track_name,
+                            self._lap_state.session_title,
+                        ) if p]
+                        session_name = " - ".join(parts) if parts else f"Auto {self.circuit_name}"
                         today_start = datetime.now(timezone.utc).replace(
                             hour=0, minute=0, second=0, microsecond=0)
 
@@ -581,6 +585,7 @@ class CircuitConnection:
                 from app.models.schemas import RaceLog
                 from sqlalchemy import update
 
+                total_laps = sum(len(k.all_laps) for k in self._lap_state.karts.values())
                 async with async_session() as db:
                     await db.execute(
                         update(RaceLog)
@@ -589,13 +594,15 @@ class CircuitConnection:
                     )
                     await db.commit()
                 logger.info(f"[{self.circuit_name}] Auto race_log #{self._lap_race_log_id} finalized "
-                            f"({len(self._lap_state.karts)} karts)")
+                            f"({len(self._lap_state.karts)} karts, {total_laps} laps)")
             except Exception as e:
                 logger.error(f"[{self.circuit_name}] Auto race_log finalize failed: {e}")
 
         self._lap_race_log_id = None
         self._lap_saved_per_kart.clear()
         self._lap_save_counter = 0
+        # Reset lap state so next race starts fresh
+        self._lap_state.reset()
 
     async def _restore_from_db(self):
         """Restore live race state from DB on startup (if backend restarted mid-race)."""
