@@ -7,6 +7,7 @@ import { msToLapTime, tierHex } from "@/lib/formatters";
 import { getDriverChannel } from "@/lib/driverChannel";
 import { useT } from "@/lib/i18n";
 import { useRaceBox, useRaceBoxStore } from "@/hooks/useRaceBox";
+import { usePhoneGps } from "@/hooks/usePhoneGps";
 
 /* ------------------------------------------------------------------ */
 /*  Persistent card order                                              */
@@ -231,9 +232,12 @@ export function DriverView() {
     useTouchDrag(cardOrder, setCardOrder);
   const boxAlert = useBoxAlert();
 
-  // RaceBox GPS
+  // GPS sources (RaceBox BLE or phone GPS)
   const raceBox = useRaceBox();
+  const phoneGps = usePhoneGps();
   const gps = useRaceBoxStore();
+  const gpsConnected = raceBox.status === "connected" || phoneGps.status === "connected";
+  const gpsSource = raceBox.status === "connected" ? "racebox" : phoneGps.status === "connected" ? "phone" : null;
 
   // Hydrate order from localStorage on mount
   useEffect(() => {
@@ -545,7 +549,7 @@ export function DriverView() {
           ? "from-green-500/25 to-green-500/5 border-green-400/50"
           : "from-red-500/25 to-red-500/5 border-red-400/50"
         : "from-cyan-500/20 to-cyan-500/5 border-cyan-500/30",
-      content: raceBox.status !== "connected" ? (
+      content: !gpsConnected ? (
         <span className="text-lg text-neutral-600 font-mono">GPS --</span>
       ) : gps.deltaMs !== null ? (
         <div className="flex flex-col items-center">
@@ -574,7 +578,7 @@ export function DriverView() {
     gpsSpeed: {
       label: t("driver.gpsSpeed"),
       accent: "from-sky-500/20 to-sky-500/5 border-sky-500/30",
-      content: raceBox.status !== "connected" ? (
+      content: !gpsConnected ? (
         <span className="text-lg text-neutral-600 font-mono">GPS --</span>
       ) : (
         <div className="flex flex-col items-center">
@@ -598,7 +602,7 @@ export function DriverView() {
         if (lat > 0.7) return "from-yellow-500/20 to-yellow-500/5 border-yellow-400/40";
         return "from-emerald-500/20 to-emerald-500/5 border-emerald-500/30";
       })(),
-      content: raceBox.status !== "connected" ? (
+      content: !gpsConnected ? (
         <span className="text-lg text-neutral-600 font-mono">GPS --</span>
       ) : (
         <div className="flex flex-col items-center gap-1">
@@ -641,32 +645,58 @@ export function DriverView() {
           {t("driver.title")} — K{ourKart}
         </span>
         <div className="flex items-center gap-2">
-          {/* RaceBox BLE button */}
-          {raceBox.supported && (
+          {/* GPS connect buttons */}
+          {gpsConnected ? (
             <button
-              onClick={() => {
-                if (raceBox.status === "connected") {
-                  setShowGpsSetup(!showGpsSetup);
-                } else {
-                  raceBox.connect();
-                }
-              }}
-              className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded transition-colors ${
-                raceBox.status === "connected"
-                  ? "bg-cyan-900/40 text-cyan-400 border border-cyan-700/40"
-                  : raceBox.status === "connecting"
-                    ? "bg-blue-900/30 text-blue-400 animate-pulse"
-                    : "text-neutral-500 hover:text-cyan-400 border border-transparent hover:border-cyan-700/30"
-              }`}
-              title={raceBox.status === "connected" ? t("driver.gpsDisconnect") : t("driver.gpsConnect")}
+              onClick={() => setShowGpsSetup(!showGpsSetup)}
+              className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-cyan-900/40 text-cyan-400 border border-cyan-700/40 transition-colors"
+              title={gpsSource === "racebox" ? "RaceBox GPS" : "Phone GPS"}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546" />
+                {gpsSource === "racebox" ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                )}
               </svg>
-              {raceBox.status === "connected" && gps.sample && (
+              {gpsSource === "racebox" && gps.sample && (
                 <span className="font-mono">{gps.sample.numSatellites}{t("driver.gpsSat")}</span>
               )}
+              {gpsSource === "phone" && (
+                <span className="font-mono">GPS</span>
+              )}
             </button>
+          ) : (raceBox.status === "connecting" || phoneGps.status === "connecting") ? (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-900/30 text-blue-400 animate-pulse">
+              GPS...
+            </span>
+          ) : (
+            <>
+              {raceBox.supported && (
+                <button
+                  onClick={() => raceBox.connect()}
+                  className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded text-neutral-500 hover:text-cyan-400 border border-transparent hover:border-cyan-700/30 transition-colors"
+                  title="RaceBox BLE"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546" />
+                  </svg>
+                  <span>BLE</span>
+                </button>
+              )}
+              {phoneGps.supported && (
+                <button
+                  onClick={() => phoneGps.connect()}
+                  className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded text-neutral-500 hover:text-cyan-400 border border-transparent hover:border-cyan-700/30 transition-colors"
+                  title="Phone GPS"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                  </svg>
+                  <span>GPS</span>
+                </button>
+              )}
+            </>
           )}
           <button
             onClick={() => setEditMode(!editMode)}
@@ -680,8 +710,11 @@ export function DriverView() {
       </div>
 
       {/* GPS setup panel (finish line) */}
-      {showGpsSetup && raceBox.status === "connected" && (
-        <GpsSetupPanel onClose={() => setShowGpsSetup(false)} />
+      {showGpsSetup && gpsConnected && (
+        <GpsSetupPanel onClose={() => setShowGpsSetup(false)} gpsSource={gpsSource} onDisconnect={() => {
+          if (gpsSource === "racebox") raceBox.disconnect();
+          else phoneGps.disconnect();
+        }} />
       )}
 
       {/* Cards grid */}
@@ -690,7 +723,7 @@ export function DriverView() {
           {cardOrder
             .filter((id) => {
               // Hide GPS cards when RaceBox is not connected (unless in edit mode)
-              if (!editMode && raceBox.status !== "connected" && (id === "gpsLapDelta" || id === "gpsSpeed" || id === "gpsGForce")) return false;
+              if (!editMode && !gpsConnected && (id === "gpsLapDelta" || id === "gpsSpeed" || id === "gpsGForce")) return false;
               return true;
             })
             .map((cardId, index) => {
@@ -738,10 +771,9 @@ export function DriverView() {
 /*  GPS Setup Panel (finish line configuration)                        */
 /* ------------------------------------------------------------------ */
 
-function GpsSetupPanel({ onClose }: { onClose: () => void }) {
+function GpsSetupPanel({ onClose, gpsSource, onDisconnect }: { onClose: () => void; gpsSource: "racebox" | "phone" | null; onDisconnect: () => void }) {
   const t = useT();
   const { sample, finishLine, setFinishLine, reset } = useRaceBoxStore();
-  const { disconnect } = useRaceBox();
   const [p1, setP1] = useState(finishLine?.p1 ?? null);
   const [p2, setP2] = useState(finishLine?.p2 ?? null);
 
@@ -764,7 +796,7 @@ function GpsSetupPanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="bg-neutral-900/95 border-b border-cyan-800/30 px-3 py-2 space-y-2 text-xs">
       <div className="flex items-center justify-between">
-        <span className="font-bold text-cyan-400 uppercase tracking-wider text-[10px]">RaceBox GPS</span>
+        <span className="font-bold text-cyan-400 uppercase tracking-wider text-[10px]">{gpsSource === "racebox" ? "RaceBox GPS" : "Phone GPS"}</span>
         <div className="flex items-center gap-2">
           <button
             onClick={() => { reset(); }}
@@ -773,7 +805,7 @@ function GpsSetupPanel({ onClose }: { onClose: () => void }) {
             Reset
           </button>
           <button
-            onClick={() => { disconnect(); onClose(); }}
+            onClick={() => { onDisconnect(); onClose(); }}
             className="text-neutral-500 hover:text-red-400 text-[10px] px-1.5 py-0.5 rounded border border-neutral-700 hover:border-red-700/40"
           >
             {t("driver.gpsDisconnect")}
