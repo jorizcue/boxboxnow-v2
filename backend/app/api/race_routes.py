@@ -72,6 +72,10 @@ async def ensure_monitoring(app_state, user_id: int):
         min_driver_time_min=session.min_driver_time_min,
         pit_closed_start_min=session.pit_closed_start_min or 0,
         pit_closed_end_min=session.pit_closed_end_min or 0,
+        finish_lat1=circuit.finish_lat1,
+        finish_lon1=circuit.finish_lon1,
+        finish_lat2=circuit.finish_lat2,
+        finish_lon2=circuit.finish_lon2,
     )
 
     # Configure PHP API client for driver auto-loading

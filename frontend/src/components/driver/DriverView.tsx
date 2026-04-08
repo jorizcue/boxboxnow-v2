@@ -240,6 +240,16 @@ export function DriverView() {
     setCardOrder(loadOrder());
   }, []);
 
+  // Sync finish line from circuit config to RaceBox store
+  useEffect(() => {
+    if (config.finishLat1 && config.finishLon1 && config.finishLat2 && config.finishLon2) {
+      gps.setFinishLine({
+        p1: { lat: config.finishLat1, lon: config.finishLon1 },
+        p2: { lat: config.finishLat2, lon: config.finishLon2 },
+      });
+    }
+  }, [config.finishLat1, config.finishLon1, config.finishLat2, config.finishLon2]);
+
   const circuitLengthM = config.circuitLengthM || 1100;
   const pitTimeS = config.pitTimeS || 0;
   const ourKart = config.ourKartNumber;

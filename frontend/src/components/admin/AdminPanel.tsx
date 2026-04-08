@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { api } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { CalendarPicker } from "@/components/shared/CalendarPicker";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
+
+const FinishLineMap = lazy(() => import("@/components/admin/FinishLineMap"));
 
 interface UserRow {
   id: number;
@@ -27,6 +29,10 @@ interface CircuitRow {
   php_api_url: string | null;
   live_timing_url: string | null;
   retention_days: number;
+  finish_lat1: number | null;
+  finish_lon1: number | null;
+  finish_lat2: number | null;
+  finish_lon2: number | null;
 }
 
 interface AccessRow {
@@ -570,6 +576,10 @@ interface CircuitForm {
   php_api_url: string;
   live_timing_url: string;
   retention_days: string;
+  finish_lat1: string;
+  finish_lon1: string;
+  finish_lat2: string;
+  finish_lon2: string;
 }
 
 const emptyForm: CircuitForm = {
@@ -584,6 +594,10 @@ const emptyForm: CircuitForm = {
   php_api_url: "",
   live_timing_url: "",
   retention_days: "30",
+  finish_lat1: "",
+  finish_lon1: "",
+  finish_lat2: "",
+  finish_lon2: "",
 };
 
 function circuitToForm(c: CircuitRow): CircuitForm {
@@ -599,6 +613,10 @@ function circuitToForm(c: CircuitRow): CircuitForm {
     php_api_url: c.php_api_url ?? "",
     live_timing_url: c.live_timing_url ?? "",
     retention_days: (c.retention_days ?? 30).toString(),
+    finish_lat1: c.finish_lat1?.toString() ?? "",
+    finish_lon1: c.finish_lon1?.toString() ?? "",
+    finish_lat2: c.finish_lat2?.toString() ?? "",
+    finish_lon2: c.finish_lon2?.toString() ?? "",
   };
 }
 
@@ -615,6 +633,10 @@ function formToPayload(f: CircuitForm) {
     php_api_url: f.php_api_url || null,
     live_timing_url: f.live_timing_url || null,
     retention_days: Number(f.retention_days) || 30,
+    finish_lat1: f.finish_lat1 ? Number(f.finish_lat1) : null,
+    finish_lon1: f.finish_lon1 ? Number(f.finish_lon1) : null,
+    finish_lat2: f.finish_lat2 ? Number(f.finish_lat2) : null,
+    finish_lon2: f.finish_lon2 ? Number(f.finish_lon2) : null,
   };
 }
 
@@ -783,6 +805,31 @@ function CircuitsManager() {
 
             {fieldInput("PHP API URL", "php_api_url", "text", "http://...")}
             {fieldInput("Live Timing URL", "live_timing_url", "text", "https://...")}
+
+            {/* Finish Line Map */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-neutral-400 uppercase tracking-wider">Finish Line (GPS)</label>
+              <Suspense fallback={<div className="h-[300px] bg-white/5 rounded-lg animate-pulse" />}>
+                <FinishLineMap
+                  p1={form.finish_lat1 && form.finish_lon1 ? { lat: Number(form.finish_lat1), lng: Number(form.finish_lon1) } : null}
+                  p2={form.finish_lat2 && form.finish_lon2 ? { lat: Number(form.finish_lat2), lng: Number(form.finish_lon2) } : null}
+                  onChange={(p1, p2) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      finish_lat1: p1 ? p1.lat.toFixed(7) : "",
+                      finish_lon1: p1 ? p1.lng.toFixed(7) : "",
+                      finish_lat2: p2 ? p2.lat.toFixed(7) : "",
+                      finish_lon2: p2 ? p2.lng.toFixed(7) : "",
+                    }));
+                  }}
+                />
+              </Suspense>
+              {form.finish_lat1 && form.finish_lon1 && form.finish_lat2 && form.finish_lon2 && (
+                <div className="text-[10px] text-neutral-500 mt-1">
+                  P1: {Number(form.finish_lat1).toFixed(6)}, {Number(form.finish_lon1).toFixed(6)} &mdash; P2: {Number(form.finish_lat2).toFixed(6)}, {Number(form.finish_lon2).toFixed(6)}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex gap-2 pt-1 max-w-xs">

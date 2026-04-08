@@ -35,6 +35,10 @@ class Circuit(Base):
     php_api_url = Column(String(255), default="")
     live_timing_url = Column(String(255), default="")
     retention_days = Column(Integer, default=30, nullable=False)
+    finish_lat1 = Column(Float, nullable=True)
+    finish_lon1 = Column(Float, nullable=True)
+    finish_lat2 = Column(Float, nullable=True)
+    finish_lon2 = Column(Float, nullable=True)
 
     user_access = relationship("UserCircuitAccess", back_populates="circuit", cascade="all, delete-orphan")
 

@@ -76,6 +76,10 @@ class CircuitOut(BaseModel):
     php_api_url: str | None = None
     live_timing_url: str | None = None
     retention_days: int = 30
+    finish_lat1: float | None = None
+    finish_lon1: float | None = None
+    finish_lat2: float | None = None
+    finish_lon2: float | None = None
 
     model_config = {"from_attributes": True}
 
@@ -92,6 +96,10 @@ class CircuitCreate(BaseModel):
     php_api_url: str | None = None
     live_timing_url: str | None = None
     retention_days: int = 30
+    finish_lat1: float | None = None
+    finish_lon1: float | None = None
+    finish_lat2: float | None = None
+    finish_lon2: float | None = None
 
 
 class CircuitUpdate(BaseModel):
@@ -106,6 +114,10 @@ class CircuitUpdate(BaseModel):
     php_api_url: str | None = None
     live_timing_url: str | None = None
     retention_days: int | None = None
+    finish_lat1: float | None = None
+    finish_lon1: float | None = None
+    finish_lat2: float | None = None
+    finish_lon2: float | None = None
 
 
 # --- User Circuit Access ---

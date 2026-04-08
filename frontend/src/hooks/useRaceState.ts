@@ -69,6 +69,10 @@ const defaultConfig: RaceConfig = {
   pitClosedStartMin: 0,
   pitClosedEndMin: 0,
   rain: false,
+  finishLat1: null,
+  finishLon1: null,
+  finishLat2: null,
+  finishLon2: null,
 };
 
 export const useRaceStore = create<RaceStore>((set) => ({

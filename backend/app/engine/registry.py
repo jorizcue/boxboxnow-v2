@@ -334,7 +334,9 @@ class UserSession:
                   max_stint_min: int, min_stint_min: int, box_lines: int,
                   box_karts: int, duration_min: int, refresh_s: int,
                   min_driver_time_min: int = 30,
-                  pit_closed_start_min: int = 0, pit_closed_end_min: int = 0):
+                  pit_closed_start_min: int = 0, pit_closed_end_min: int = 0,
+                  finish_lat1: float | None = None, finish_lon1: float | None = None,
+                  finish_lat2: float | None = None, finish_lon2: float | None = None):
         """Apply race session config to state and fifo."""
         self.state.circuit_length_m = circuit_length_m or 1100
         self.state.pit_time_s = pit_time_s or 120
@@ -350,6 +352,10 @@ class UserSession:
         self.state.pit_closed_end_min = pit_closed_end_min
         self.state.box_lines = box_lines
         self.state.box_karts = box_karts
+        self.state.finish_lat1 = finish_lat1
+        self.state.finish_lon1 = finish_lon1
+        self.state.finish_lat2 = finish_lat2
+        self.state.finish_lon2 = finish_lon2
         self.state.update_duration(duration_min)
         self._refresh_s = refresh_s
         self.fifo.update_config(box_karts, box_lines)
@@ -571,6 +577,10 @@ class UserSession:
                                     "minDriverTimeMin": self.state.min_driver_time_min,
                                     "pitClosedStartMin": self.state.pit_closed_start_min,
                                     "pitClosedEndMin": self.state.pit_closed_end_min,
+                                    "finishLat1": self.state.finish_lat1,
+                                    "finishLon1": self.state.finish_lon1,
+                                    "finishLat2": self.state.finish_lat2,
+                                    "finishLon2": self.state.finish_lon2,
                                 },
                             },
                         }
@@ -921,6 +931,10 @@ class ReplaySession:
                                     "minDriverTimeMin": self.state.min_driver_time_min,
                                     "pitClosedStartMin": self.state.pit_closed_start_min,
                                     "pitClosedEndMin": self.state.pit_closed_end_min,
+                                    "finishLat1": self.state.finish_lat1,
+                                    "finishLon1": self.state.finish_lon1,
+                                    "finishLat2": self.state.finish_lat2,
+                                    "finishLon2": self.state.finish_lon2,
                                 },
                             },
                         }

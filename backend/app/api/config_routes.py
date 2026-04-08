@@ -176,6 +176,10 @@ async def update_session(
             min_driver_time_min=session.min_driver_time_min,
             pit_closed_start_min=session.pit_closed_start_min,
             pit_closed_end_min=session.pit_closed_end_min,
+            finish_lat1=c.finish_lat1 if c else None,
+            finish_lon1=c.finish_lon1 if c else None,
+            finish_lat2=c.finish_lat2 if c else None,
+            finish_lon2=c.finish_lon2 if c else None,
         )
         await user_session.broadcast_snapshot()
         logger.info(f"Live reconfigured session for user {user.id} "

@@ -93,6 +93,10 @@ export interface RaceConfig {
   pitClosedStartMin: number;
   pitClosedEndMin: number;
   rain: boolean;
+  finishLat1?: number | null;
+  finishLon1?: number | null;
+  finishLat2?: number | null;
+  finishLon2?: number | null;
 }
 
 export interface RaceSnapshot {

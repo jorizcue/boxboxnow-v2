@@ -184,6 +184,10 @@ class RaceStateManager:
         self.box_lines: int = 2
         self.box_karts: int = 30
         self.duration_min: int = 180
+        self.finish_lat1: float | None = None
+        self.finish_lon1: float | None = None
+        self.finish_lat2: float | None = None
+        self.finish_lon2: float | None = None
 
     def reset(self):
         """Reset all race state (used when starting/stopping replay)."""
@@ -764,6 +768,10 @@ class RaceStateManager:
                     "pitClosedStartMin": self.pit_closed_start_min,
                     "pitClosedEndMin": self.pit_closed_end_min,
                     "rain": self.rain_mode,
+                    "finishLat1": self.finish_lat1,
+                    "finishLon1": self.finish_lon1,
+                    "finishLat2": self.finish_lat2,
+                    "finishLon2": self.finish_lon2,
                 },
                 "durationMs": getattr(self, '_first_countdown_ms', 0) or self.duration_min * 60 * 1000,
                 "raceCurrentLap": self.race_current_lap,
