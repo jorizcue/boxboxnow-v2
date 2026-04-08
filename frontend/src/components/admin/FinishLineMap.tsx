@@ -54,9 +54,17 @@ export default function FinishLineMap({ p1, p2, onChange }: Props) {
       attributionControl: false,
     });
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    const streets = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 20,
-    }).addTo(map);
+    });
+
+    const satellite = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 20 },
+    );
+
+    satellite.addTo(map);
+    L.control.layers({ "Mapa": streets, "Satélite": satellite }, {}, { position: "topright" }).addTo(map);
 
     mapRef.current = map;
 
