@@ -6,14 +6,15 @@ import { useSimNow } from "@/hooks/useSimNow";
 import { msToLapTime, tierHex } from "@/lib/formatters";
 import { getDriverChannel } from "@/lib/driverChannel";
 import { useT } from "@/lib/i18n";
+import { useRaceBox, useRaceBoxStore } from "@/hooks/useRaceBox";
 
 /* ------------------------------------------------------------------ */
 /*  Persistent card order                                              */
 /* ------------------------------------------------------------------ */
 
-type CardId = "lastLap" | "pace" | "position" | "gapAhead" | "gapBehind" | "realPos" | "boxScore";
+type CardId = "lastLap" | "pace" | "position" | "gapAhead" | "gapBehind" | "realPos" | "boxScore" | "gpsLapDelta" | "gpsSpeed" | "gpsGForce";
 
-const DEFAULT_ORDER: CardId[] = ["lastLap", "pace", "position", "gapAhead", "gapBehind", "realPos", "boxScore"];
+const DEFAULT_ORDER: CardId[] = ["lastLap", "pace", "position", "gapAhead", "gapBehind", "realPos", "boxScore", "gpsLapDelta", "gpsSpeed", "gpsGForce"];
 
 function loadOrder(): CardId[] {
   if (typeof window === "undefined") return DEFAULT_ORDER;
@@ -224,10 +225,15 @@ export function DriverView() {
   const { now, speed } = useSimNow();
   const [cardOrder, setCardOrder] = useState<CardId[]>(DEFAULT_ORDER);
   const [editMode, setEditMode] = useState(false);
+  const [showGpsSetup, setShowGpsSetup] = useState(false);
 
   const { dragging, registerRect, onTouchStart, onTouchMove, onTouchEnd } =
     useTouchDrag(cardOrder, setCardOrder);
   const boxAlert = useBoxAlert();
+
+  // RaceBox GPS
+  const raceBox = useRaceBox();
+  const gps = useRaceBoxStore();
 
   // Hydrate order from localStorage on mount
   useEffect(() => {
@@ -520,6 +526,82 @@ export function DriverView() {
         </div>
       ),
     },
+    gpsLapDelta: {
+      label: gps.currentLapNumber > 0
+        ? `${t("driver.gpsLapDelta")} · V${gps.currentLapNumber}`
+        : t("driver.gpsLapDelta"),
+      accent: gps.deltaMs !== null
+        ? gps.deltaMs < 0
+          ? "from-green-500/25 to-green-500/5 border-green-400/50"
+          : "from-red-500/25 to-red-500/5 border-red-400/50"
+        : "from-cyan-500/20 to-cyan-500/5 border-cyan-500/30",
+      content: raceBox.status !== "connected" ? (
+        <span className="text-lg text-neutral-600 font-mono">GPS --</span>
+      ) : gps.deltaMs !== null ? (
+        <div className="flex flex-col items-center">
+          <span className={`text-3xl sm:text-4xl font-mono font-black leading-none ${
+            gps.deltaMs < 0 ? "text-green-400" : "text-red-400"
+          }`}>
+            {gps.deltaMs < 0 ? "" : "+"}{(gps.deltaMs / 1000).toFixed(2)}s
+          </span>
+          <span className="text-[10px] text-neutral-500 font-mono mt-1">
+            {msToLapTime(Math.round(gps.currentLapElapsedMs))}
+          </span>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center">
+          <span className="text-2xl font-mono font-bold text-neutral-500">
+            {gps.currentLapStartTime > 0 ? msToLapTime(Math.round(gps.currentLapElapsedMs)) : "--:--.---"}
+          </span>
+          {gps.lastLapMs > 0 && (
+            <span className="text-[10px] text-neutral-600 font-mono mt-1">
+              Prev: {msToLapTime(Math.round(gps.lastLapMs))}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    gpsSpeed: {
+      label: t("driver.gpsSpeed"),
+      accent: "from-sky-500/20 to-sky-500/5 border-sky-500/30",
+      content: raceBox.status !== "connected" ? (
+        <span className="text-lg text-neutral-600 font-mono">GPS --</span>
+      ) : (
+        <div className="flex flex-col items-center">
+          <span className="text-3xl sm:text-4xl font-mono font-black text-white leading-none">
+            {Math.round(gps.sample?.speedKmh ?? 0)}
+          </span>
+          <span className="text-[9px] text-neutral-500 uppercase tracking-widest mt-0.5">km/h</span>
+          {gps.maxSpeedKmh > 0 && (
+            <span className="text-[10px] text-sky-400/60 font-mono mt-0.5">
+              {t("driver.maxSpeed")}: {Math.round(gps.maxSpeedKmh)}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    gpsGForce: {
+      label: t("driver.gpsGForce"),
+      accent: (() => {
+        const lat = Math.abs(gps.sample?.gForceX ?? 0);
+        if (lat > 1.2) return "from-red-500/25 to-red-500/5 border-red-400/50";
+        if (lat > 0.7) return "from-yellow-500/20 to-yellow-500/5 border-yellow-400/40";
+        return "from-emerald-500/20 to-emerald-500/5 border-emerald-500/30";
+      })(),
+      content: raceBox.status !== "connected" ? (
+        <span className="text-lg text-neutral-600 font-mono">GPS --</span>
+      ) : (
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-3xl sm:text-4xl font-mono font-black text-white leading-none">
+            {Math.abs(gps.sample?.gForceX ?? 0).toFixed(1)}G
+          </span>
+          <div className="flex gap-3 text-[10px] font-mono text-neutral-500">
+            <span>{t("driver.lateral")}: {(gps.sample?.gForceX ?? 0).toFixed(1)}</span>
+            <span>{t("driver.braking")}: {(gps.sample?.gForceY ?? 0).toFixed(1)}</span>
+          </div>
+        </div>
+      ),
+    },
   };
 
   return (
@@ -548,20 +630,60 @@ export function DriverView() {
         <span className="text-sm font-bold text-white tracking-wide">
           {t("driver.title")} — K{ourKart}
         </span>
-        <button
-          onClick={() => setEditMode(!editMode)}
-          className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded transition-colors ${
-            editMode ? "bg-accent/20 text-accent" : "text-neutral-500 hover:text-neutral-300"
-          }`}
-        >
-          {editMode ? "✓" : "⇄"}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* RaceBox BLE button */}
+          {raceBox.supported && (
+            <button
+              onClick={() => {
+                if (raceBox.status === "connected") {
+                  setShowGpsSetup(!showGpsSetup);
+                } else {
+                  raceBox.connect();
+                }
+              }}
+              className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+                raceBox.status === "connected"
+                  ? "bg-cyan-900/40 text-cyan-400 border border-cyan-700/40"
+                  : raceBox.status === "connecting"
+                    ? "bg-blue-900/30 text-blue-400 animate-pulse"
+                    : "text-neutral-500 hover:text-cyan-400 border border-transparent hover:border-cyan-700/30"
+              }`}
+              title={raceBox.status === "connected" ? t("driver.gpsDisconnect") : t("driver.gpsConnect")}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546" />
+              </svg>
+              {raceBox.status === "connected" && gps.sample && (
+                <span className="font-mono">{gps.sample.numSatellites}{t("driver.gpsSat")}</span>
+              )}
+            </button>
+          )}
+          <button
+            onClick={() => setEditMode(!editMode)}
+            className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded transition-colors ${
+              editMode ? "bg-accent/20 text-accent" : "text-neutral-500 hover:text-neutral-300"
+            }`}
+          >
+            {editMode ? "✓" : "⇄"}
+          </button>
+        </div>
       </div>
 
-      {/* Cards grid — 3×2 landscape layout */}
-      <div className="flex-1 p-2 sm:p-3 overflow-hidden">
-        <div className="grid grid-cols-3 auto-rows-fr gap-2 sm:gap-3 h-full">
-          {cardOrder.map((cardId, index) => {
+      {/* GPS setup panel (finish line) */}
+      {showGpsSetup && raceBox.status === "connected" && (
+        <GpsSetupPanel onClose={() => setShowGpsSetup(false)} />
+      )}
+
+      {/* Cards grid */}
+      <div className="flex-1 p-2 sm:p-3 overflow-auto">
+        <div className="grid grid-cols-3 auto-rows-fr gap-2 sm:gap-3 h-full min-h-0">
+          {cardOrder
+            .filter((id) => {
+              // Hide GPS cards when RaceBox is not connected (unless in edit mode)
+              if (!editMode && raceBox.status !== "connected" && (id === "gpsLapDelta" || id === "gpsSpeed" || id === "gpsGForce")) return false;
+              return true;
+            })
+            .map((cardId, index) => {
             const card = cards[cardId];
             const isDragging = dragging === index;
             return (
@@ -598,6 +720,97 @@ export function DriverView() {
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  GPS Setup Panel (finish line configuration)                        */
+/* ------------------------------------------------------------------ */
+
+function GpsSetupPanel({ onClose }: { onClose: () => void }) {
+  const t = useT();
+  const { sample, finishLine, setFinishLine, reset } = useRaceBoxStore();
+  const { disconnect } = useRaceBox();
+  const [p1, setP1] = useState(finishLine?.p1 ?? null);
+  const [p2, setP2] = useState(finishLine?.p2 ?? null);
+
+  const captureP1 = () => {
+    if (sample && sample.fixType >= 3) {
+      const pt = { lat: sample.lat, lon: sample.lon };
+      setP1(pt);
+      if (p2) setFinishLine({ p1: pt, p2 });
+    }
+  };
+
+  const captureP2 = () => {
+    if (sample && sample.fixType >= 3) {
+      const pt = { lat: sample.lat, lon: sample.lon };
+      setP2(pt);
+      if (p1) setFinishLine({ p1, p2: pt });
+    }
+  };
+
+  return (
+    <div className="bg-neutral-900/95 border-b border-cyan-800/30 px-3 py-2 space-y-2 text-xs">
+      <div className="flex items-center justify-between">
+        <span className="font-bold text-cyan-400 uppercase tracking-wider text-[10px]">RaceBox GPS</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { reset(); }}
+            className="text-neutral-500 hover:text-yellow-400 text-[10px] px-1.5 py-0.5 rounded border border-neutral-700 hover:border-yellow-700/40"
+          >
+            Reset
+          </button>
+          <button
+            onClick={() => { disconnect(); onClose(); }}
+            className="text-neutral-500 hover:text-red-400 text-[10px] px-1.5 py-0.5 rounded border border-neutral-700 hover:border-red-700/40"
+          >
+            {t("driver.gpsDisconnect")}
+          </button>
+          <button onClick={onClose} className="text-neutral-500 hover:text-white p-0.5">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Finish line setup */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={captureP1}
+          className={`flex-1 text-center py-1 rounded border transition-colors ${
+            p1 ? "border-green-700/40 text-green-400 bg-green-900/20" : "border-neutral-700 text-neutral-400 hover:border-cyan-700/40 hover:text-cyan-400"
+          }`}
+        >
+          {p1 ? `P1: ${p1.lat.toFixed(5)}, ${p1.lon.toFixed(5)}` : t("driver.setFinishP1")}
+        </button>
+        <button
+          onClick={captureP2}
+          className={`flex-1 text-center py-1 rounded border transition-colors ${
+            p2 ? "border-green-700/40 text-green-400 bg-green-900/20" : "border-neutral-700 text-neutral-400 hover:border-cyan-700/40 hover:text-cyan-400"
+          }`}
+        >
+          {p2 ? `P2: ${p2.lat.toFixed(5)}, ${p2.lon.toFixed(5)}` : t("driver.setFinishP2")}
+        </button>
+      </div>
+
+      {finishLine ? (
+        <div className="text-green-400/70 text-center text-[10px]">{t("driver.finishSet")}</div>
+      ) : (
+        <div className="text-neutral-600 text-center text-[10px]">{t("driver.noFinishLine")}</div>
+      )}
+
+      {/* Status line */}
+      {sample && (
+        <div className="flex justify-between text-[10px] text-neutral-500 font-mono">
+          <span>Fix: {sample.fixType === 3 ? "3D" : sample.fixType === 2 ? "2D" : "None"}</span>
+          <span>{sample.numSatellites} sat</span>
+          <span>{sample.lat.toFixed(6)}, {sample.lon.toFixed(6)}</span>
+          <span>{sample.batteryPercent}%</span>
+        </div>
+      )}
     </div>
   );
 }
