@@ -188,7 +188,13 @@ function UsersManager() {
   };
 
   const revokeAccess = async (accessId: number) => {
-    try { await api.revokeAccess(accessId); if (selectedUser) loadAccess(selectedUser); } catch {}
+    try {
+      await api.revokeAccess(accessId);
+      // Reload access list without toggling selection (loadAccess toggles)
+      if (selectedUser) {
+        setAccess(await api.getUserAccess(selectedUser));
+      }
+    } catch {}
   };
 
   const toggleNewTab = (tab: string) => {
