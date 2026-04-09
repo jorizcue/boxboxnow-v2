@@ -189,6 +189,7 @@ export function RealClassificationBeta() {
               {expectedPits > 0 && (
                 <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">{t("adjusted.missingPits")}</th>
               )}
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Dist. (m)</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("adjusted.gapSeconds")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("adjusted.intSeconds")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("race.avg20")}</th>
@@ -261,6 +262,11 @@ export function RealClassificationBeta() {
                       )}
                     </td>
                   )}
+
+                  {/* Total distance */}
+                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-right font-mono text-xs font-bold text-accent">
+                    {Math.round(kart.adjustedDistanceM).toLocaleString()}
+                  </td>
 
                   {/* Gap to leader */}
                   <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-right font-mono text-xs">
