@@ -227,6 +227,7 @@ export function DriverView() {
   const [cardOrder, setCardOrder] = useState<CardId[]>(DEFAULT_ORDER);
   const [editMode, setEditMode] = useState(false);
   const [showGpsSetup, setShowGpsSetup] = useState(false);
+  const [hideCalBanner, setHideCalBanner] = useState(false);
 
   const { dragging, registerRect, onTouchStart, onTouchMove, onTouchEnd } =
     useTouchDrag(cardOrder, setCardOrder);
@@ -243,6 +244,16 @@ export function DriverView() {
   useEffect(() => {
     setCardOrder(loadOrder());
   }, []);
+
+  // Auto-hide calibration "aligned" banner after 3s
+  useEffect(() => {
+    if (gps.calibrationPhase === "aligned") {
+      setHideCalBanner(false);
+      const t = setTimeout(() => setHideCalBanner(true), 3000);
+      return () => clearTimeout(t);
+    }
+    setHideCalBanner(false);
+  }, [gps.calibrationPhase]);
 
   // Sync finish line from circuit config to RaceBox store
   useEffect(() => {
@@ -715,6 +726,54 @@ export function DriverView() {
           if (gpsSource === "racebox") raceBox.disconnect();
           else phoneGps.disconnect();
         }} />
+      )}
+
+      {/* IMU Calibration banner */}
+      {gpsConnected && gps.calibrationPhase === "idle" && (
+        <div className="bg-yellow-900/40 border-b border-yellow-700/30 px-3 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-yellow-400 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z M12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            <span className="text-[11px] text-yellow-300">G-force sin calibrar — mantén el kart quieto y pulsa calibrar</span>
+          </div>
+          <button
+            onClick={() => gps.startCalibration()}
+            className="text-[10px] font-bold px-3 py-1 rounded bg-yellow-500 text-black hover:bg-yellow-400 transition-colors shrink-0"
+          >
+            Calibrar
+          </button>
+        </div>
+      )}
+      {gpsConnected && gps.calibrationPhase === "sampling" && (
+        <div className="bg-blue-900/40 border-b border-blue-700/30 px-3 py-2 flex items-center gap-3">
+          <div className="flex-1">
+            <span className="text-[11px] text-blue-300 font-medium">Calibrando... no muevas el kart</span>
+            <div className="mt-1 h-1.5 bg-blue-950 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-400 rounded-full transition-all duration-200"
+                style={{ width: `${Math.round(gps.calibrationProgress * 100)}%` }}
+              />
+            </div>
+          </div>
+          <span className="text-[10px] text-blue-400 font-mono">{Math.round(gps.calibrationProgress * 100)}%</span>
+        </div>
+      )}
+      {gpsConnected && gps.calibrationPhase === "ready" && (
+        <div className="bg-cyan-900/30 border-b border-cyan-700/30 px-3 py-1.5 flex items-center gap-2">
+          <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+          <span className="text-[10px] text-cyan-300">Gravedad calibrada — empieza a rodar para alinear ejes ({">"}15 km/h)</span>
+        </div>
+      )}
+      {gpsConnected && gps.calibrationPhase === "aligned" && !hideCalBanner && (
+        <div className="bg-green-900/30 border-b border-green-700/30 px-3 py-1.5 flex items-center gap-2 animate-in fade-in duration-500">
+          <svg className="w-3.5 h-3.5 text-green-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+          <span className="text-[10px] text-green-300">IMU calibrado — G-force alineada con el vehículo</span>
+        </div>
       )}
 
       {/* Cards grid */}

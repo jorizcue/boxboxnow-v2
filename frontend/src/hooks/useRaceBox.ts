@@ -4,6 +4,7 @@ import { useRef, useEffect, useCallback, useState } from "react";
 import { create } from "zustand";
 import { UbxParser, type RaceBoxSample } from "@/lib/racebox/ubxParser";
 import { distanceM, segmentCrossingFraction, type GeoPoint } from "@/lib/racebox/geo";
+import { ImuCalibrator, type CalibrationPhase } from "@/lib/racebox/calibration";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -55,14 +56,23 @@ interface RaceBoxState {
   currentDistanceM: number;
   maxSpeedKmh: number;
 
+  // IMU calibration
+  calibrationPhase: CalibrationPhase;
+  calibrationProgress: number;
+
   // Actions
   setStatus: (s: RaceBoxStatus, error?: string) => void;
   setFinishLine: (fl: FinishLine | null) => void;
   addSample: (s: RaceBoxSample) => void;
+  startCalibration: () => void;
   reset: () => void;
 }
 
 const CROSSING_COOLDOWN = 75; // minimum samples between crossings (~3s at 25Hz)
+const ALIGN_SPEED = 15; // km/h threshold for heading alignment
+
+// Singleton calibrator — survives store resets
+const calibrator = new ImuCalibrator();
 
 function computeDelta(
   currentDist: number,
@@ -123,6 +133,9 @@ export const useRaceBoxStore = create<RaceBoxState>((set, get) => ({
   currentDistanceM: 0,
   maxSpeedKmh: 0,
 
+  calibrationPhase: "idle",
+  calibrationProgress: 0,
+
   setStatus: (status, error) => set({ status, error: error ?? null }),
 
   setFinishLine: (fl) => {
@@ -130,8 +143,42 @@ export const useRaceBoxStore = create<RaceBoxState>((set, get) => ({
     saveFinishLine(fl);
   },
 
+  startCalibration: () => {
+    calibrator.startCalibration();
+    set({ calibrationPhase: "sampling", calibrationProgress: 0 });
+  },
+
   addSample: (s) => {
     const state = get();
+    const calPhase = calibrator.state.phase;
+
+    // Phase 1: static calibration — accumulate gravity samples
+    if (calPhase === "sampling") {
+      const raw = { x: s.gForceX, y: s.gForceY, z: s.gForceZ };
+      const done = calibrator.addStaticSample(raw);
+      set({
+        sample: s,
+        calibrationProgress: calibrator.state.progress,
+        ...(done ? { calibrationPhase: "ready" as CalibrationPhase } : {}),
+      });
+      return; // Don't process laps during calibration
+    }
+
+    // Phase 2: dynamic alignment — check on each sample if moving fast enough
+    if (calPhase === "ready" && s.speedKmh >= ALIGN_SPEED) {
+      const noGrav = calibrator.removeGravity({ x: s.gForceX, y: s.gForceY, z: s.gForceZ });
+      const aligned = calibrator.addHeadingSample(s.headingDeg, noGrav);
+      if (aligned) {
+        set({ calibrationPhase: "aligned" });
+      }
+    }
+
+    // Apply calibration to G-force values
+    if (calPhase === "ready" || calPhase === "aligned") {
+      const calibrated = calibrator.transform({ x: s.gForceX, y: s.gForceY, z: s.gForceZ });
+      s = { ...s, gForceX: calibrated.x, gForceY: calibrated.y, gForceZ: calibrated.z };
+    }
+
     const fl = state.finishLine;
     const prev = state.prevSample;
     let {
@@ -239,23 +286,28 @@ export const useRaceBoxStore = create<RaceBoxState>((set, get) => ({
     });
   },
 
-  reset: () => set({
-    currentLapNumber: 0,
-    currentLapStartTime: 0,
-    currentLapDistances: [],
-    currentLapTimestamps: [],
-    prevSample: null,
-    samplesSinceCrossing: 0,
-    previousLap: null,
-    bestLap: null,
-    laps: [],
-    lastLapMs: 0,
-    bestLapMs: 0,
-    deltaMs: null,
-    currentLapElapsedMs: 0,
-    currentDistanceM: 0,
-    maxSpeedKmh: 0,
-  }),
+  reset: () => {
+    calibrator.reset();
+    set({
+      currentLapNumber: 0,
+      currentLapStartTime: 0,
+      currentLapDistances: [],
+      currentLapTimestamps: [],
+      prevSample: null,
+      samplesSinceCrossing: 0,
+      previousLap: null,
+      bestLap: null,
+      laps: [],
+      lastLapMs: 0,
+      bestLapMs: 0,
+      deltaMs: null,
+      currentLapElapsedMs: 0,
+      currentDistanceM: 0,
+      maxSpeedKmh: 0,
+      calibrationPhase: "idle",
+      calibrationProgress: 0,
+    });
+  },
 }));
 
 /* ------------------------------------------------------------------ */
