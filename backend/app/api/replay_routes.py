@@ -348,9 +348,18 @@ async def start_replay(
     # Reset state and apply user config
     replay_session.state.reset()
     if session:
-        # Load circuit
+        # Load circuit — prefer auto-detection from recording path
         circuit = None
-        if session.circuit_id:
+        if data.circuit_dir:
+            # Auto-detect circuit from recording directory name
+            from app.apex.circuit_hub import _safe_name
+            all_circuits = (await db.execute(select(Circuit))).scalars().all()
+            for c in all_circuits:
+                if _safe_name(c.name) == data.circuit_dir:
+                    circuit = c
+                    logger.info(f"Replay auto-detected circuit from recording dir: {c.name} (id={c.id})")
+                    break
+        if circuit is None and session.circuit_id:
             circuit = (await db.execute(
                 select(Circuit).where(Circuit.id == session.circuit_id)
             )).scalar_one_or_none()

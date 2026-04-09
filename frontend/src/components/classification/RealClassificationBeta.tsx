@@ -63,20 +63,36 @@ export function RealClassificationBeta() {
     if (karts.length === 0) return [];
 
     // Hybrid pit penalty: use max(pitCount) across racing karts.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     // When nobody has pitted, maxPits=0 → penalty=0 for all → ordering matches Apex.
     // When pits start, only penalize karts that are behind in pit count.
     const racingKarts = karts.filter((k) => k.totalLaps > 0);
     const maxPits = Math.max(...racingKarts.map((k) => k.pitStatus !== "in_pit" ? k.pitCount : 0), 0);
 
     // Compute average speed across all karts for a uniform pit penalty
-    // This prevents faster karts from being disproportionately penalized
     const avgSpeeds = racingKarts
       .filter((k) => k.avgLapMs > 0)
       .map((k) => circuitLengthM / (k.avgLapMs / 1000));
     const fieldAvgSpeed = avgSpeeds.length > 0
       ? avgSpeeds.reduce((a, b) => a + b, 0) / avgSpeeds.length
       : 0;
+
+    // Use OBSERVED pit times from actual pit history instead of configured pitTimeS.
+    // This is much more accurate — the configured value may not reflect reality.
+    // Collect all completed pit times (pitTimeMs > 0) from all karts.
+    const observedPitTimesMs: number[] = [];
+    for (const k of racingKarts) {
+      if (k.pitHistory) {
+        for (const p of k.pitHistory) {
+          if (p.pitTimeMs > 0) {
+            observedPitTimesMs.push(p.pitTimeMs);
+          }
+        }
+      }
+    }
+    // Use average observed pit time if available, otherwise fall back to config
+    const effectivePitTimeS = observedPitTimesMs.length > 0
+      ? (observedPitTimesMs.reduce((a, b) => a + b, 0) / observedPitTimesMs.length) / 1000
+      : pitTimeS;
 
     return racingKarts
       .map((kart) => {
@@ -126,9 +142,9 @@ export function RealClassificationBeta() {
         const totalDistanceM = baseDistanceM + metersExtra;
 
         // Pit penalty: use field average speed so penalty is uniform per missing pit.
-        // missingPits = how many more pits the leader (in pit count) has done vs this kart.
+        // Uses observed pit time (from actual pit history) when available.
         const missingPits = Math.max(0, maxPits - kart.pitCount);
-        const pitPenaltyM = missingPits * fieldAvgSpeed * pitTimeS;
+        const pitPenaltyM = missingPits * fieldAvgSpeed * effectivePitTimeS;
 
         const adjustedDistanceM = totalDistanceM - pitPenaltyM;
 
@@ -149,6 +165,8 @@ export function RealClassificationBeta() {
           lapProgress,
           interpolationMethod,
           maxPits,
+          effectivePitTimeS,
+          observedPitCount: observedPitTimesMs.length,
         };
       })
       .sort((a, b) => b.adjustedDistanceM - a.adjustedDistanceM);
@@ -179,7 +197,9 @@ export function RealClassificationBeta() {
           Posiciones calculadas por distancia recorrida, interpolando posicion entre vueltas usando el reloj de carrera (countdown).
           {" "}Se penaliza a karts con menos paradas que el lider en pits
           {adjusted.length > 0 && adjusted[0].maxPits > 0
-            ? <> (actualmente <span className="text-white font-medium">{adjusted[0].maxPits} parada{adjusted[0].maxPits !== 1 ? "s" : ""}</span>).</>
+            ? <> (actualmente <span className="text-white font-medium">{adjusted[0].maxPits} parada{adjusted[0].maxPits !== 1 ? "s" : ""}</span>,
+                  pit time: <span className="text-white font-medium">{Math.round(adjusted[0].effectivePitTimeS)}s</span>
+                  {adjusted[0].observedPitCount > 0 ? " observado" : " config"}).</>
             : <> (nadie ha parado todavia — sin penalizacion).</>
           }
         </p>
@@ -341,7 +361,7 @@ export function RealClassificationBeta() {
       <div className="bg-surface/50 rounded-lg p-2 border border-border/50">
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-neutral-600">
           <span>Circuito: <span className="text-neutral-400 font-mono">{circuitLengthM}m</span></span>
-          <span>Pit time: <span className="text-neutral-400 font-mono">{pitTimeS}s</span></span>
+          <span>Pit time: <span className="text-neutral-400 font-mono">{Math.round(adjusted[0]?.effectivePitTimeS ?? pitTimeS)}s{(adjusted[0]?.observedPitCount ?? 0) > 0 ? ` (obs. ${adjusted[0].observedPitCount} pits)` : " (config)"}</span></span>
           <span>Max pits: <span className="text-neutral-400 font-mono">{adjusted[0]?.maxPits ?? 0}</span></span>
           <span>Countdown: <span className="text-neutral-400 font-mono">{Math.round(countdownMs / 1000)}s</span></span>
           <span>Metodo: {(() => {
