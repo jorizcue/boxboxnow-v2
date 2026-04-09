@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { useT } from "@/lib/i18n";
 import { useRaceStore } from "@/hooks/useRaceState";
 
-export type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "driver" | "config" | "replay" | "analytics" | "insights" | "admin-users" | "admin-circuits" | "admin-hub";
+export type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "driver" | "driver-config" | "config" | "replay" | "analytics" | "insights" | "admin-users" | "admin-circuits" | "admin-hub";
 
 interface SidebarProps {
   activeTab: Tab;
@@ -56,6 +56,11 @@ const TAB_ICONS: Record<string, JSX.Element> = {
       <path strokeLinecap="round" d="M5.5 16.5c2-1.5 4.5-2 6.5-2s4.5.5 6.5 2" />
       <path strokeLinecap="round" d="M7 8.5h2M15 8.5h2" />
       <path strokeLinecap="round" d="M12 7v4" />
+    </svg>
+  ),
+  "driver-config": (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
     </svg>
   ),
   config: (
@@ -111,6 +116,7 @@ const TAB_ICONS: Record<string, JSX.Element> = {
 let _sidebarCollapsed = false;
 let _adminExpanded = true;
 let _analysisExpanded = true;
+let _driverExpanded = true;
 
 export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarProps) {
   const t = useT();
@@ -122,15 +128,18 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
   const [mobileOpen, setMobileOpen] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(_adminExpanded);
   const [analysisExpanded, setAnalysisExpanded] = useState(_analysisExpanded);
+  const [driverExpanded, setDriverExpanded] = useState(_driverExpanded);
 
   useEffect(() => { _sidebarCollapsed = collapsed; }, [collapsed]);
   useEffect(() => { _adminExpanded = adminExpanded; }, [adminExpanded]);
   useEffect(() => { _analysisExpanded = analysisExpanded; }, [analysisExpanded]);
+  useEffect(() => { _driverExpanded = driverExpanded; }, [driverExpanded]);
 
   // Auto-expand sections when a sub-tab is active
   useEffect(() => {
     if (activeTab.startsWith("admin-")) setAdminExpanded(true);
     if (activeTab === "replay" || activeTab === "analytics" || activeTab === "insights") setAnalysisExpanded(true);
+    if (activeTab === "driver" || activeTab === "driver-config") setDriverExpanded(true);
   }, [activeTab]);
 
   const mainTabs: { id: Tab; labelKey: string; tabAccess?: string }[] = [
@@ -138,8 +147,12 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
     { id: "pit", labelKey: "nav.box", tabAccess: "pit" },
     { id: "live", labelKey: "nav.live", tabAccess: "live" },
     { id: "adjusted", labelKey: "nav.adjusted", tabAccess: "adjusted" },
-    { id: "driver", labelKey: "nav.driver", tabAccess: "driver" },
     { id: "config", labelKey: "nav.config", tabAccess: "config" },
+  ];
+
+  const driverSubTabs: { id: Tab; labelKey: string }[] = [
+    { id: "driver", labelKey: "nav.driverView" },
+    { id: "driver-config", labelKey: "nav.driverConfig" },
   ];
 
   const analysisSubTabs: { id: Tab; labelKey: string; tabAccess: string }[] = [
@@ -158,6 +171,9 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
     if (tab.tabAccess) return userTabs.includes(tab.tabAccess);
     return true;
   });
+
+  const hasDriver = userTabs.includes("driver");
+  const isDriverTabActive = activeTab === "driver" || activeTab === "driver-config";
 
   const visibleAnalysisTabs = analysisSubTabs.filter((tab) => userTabs.includes(tab.tabAccess));
   const hasAnalysis = visibleAnalysisTabs.length > 0;
@@ -207,19 +223,6 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
           {tab.id === "race" && raceActive && (
             <span className="ml-1.5 inline-block w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse align-middle" />
           )}
-        </span>
-      )}
-      {/* Driver popup button */}
-      {tab.id === "driver" && !collapsed && (
-        <span
-          role="button"
-          onClick={openDriverPopup}
-          className="shrink-0 p-0.5 rounded hover:bg-white/10 text-neutral-500 hover:text-accent transition-colors"
-          title={t("driver.open")}
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-          </svg>
         </span>
       )}
       {/* Tooltip on collapsed (only for non-sub items) */}
@@ -274,6 +277,70 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
       {/* Tab list */}
       <nav className="flex-1 py-2 space-y-0.5 overflow-y-auto scrollbar-none">
         {visibleMainTabs.map((tab) => renderTabButton(tab))}
+
+        {/* Driver section with sub-menu */}
+        {hasDriver && (
+          <>
+            <div className="my-2 mx-3 border-t border-border" />
+
+            <button
+              onClick={() => {
+                if (collapsed) {
+                  setCollapsed(false);
+                  setDriverExpanded(true);
+                  if (!isDriverTabActive) handleTabClick("driver");
+                } else {
+                  setDriverExpanded(!driverExpanded);
+                }
+              }}
+              className={clsx(
+                "w-full flex items-center gap-3 transition-colors relative group",
+                collapsed ? "justify-center px-2 py-2.5" : "px-4 py-2.5",
+                isDriverTabActive
+                  ? "text-accent"
+                  : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03]"
+              )}
+            >
+              <span className="shrink-0">{TAB_ICONS.driver}</span>
+              {!collapsed && (
+                <>
+                  <span className="text-sm font-medium truncate flex-1 text-left">{t("nav.driver")}</span>
+                  {/* Popup button */}
+                  <span
+                    role="button"
+                    onClick={openDriverPopup}
+                    className="shrink-0 p-0.5 rounded hover:bg-white/10 text-neutral-500 hover:text-accent transition-colors"
+                    title={t("driver.open")}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                    </svg>
+                  </span>
+                  <svg
+                    className={clsx(
+                      "w-3.5 h-3.5 shrink-0 transition-transform duration-200",
+                      driverExpanded ? "rotate-180" : ""
+                    )}
+                    fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </>
+              )}
+              {collapsed && (
+                <span className="absolute left-full ml-2 px-2 py-1 bg-surface border border-border rounded text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                  {t("nav.driver")}
+                </span>
+              )}
+            </button>
+
+            {!collapsed && driverExpanded && (
+              <div className="space-y-0.5">
+                {driverSubTabs.map((sub) => renderTabButton(sub, true))}
+              </div>
+            )}
+          </>
+        )}
 
         {/* Analysis section with sub-menu */}
         {hasAnalysis && (

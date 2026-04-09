@@ -19,6 +19,7 @@ import { ReplayTab } from "@/components/replay/ReplayTab";
 import { KartAnalyticsTab } from "@/components/analytics/KartAnalyticsTab";
 import { GpsInsightsTab } from "@/components/insights/GpsInsightsTab";
 import { DriverView } from "@/components/driver/DriverView";
+import { DriverConfigTab } from "@/components/driver/DriverConfigTab";
 import { MfaSetupRequired } from "@/components/auth/MfaSetupRequired";
 import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
 
@@ -81,6 +82,7 @@ function Dashboard({
           {activeTab === "classification" && <ClassificationTable />}
           {activeTab === "adjusted" && userTabs.includes("adjusted") && <AdjustedClassification />}
           {activeTab === "driver" && userTabs.includes("driver") && <DriverView />}
+          {activeTab === "driver-config" && userTabs.includes("driver") && <DriverConfigTab />}
           {activeTab === "config" && userTabs.includes("config") && <ConfigPanel />}
           {activeTab === "replay" && userTabs.includes("replay") && <ReplayTab />}
           {activeTab === "analytics" && userTabs.includes("analytics") && <KartAnalyticsTab />}
