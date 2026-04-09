@@ -573,10 +573,15 @@ function UsersManager() {
                       </div>
                       <button
                         onClick={async () => {
+                          const newVal = !u.mfa_required;
+                          // Optimistic update
+                          setUsers((prev) => prev.map((x) => x.id === u.id ? { ...x, mfa_required: newVal } : x));
                           try {
-                            await api.updateUser(u.id, { mfa_required: !u.mfa_required });
-                            loadUsers();
-                          } catch {}
+                            await api.updateUser(u.id, { mfa_required: newVal });
+                          } catch {
+                            // Revert on error
+                            setUsers((prev) => prev.map((x) => x.id === u.id ? { ...x, mfa_required: !newVal } : x));
+                          }
                         }}
                         className={`relative w-9 h-5 rounded-full transition-colors ${
                           u.mfa_required ? "bg-accent" : "bg-neutral-700"
