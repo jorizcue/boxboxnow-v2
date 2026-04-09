@@ -58,16 +58,28 @@ export function AdminHubPanel() {
   return <CircuitHubManager />;
 }
 
-const ALL_TAB_OPTIONS: [string, string][] = [
+const STANDARD_TAB_OPTIONS: [string, string][] = [
   ["race", "Carrera"],
   ["pit", "Box"],
   ["live", "Live"],
-  ["adjusted", "C.Real"],
-  ["driver", "Piloto"],
   ["config", "Config"],
+  ["adjusted", "Clasif. Real"],
+  ["adjusted-beta", "Real Beta"],
+  ["driver", "Vista en vivo"],
+  ["driver-config", "Config Piloto"],
   ["replay", "Replay"],
-  ["analytics", "Analytics"],
+  ["analytics", "Karts"],
+  ["insights", "GPS Insights"],
 ];
+
+const ADMIN_TAB_OPTIONS: [string, string][] = [
+  ["admin-users", "Usuarios"],
+  ["admin-circuits", "Circuitos"],
+  ["admin-hub", "Circuit Hub"],
+];
+
+// All options for new user defaults (standard tabs only, no admin tabs)
+const ALL_TAB_OPTIONS = STANDARD_TAB_OPTIONS;
 
 function UsersManager() {
   const t = useT();

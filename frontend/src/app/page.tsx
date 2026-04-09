@@ -82,16 +82,16 @@ function Dashboard({
           {activeTab === "live" && userTabs.includes("live") && <LiveTiming />}
           {activeTab === "classification" && <ClassificationTable />}
           {activeTab === "adjusted" && userTabs.includes("adjusted") && <AdjustedClassification />}
-          {activeTab === "adjusted-beta" && userTabs.includes("adjusted") && <RealClassificationBeta />}
+          {activeTab === "adjusted-beta" && userTabs.includes("adjusted-beta") && <RealClassificationBeta />}
           {activeTab === "driver" && userTabs.includes("driver") && <DriverView />}
-          {activeTab === "driver-config" && userTabs.includes("driver") && <DriverConfigTab />}
+          {activeTab === "driver-config" && userTabs.includes("driver-config") && <DriverConfigTab />}
           {activeTab === "config" && userTabs.includes("config") && <ConfigPanel />}
           {activeTab === "replay" && userTabs.includes("replay") && <ReplayTab />}
           {activeTab === "analytics" && userTabs.includes("analytics") && <KartAnalyticsTab />}
-          {activeTab === "insights" && userTabs.includes("analytics") && <GpsInsightsTab />}
-          {activeTab === "admin-users" && user?.is_admin && <AdminUsersPanel />}
-          {activeTab === "admin-circuits" && user?.is_admin && <AdminCircuitsPanel />}
-          {activeTab === "admin-hub" && user?.is_admin && <AdminHubPanel />}
+          {activeTab === "insights" && userTabs.includes("insights") && <GpsInsightsTab />}
+          {activeTab === "admin-users" && user?.is_admin && userTabs.includes("admin-users") && <AdminUsersPanel />}
+          {activeTab === "admin-circuits" && user?.is_admin && userTabs.includes("admin-circuits") && <AdminCircuitsPanel />}
+          {activeTab === "admin-hub" && user?.is_admin && userTabs.includes("admin-hub") && <AdminHubPanel />}
         </main>
       </div>
     </div>

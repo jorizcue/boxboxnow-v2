@@ -163,26 +163,26 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
     { id: "config", labelKey: "nav.config", tabAccess: "config" },
   ];
 
-  const clasificacionSubTabs: { id: Tab; labelKey: string }[] = [
-    { id: "adjusted", labelKey: "nav.adjusted" },
-    { id: "adjusted-beta", labelKey: "nav.adjustedBeta" },
+  const clasificacionSubTabs: { id: Tab; labelKey: string; tabAccess: string }[] = [
+    { id: "adjusted", labelKey: "nav.adjusted", tabAccess: "adjusted" },
+    { id: "adjusted-beta", labelKey: "nav.adjustedBeta", tabAccess: "adjusted-beta" },
   ];
 
-  const driverSubTabs: { id: Tab; labelKey: string }[] = [
-    { id: "driver", labelKey: "nav.driverView" },
-    { id: "driver-config", labelKey: "nav.driverConfig" },
+  const driverSubTabs: { id: Tab; labelKey: string; tabAccess: string }[] = [
+    { id: "driver", labelKey: "nav.driverView", tabAccess: "driver" },
+    { id: "driver-config", labelKey: "nav.driverConfig", tabAccess: "driver-config" },
   ];
 
   const analysisSubTabs: { id: Tab; labelKey: string; tabAccess: string }[] = [
     { id: "replay", labelKey: "nav.replay", tabAccess: "replay" },
     { id: "analytics", labelKey: "nav.analyticsShort", tabAccess: "analytics" },
-    { id: "insights", labelKey: "nav.insights", tabAccess: "analytics" },
+    { id: "insights", labelKey: "nav.insights", tabAccess: "insights" },
   ];
 
-  const adminSubTabs: { id: Tab; labelKey: string }[] = [
-    { id: "admin-users", labelKey: "admin.users" },
-    { id: "admin-circuits", labelKey: "admin.circuits" },
-    { id: "admin-hub", labelKey: "admin.hub" },
+  const adminSubTabs: { id: Tab; labelKey: string; tabAccess: string }[] = [
+    { id: "admin-users", labelKey: "admin.users", tabAccess: "admin-users" },
+    { id: "admin-circuits", labelKey: "admin.circuits", tabAccess: "admin-circuits" },
+    { id: "admin-hub", labelKey: "admin.hub", tabAccess: "admin-hub" },
   ];
 
   const visibleMainTabs = mainTabs.filter((tab) => {
@@ -190,15 +190,20 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
     return true;
   });
 
-  const hasClasificacion = userTabs.includes("adjusted");
+  const visibleClasificacionTabs = clasificacionSubTabs.filter((tab) => userTabs.includes(tab.tabAccess));
+  const hasClasificacion = visibleClasificacionTabs.length > 0;
   const isClasificacionTabActive = activeTab === "adjusted" || activeTab === "adjusted-beta";
 
-  const hasDriver = userTabs.includes("driver");
+  const visibleDriverTabs = driverSubTabs.filter((tab) => userTabs.includes(tab.tabAccess));
+  const hasDriver = visibleDriverTabs.length > 0;
   const isDriverTabActive = activeTab === "driver" || activeTab === "driver-config";
 
   const visibleAnalysisTabs = analysisSubTabs.filter((tab) => userTabs.includes(tab.tabAccess));
   const hasAnalysis = visibleAnalysisTabs.length > 0;
   const isAnalysisTabActive = activeTab === "replay" || activeTab === "analytics" || activeTab === "insights";
+
+  const visibleAdminTabs = adminSubTabs.filter((tab) => userTabs.includes(tab.tabAccess));
+  const hasAdminTabs = isAdmin && visibleAdminTabs.length > 0;
 
   const handleTabClick = (tab: Tab) => {
     onTabChange(tab);
@@ -346,7 +351,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
 
             {!collapsed && clasificacionExpanded && (
               <div className="space-y-0.5">
-                {clasificacionSubTabs.map((sub) => renderTabButton(sub, true))}
+                {visibleClasificacionTabs.map((sub) => renderTabButton(sub, true))}
               </div>
             )}
           </>
@@ -410,7 +415,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
 
             {!collapsed && driverExpanded && (
               <div className="space-y-0.5">
-                {driverSubTabs.map((sub) => renderTabButton(sub, true))}
+                {visibleDriverTabs.map((sub) => renderTabButton(sub, true))}
               </div>
             )}
           </>
@@ -474,7 +479,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
         )}
 
         {/* Admin section with sub-menu */}
-        {isAdmin && (
+        {hasAdminTabs && (
           <>
             {/* Separator */}
             <div className="my-2 mx-3 border-t border-border" />
@@ -486,7 +491,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
                   // When collapsed, clicking admin goes to first sub-tab
                   setCollapsed(false);
                   setAdminExpanded(true);
-                  if (!activeTab.startsWith("admin-")) handleTabClick("admin-users");
+                  if (!activeTab.startsWith("admin-") && visibleAdminTabs.length > 0) handleTabClick(visibleAdminTabs[0].id);
                 } else {
                   setAdminExpanded(!adminExpanded);
                 }
@@ -525,7 +530,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
             {/* Admin sub-tabs */}
             {!collapsed && adminExpanded && (
               <div className="space-y-0.5">
-                {adminSubTabs.map((sub) => renderTabButton(sub, true))}
+                {visibleAdminTabs.map((sub) => renderTabButton(sub, true))}
               </div>
             )}
           </>

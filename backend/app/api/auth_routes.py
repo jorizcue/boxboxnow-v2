@@ -179,7 +179,13 @@ async def get_current_user(
     return user
 
 
-ALL_TABS = ["race", "pit", "live", "adjusted", "driver", "config", "replay", "analytics"]
+ALL_TABS = [
+    "race", "pit", "live", "config",
+    "adjusted", "adjusted-beta",
+    "driver", "driver-config",
+    "replay", "analytics", "insights",
+    "admin-users", "admin-circuits", "admin-hub",
+]
 
 
 def _user_out(user: User) -> UserOut:

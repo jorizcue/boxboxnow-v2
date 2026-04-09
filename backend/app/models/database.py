@@ -116,6 +116,22 @@ async def init_db():
                 )
             """), {"tab": tab})
 
+        # Migrate granular tab permissions: users with parent tab get new sub-tabs
+        # adjusted → adjusted-beta, driver → driver-config, analytics → insights
+        tab_migrations = [
+            ("adjusted", "adjusted-beta"),
+            ("driver", "driver-config"),
+            ("analytics", "insights"),
+        ]
+        for parent_tab, new_tab in tab_migrations:
+            await conn.execute(text("""
+                INSERT OR IGNORE INTO user_tab_access (user_id, tab)
+                SELECT user_id, :new_tab FROM user_tab_access
+                WHERE tab = :parent_tab AND user_id NOT IN (
+                    SELECT user_id FROM user_tab_access WHERE tab = :new_tab
+                )
+            """), {"parent_tab": parent_tab, "new_tab": new_tab})
+
 
 async def get_db():
     async with async_session() as session:
