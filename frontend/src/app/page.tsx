@@ -19,6 +19,7 @@ import { ReplayTab } from "@/components/replay/ReplayTab";
 import { KartAnalyticsTab } from "@/components/analytics/KartAnalyticsTab";
 import { GpsInsightsTab } from "@/components/insights/GpsInsightsTab";
 import { DriverView } from "@/components/driver/DriverView";
+import { MfaSetupRequired } from "@/components/auth/MfaSetupRequired";
 import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
 
 export default function Home() {
@@ -35,6 +36,11 @@ export default function Home() {
 
   if (!token) {
     return <ConfirmProvider><LoginPage /></ConfirmProvider>;
+  }
+
+  // Force MFA setup if admin requires it but user hasn't configured it
+  if (user?.mfa_required && !user?.mfa_enabled) {
+    return <ConfirmProvider><MfaSetupRequired /></ConfirmProvider>;
   }
 
   return <ConfirmProvider><Dashboard activeTab={activeTab} setActiveTab={setActiveTab} /></ConfirmProvider>;

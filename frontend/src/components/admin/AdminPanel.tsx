@@ -14,6 +14,7 @@ interface UserRow {
   is_admin: boolean;
   max_devices: number;
   mfa_enabled: boolean;
+  mfa_required: boolean;
   tab_access: string[];
 }
 
@@ -228,6 +229,7 @@ function UsersManager() {
                   {u.username}
                   {u.is_admin && <span className="ml-1.5 text-[9px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-semibold uppercase">Admin</span>}
                   {u.mfa_enabled && <span className="ml-1 text-[9px] bg-green-500/15 text-green-400 px-1.5 py-0.5 rounded font-semibold uppercase">MFA</span>}
+                  {u.mfa_required && !u.mfa_enabled && <span className="ml-1 text-[9px] bg-yellow-500/15 text-yellow-400 px-1.5 py-0.5 rounded font-semibold uppercase">MFA pendiente</span>}
                 </div>
                 <div className="flex gap-2 text-[10px] text-neutral-400 mt-0.5">
                   <span>{t("admin.devicesShort")} {u.max_devices}</span>
@@ -559,34 +561,59 @@ function UsersManager() {
                 </div>
               </div>
 
-              {/* MFA Reset */}
+              {/* MFA Management */}
               {selectedUser && (() => {
                 const u = users.find((u) => u.id === selectedUser);
-                return u && (u as any).mfa_enabled ? (
-                  <div className="border-t border-border pt-4">
+                if (!u) return null;
+                return (
+                  <div className="border-t border-border pt-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <label className="text-[10px] text-neutral-400 uppercase tracking-wider">MFA</label>
-                        <span className="text-[10px] bg-green-500/15 text-green-400 px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">
-                          {t("mfa.enabled")}
-                        </span>
+                        <label className="text-[10px] text-neutral-400 uppercase tracking-wider">MFA obligatorio</label>
                       </div>
                       <button
                         onClick={async () => {
-                          const ok = await confirm({ message: t("mfa.adminResetConfirm"), danger: true, confirmText: t("mfa.adminReset") });
-                          if (!ok) return;
                           try {
-                            await api.adminResetMfa(selectedUser);
+                            await api.updateUser(u.id, { mfa_required: !u.mfa_required });
                             loadUsers();
                           } catch {}
                         }}
-                        className="text-red-400/60 hover:text-red-400 text-[10px] transition-colors"
+                        className={`relative w-9 h-5 rounded-full transition-colors ${
+                          u.mfa_required ? "bg-accent" : "bg-neutral-700"
+                        }`}
                       >
-                        {t("mfa.adminReset")}
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                          u.mfa_required ? "translate-x-4" : ""
+                        }`} />
                       </button>
                     </div>
+                    {u.mfa_required && !u.mfa_enabled && (
+                      <p className="text-[10px] text-yellow-400/80">⚠ MFA obligatorio pero el usuario aún no lo ha configurado. Se le pedirá al iniciar sesión.</p>
+                    )}
+                    {u.mfa_enabled && (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] bg-green-500/15 text-green-400 px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">
+                            {t("mfa.enabled")}
+                          </span>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            const ok = await confirm({ message: t("mfa.adminResetConfirm"), danger: true, confirmText: t("mfa.adminReset") });
+                            if (!ok) return;
+                            try {
+                              await api.adminResetMfa(selectedUser);
+                              loadUsers();
+                            } catch {}
+                          }}
+                          className="text-red-400/60 hover:text-red-400 text-[10px] transition-colors"
+                        >
+                          {t("mfa.adminReset")}
+                        </button>
+                      </div>
+                    )}
                   </div>
-                ) : null;
+                );
               })()}
             </>
           ) : null}

@@ -23,6 +23,7 @@ class UserOut(BaseModel):
     is_admin: bool
     max_devices: int = 1
     mfa_enabled: bool = False
+    mfa_required: bool = False
     tab_access: list[str] = []
     created_at: datetime | None = None
 
@@ -61,6 +62,7 @@ class UserUpdate(BaseModel):
     password: str | None = None
     is_admin: bool | None = None
     max_devices: int | None = None
+    mfa_required: bool | None = None
 
     @field_validator("password")
     @classmethod

@@ -14,6 +14,7 @@ class User(Base):
     max_devices = Column(Integer, default=1, nullable=False)
     mfa_secret = Column(String, nullable=True)
     mfa_enabled = Column(Boolean, default=False)
+    mfa_required = Column(Boolean, default=False)  # Admin forces user to enable MFA
     created_at = Column(DateTime, server_default=func.now())
 
     circuit_access = relationship("UserCircuitAccess", back_populates="user", cascade="all, delete-orphan")

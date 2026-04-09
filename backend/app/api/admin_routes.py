@@ -75,6 +75,8 @@ async def update_user(user_id: int, data: UserUpdate, admin: User = Depends(requ
         user.max_devices = data.max_devices
     if data.is_admin is not None:
         user.is_admin = data.is_admin
+    if data.mfa_required is not None:
+        user.mfa_required = data.mfa_required
 
     await db.commit()
     await db.refresh(user)

@@ -84,6 +84,10 @@ async def init_db():
             await conn.execute(text("ALTER TABLE users ADD COLUMN mfa_enabled BOOLEAN DEFAULT 0"))
         except Exception:
             pass
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN mfa_required BOOLEAN DEFAULT 0"))
+        except Exception:
+            pass
 
         # Seed default app settings
         await conn.execute(text("""

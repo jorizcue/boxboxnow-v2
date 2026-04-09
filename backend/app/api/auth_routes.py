@@ -194,6 +194,7 @@ def _user_out(user: User) -> UserOut:
         is_admin=user.is_admin,
         max_devices=user.max_devices,
         mfa_enabled=user.mfa_enabled or False,
+        mfa_required=user.mfa_required or False,
         tab_access=tabs,
         created_at=user.created_at,
     )
@@ -248,6 +249,9 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
         totp = pyotp.TOTP(user.mfa_secret)
         if not totp.verify(data.mfa_code, valid_window=1):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid MFA code")
+    # Note: if mfa_required but not mfa_enabled, we let login succeed.
+    # The frontend will show a mandatory MFA setup screen based on
+    # user.mfa_required && !user.mfa_enabled in the response.
 
     # Non-admin users must have at least one active circuit access
     if not user.is_admin:
