@@ -27,6 +27,8 @@ class UserOut(BaseModel):
     mfa_required: bool = False
     tab_access: list[str] = []
     has_active_subscription: bool = False
+    subscription_plan: str | None = None
+    trial_ends_at: str | None = None  # ISO string if on trial
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}

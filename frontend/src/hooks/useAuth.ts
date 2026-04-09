@@ -13,6 +13,8 @@ interface AuthUser {
   mfa_required: boolean;
   tab_access: string[];
   has_active_subscription?: boolean;
+  subscription_plan?: string | null;
+  trial_ends_at?: string | null;
 }
 
 interface AuthStore {

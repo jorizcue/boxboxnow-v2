@@ -330,6 +330,10 @@ export default function LoginPage() {
               Registrate
             </Link>
           </p>
+          <Link href="/forgot-password" className="inline-block text-sm text-neutral-500 hover:text-neutral-300 transition-colors">
+            Has olvidado tu contrasena?
+          </Link>
+          <br />
           <Link href="/" className="inline-block text-sm text-neutral-500 hover:text-neutral-300 transition-colors">
             &larr; Volver
           </Link>

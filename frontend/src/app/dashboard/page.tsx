@@ -77,6 +77,37 @@ export default function DashboardPage() {
   );
 }
 
+function TrialBanner() {
+  const { user } = useAuth();
+  const router = useRouter();
+
+  if (!user?.trial_ends_at || user?.is_admin) return null;
+
+  const trialEnd = new Date(user.trial_ends_at);
+  const now = new Date();
+  const daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+
+  if (daysLeft > 7) return null; // Only show when 7 days or less
+
+  const urgency = daysLeft <= 3;
+
+  return (
+    <div className={`px-3 py-1.5 text-xs flex items-center justify-between ${urgency ? "bg-yellow-900/50 border-b border-yellow-800/50" : "bg-accent/5 border-b border-accent/10"}`}>
+      <span className={urgency ? "text-yellow-300" : "text-accent/80"}>
+        {daysLeft === 0
+          ? "Tu prueba gratuita termina hoy"
+          : `Prueba gratuita: ${daysLeft} dia${daysLeft !== 1 ? "s" : ""} restante${daysLeft !== 1 ? "s" : ""}`}
+      </span>
+      <a
+        href="/#pricing"
+        className={`font-semibold px-3 py-1 rounded text-xs transition-colors ${urgency ? "bg-yellow-600 hover:bg-yellow-500 text-black" : "bg-accent hover:bg-accent-hover text-black"}`}
+      >
+        Elegir plan
+      </a>
+    </div>
+  );
+}
+
 function Dashboard({
   activeTab,
   setActiveTab,
@@ -97,6 +128,7 @@ function Dashboard({
         countdownMs={countdownMs}
         username={user?.username || ""}
       />
+      <TrialBanner />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           activeTab={activeTab}
@@ -127,7 +159,7 @@ function Dashboard({
 }
 
 function NoSubscription({ username }: { username: string }) {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -162,15 +194,23 @@ function NoSubscription({ username }: { username: string }) {
 
         <div className="bg-surface rounded-2xl p-6 sm:p-8 border border-border mb-6">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-accent/10 flex items-center justify-center">
-            <svg className="w-8 h-8 text-accent" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-            </svg>
+            {user?.subscription_plan === "trial" ? (
+              <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg className="w-8 h-8 text-accent" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+              </svg>
+            )}
           </div>
           <h2 className="text-xl font-bold text-white mb-2">
             Hola, {username}
           </h2>
           <p className="text-neutral-400 text-sm mb-6">
-            No tienes una suscripción activa. Elige un plan para acceder a todas las funcionalidades de BoxBoxNow.
+            {user?.subscription_plan === "trial"
+              ? "Tu prueba gratuita ha terminado. Elige un plan para seguir usando BoxBoxNow con todas sus funcionalidades."
+              : "No tienes una suscripcion activa. Elige un plan para acceder a todas las funcionalidades de BoxBoxNow."}
           </p>
 
           <a
@@ -184,7 +224,7 @@ function NoSubscription({ username }: { username: string }) {
             onClick={handlePortal}
             className="w-full text-accent hover:text-accent-hover text-sm py-2 transition-colors"
           >
-            Gestionar suscripción
+            Gestionar suscripcion existente
           </button>
         </div>
 

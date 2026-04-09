@@ -145,6 +145,17 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
         # Subscription: details come from subscription.updated webhook
         sub_id = session_data.get("subscription")
         if sub_id:
+            # Cancel any trial subscription for this user
+            trial_result = await db.execute(
+                select(Subscription).where(
+                    Subscription.user_id == user_id,
+                    Subscription.plan_type == "trial",
+                    Subscription.status == "trialing",
+                )
+            )
+            for trial_sub in trial_result.scalars().all():
+                trial_sub.status = "canceled"
+
             sub = Subscription(
                 user_id=user_id,
                 stripe_subscription_id=sub_id,
@@ -167,6 +178,17 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
             # Update user plan capabilities
             await _apply_plan_to_user(user_id, plan_type, db)
             await db.commit()
+
+            # Send confirmation email
+            user_result = await db.execute(select(User).where(User.id == user_id))
+            _user = user_result.scalar_one_or_none()
+            if _user and _user.email:
+                from app.services.email_service import send_subscription_confirmation_email
+                import asyncio
+                plan_names = {"basic_monthly": "Basico Mensual", "basic_annual": "Basico Anual",
+                              "pro_monthly": "Pro Mensual", "pro_annual": "Pro Anual", "event": "Evento"}
+                asyncio.create_task(send_subscription_confirmation_email(
+                    _user.email, _user.username, plan_names.get(plan_type, plan_type)))
 
     elif session_data.get("mode") == "payment":
         # One-time payment (event)

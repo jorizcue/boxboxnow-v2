@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
 
+    # Email (Resend)
+    resend_api_key: str = ""
+    from_email: str = "BoxBoxNow <noreply@boxboxnow.com>"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @property

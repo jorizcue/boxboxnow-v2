@@ -63,6 +63,10 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(cleanup_old_analytics())
     analytics_cleanup_task = asyncio.create_task(periodic_analytics_cleanup(interval_hours=24))
 
+    # Trial expiration checker + email reminders (runs daily)
+    from app.tasks.trial_checker import periodic_trial_check
+    trial_check_task = asyncio.create_task(periodic_trial_check(interval_hours=24))
+
     logger.info("BoxboxNow v2 started (multi-tenant + CircuitHub)")
 
     yield
@@ -70,6 +74,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     compress_task.cancel()
     analytics_cleanup_task.cancel()
+    trial_check_task.cancel()
     await registry.stop_all()
     await replay_registry.stop_all()
     await circuit_hub.stop_all()

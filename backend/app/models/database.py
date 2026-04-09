@@ -119,6 +119,16 @@ async def init_db():
         except Exception:
             pass
 
+        # Add password reset columns to users
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN password_reset_token VARCHAR(255)"))
+        except Exception:
+            pass
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN password_reset_expires DATETIME"))
+        except Exception:
+            pass
+
         # Seed default tab access for all users (basic tabs)
         # This ensures existing users get access to all standard tabs
         basic_tabs = ["race", "pit", "live", "adjusted", "driver", "config", "replay", "analytics"]

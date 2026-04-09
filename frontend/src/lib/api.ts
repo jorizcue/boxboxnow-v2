@@ -282,6 +282,18 @@ export const api = {
   getCustomerPortal: () =>
     fetchApi<{ url: string }>("/api/stripe/customer-portal", { method: "POST" }),
 
+  // Password reset
+  forgotPassword: (email: string) =>
+    fetchRaw<{ ok: boolean; message: string }>("/api/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+  resetPassword: (token: string, password: string) =>
+    fetchRaw<{ ok: boolean; message: string }>("/api/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, password }),
+    }),
+
   // GPS Telemetry
   saveGpsLaps: (laps: any[]) =>
     fetchApi("/api/gps/laps", { method: "POST", body: JSON.stringify({ laps }) }),

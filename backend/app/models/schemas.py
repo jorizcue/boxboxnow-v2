@@ -18,6 +18,8 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=True, index=True)
     google_id = Column(String(255), unique=True, nullable=True, index=True)
     stripe_customer_id = Column(String(255), unique=True, nullable=True, index=True)
+    password_reset_token = Column(String(255), nullable=True)
+    password_reset_expires = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
     circuit_access = relationship("UserCircuitAccess", back_populates="user", cascade="all, delete-orphan")
@@ -287,7 +289,7 @@ class Subscription(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     stripe_subscription_id = Column(String(255), unique=True, nullable=True)
     stripe_price_id = Column(String(255), nullable=True)
-    plan_type = Column(String(50), nullable=False)  # "basic_monthly", "basic_annual", "pro_monthly", "pro_annual", "event"
+    plan_type = Column(String(50), nullable=False)  # "trial", "basic_monthly", "basic_annual", "pro_monthly", "pro_annual", "event"
     status = Column(String(50), nullable=False, default="active")  # "active", "canceled", "past_due", "expired"
     circuit_id = Column(Integer, ForeignKey("circuits.id"), nullable=True)  # Which circuit this sub covers
     current_period_start = Column(DateTime, nullable=True)

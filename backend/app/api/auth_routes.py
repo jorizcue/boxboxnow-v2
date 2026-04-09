@@ -29,7 +29,7 @@ from sqlalchemy import select, func, delete
 
 from app.config import get_settings
 from app.models.database import get_db
-from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess, Subscription
+from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess, Subscription, Circuit
 from sqlalchemy.orm import selectinload
 from app.models.pydantic_models import (
     LoginRequest, LoginResponse, UserOut, DeviceSessionOut,
@@ -197,18 +197,22 @@ def _user_out(user: User) -> UserOut:
 
     # Check active subscription (only if relationship is already loaded to avoid MissingGreenlet)
     has_sub = user.is_admin  # admins always have access
+    sub_plan: str | None = None
+    trial_ends_at: str | None = None
+
     if not has_sub:
-        from sqlalchemy.orm import object_session
         from sqlalchemy import inspect as sa_inspect
         try:
             state = sa_inspect(user)
             if 'subscriptions' in state.dict:
-                # Relationship already loaded — safe to access
                 now = datetime.now(timezone.utc)
-                has_sub = any(
-                    s.status == "active" and (s.current_period_end is None or s.current_period_end > now)
-                    for s in (user.subscriptions or [])
-                )
+                for s in (user.subscriptions or []):
+                    if s.status in ("active", "trialing") and (s.current_period_end is None or s.current_period_end > now):
+                        has_sub = True
+                        sub_plan = s.plan_type
+                        if s.status == "trialing" and s.current_period_end:
+                            trial_ends_at = s.current_period_end.isoformat()
+                        break
         except Exception:
             pass
 
@@ -222,6 +226,8 @@ def _user_out(user: User) -> UserOut:
         mfa_required=user.mfa_required or False,
         tab_access=tabs,
         has_active_subscription=has_sub,
+        subscription_plan=sub_plan,
+        trial_ends_at=trial_ends_at,
         created_at=user.created_at,
     )
 
@@ -277,10 +283,32 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
     db.add(user)
     await db.flush()
 
-    # Assign basic tabs
-    basic_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config"]
-    for tab in basic_tabs:
+    # Assign all tabs for trial users (full access during trial)
+    trial_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config", "replay", "analytics", "insights"]
+    for tab in trial_tabs:
         db.add(UserTabAccess(user_id=user.id, tab=tab))
+
+    # Create 14-day trial subscription
+    trial_end = datetime.now(timezone.utc) + timedelta(days=14)
+    trial_sub = Subscription(
+        user_id=user.id,
+        plan_type="trial",
+        status="trialing",
+        current_period_start=datetime.now(timezone.utc),
+        current_period_end=trial_end,
+    )
+    db.add(trial_sub)
+
+    # Grant circuit access to all circuits for trial period
+    circuits_result = await db.execute(select(Circuit))
+    for circuit in circuits_result.scalars().all():
+        db.add(UserCircuitAccess(
+            user_id=user.id,
+            circuit_id=circuit.id,
+            valid_from=datetime.now(timezone.utc),
+            valid_until=trial_end,
+        ))
+
     await db.commit()
 
     # Auto-login: create device session
@@ -298,6 +326,11 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
         select(User).where(User.id == user.id).options(selectinload(User.tab_access), selectinload(User.subscriptions))
     )
     user = result.scalar_one()
+
+    # Send welcome email (fire and forget)
+    from app.services.email_service import send_welcome_email
+    import asyncio
+    asyncio.create_task(send_welcome_email(data.email, data.username))
 
     access_token = create_token(user.id, user.username, user.is_admin, session_token)
     return LoginResponse(
@@ -517,10 +550,32 @@ async def google_callback(code: str, request: Request, db: AsyncSession = Depend
         db.add(user)
         await db.flush()
 
-        # Assign basic tabs
-        basic_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config"]
-        for tab in basic_tabs:
+        # Assign all tabs for trial users
+        trial_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config", "replay", "analytics", "insights"]
+        for tab in trial_tabs:
             db.add(UserTabAccess(user_id=user.id, tab=tab))
+
+        # Create 14-day trial subscription
+        trial_end = datetime.now(timezone.utc) + timedelta(days=14)
+        trial_sub = Subscription(
+            user_id=user.id,
+            plan_type="trial",
+            status="trialing",
+            current_period_start=datetime.now(timezone.utc),
+            current_period_end=trial_end,
+        )
+        db.add(trial_sub)
+
+        # Grant circuit access to all circuits for trial period
+        circuits_result = await db.execute(select(Circuit))
+        for circuit in circuits_result.scalars().all():
+            db.add(UserCircuitAccess(
+                user_id=user.id,
+                circuit_id=circuit.id,
+                valid_from=datetime.now(timezone.utc),
+                valid_until=trial_end,
+            ))
+
         await db.commit()
 
         # Reload with relationships
@@ -528,6 +583,12 @@ async def google_callback(code: str, request: Request, db: AsyncSession = Depend
             select(User).where(User.id == user.id).options(selectinload(User.tab_access), selectinload(User.subscriptions))
         )
         user = result.scalar_one()
+
+        # Send welcome email
+        if email:
+            from app.services.email_service import send_welcome_email
+            import asyncio as _asyncio
+            _asyncio.create_task(send_welcome_email(email, username))
 
     # Cleanup stale sessions
     await _cleanup_stale_sessions(db, user.id)
@@ -549,15 +610,20 @@ async def google_callback(code: str, request: Request, db: AsyncSession = Depend
     from urllib.parse import urlencode
     import json
     frontend_url = settings.frontend_url
+    user_out = _user_out(user)
     params = urlencode({
         "token": access_token,
         "session_token": session_token,
         "user": json.dumps({
-            "id": user.id, "username": user.username,
-            "is_admin": user.is_admin, "max_devices": user.max_devices,
-            "mfa_enabled": user.mfa_enabled or False,
-            "mfa_required": user.mfa_required or False,
-            "tab_access": [ta.tab for ta in (user.tab_access or [])] if not user.is_admin else ALL_TABS,
+            "id": user_out.id, "username": user_out.username,
+            "email": user_out.email,
+            "is_admin": user_out.is_admin, "max_devices": user_out.max_devices,
+            "mfa_enabled": user_out.mfa_enabled,
+            "mfa_required": user_out.mfa_required,
+            "tab_access": user_out.tab_access,
+            "has_active_subscription": user_out.has_active_subscription,
+            "subscription_plan": user_out.subscription_plan,
+            "trial_ends_at": user_out.trial_ends_at,
         }),
     })
     return RedirectResponse(f"{frontend_url}/login?oauth=google&{params}")
@@ -749,6 +815,68 @@ async def logout(
         from app.ws.server import close_ws_for_session
         await close_ws_for_session(current_sid)
     return {"logged_out": True}
+
+
+# --- Password Reset ---
+
+@router.post("/forgot-password")
+async def forgot_password(request: Request, db: AsyncSession = Depends(get_db)):
+    """Request a password reset email."""
+    body = await request.json()
+    email = body.get("email", "").strip().lower()
+
+    if not email:
+        raise HTTPException(400, "Email requerido")
+
+    # Always return success to prevent email enumeration
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if user:
+        # Generate reset token
+        reset_token = secrets.token_urlsafe(48)
+        user.password_reset_token = reset_token
+        user.password_reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+        await db.commit()
+
+        # Send email (fire and forget)
+        from app.services.email_service import send_password_reset_email
+        import asyncio
+        asyncio.create_task(send_password_reset_email(email, user.username, reset_token))
+
+    return {"ok": True, "message": "Si el email existe, recibiras un enlace para restablecer tu contrasena."}
+
+
+@router.post("/reset-password")
+async def reset_password(request: Request, db: AsyncSession = Depends(get_db)):
+    """Reset password with token from email."""
+    body = await request.json()
+    token = body.get("token", "")
+    new_password = body.get("password", "")
+
+    if not token or not new_password:
+        raise HTTPException(400, "Token y contrasena requeridos")
+
+    if len(new_password) < 8:
+        raise HTTPException(400, "La contrasena debe tener al menos 8 caracteres")
+
+    result = await db.execute(
+        select(User).where(User.password_reset_token == token)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(400, "Token invalido o expirado")
+
+    if user.password_reset_expires and user.password_reset_expires < datetime.now(timezone.utc):
+        raise HTTPException(400, "Token invalido o expirado")
+
+    user.password_hash = hash_password(new_password)
+    user.password_reset_token = None
+    user.password_reset_expires = None
+    await db.commit()
+
+    return {"ok": True, "message": "Contrasena actualizada correctamente"}
 
 
 # --- Kill session without being logged in (from the 409 screen) ---
