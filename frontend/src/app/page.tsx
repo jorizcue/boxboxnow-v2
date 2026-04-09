@@ -15,6 +15,7 @@ import { ConfigPanel } from "@/components/config/ConfigPanel";
 import { AdminUsersPanel, AdminCircuitsPanel, AdminHubPanel } from "@/components/admin/AdminPanel";
 import { LiveTiming } from "@/components/live/LiveTiming";
 import { AdjustedClassification } from "@/components/classification/AdjustedClassification";
+import { RealClassificationBeta } from "@/components/classification/RealClassificationBeta";
 import { ReplayTab } from "@/components/replay/ReplayTab";
 import { KartAnalyticsTab } from "@/components/analytics/KartAnalyticsTab";
 import { GpsInsightsTab } from "@/components/insights/GpsInsightsTab";
@@ -81,6 +82,7 @@ function Dashboard({
           {activeTab === "live" && userTabs.includes("live") && <LiveTiming />}
           {activeTab === "classification" && <ClassificationTable />}
           {activeTab === "adjusted" && userTabs.includes("adjusted") && <AdjustedClassification />}
+          {activeTab === "adjusted-beta" && userTabs.includes("adjusted") && <RealClassificationBeta />}
           {activeTab === "driver" && userTabs.includes("driver") && <DriverView />}
           {activeTab === "driver-config" && userTabs.includes("driver") && <DriverConfigTab />}
           {activeTab === "config" && userTabs.includes("config") && <ConfigPanel />}

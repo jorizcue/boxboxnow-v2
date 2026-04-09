@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { useT } from "@/lib/i18n";
 import { useRaceStore } from "@/hooks/useRaceState";
 
-export type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "driver" | "driver-config" | "config" | "replay" | "analytics" | "insights" | "admin-users" | "admin-circuits" | "admin-hub";
+export type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "adjusted-beta" | "driver" | "driver-config" | "config" | "replay" | "analytics" | "insights" | "admin-users" | "admin-circuits" | "admin-hub";
 
 interface SidebarProps {
   activeTab: Tab;
@@ -110,6 +110,16 @@ const TAB_ICONS: Record<string, JSX.Element> = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0h.375a2.625 2.625 0 010 5.25H17.25m-13.5-5.25H3.375a2.625 2.625 0 000 5.25H5.25" />
     </svg>
   ),
+  clasificacion: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25-.75L17.25 9m0 0L21 12.75M17.25 9v12" />
+    </svg>
+  ),
+  "adjusted-beta": (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+    </svg>
+  ),
 };
 
 // Persist sidebar state
@@ -117,6 +127,7 @@ let _sidebarCollapsed = false;
 let _adminExpanded = true;
 let _analysisExpanded = true;
 let _driverExpanded = true;
+let _clasificacionExpanded = true;
 
 export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarProps) {
   const t = useT();
@@ -129,25 +140,32 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
   const [adminExpanded, setAdminExpanded] = useState(_adminExpanded);
   const [analysisExpanded, setAnalysisExpanded] = useState(_analysisExpanded);
   const [driverExpanded, setDriverExpanded] = useState(_driverExpanded);
+  const [clasificacionExpanded, setClasificacionExpanded] = useState(_clasificacionExpanded);
 
   useEffect(() => { _sidebarCollapsed = collapsed; }, [collapsed]);
   useEffect(() => { _adminExpanded = adminExpanded; }, [adminExpanded]);
   useEffect(() => { _analysisExpanded = analysisExpanded; }, [analysisExpanded]);
   useEffect(() => { _driverExpanded = driverExpanded; }, [driverExpanded]);
+  useEffect(() => { _clasificacionExpanded = clasificacionExpanded; }, [clasificacionExpanded]);
 
   // Auto-expand sections when a sub-tab is active
   useEffect(() => {
     if (activeTab.startsWith("admin-")) setAdminExpanded(true);
     if (activeTab === "replay" || activeTab === "analytics" || activeTab === "insights") setAnalysisExpanded(true);
     if (activeTab === "driver" || activeTab === "driver-config") setDriverExpanded(true);
+    if (activeTab === "adjusted" || activeTab === "adjusted-beta") setClasificacionExpanded(true);
   }, [activeTab]);
 
   const mainTabs: { id: Tab; labelKey: string; tabAccess?: string }[] = [
     { id: "race", labelKey: "nav.race", tabAccess: "race" },
     { id: "pit", labelKey: "nav.box", tabAccess: "pit" },
     { id: "live", labelKey: "nav.live", tabAccess: "live" },
-    { id: "adjusted", labelKey: "nav.adjusted", tabAccess: "adjusted" },
     { id: "config", labelKey: "nav.config", tabAccess: "config" },
+  ];
+
+  const clasificacionSubTabs: { id: Tab; labelKey: string }[] = [
+    { id: "adjusted", labelKey: "nav.adjusted" },
+    { id: "adjusted-beta", labelKey: "nav.adjustedBeta" },
   ];
 
   const driverSubTabs: { id: Tab; labelKey: string }[] = [
@@ -171,6 +189,9 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
     if (tab.tabAccess) return userTabs.includes(tab.tabAccess);
     return true;
   });
+
+  const hasClasificacion = userTabs.includes("adjusted");
+  const isClasificacionTabActive = activeTab === "adjusted" || activeTab === "adjusted-beta";
 
   const hasDriver = userTabs.includes("driver");
   const isDriverTabActive = activeTab === "driver" || activeTab === "driver-config";
@@ -277,6 +298,59 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
       {/* Tab list */}
       <nav className="flex-1 py-2 space-y-0.5 overflow-y-auto scrollbar-none">
         {visibleMainTabs.map((tab) => renderTabButton(tab))}
+
+        {/* Clasificacion section with sub-menu */}
+        {hasClasificacion && (
+          <>
+            <div className="my-2 mx-3 border-t border-border" />
+
+            <button
+              onClick={() => {
+                if (collapsed) {
+                  setCollapsed(false);
+                  setClasificacionExpanded(true);
+                  if (!isClasificacionTabActive) handleTabClick("adjusted");
+                } else {
+                  setClasificacionExpanded(!clasificacionExpanded);
+                }
+              }}
+              className={clsx(
+                "w-full flex items-center gap-3 transition-colors relative group",
+                collapsed ? "justify-center px-2 py-2.5" : "px-4 py-2.5",
+                isClasificacionTabActive
+                  ? "text-accent"
+                  : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03]"
+              )}
+            >
+              <span className="shrink-0">{TAB_ICONS.clasificacion}</span>
+              {!collapsed && (
+                <>
+                  <span className="text-sm font-medium truncate flex-1 text-left">{t("nav.clasificacion")}</span>
+                  <svg
+                    className={clsx(
+                      "w-3.5 h-3.5 shrink-0 transition-transform duration-200",
+                      clasificacionExpanded ? "rotate-180" : ""
+                    )}
+                    fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </>
+              )}
+              {collapsed && (
+                <span className="absolute left-full ml-2 px-2 py-1 bg-surface border border-border rounded text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                  {t("nav.clasificacion")}
+                </span>
+              )}
+            </button>
+
+            {!collapsed && clasificacionExpanded && (
+              <div className="space-y-0.5">
+                {clasificacionSubTabs.map((sub) => renderTabButton(sub, true))}
+              </div>
+            )}
+          </>
+        )}
 
         {/* Driver section with sub-menu */}
         {hasDriver && (

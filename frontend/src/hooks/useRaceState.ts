@@ -164,7 +164,10 @@ export const useRaceStore = create<RaceStore>((set) => ({
         switch (ev.event) {
           case "lap":
           case "lapMs":
-            if (typeof ev.lapTimeMs === "number") kart.lastLapMs = ev.lapTimeMs;
+            if (typeof ev.lapTimeMs === "number") {
+              kart.lastLapMs = ev.lapTimeMs;
+              kart.stintElapsedMs += ev.lapTimeMs; // Keep stint elapsed in sync
+            }
             if (typeof ev.totalLaps === "number") kart.totalLaps = ev.totalLaps;
             break;
           case "bestLap":

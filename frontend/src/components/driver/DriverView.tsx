@@ -200,7 +200,7 @@ function useBoxAlert() {
 
 export function DriverView() {
   const t = useT();
-  const { karts, config, fifo, connected } = useRaceStore();
+  const { karts, config, fifo, connected, countdownMs } = useRaceStore();
   const { now, speed } = useSimNow();
   const raceClock = useRaceClock();
   const driverCfg = useDriverConfig();
@@ -249,12 +249,12 @@ export function DriverView() {
   // Previous lap tracking for lastLap card
   const { lastLapMs: lastLapVal, lapDelta } = usePrevLap(ourKart);
 
-  /* ---------- Compute adjusted classification (distance-based) ---------- */
+  /* ---------- Compute adjusted classification (countdown-based, same as Beta) ---------- */
   const { ourData } = useMemo(() => {
     if (karts.length === 0 || ourKart <= 0)
       return { ourData: null };
 
-    const maxPits = Math.max(...karts.filter((k) => k.pitStatus !== "in_pit").map((k) => k.pitCount), 0);
+    const expectedPits = config.minPits || 0;
 
     const mapped = karts
       .filter((k) => k.totalLaps > 0)
@@ -263,17 +263,27 @@ export function DriverView() {
         const baseDistM = kart.totalLaps * circuitLengthM;
 
         let metersExtra = 0;
-        if (kart.pitStatus === "racing" && speedMs > 0 && kart.stintStartTime > 0) {
-          const wallS = Math.max(0, (now - kart.stintStartTime) * speed);
-          const stintElS = kart.stintElapsedMs / 1000;
-          const sinceCross = wallS - stintElS;
-          if (sinceCross > 0) {
-            metersExtra = Math.min(sinceCross * speedMs, circuitLengthM * 0.99);
+        if (kart.pitStatus === "racing" && speedMs > 0) {
+          // Countdown-based: both values from Apex, no clock sync issues
+          if (kart.stintStartCountdownMs > 0 && countdownMs !== 0) {
+            const stintTimeMs = kart.stintStartCountdownMs - countdownMs;
+            const sinceCrossMs = stintTimeMs - kart.stintElapsedMs;
+            if (sinceCrossMs > 0) {
+              metersExtra = (sinceCrossMs / 1000) * speedMs;
+            }
+          } else if (kart.stintStartTime > 0) {
+            // Fallback to wall clock when countdown unavailable
+            const wallS = Math.max(0, (now - kart.stintStartTime) * speed);
+            const sinceCross = wallS - kart.stintElapsedMs / 1000;
+            if (sinceCross > 0) {
+              metersExtra = sinceCross * speedMs;
+            }
           }
+          metersExtra = Math.min(metersExtra, circuitLengthM * 0.95);
         }
 
         const totalDist = baseDistM + metersExtra;
-        const missing = Math.max(0, maxPits - kart.pitCount);
+        const missing = Math.max(0, expectedPits - kart.pitCount);
         const penalty = missing * speedMs * pitTimeS;
         const adjDist = totalDist - penalty;
 
@@ -307,7 +317,7 @@ export function DriverView() {
         behindSeconds: behindTimeDiff,
       },
     };
-  }, [karts, now, ourKart, circuitLengthM, pitTimeS]);
+  }, [karts, now, countdownMs, ourKart, circuitLengthM, pitTimeS, config.minPits]);
 
   /* ---------- Race position by avg pace ---------- */
   const racePosition = useMemo(() => {

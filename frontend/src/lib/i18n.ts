@@ -49,6 +49,8 @@ const translations: Record<string, Record<Language, string>> = {
   "nav.driver": { es: "Vista Piloto", en: "Driver View", it: "Vista Pilota", de: "Fahreransicht" },
   "nav.driverView": { es: "Vista en vivo", en: "Live View", it: "Vista live", de: "Live-Ansicht" },
   "nav.driverConfig": { es: "Configuración", en: "Configuration", it: "Configurazione", de: "Konfiguration" },
+  "nav.clasificacion": { es: "Clasificacion", en: "Classification", it: "Classifica", de: "Klassifizierung" },
+  "nav.adjustedBeta": { es: "Real Beta", en: "Real Beta", it: "Reale Beta", de: "Echt Beta" },
   "nav.adjustedShort": { es: "C.Real", en: "Real", it: "Reale", de: "Echt" },
   "nav.replay": { es: "Replay", en: "Replay", it: "Replay", de: "Replay" },
   "nav.analytics": { es: "Kart Analytics", en: "Kart Analytics", it: "Kart Analytics", de: "Kart Analytics" },
