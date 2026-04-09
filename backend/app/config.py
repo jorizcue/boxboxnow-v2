@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     log_level: str = "info"
+    allowed_origins: str = "*"
 
     # Auth
     jwt_secret: str = "change-me-in-production"

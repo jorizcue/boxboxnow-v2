@@ -75,6 +75,16 @@ async def init_db():
         except Exception:
             pass
 
+        # Add MFA columns to users
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN mfa_secret VARCHAR"))
+        except Exception:
+            pass
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN mfa_enabled BOOLEAN DEFAULT 0"))
+        except Exception:
+            pass
+
         # Seed default app settings
         await conn.execute(text("""
             INSERT OR IGNORE INTO app_settings (key, value) VALUES ('kart_analytics_retention_days', '30')

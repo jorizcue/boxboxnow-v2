@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { useT } from "@/lib/i18n";
 import { useRaceStore } from "@/hooks/useRaceState";
 
-export type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "driver" | "config" | "replay" | "analytics" | "admin-users" | "admin-circuits" | "admin-hub";
+export type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "driver" | "config" | "replay" | "analytics" | "insights" | "admin-users" | "admin-circuits" | "admin-hub";
 
 interface SidebarProps {
   activeTab: Tab;
@@ -74,6 +74,12 @@ const TAB_ICONS: Record<string, JSX.Element> = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
     </svg>
   ),
+  insights: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+    </svg>
+  ),
   analysis: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9zm3.75 11.625a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
@@ -124,7 +130,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
   // Auto-expand sections when a sub-tab is active
   useEffect(() => {
     if (activeTab.startsWith("admin-")) setAdminExpanded(true);
-    if (activeTab === "replay" || activeTab === "analytics") setAnalysisExpanded(true);
+    if (activeTab === "replay" || activeTab === "analytics" || activeTab === "insights") setAnalysisExpanded(true);
   }, [activeTab]);
 
   const mainTabs: { id: Tab; labelKey: string; tabAccess?: string }[] = [
@@ -139,6 +145,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
   const analysisSubTabs: { id: Tab; labelKey: string; tabAccess: string }[] = [
     { id: "replay", labelKey: "nav.replay", tabAccess: "replay" },
     { id: "analytics", labelKey: "nav.analyticsShort", tabAccess: "analytics" },
+    { id: "insights", labelKey: "nav.insights", tabAccess: "analytics" },
   ];
 
   const adminSubTabs: { id: Tab; labelKey: string }[] = [
@@ -154,7 +161,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
 
   const visibleAnalysisTabs = analysisSubTabs.filter((tab) => userTabs.includes(tab.tabAccess));
   const hasAnalysis = visibleAnalysisTabs.length > 0;
-  const isAnalysisTabActive = activeTab === "replay" || activeTab === "analytics";
+  const isAnalysisTabActive = activeTab === "replay" || activeTab === "analytics" || activeTab === "insights";
 
   const handleTabClick = (tab: Tab) => {
     onTabChange(tab);

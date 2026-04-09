@@ -3,45 +3,24 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useSimNow } from "@/hooks/useSimNow";
+import { useRaceClock } from "@/hooks/useRaceClock";
 import { msToLapTime, tierHex } from "@/lib/formatters";
 import { getDriverChannel } from "@/lib/driverChannel";
 import { useT } from "@/lib/i18n";
 import { useRaceBox, useRaceBoxStore } from "@/hooks/useRaceBox";
 import { usePhoneGps } from "@/hooks/usePhoneGps";
-
-/* ------------------------------------------------------------------ */
-/*  Persistent card order                                              */
-/* ------------------------------------------------------------------ */
-
-type CardId = "lastLap" | "pace" | "position" | "gapAhead" | "gapBehind" | "realPos" | "boxScore" | "gpsLapDelta" | "gpsSpeed" | "gpsGForce";
-
-const DEFAULT_ORDER: CardId[] = ["lastLap", "pace", "position", "gapAhead", "gapBehind", "realPos", "boxScore", "gpsLapDelta", "gpsSpeed", "gpsGForce"];
-
-function loadOrder(): CardId[] {
-  if (typeof window === "undefined") return DEFAULT_ORDER;
-  try {
-    const raw = localStorage.getItem("bbn-driver-order");
-    if (raw) {
-      const parsed = JSON.parse(raw) as CardId[];
-      // Reset if card set changed (new cards added / removed)
-      const hasAll = DEFAULT_ORDER.every((c) => parsed.includes(c));
-      if (parsed.length === DEFAULT_ORDER.length && hasAll) return parsed;
-    }
-  } catch {}
-  return DEFAULT_ORDER;
-}
-
-function saveOrder(order: CardId[]) {
-  localStorage.setItem("bbn-driver-order", JSON.stringify(order));
-}
+import { useDriverConfig, ALL_DRIVER_CARDS, DEFAULT_CARD_ORDER, type DriverCardId } from "@/hooks/useDriverConfig";
+import { GForceRadar } from "@/components/driver/GForceRadar";
+import { DriverConfigPanel } from "@/components/driver/DriverConfigPanel";
+import { useGpsTelemetrySave } from "@/hooks/useGpsTelemetrySave";
 
 /* ------------------------------------------------------------------ */
 /*  Touch drag-and-drop hook                                           */
 /* ------------------------------------------------------------------ */
 
 function useTouchDrag(
-  cardOrder: CardId[],
-  setCardOrder: (order: CardId[]) => void
+  cardOrder: DriverCardId[],
+  setCardOrder: (order: DriverCardId[]) => void
 ) {
   const draggingIdx = useRef<number | null>(null);
   const cardRects = useRef<Map<number, DOMRect>>(new Map());
@@ -86,7 +65,6 @@ function useTouchDrag(
         const [dragged] = newOrder.splice(fromIdx, 1);
         newOrder.splice(idx, 0, dragged);
         setCardOrder(newOrder);
-        saveOrder(newOrder);
         draggingIdx.current = idx;
         break;
       }
@@ -224,26 +202,25 @@ export function DriverView() {
   const t = useT();
   const { karts, config, fifo, connected } = useRaceStore();
   const { now, speed } = useSimNow();
-  const [cardOrder, setCardOrder] = useState<CardId[]>(DEFAULT_ORDER);
+  const raceClock = useRaceClock();
+  const driverCfg = useDriverConfig();
   const [editMode, setEditMode] = useState(false);
   const [showGpsSetup, setShowGpsSetup] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
   const [hideCalBanner, setHideCalBanner] = useState(false);
+  const [calibrationSkipped, setCalibrationSkipped] = useState(false);
 
   const { dragging, registerRect, onTouchStart, onTouchMove, onTouchEnd } =
-    useTouchDrag(cardOrder, setCardOrder);
+    useTouchDrag(driverCfg.cardOrder, driverCfg.setCardOrder);
   const boxAlert = useBoxAlert();
 
   // GPS sources (RaceBox BLE or phone GPS)
   const raceBox = useRaceBox();
   const phoneGps = usePhoneGps();
   const gps = useRaceBoxStore();
+  useGpsTelemetrySave();
   const gpsConnected = raceBox.status === "connected" || phoneGps.status === "connected";
   const gpsSource = raceBox.status === "connected" ? "racebox" : phoneGps.status === "connected" ? "phone" : null;
-
-  // Hydrate order from localStorage on mount
-  useEffect(() => {
-    setCardOrder(loadOrder());
-  }, []);
 
   // Auto-hide calibration "aligned" banner after 3s
   useEffect(() => {
@@ -267,10 +244,9 @@ export function DriverView() {
 
   const circuitLengthM = config.circuitLengthM || 1100;
   const pitTimeS = config.pitTimeS || 0;
-  const ourKart = config.ourKartNumber;
+  // Kart number: user override from driver config, fallback to race session config
+  const ourKart = driverCfg.selectedKartNumber ?? config.ourKartNumber;
 
-  // Lap delta flash
-  const { delta, deltaMs } = useLapDelta(ourKart);
   // Previous lap tracking for lastLap card
   const { lastLapMs: lastLapVal, lapDelta } = usePrevLap(ourKart);
 
@@ -370,14 +346,13 @@ export function DriverView() {
   const onDragEnd = useCallback(() => {
     if (dragItem.current === null || dragOverItem.current === null) return;
     if (dragItem.current === dragOverItem.current) return;
-    const newOrder = [...cardOrder];
+    const newOrder = [...driverCfg.cardOrder];
     const [d] = newOrder.splice(dragItem.current, 1);
     newOrder.splice(dragOverItem.current, 0, d);
-    setCardOrder(newOrder);
-    saveOrder(newOrder);
+    driverCfg.setCardOrder(newOrder);
     dragItem.current = null;
     dragOverItem.current = null;
-  }, [cardOrder]);
+  }, [driverCfg.cardOrder]);
 
   /* ---------- Waiting for data / no kart ---------- */
   const hasReceivedData = karts.length > 0 || config.ourKartNumber > 0;
@@ -409,25 +384,45 @@ export function DriverView() {
 
   const boxScore = fifo?.score ?? 0;
 
-  // Delta display for pace card
-  const deltaDisplay = delta ? (
-    <div className={`flex items-center gap-1.5 mt-1 ${delta === "faster" ? "text-green-400" : "text-red-400"}`}>
-      {delta === "faster" ? (
-        <svg className="w-5 h-5 animate-bounce" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M10 17a.75.75 0 01-.75-.75V5.612L5.29 9.77a.75.75 0 01-1.08-1.04l5.25-5.5a.75.75 0 011.08 0l5.25 5.5a.75.75 0 11-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0110 17z" clipRule="evenodd" />
-        </svg>
-      ) : (
-        <svg className="w-5 h-5 animate-bounce" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M10 3a.75.75 0 01.75.75v10.638l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z" clipRule="evenodd" />
-        </svg>
-      )}
-      <span className="text-sm font-mono font-bold">
-        {delta === "faster" ? "" : "+"}{(deltaMs / 1000).toFixed(2)}s
-      </span>
-    </div>
-  ) : null;
+  // Format race clock
+  const raceClockH = Math.floor(raceClock / 3600000);
+  const raceClockM = Math.floor((raceClock % 3600000) / 60000);
+  const raceClockS = Math.floor((raceClock % 60000) / 1000);
+  const raceClockStr = raceClock > 0
+    ? `${raceClockH}:${String(raceClockM).padStart(2, "0")}:${String(raceClockS).padStart(2, "0")}`
+    : "--:--:--";
 
-  const cards: Record<CardId, { label: string; content: React.ReactNode; accent: string }> = {
+  // Current lap time (from GPS if available)
+  const currentLapTimeMs = gpsConnected && gps.currentLapStartTime > 0
+    ? gps.currentLapElapsedMs
+    : 0;
+
+  // Avg lap 20 from kart data
+  const avgLap20Ms = paceDisplay?.avgLapMs ?? 0;
+
+  const cards: Record<DriverCardId, { label: string; content: React.ReactNode; accent: string }> = {
+    raceTimer: {
+      label: "Tiempo de carrera",
+      accent: raceClock > 0 && raceClock < 600000
+        ? "from-red-500/25 to-red-500/5 border-red-400/50"
+        : "from-neutral-500/20 to-neutral-500/5 border-neutral-500/30",
+      content: (
+        <span className={`text-3xl sm:text-4xl font-mono font-black leading-none ${
+          raceClock > 0 && raceClock < 600000 ? "text-red-400 animate-pulse" : "text-white"
+        }`}>
+          {raceClockStr}
+        </span>
+      ),
+    },
+    currentLapTime: {
+      label: "Vuelta actual",
+      accent: "from-blue-500/20 to-blue-500/5 border-blue-500/30",
+      content: (
+        <span className="text-3xl sm:text-4xl font-mono font-black text-white leading-none">
+          {currentLapTimeMs > 0 ? msToLapTime(Math.round(currentLapTimeMs)) : "--:--.---"}
+        </span>
+      ),
+    },
     lastLap: {
       label: t("driver.lastLap"),
       accent: lapDelta === "faster"
@@ -457,25 +452,6 @@ export function DriverView() {
         </div>
       ),
     },
-    pace: {
-      label: t("driver.pace"),
-      accent: delta === "faster"
-        ? "from-green-500/25 to-green-500/5 border-green-400/50"
-        : delta === "slower"
-          ? "from-red-500/25 to-red-500/5 border-red-400/50"
-          : "from-blue-500/20 to-blue-500/5 border-blue-500/30",
-      content: (
-        <div className="flex flex-col items-center">
-          <span className="text-3xl sm:text-4xl font-mono font-black text-white leading-none tracking-tight">
-            {paceDisplay?.avgLapMs ? msToLapTime(Math.round(paceDisplay.avgLapMs)) : "--:--.---"}
-          </span>
-          <span className="text-[10px] sm:text-xs text-neutral-500 mt-1">
-            {t("driver.lastLap")}: {paceDisplay?.lastLapMs ? msToLapTime(paceDisplay.lastLapMs) : "-"}
-          </span>
-          {deltaDisplay}
-        </div>
-      ),
-    },
     position: {
       label: t("driver.pacePosition"),
       accent: "from-purple-500/20 to-purple-500/5 border-purple-500/30",
@@ -498,8 +474,8 @@ export function DriverView() {
           <span className="text-3xl sm:text-4xl font-mono font-black text-red-400 leading-none">
             -{ourData.aheadSeconds.toFixed(1)}s
           </span>
-          <span className="text-xs sm:text-sm text-red-400/60 font-mono">
-            -{ourData.aheadMeters.toLocaleString()}m
+          <span className="text-[10px] text-neutral-500 mt-0.5 truncate max-w-full">
+            {ourData.aheadKart.teamName || ourData.aheadKart.driverName || `K${ourData.aheadKart.kartNumber}`}
           </span>
         </div>
       ) : (
@@ -514,12 +490,21 @@ export function DriverView() {
           <span className="text-3xl sm:text-4xl font-mono font-black text-green-400 leading-none">
             +{ourData.behindSeconds.toFixed(1)}s
           </span>
-          <span className="text-xs sm:text-sm text-green-400/60 font-mono">
-            +{ourData.behindMeters.toLocaleString()}m
+          <span className="text-[10px] text-neutral-500 mt-0.5 truncate max-w-full">
+            {ourData.behindKart.teamName || ourData.behindKart.driverName || `K${ourData.behindKart.kartNumber}`}
           </span>
         </div>
       ) : (
         <span className="text-2xl sm:text-3xl font-black text-neutral-500 leading-none">{t("driver.last")}</span>
+      ),
+    },
+    avgLap20: {
+      label: "Media (20v)",
+      accent: "from-indigo-500/20 to-indigo-500/5 border-indigo-500/30",
+      content: (
+        <span className="text-3xl sm:text-4xl font-mono font-black text-white leading-none">
+          {avgLap20Ms > 0 ? msToLapTime(Math.round(avgLap20Ms)) : "--:--.---"}
+        </span>
       ),
     },
     realPos: {
@@ -548,6 +533,45 @@ export function DriverView() {
             {boxScore}
           </span>
           <span className="text-[9px] sm:text-[10px] text-neutral-600 uppercase tracking-widest">/ 100</span>
+        </div>
+      ),
+    },
+    deltaBestLap: {
+      label: gps.bestLapMs > 0
+        ? `Delta Best · ${msToLapTime(Math.round(gps.bestLapMs))}`
+        : "Delta Best Lap",
+      accent: gps.deltaBestMs !== null
+        ? gps.deltaBestMs < 0
+          ? "from-green-500/25 to-green-500/5 border-green-400/50"
+          : "from-red-500/25 to-red-500/5 border-red-400/50"
+        : "from-violet-500/20 to-violet-500/5 border-violet-500/30",
+      content: !gpsConnected ? (
+        <span className="text-lg text-neutral-600 font-mono">GPS --</span>
+      ) : gps.deltaBestMs !== null ? (
+        <div className="flex flex-col items-center">
+          <span className={`text-3xl sm:text-4xl font-mono font-black leading-none ${
+            gps.deltaBestMs < 0 ? "text-green-400" : "text-red-400"
+          }`}>
+            {gps.deltaBestMs < 0 ? "" : "+"}{(gps.deltaBestMs / 1000).toFixed(2)}s
+          </span>
+          <span className="text-[10px] text-neutral-500 font-mono mt-1">
+            {msToLapTime(Math.round(gps.currentLapElapsedMs))}
+          </span>
+        </div>
+      ) : (
+        <span className="text-lg text-neutral-600 font-mono">
+          {gps.bestLapMs > 0 ? "Esperando vuelta..." : "Sin best lap"}
+        </span>
+      ),
+    },
+    gForceRadar: {
+      label: "G-Force",
+      accent: "from-neutral-500/10 to-neutral-500/5 border-neutral-600/30",
+      content: !gpsConnected ? (
+        <span className="text-lg text-neutral-600 font-mono">GPS --</span>
+      ) : (
+        <div className="w-full h-full min-h-[80px]">
+          <GForceRadar gX={gps.sample?.gForceX ?? 0} gY={gps.sample?.gForceY ?? 0} />
         </div>
       ),
     },
@@ -709,6 +733,18 @@ export function DriverView() {
               )}
             </>
           )}
+          {/* Config gear button */}
+          <button
+            onClick={() => setShowConfig(!showConfig)}
+            className={`text-[10px] p-0.5 rounded transition-colors ${
+              showConfig ? "bg-accent/20 text-accent" : "text-neutral-500 hover:text-neutral-300"
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
           <button
             onClick={() => setEditMode(!editMode)}
             className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded transition-colors ${
@@ -720,6 +756,9 @@ export function DriverView() {
         </div>
       </div>
 
+      {/* Driver config panel */}
+      {showConfig && <DriverConfigPanel onClose={() => setShowConfig(false)} />}
+
       {/* GPS setup panel (finish line) */}
       {showGpsSetup && gpsConnected && (
         <GpsSetupPanel onClose={() => setShowGpsSetup(false)} gpsSource={gpsSource} onDisconnect={() => {
@@ -729,7 +768,7 @@ export function DriverView() {
       )}
 
       {/* IMU Calibration banner */}
-      {gpsConnected && gps.calibrationPhase === "idle" && (
+      {gpsConnected && gps.calibrationPhase === "idle" && !calibrationSkipped && (
         <div className="bg-yellow-900/40 border-b border-yellow-700/30 px-3 py-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <svg className="w-4 h-4 text-yellow-400 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -737,12 +776,20 @@ export function DriverView() {
             </svg>
             <span className="text-[11px] text-yellow-300">G-force sin calibrar — mantén el kart quieto y pulsa calibrar</span>
           </div>
-          <button
-            onClick={() => gps.startCalibration()}
-            className="text-[10px] font-bold px-3 py-1 rounded bg-yellow-500 text-black hover:bg-yellow-400 transition-colors shrink-0"
-          >
-            Calibrar
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setCalibrationSkipped(true)}
+              className="text-[10px] font-bold px-3 py-1 rounded bg-neutral-700 text-neutral-300 hover:bg-neutral-600 transition-colors"
+            >
+              Saltar
+            </button>
+            <button
+              onClick={() => gps.startCalibration()}
+              className="text-[10px] font-bold px-3 py-1 rounded bg-yellow-500 text-black hover:bg-yellow-400 transition-colors"
+            >
+              Calibrar
+            </button>
+          </div>
         </div>
       )}
       {gpsConnected && gps.calibrationPhase === "sampling" && (
@@ -760,11 +807,19 @@ export function DriverView() {
         </div>
       )}
       {gpsConnected && gps.calibrationPhase === "ready" && (
-        <div className="bg-cyan-900/30 border-b border-cyan-700/30 px-3 py-1.5 flex items-center gap-2">
-          <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-          </svg>
-          <span className="text-[10px] text-cyan-300">Gravedad calibrada — empieza a rodar para alinear ejes ({">"}15 km/h)</span>
+        <div className="bg-cyan-900/30 border-b border-cyan-700/30 px-3 py-1.5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+            <span className="text-[10px] text-cyan-300">Gravedad calibrada — empieza a rodar para alinear ejes ({">"}15 km/h)</span>
+          </div>
+          <button
+            onClick={() => gps.skipAlignment()}
+            className="text-[10px] px-2 py-0.5 rounded border border-cyan-700/40 text-cyan-400 hover:bg-cyan-900/40 transition-colors shrink-0"
+          >
+            Saltar
+          </button>
         </div>
       )}
       {gpsConnected && gps.calibrationPhase === "aligned" && !hideCalBanner && (
@@ -779,10 +834,13 @@ export function DriverView() {
       {/* Cards grid */}
       <div className="flex-1 p-2 sm:p-3 overflow-auto">
         <div className="grid grid-cols-3 auto-rows-fr gap-2 sm:gap-3 h-full min-h-0">
-          {cardOrder
+          {driverCfg.cardOrder
             .filter((id) => {
-              // Hide GPS cards when RaceBox is not connected (unless in edit mode)
-              if (!editMode && !gpsConnected && (id === "gpsLapDelta" || id === "gpsSpeed" || id === "gpsGForce")) return false;
+              // Hide cards disabled in driver config
+              if (!driverCfg.visibleCards[id]) return false;
+              // Hide GPS cards when GPS not connected (unless in edit mode)
+              const gpsCards: DriverCardId[] = ["gpsLapDelta", "gpsSpeed", "gpsGForce", "deltaBestLap", "gForceRadar"];
+              if (!editMode && !gpsConnected && gpsCards.includes(id)) return false;
               return true;
             })
             .map((cardId, index) => {

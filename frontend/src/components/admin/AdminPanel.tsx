@@ -13,6 +13,7 @@ interface UserRow {
   username: string;
   is_admin: boolean;
   max_devices: number;
+  mfa_enabled: boolean;
   tab_access: string[];
 }
 
@@ -226,6 +227,7 @@ function UsersManager() {
                 <div className={`text-sm font-medium truncate ${selectedUser === u.id ? "text-accent" : "text-white"}`}>
                   {u.username}
                   {u.is_admin && <span className="ml-1.5 text-[9px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-semibold uppercase">Admin</span>}
+                  {u.mfa_enabled && <span className="ml-1 text-[9px] bg-green-500/15 text-green-400 px-1.5 py-0.5 rounded font-semibold uppercase">MFA</span>}
                 </div>
                 <div className="flex gap-2 text-[10px] text-neutral-400 mt-0.5">
                   <span>{t("admin.devicesShort")} {u.max_devices}</span>
@@ -556,6 +558,36 @@ function UsersManager() {
                   )}
                 </div>
               </div>
+
+              {/* MFA Reset */}
+              {selectedUser && (() => {
+                const u = users.find((u) => u.id === selectedUser);
+                return u && (u as any).mfa_enabled ? (
+                  <div className="border-t border-border pt-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <label className="text-[10px] text-neutral-400 uppercase tracking-wider">MFA</label>
+                        <span className="text-[10px] bg-green-500/15 text-green-400 px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">
+                          {t("mfa.enabled")}
+                        </span>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          const ok = await confirm({ message: t("mfa.adminResetConfirm"), danger: true, confirmText: t("mfa.adminReset") });
+                          if (!ok) return;
+                          try {
+                            await api.adminResetMfa(selectedUser);
+                            loadUsers();
+                          } catch {}
+                        }}
+                        className="text-red-400/60 hover:text-red-400 text-[10px] transition-colors"
+                      >
+                        {t("mfa.adminReset")}
+                      </button>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
             </>
           ) : null}
         </div>

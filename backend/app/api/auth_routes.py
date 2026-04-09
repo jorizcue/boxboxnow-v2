@@ -17,6 +17,7 @@ User can list and kill their own sessions (like Netflix device management).
 Admin can set max_devices per user.
 """
 
+import time
 import secrets
 import bcrypt
 import jwt
@@ -32,10 +33,35 @@ from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAc
 from sqlalchemy.orm import selectinload
 from app.models.pydantic_models import (
     LoginRequest, LoginResponse, UserOut, DeviceSessionOut,
+    MfaSetupResponse, MfaVerifyRequest,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 security = HTTPBearer()
+
+
+class RateLimiter:
+    """Simple in-memory rate limiter: max_attempts per window_seconds per IP."""
+
+    def __init__(self, max_attempts: int = 5, window_seconds: int = 60):
+        self.max_attempts = max_attempts
+        self.window_seconds = window_seconds
+        self._attempts: dict[str, list[float]] = {}
+
+    def check(self, ip: str) -> None:
+        now = time.monotonic()
+        timestamps = self._attempts.get(ip, [])
+        timestamps = [t for t in timestamps if now - t < self.window_seconds]
+        if len(timestamps) >= self.max_attempts:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many attempts. Please try again later.",
+            )
+        timestamps.append(now)
+        self._attempts[ip] = timestamps
+
+
+login_limiter = RateLimiter(max_attempts=5, window_seconds=60)
 
 
 def hash_password(password: str) -> str:
@@ -167,6 +193,7 @@ def _user_out(user: User) -> UserOut:
         username=user.username,
         is_admin=user.is_admin,
         max_devices=user.max_devices,
+        mfa_enabled=user.mfa_enabled or False,
         tab_access=tabs,
         created_at=user.created_at,
     )
@@ -199,6 +226,7 @@ async def _cleanup_stale_sessions(db: AsyncSession, user_id: int):
 
 @router.post("/login", response_model=LoginResponse)
 async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    login_limiter.check(request.client.host if request.client else "unknown")
     # Validate credentials
     result = await db.execute(
         select(User).where(User.username == data.username).options(selectinload(User.tab_access))
@@ -207,6 +235,19 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
 
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+
+    # MFA check
+    if user.mfa_enabled:
+        if not data.mfa_code:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="MFA code required",
+                headers={"X-MFA-Required": "true"},
+            )
+        import pyotp
+        totp = pyotp.TOTP(user.mfa_secret)
+        if not totp.verify(data.mfa_code, valid_window=1):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid MFA code")
 
     # Non-admin users must have at least one active circuit access
     if not user.is_admin:
@@ -397,6 +438,75 @@ async def kill_all_other_sessions(
         await close_ws_for_session(tk)
 
     return {"killed_all_others": True}
+
+
+# --- MFA ---
+
+@router.post("/mfa/setup", response_model=MfaSetupResponse)
+async def mfa_setup(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Generate a new TOTP secret and return QR code URI. Does NOT enable MFA yet."""
+    import pyotp
+    secret = pyotp.random_base32()
+    user.mfa_secret = secret
+    await db.commit()
+
+    totp = pyotp.TOTP(secret)
+    uri = totp.provisioning_uri(name=user.username, issuer_name="BoxBoxNow")
+    return MfaSetupResponse(secret=secret, qr_uri=uri)
+
+
+@router.get("/mfa/qr")
+async def mfa_qr(user: User = Depends(get_current_user)):
+    """Return QR code as base64 PNG for the current MFA secret."""
+    import pyotp
+    import qrcode
+    import io
+    import base64
+
+    if not user.mfa_secret:
+        raise HTTPException(status_code=400, detail="No MFA secret")
+
+    totp = pyotp.TOTP(user.mfa_secret)
+    uri = totp.provisioning_uri(name=user.username, issuer_name="BoxBoxNow")
+
+    img = qrcode.make(uri)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    return {"qr_base64": f"data:image/png;base64,{b64}"}
+
+
+@router.post("/mfa/verify")
+async def mfa_verify(data: MfaVerifyRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Verify a TOTP code to confirm setup. Enables MFA on success."""
+    import pyotp
+    if not user.mfa_secret:
+        raise HTTPException(status_code=400, detail="MFA not set up. Call /mfa/setup first.")
+
+    totp = pyotp.TOTP(user.mfa_secret)
+    if not totp.verify(data.code, valid_window=1):
+        raise HTTPException(status_code=400, detail="Invalid code")
+
+    user.mfa_enabled = True
+    await db.commit()
+    return {"ok": True, "message": "MFA enabled successfully"}
+
+
+@router.post("/mfa/disable")
+async def mfa_disable(data: MfaVerifyRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Disable MFA. Requires a valid TOTP code to confirm."""
+    import pyotp
+    if not user.mfa_enabled or not user.mfa_secret:
+        raise HTTPException(status_code=400, detail="MFA is not enabled")
+
+    totp = pyotp.TOTP(user.mfa_secret)
+    if not totp.verify(data.code, valid_window=1):
+        raise HTTPException(status_code=400, detail="Invalid code")
+
+    user.mfa_enabled = False
+    user.mfa_secret = None
+    await db.commit()
+    return {"ok": True, "message": "MFA disabled"}
 
 
 @router.post("/logout")

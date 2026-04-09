@@ -82,9 +82,12 @@ def compute_classification(state: RaceStateManager) -> None:
         distancia_vueltas = last_lap * longitud_circuito
 
         # Time since last crossing
-        ahora = pd.Timestamp.now()
+        ahora = pd.Timestamp.now(tz='UTC')
+        if last_time.tzinfo is None:
+            last_time = last_time.tz_localize('UTC')
         tiempo_desde_meta = (ahora - last_time).total_seconds()
         metros_extra = velocidad_media * tiempo_desde_meta if not np.isnan(velocidad_media) else 0
+        metros_extra = min(metros_extra, longitud_circuito * 0.99)
 
         # Pit penalty
         distancia_pit = velocidad_media * tiempo_pit if not np.isnan(velocidad_media) and tiempo_pit else np.nan

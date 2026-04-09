@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useT } from "@/lib/i18n";
+import { MfaSetup } from "@/components/auth/MfaSetup";
 
 interface DeviceSession {
   id: number;
@@ -49,7 +50,7 @@ export function SessionManager({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-surface rounded-2xl p-6 w-full max-w-lg border border-border">
+      <div className="bg-surface rounded-2xl p-6 w-full max-w-lg border border-border max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-white">{t("sessions.connectedDevices")}</h2>
           <button onClick={onClose} className="text-neutral-400 hover:text-neutral-300 text-xl transition-colors">
@@ -108,6 +109,11 @@ export function SessionManager({ onClose }: { onClose: () => void }) {
             {t("sessions.closeAllOthers")}
           </button>
         )}
+
+        {/* MFA Setup */}
+        <div className="mt-4 mb-4">
+          <MfaSetup />
+        </div>
 
         <button
           onClick={onClose}

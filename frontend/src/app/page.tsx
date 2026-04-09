@@ -17,6 +17,7 @@ import { LiveTiming } from "@/components/live/LiveTiming";
 import { AdjustedClassification } from "@/components/classification/AdjustedClassification";
 import { ReplayTab } from "@/components/replay/ReplayTab";
 import { KartAnalyticsTab } from "@/components/analytics/KartAnalyticsTab";
+import { GpsInsightsTab } from "@/components/insights/GpsInsightsTab";
 import { DriverView } from "@/components/driver/DriverView";
 import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
 
@@ -77,6 +78,7 @@ function Dashboard({
           {activeTab === "config" && userTabs.includes("config") && <ConfigPanel />}
           {activeTab === "replay" && userTabs.includes("replay") && <ReplayTab />}
           {activeTab === "analytics" && userTabs.includes("analytics") && <KartAnalyticsTab />}
+          {activeTab === "insights" && userTabs.includes("analytics") && <GpsInsightsTab />}
           {activeTab === "admin-users" && user?.is_admin && <AdminUsersPanel />}
           {activeTab === "admin-circuits" && user?.is_admin && <AdminCircuitsPanel />}
           {activeTab === "admin-hub" && user?.is_admin && <AdminHubPanel />}

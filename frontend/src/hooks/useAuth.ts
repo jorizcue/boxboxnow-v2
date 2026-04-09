@@ -8,6 +8,7 @@ interface AuthUser {
   username: string;
   is_admin: boolean;
   max_devices: number;
+  mfa_enabled: boolean;
   tab_access: string[];
 }
 

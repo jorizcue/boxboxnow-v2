@@ -12,12 +12,15 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
     max_devices = Column(Integer, default=1, nullable=False)
+    mfa_secret = Column(String, nullable=True)
+    mfa_enabled = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
 
     circuit_access = relationship("UserCircuitAccess", back_populates="user", cascade="all, delete-orphan")
     tab_access = relationship("UserTabAccess", back_populates="user", cascade="all, delete-orphan")
     race_sessions = relationship("RaceSession", back_populates="user", cascade="all, delete-orphan")
     device_sessions = relationship("DeviceSession", back_populates="user", cascade="all, delete-orphan")
+    gps_laps = relationship("GpsTelemetryLap", backref="user", cascade="all, delete-orphan")
 
 
 class Circuit(Base):
@@ -245,3 +248,28 @@ class DeviceSession(Base):
     last_active = Column(DateTime, server_default=func.now())
 
     user = relationship("User", back_populates="device_sessions")
+
+
+class GpsTelemetryLap(Base):
+    __tablename__ = "gps_telemetry_laps"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    circuit_id = Column(Integer, ForeignKey("circuits.id"), nullable=True)
+    race_session_id = Column(Integer, ForeignKey("race_sessions.id"), nullable=True)
+
+    lap_number = Column(Integer, nullable=False)
+    duration_ms = Column(Float, nullable=False)
+    total_distance_m = Column(Float, nullable=False)
+    max_speed_kmh = Column(Float, nullable=True)
+
+    # JSON arrays for the full lap trace (distances[], timestamps[], lat/lon[], speed[], gforce[])
+    distances_json = Column(Text, nullable=True)      # JSON array of cumulative meters
+    timestamps_json = Column(Text, nullable=True)      # JSON array of ms timestamps
+    positions_json = Column(Text, nullable=True)       # JSON array of {lat, lon}
+    speeds_json = Column(Text, nullable=True)          # JSON array of km/h
+    gforce_lat_json = Column(Text, nullable=True)      # JSON array of lateral G
+    gforce_lon_json = Column(Text, nullable=True)      # JSON array of longitudinal G
+
+    gps_source = Column(String, nullable=True)         # "racebox" or "phone"
+    recorded_at = Column(DateTime, server_default=func.now())

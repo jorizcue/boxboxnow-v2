@@ -45,12 +45,17 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-/** Fetch that does NOT auto-clear auth on 401 (for login flow). */
-async function fetchRaw<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+/** Fetch that does NOT auto-clear auth on 401 (for login flow). Returns raw Response for header inspection. */
+async function fetchRawResponse(path: string, options?: RequestInit): Promise<Response> {
+  return fetch(`${API_URL}${path}`, {
     ...options,
     headers: { "Content-Type": "application/json", ...(options?.headers as Record<string, string>) },
   });
+}
+
+/** Fetch that does NOT auto-clear auth on 401 (for login flow). */
+async function fetchRaw<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetchRawResponse(path, options);
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`API error ${res.status}: ${body}`);
@@ -60,13 +65,32 @@ async function fetchRaw<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   // Auth
-  login: (username: string, password: string) =>
-    fetchRaw<any>("/api/auth/login", {
+  login: (username: string, password: string, mfaCode?: string) => {
+    const body: any = { username, password };
+    if (mfaCode) body.mfa_code = mfaCode;
+    return fetchRawResponse("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ username, password }),
-    }),
+      body: JSON.stringify(body),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const text = await res.text();
+        const err: any = new Error(`API error ${res.status}: ${text}`);
+        err.status = res.status;
+        err.mfaRequired = res.headers.get("X-MFA-Required") === "true";
+        throw err;
+      }
+      return res.json();
+    });
+  },
   getMe: () => fetchApi<any>("/api/auth/me"),
   logout: () => fetchApi<any>("/api/auth/logout", { method: "POST" }).catch(() => {}),
+
+  // MFA
+  mfaSetup: () => fetchApi<{ secret: string; qr_uri: string }>("/api/auth/mfa/setup", { method: "POST" }),
+  mfaGetQr: () => fetchApi<{ qr_base64: string }>("/api/auth/mfa/qr"),
+  mfaVerify: (code: string) => fetchApi<{ ok: boolean; message: string }>("/api/auth/mfa/verify", { method: "POST", body: JSON.stringify({ code }) }),
+  mfaDisable: (code: string) => fetchApi<{ ok: boolean; message: string }>("/api/auth/mfa/disable", { method: "POST", body: JSON.stringify({ code }) }),
+  adminResetMfa: (userId: number) => fetchApi<{ ok: boolean }>(`/api/admin/users/${userId}/mfa/reset`, { method: "POST" }),
 
   // Device sessions
   getMySessions: () => fetchApi<any[]>("/api/auth/sessions"),
@@ -239,5 +263,22 @@ export const api = {
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     return fetchApi<any[]>(`/api/analytics/race-logs?${params}`);
+  },
+
+  // GPS Telemetry
+  saveGpsLaps: (laps: any[]) =>
+    fetchApi("/api/gps/laps", { method: "POST", body: JSON.stringify({ laps }) }),
+  getGpsLaps: (params?: { circuit_id?: number; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.circuit_id) qs.set("circuit_id", String(params.circuit_id));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    return fetchApi(`/api/gps/laps?${qs}`);
+  },
+  getGpsLapDetail: (lapId: number) => fetchApi(`/api/gps/laps/${lapId}`),
+  deleteGpsLap: (lapId: number) =>
+    fetchApi(`/api/gps/laps/${lapId}`, { method: "DELETE" }),
+  getGpsStats: (circuitId?: number) => {
+    const qs = circuitId ? `?circuit_id=${circuitId}` : "";
+    return fetchApi(`/api/gps/stats${qs}`);
   },
 };

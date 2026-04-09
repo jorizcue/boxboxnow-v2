@@ -81,6 +81,19 @@ async def update_user(user_id: int, data: UserUpdate, admin: User = Depends(requ
     return user
 
 
+@router.post("/users/{user_id}/mfa/reset")
+async def admin_reset_mfa(user_id: int, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """Admin: Force-disable MFA for a user."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(404, "User not found")
+    user.mfa_enabled = False
+    user.mfa_secret = None
+    await db.commit()
+    return {"ok": True}
+
+
 @router.delete("/users/{user_id}")
 async def delete_user(user_id: int, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.id == user_id))

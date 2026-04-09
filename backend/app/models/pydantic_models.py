@@ -1,4 +1,5 @@
-from pydantic import BaseModel
+import re
+from pydantic import BaseModel, field_validator
 from datetime import datetime
 
 
@@ -7,6 +8,7 @@ from datetime import datetime
 class LoginRequest(BaseModel):
     username: str
     password: str
+    mfa_code: str | None = None
 
 
 class TokenResponse(BaseModel):
@@ -20,10 +22,20 @@ class UserOut(BaseModel):
     username: str
     is_admin: bool
     max_devices: int = 1
+    mfa_enabled: bool = False
     tab_access: list[str] = []
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
+
+
+class MfaSetupResponse(BaseModel):
+    secret: str
+    qr_uri: str
+
+
+class MfaVerifyRequest(BaseModel):
+    code: str
 
 
 class UserCreate(BaseModel):
@@ -32,12 +44,36 @@ class UserCreate(BaseModel):
     is_admin: bool = False
     max_devices: int = 1
 
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[0-9]", v):
+            raise ValueError("Password must contain at least one number")
+        return v
+
 
 class UserUpdate(BaseModel):
     username: str | None = None
     password: str | None = None
     is_admin: bool | None = None
     max_devices: int | None = None
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[0-9]", v):
+            raise ValueError("Password must contain at least one number")
+        return v
 
 
 # --- Device Sessions ---
@@ -302,3 +338,48 @@ class RaceLogOut(BaseModel):
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
+
+
+# --- GPS Telemetry ---
+
+class GpsLapCreate(BaseModel):
+    circuit_id: int | None = None
+    race_session_id: int | None = None
+    lap_number: int
+    duration_ms: float
+    total_distance_m: float
+    max_speed_kmh: float | None = None
+    distances: list[float] | None = None
+    timestamps: list[float] | None = None
+    positions: list[dict] | None = None       # [{lat, lon}, ...]
+    speeds: list[float] | None = None
+    gforce_lat: list[float] | None = None
+    gforce_lon: list[float] | None = None
+    gps_source: str | None = None
+
+
+class GpsLapOut(BaseModel):
+    id: int
+    user_id: int
+    circuit_id: int | None
+    race_session_id: int | None
+    lap_number: int
+    duration_ms: float
+    total_distance_m: float
+    max_speed_kmh: float | None
+    gps_source: str | None
+    recorded_at: datetime | None
+
+    # Only included when requesting full detail
+    distances: list[float] | None = None
+    timestamps: list[float] | None = None
+    positions: list[dict] | None = None
+    speeds: list[float] | None = None
+    gforce_lat: list[float] | None = None
+    gforce_lon: list[float] | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class GpsLapBatchCreate(BaseModel):
+    laps: list[GpsLapCreate]

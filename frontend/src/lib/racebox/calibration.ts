@@ -118,6 +118,14 @@ export class ImuCalibrator {
     };
   }
 
+  /** Skip phase 2 (axis alignment) — uses identity rotation so gravity
+   *  removal still works but lateral/longitudinal won't be mapped. */
+  skipAlignment() {
+    if (this._state.phase !== "ready") return;
+    this._state.rotationMatrix = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+    this._state.phase = "aligned";
+  }
+
   reset() {
     this._samples = [];
     this._headingSamples = [];

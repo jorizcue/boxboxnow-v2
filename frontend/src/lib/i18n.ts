@@ -52,6 +52,7 @@ const translations: Record<string, Record<Language, string>> = {
   "nav.analytics": { es: "Kart Analytics", en: "Kart Analytics", it: "Kart Analytics", de: "Kart Analytics" },
   "nav.analyticsShort": { es: "Karts", en: "Karts", it: "Karts", de: "Karts" },
   "nav.analysis": { es: "Análisis", en: "Analysis", it: "Analisi", de: "Analyse" },
+  "nav.insights": { es: "GPS Insights", en: "GPS Insights", it: "GPS Insights", de: "GPS Insights" },
 
   // === Login ===
   "login.username": { es: "Usuario", en: "Username", it: "Utente", de: "Benutzer" },
@@ -65,6 +66,10 @@ const translations: Record<string, Record<Language, string>> = {
   "login.close": { es: "Cerrar", en: "Close", it: "Chiudi", de: "Schliessen" },
   "login.backToLogin": { es: "Volver al login", en: "Back to login", it: "Torna al login", de: "Zuruck zum Login" },
   "login.noCircuitAccess": { es: "No tienes acceso a ningun circuito. Contacta con el administrador.", en: "You don't have access to any circuit. Contact the administrator.", it: "Non hai accesso a nessun circuito. Contatta l'amministratore.", de: "Sie haben keinen Zugang zu einer Strecke. Kontaktieren Sie den Administrator." },
+  "login.mfaPrompt": { es: "Introduce el codigo de tu app de autenticacion", en: "Enter the code from your authenticator app", it: "Inserisci il codice dalla tua app di autenticazione", de: "Geben Sie den Code aus Ihrer Authenticator-App ein" },
+  "login.mfaCode": { es: "Codigo MFA", en: "MFA Code", it: "Codice MFA", de: "MFA-Code" },
+  "login.invalidMfaCode": { es: "Codigo MFA invalido", en: "Invalid MFA code", it: "Codice MFA non valido", de: "Ungultiger MFA-Code" },
+  "login.verify": { es: "VERIFICAR", en: "VERIFY", it: "VERIFICA", de: "VERIFIZIEREN" },
 
   // === Session Manager ===
   "sessions.connectedDevices": { es: "Dispositivos conectados", en: "Connected devices", it: "Dispositivi collegati", de: "Verbundene Gerate" },
@@ -382,6 +387,28 @@ const translations: Record<string, Record<Language, string>> = {
   // BOX call button
   "box.callBox": { es: "Llamar a BOX", en: "Call BOX", it: "Chiama BOX", de: "BOX rufen" },
   "box.sent": { es: "Enviado!", en: "Sent!", it: "Inviato!", de: "Gesendet!" },
+
+  // === MFA ===
+  "mfa.title": { es: "Autenticacion en dos pasos (MFA)", en: "Two-Factor Authentication (MFA)", it: "Autenticazione a due fattori (MFA)", de: "Zwei-Faktor-Authentifizierung (MFA)" },
+  "mfa.enabled": { es: "MFA activado", en: "MFA enabled", it: "MFA attivato", de: "MFA aktiviert" },
+  "mfa.disabled": { es: "MFA desactivado", en: "MFA disabled", it: "MFA disattivato", de: "MFA deaktiviert" },
+  "mfa.enable": { es: "Activar MFA", en: "Enable MFA", it: "Attiva MFA", de: "MFA aktivieren" },
+  "mfa.disable": { es: "Desactivar MFA", en: "Disable MFA", it: "Disattiva MFA", de: "MFA deaktivieren" },
+  "mfa.step1": { es: "1. Escanea este codigo QR con tu app de autenticacion (Google Authenticator, Authy, etc.)", en: "1. Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)", it: "1. Scansiona questo codice QR con la tua app di autenticazione (Google Authenticator, Authy, ecc.)", de: "1. Scannen Sie diesen QR-Code mit Ihrer Authenticator-App (Google Authenticator, Authy, etc.)" },
+  "mfa.step2": { es: "2. Introduce el codigo de 6 digitos para verificar", en: "2. Enter the 6-digit code to verify", it: "2. Inserisci il codice a 6 cifre per verificare", de: "2. Geben Sie den 6-stelligen Code zur Verifizierung ein" },
+  "mfa.manualKey": { es: "Clave manual", en: "Manual key", it: "Chiave manuale", de: "Manueller Schlussel" },
+  "mfa.verifyAndEnable": { es: "Verificar y activar", en: "Verify and enable", it: "Verifica e attiva", de: "Verifizieren und aktivieren" },
+  "mfa.enterCodeToDisable": { es: "Introduce tu codigo MFA para desactivar", en: "Enter your MFA code to disable", it: "Inserisci il codice MFA per disattivare", de: "Geben Sie Ihren MFA-Code zum Deaktivieren ein" },
+  "mfa.confirmDisable": { es: "Confirmar desactivacion", en: "Confirm disable", it: "Conferma disattivazione", de: "Deaktivierung bestatigen" },
+  "mfa.cancel": { es: "Cancelar", en: "Cancel", it: "Annulla", de: "Abbrechen" },
+  "mfa.setupError": { es: "Error al configurar MFA", en: "Error setting up MFA", it: "Errore nella configurazione MFA", de: "Fehler bei der MFA-Einrichtung" },
+  "mfa.verifyError": { es: "Codigo invalido. Intentalo de nuevo.", en: "Invalid code. Try again.", it: "Codice non valido. Riprova.", de: "Ungultiger Code. Versuchen Sie es erneut." },
+  "mfa.disableError": { es: "Codigo invalido. No se pudo desactivar.", en: "Invalid code. Could not disable.", it: "Codice non valido. Impossibile disattivare.", de: "Ungultiger Code. Konnte nicht deaktiviert werden." },
+  "mfa.successEnabled": { es: "MFA activado correctamente", en: "MFA enabled successfully", it: "MFA attivato con successo", de: "MFA erfolgreich aktiviert" },
+  "mfa.successDisabled": { es: "MFA desactivado correctamente", en: "MFA disabled successfully", it: "MFA disattivato con successo", de: "MFA erfolgreich deaktiviert" },
+  "mfa.adminReset": { es: "Reset MFA", en: "Reset MFA", it: "Reset MFA", de: "MFA zurucksetzen" },
+  "mfa.adminResetConfirm": { es: "Desactivar MFA para este usuario?", en: "Disable MFA for this user?", it: "Disattivare MFA per questo utente?", de: "MFA fur diesen Benutzer deaktivieren?" },
+  "mfa.description": { es: "Protege tu cuenta con un codigo temporal de tu telefono", en: "Protect your account with a temporary code from your phone", it: "Proteggi il tuo account con un codice temporaneo dal tuo telefono", de: "Schutzen Sie Ihr Konto mit einem temporaren Code von Ihrem Telefon" },
 
   // === Common ===
   "common.loading": { es: "Cargando...", en: "Loading...", it: "Caricamento...", de: "Laden..." },

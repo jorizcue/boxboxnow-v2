@@ -22,6 +22,8 @@ interface DeviceLimitError {
 export function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaRequired, setMfaRequired] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [deviceLimit, setDeviceLimit] = useState<DeviceLimitError | null>(null);
@@ -35,18 +37,35 @@ export function LoginPage() {
     setLoading(true);
 
     try {
-      const data = await api.login(username, password);
+      const data = await api.login(username, password, mfaRequired ? mfaCode : undefined);
       setAuth(data.access_token, data.session_token, data.user);
     } catch (err: any) {
       const msg = err.message || "";
-      // 403: no circuit access
-      if (msg.includes("API error 403:")) {
+      // 403: MFA required or invalid MFA code
+      if (err.status === 403 || msg.includes("API error 403:")) {
+        if (err.mfaRequired) {
+          setMfaRequired(true);
+          setLoading(false);
+          return;
+        }
         try {
           const body = JSON.parse(msg.replace("API error 403: ", ""));
+          if (body.detail === "MFA code required") {
+            setMfaRequired(true);
+            setLoading(false);
+            return;
+          }
+          if (body.detail === "Invalid MFA code") {
+            setError(t("login.invalidMfaCode"));
+            setMfaCode("");
+            setLoading(false);
+            return;
+          }
           setError(body.detail || t("login.noCircuitAccess"));
         } catch {
           setError(t("login.noCircuitAccess"));
         }
+        setLoading(false);
         return;
       }
       // 409: device limit
@@ -148,38 +167,75 @@ export function LoginPage() {
 
         <div className="bg-surface rounded-2xl p-5 sm:p-8 border border-border">
           <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">{t("login.username")}</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700"
-                placeholder={t("login.username").toLowerCase()}
-                autoFocus
-              />
-            </div>
+            {!mfaRequired ? (
+              <>
+                <div>
+                  <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">{t("login.username")}</label>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700"
+                    placeholder={t("login.username").toLowerCase()}
+                    autoFocus
+                  />
+                </div>
 
-            <div>
-              <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">{t("login.password")}</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700"
-                placeholder={t("login.password").toLowerCase()}
-              />
-            </div>
+                <div>
+                  <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">{t("login.password")}</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700"
+                    placeholder={t("login.password").toLowerCase()}
+                  />
+                </div>
+              </>
+            ) : (
+              <div>
+                <div className="text-center mb-4">
+                  <div className="inline-flex items-center justify-center w-10 h-10 bg-accent/10 rounded-full mb-2">
+                    <svg className="w-5 h-5 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-neutral-300">{t("login.mfaPrompt")}</p>
+                </div>
+                <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">{t("login.mfaCode")}</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700 text-center font-mono text-lg tracking-[0.5em]"
+                  placeholder="000000"
+                  autoFocus
+                />
+              </div>
+            )}
 
             {error && <p className="text-red-400 text-sm">{error}</p>}
 
             <button
               type="submit"
-              disabled={loading || !username || !password}
+              disabled={loading || !username || !password || (mfaRequired && mfaCode.length !== 6)}
               className="w-full bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold py-3 rounded-lg transition-colors tracking-wide"
             >
-              {loading ? t("login.entering") : t("login.enter")}
+              {loading ? t("login.entering") : mfaRequired ? t("login.verify") : t("login.enter")}
             </button>
+
+            {mfaRequired && (
+              <button
+                type="button"
+                onClick={() => { setMfaRequired(false); setMfaCode(""); setError(""); }}
+                className="w-full text-neutral-400 hover:text-white text-sm py-2 transition-colors"
+              >
+                {t("login.backToLogin")}
+              </button>
+            )}
           </form>
         </div>
       </div>

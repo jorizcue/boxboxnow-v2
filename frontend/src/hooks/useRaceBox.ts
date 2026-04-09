@@ -52,6 +52,7 @@ interface RaceBoxState {
 
   // Real-time delta
   deltaMs: number | null;
+  deltaBestMs: number | null;
   currentLapElapsedMs: number;
   currentDistanceM: number;
   maxSpeedKmh: number;
@@ -65,6 +66,7 @@ interface RaceBoxState {
   setFinishLine: (fl: FinishLine | null) => void;
   addSample: (s: RaceBoxSample) => void;
   startCalibration: () => void;
+  skipAlignment: () => void;
   reset: () => void;
 }
 
@@ -129,6 +131,7 @@ export const useRaceBoxStore = create<RaceBoxState>((set, get) => ({
   bestLapMs: 0,
 
   deltaMs: null,
+  deltaBestMs: null,
   currentLapElapsedMs: 0,
   currentDistanceM: 0,
   maxSpeedKmh: 0,
@@ -146,6 +149,14 @@ export const useRaceBoxStore = create<RaceBoxState>((set, get) => ({
   startCalibration: () => {
     calibrator.startCalibration();
     set({ calibrationPhase: "sampling", calibrationProgress: 0 });
+  },
+
+  skipAlignment: () => {
+    // Skip phase 2 (heading alignment) — gravity-only calibration
+    calibrator.skipAlignment();
+    if (calibrator.state.phase === "aligned") {
+      set({ calibrationPhase: "aligned" });
+    }
   },
 
   addSample: (s) => {
@@ -272,6 +283,11 @@ export const useRaceBoxStore = create<RaceBoxState>((set, get) => ({
     if (previousLap && currentLapStartTime > 0) {
       deltaMs = computeDelta(currentDist, currentElapsed, previousLap);
     }
+    // Compute delta against best lap
+    let deltaBestMs: number | null = null;
+    if (bestLap && currentLapStartTime > 0) {
+      deltaBestMs = computeDelta(currentDist, currentElapsed, bestLap);
+    }
 
     set({
       sample: s,
@@ -280,6 +296,7 @@ export const useRaceBoxStore = create<RaceBoxState>((set, get) => ({
       currentLapTimestamps: newTimestamps,
       samplesSinceCrossing,
       deltaMs,
+      deltaBestMs,
       currentLapElapsedMs: currentElapsed,
       currentDistanceM: currentDist,
       maxSpeedKmh,
@@ -301,6 +318,7 @@ export const useRaceBoxStore = create<RaceBoxState>((set, get) => ({
       lastLapMs: 0,
       bestLapMs: 0,
       deltaMs: null,
+      deltaBestMs: null,
       currentLapElapsedMs: 0,
       currentDistanceM: 0,
       maxSpeedKmh: 0,
