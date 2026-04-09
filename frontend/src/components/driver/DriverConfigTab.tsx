@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "@/lib/api";
 import { useDriverConfig, ALL_DRIVER_CARDS, type DriverCardId } from "@/hooks/useDriverConfig";
 
@@ -31,16 +31,6 @@ export function DriverConfigTab() {
 
   const gpsCards = ALL_DRIVER_CARDS.filter((c) => c.requiresGps);
   const standardCards = ALL_DRIVER_CARDS.filter((c) => !c.requiresGps);
-
-  const moveCard = (id: DriverCardId, direction: "up" | "down") => {
-    const order = [...config.cardOrder];
-    const idx = order.indexOf(id);
-    if (idx < 0) return;
-    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= order.length) return;
-    [order[idx], order[targetIdx]] = [order[targetIdx], order[idx]];
-    config.setCardOrder(order);
-  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -138,56 +128,246 @@ export function DriverConfigTab() {
         </div>
       </div>
 
-      {/* Card order */}
+      {/* Visual preview with drag-and-drop */}
       <div className="bg-surface border border-border rounded-xl p-4 space-y-3">
-        <h3 className="text-xs font-bold text-accent uppercase tracking-wider">Orden de tarjetas</h3>
-        <p className="text-[11px] text-neutral-500">Arrastra o usa las flechas para reordenar las tarjetas en la vista del piloto.</p>
+        <h3 className="text-xs font-bold text-accent uppercase tracking-wider">Preview y orden</h3>
+        <p className="text-[11px] text-neutral-500">Arrastra las tarjetas para reordenarlas. La vista refleja como se vera en la pantalla del piloto.</p>
 
-        <div className="space-y-1">
-          {config.cardOrder.map((cardId, idx) => {
+        <CardOrderPreview config={config} />
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Static accent colors per card (default/neutral variants)           */
+/* ------------------------------------------------------------------ */
+
+const CARD_ACCENTS: Record<DriverCardId, string> = {
+  raceTimer: "from-neutral-500/20 to-neutral-500/5 border-neutral-500/30",
+  currentLapTime: "from-blue-500/20 to-blue-500/5 border-blue-500/30",
+  lastLap: "from-neutral-500/20 to-neutral-500/5 border-neutral-500/30",
+  deltaBestLap: "from-violet-500/20 to-violet-500/5 border-violet-500/30",
+  gForceRadar: "from-neutral-500/10 to-neutral-500/5 border-neutral-600/30",
+  position: "from-purple-500/20 to-purple-500/5 border-purple-500/30",
+  realPos: "from-accent/20 to-accent/5 border-accent/30",
+  gapAhead: "from-red-500/20 to-red-500/5 border-red-500/30",
+  gapBehind: "from-green-500/20 to-green-500/5 border-green-500/30",
+  avgLap20: "from-indigo-500/20 to-indigo-500/5 border-indigo-500/30",
+  boxScore: "from-yellow-500/20 to-yellow-500/5 border-yellow-500/30",
+  gpsLapDelta: "from-cyan-500/20 to-cyan-500/5 border-cyan-500/30",
+  gpsSpeed: "from-sky-500/20 to-sky-500/5 border-sky-500/30",
+  gpsGForce: "from-emerald-500/20 to-emerald-500/5 border-emerald-500/30",
+};
+
+const CARD_SAMPLE_VALUES: Record<DriverCardId, string> = {
+  raceTimer: "1:23:45",
+  currentLapTime: "0:42.318",
+  lastLap: "1:02.456",
+  deltaBestLap: "-0.32s",
+  gForceRadar: "G",
+  position: "P3/12",
+  realPos: "P5/12",
+  gapAhead: "-1.2s",
+  gapBehind: "+0.8s",
+  avgLap20: "1:03.120",
+  boxScore: "87",
+  gpsLapDelta: "+0.15s",
+  gpsSpeed: "94 km/h",
+  gpsGForce: "1.2G",
+};
+
+/* ------------------------------------------------------------------ */
+/*  Card Order Preview (3-col grid with drag-and-drop)                 */
+/* ------------------------------------------------------------------ */
+
+interface CardOrderPreviewProps {
+  config: {
+    cardOrder: DriverCardId[];
+    visibleCards: Record<DriverCardId, boolean>;
+    setCardOrder: (order: DriverCardId[]) => void;
+  };
+}
+
+function CardOrderPreview({ config }: CardOrderPreviewProps) {
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
+
+  // Touch drag state
+  const touchDragIdx = useRef<number | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cardRefs = useRef<Map<number, HTMLElement>>(new Map());
+  const [touchDragging, setTouchDragging] = useState<number | null>(null);
+
+  const visibleOrder = config.cardOrder.filter((id) => config.visibleCards[id] !== false);
+
+  // --- HTML5 drag-and-drop (desktop) ---
+  const onDragStart = useCallback((idx: number) => {
+    setDragIdx(idx);
+  }, []);
+
+  const onDragEnter = useCallback((idx: number) => {
+    setOverIdx(idx);
+  }, []);
+
+  const onDragEnd = useCallback(() => {
+    if (dragIdx !== null && overIdx !== null && dragIdx !== overIdx) {
+      const newOrder = [...config.cardOrder];
+      // Map visible indices back to full order indices
+      const fromCardId = visibleOrder[dragIdx];
+      const toCardId = visibleOrder[overIdx];
+      const fromFull = newOrder.indexOf(fromCardId);
+      const toFull = newOrder.indexOf(toCardId);
+      if (fromFull >= 0 && toFull >= 0) {
+        const [moved] = newOrder.splice(fromFull, 1);
+        newOrder.splice(toFull, 0, moved);
+        config.setCardOrder(newOrder);
+      }
+    }
+    setDragIdx(null);
+    setOverIdx(null);
+  }, [dragIdx, overIdx, config, visibleOrder]);
+
+  // --- Touch drag-and-drop (mobile) ---
+  const onTouchStart = useCallback((idx: number) => {
+    longPressTimer.current = setTimeout(() => {
+      touchDragIdx.current = idx;
+      setTouchDragging(idx);
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, 300);
+  }, []);
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchDragIdx.current === null) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+      return;
+    }
+    e.preventDefault();
+    const touch = e.touches[0];
+    const entries = Array.from(cardRefs.current.entries());
+    for (const [idx, el] of entries) {
+      const rect = el.getBoundingClientRect();
+      if (
+        touch.clientX >= rect.left &&
+        touch.clientX <= rect.right &&
+        touch.clientY >= rect.top &&
+        touch.clientY <= rect.bottom &&
+        idx !== touchDragIdx.current
+      ) {
+        const fromCardId = visibleOrder[touchDragIdx.current!];
+        const toCardId = visibleOrder[idx];
+        const newOrder = [...config.cardOrder];
+        const fromFull = newOrder.indexOf(fromCardId);
+        const toFull = newOrder.indexOf(toCardId);
+        if (fromFull >= 0 && toFull >= 0) {
+          const [moved] = newOrder.splice(fromFull, 1);
+          newOrder.splice(toFull, 0, moved);
+          config.setCardOrder(newOrder);
+        }
+        touchDragIdx.current = idx;
+        break;
+      }
+    }
+  }, [config, visibleOrder]);
+
+  const onTouchEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    touchDragIdx.current = null;
+    setTouchDragging(null);
+  }, []);
+
+  const registerRef = useCallback((idx: number, el: HTMLElement | null) => {
+    if (el) cardRefs.current.set(idx, el);
+    else cardRefs.current.delete(idx);
+  }, []);
+
+  // Hidden cards listed below
+  const hiddenCards = config.cardOrder.filter((id) => config.visibleCards[id] === false);
+
+  return (
+    <div className="space-y-3">
+      {/* Simulated driver view frame */}
+      <div className="bg-black rounded-xl border border-neutral-800 p-2 sm:p-3">
+        {/* Mini header to mimic the driver view */}
+        <div className="flex items-center justify-between mb-2 px-1">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[9px] font-bold text-white">BB<span className="text-accent">N</span></span>
+            <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+          </div>
+          <span className="text-[8px] text-neutral-600 font-mono">K42 · Vista Piloto</span>
+        </div>
+
+        {/* 3-column grid */}
+        <div
+          className="grid grid-cols-3 auto-rows-fr gap-1.5 sm:gap-2"
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+          {visibleOrder.map((cardId, idx) => {
             const card = ALL_DRIVER_CARDS.find((c) => c.id === cardId);
             if (!card) return null;
-            const isVisible = config.visibleCards[cardId] ?? true;
+            const accent = CARD_ACCENTS[cardId];
+            const isDragging = dragIdx === idx || touchDragging === idx;
+            const isOver = overIdx === idx && dragIdx !== null && dragIdx !== idx;
             return (
               <div
                 key={cardId}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
-                  isVisible
-                    ? "bg-black/40 border-border text-neutral-200"
-                    : "bg-black/20 border-border/50 text-neutral-600"
-                }`}
+                ref={(el) => registerRef(idx, el)}
+                draggable
+                onDragStart={() => onDragStart(idx)}
+                onDragEnter={() => onDragEnter(idx)}
+                onDragEnd={onDragEnd}
+                onDragOver={(e) => e.preventDefault()}
+                onTouchStart={() => onTouchStart(idx)}
+                className={`
+                  relative rounded-xl border bg-gradient-to-b ${accent}
+                  flex flex-col items-center justify-center
+                  p-2 sm:p-3 min-h-[60px] sm:min-h-[80px]
+                  cursor-grab active:cursor-grabbing
+                  select-none
+                  ${isDragging ? "opacity-40 scale-95" : ""}
+                  ${isOver ? "ring-2 ring-accent/50 scale-[1.02]" : ""}
+                  transition-all duration-150
+                `}
               >
-                <span className="text-neutral-600 text-xs font-mono w-5 text-right">{idx + 1}</span>
-                <span className="flex-1 text-xs truncate">
+                {/* Drag handle indicator */}
+                <div className="absolute top-1 right-1.5 text-neutral-700 text-[9px]">⋮⋮</div>
+
+                {/* Card label */}
+                <span className="text-[7px] sm:text-[9px] text-neutral-500 uppercase tracking-widest mb-1 font-bold text-center leading-tight">
                   {card.label}
-                  {card.requiresGps && <span className="ml-1.5 text-cyan-600 text-[9px]">GPS</span>}
-                  {!isVisible && <span className="ml-1.5 text-neutral-600 text-[9px]">(oculta)</span>}
                 </span>
-                <div className="flex gap-0.5">
-                  <button
-                    onClick={() => moveCard(cardId, "up")}
-                    disabled={idx === 0}
-                    className="p-1 rounded hover:bg-white/10 disabled:opacity-20 text-neutral-400 hover:text-white transition-colors"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => moveCard(cardId, "down")}
-                    disabled={idx === config.cardOrder.length - 1}
-                    className="p-1 rounded hover:bg-white/10 disabled:opacity-20 text-neutral-400 hover:text-white transition-colors"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                    </svg>
-                  </button>
-                </div>
+
+                {/* Sample value */}
+                <span className="text-sm sm:text-lg font-mono font-black text-white/70 leading-none">
+                  {CARD_SAMPLE_VALUES[cardId]}
+                </span>
+
+                {/* GPS badge */}
+                {card.requiresGps && (
+                  <span className="absolute bottom-1 left-1.5 text-[7px] text-cyan-600 font-semibold">GPS</span>
+                )}
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* Hidden cards info */}
+      {hiddenCards.length > 0 && (
+        <div className="px-1">
+          <p className="text-[10px] text-neutral-600">
+            <span className="font-semibold text-neutral-500">{hiddenCards.length} tarjeta{hiddenCards.length !== 1 ? "s" : ""} oculta{hiddenCards.length !== 1 ? "s" : ""}:</span>{" "}
+            {hiddenCards.map((id) => ALL_DRIVER_CARDS.find((c) => c.id === id)?.label).filter(Boolean).join(", ")}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
