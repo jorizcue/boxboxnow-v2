@@ -62,37 +62,15 @@ export function RealClassificationBeta() {
   const adjusted = useMemo(() => {
     if (karts.length === 0) return [];
 
-    // Hybrid pit penalty: use max(pitCount) across racing karts.
-    // When nobody has pitted, maxPits=0 → penalty=0 for all → ordering matches Apex.
-    // When pits start, only penalize karts that are behind in pit count.
+    // Pit bonus approach: ADD distance to karts that have pitted, instead of
+    // penalizing those that haven't. Uses ACTUAL pit durations from pitHistory.
+    //
+    // pitBonus = sum of (each completed pit's actual duration × kart's speed)
+    //
+    // This represents the distance the kart WOULD have covered had it not stopped.
+    // Benefits: no estimations, no negative distances, no dependency on maxPits,
+    // smooth transitions, uses real data.
     const racingKarts = karts.filter((k) => k.totalLaps > 0);
-    const maxPits = Math.max(...racingKarts.map((k) => k.pitStatus !== "in_pit" ? k.pitCount : 0), 0);
-
-    // Compute average speed across all karts for a uniform pit penalty
-    const avgSpeeds = racingKarts
-      .filter((k) => k.avgLapMs > 0)
-      .map((k) => circuitLengthM / (k.avgLapMs / 1000));
-    const fieldAvgSpeed = avgSpeeds.length > 0
-      ? avgSpeeds.reduce((a, b) => a + b, 0) / avgSpeeds.length
-      : 0;
-
-    // Use OBSERVED pit times from actual pit history instead of configured pitTimeS.
-    // This is much more accurate — the configured value may not reflect reality.
-    // Collect all completed pit times (pitTimeMs > 0) from all karts.
-    const observedPitTimesMs: number[] = [];
-    for (const k of racingKarts) {
-      if (k.pitHistory) {
-        for (const p of k.pitHistory) {
-          if (p.pitTimeMs > 0) {
-            observedPitTimesMs.push(p.pitTimeMs);
-          }
-        }
-      }
-    }
-    // Use average observed pit time if available, otherwise fall back to config
-    const effectivePitTimeS = observedPitTimesMs.length > 0
-      ? (observedPitTimesMs.reduce((a, b) => a + b, 0) / observedPitTimesMs.length) / 1000
-      : pitTimeS;
 
     return racingKarts
       .map((kart) => {
@@ -123,7 +101,6 @@ export function RealClassificationBeta() {
           }
 
           // METHOD 2 (fallback): Browser timestamp of last lap change
-          // Used when countdown isn't available (e.g., race hasn't started countdown yet)
           if (interpolationMethod === "none") {
             const lastTs = lastLapTs.current.get(kart.kartNumber);
             if (lastTs && lastTs.ts > 0) {
@@ -141,12 +118,21 @@ export function RealClassificationBeta() {
 
         const totalDistanceM = baseDistanceM + metersExtra;
 
-        // Pit penalty: use field average speed so penalty is uniform per missing pit.
-        // Uses observed pit time (from actual pit history) when available.
-        const missingPits = Math.max(0, maxPits - kart.pitCount);
-        const pitPenaltyM = missingPits * fieldAvgSpeed * effectivePitTimeS;
+        // Pit bonus: credit each completed pit stop's actual duration as distance
+        let pitBonusM = 0;
+        let totalPitTimeMs = 0;
+        if (kart.pitHistory) {
+          for (const p of kart.pitHistory) {
+            if (p.pitTimeMs > 0) {
+              totalPitTimeMs += p.pitTimeMs;
+            }
+          }
+        }
+        if (totalPitTimeMs > 0 && speedMs > 0) {
+          pitBonusM = (totalPitTimeMs / 1000) * speedMs;
+        }
 
-        const adjustedDistanceM = totalDistanceM - pitPenaltyM;
+        const adjustedDistanceM = totalDistanceM + pitBonusM;
 
         // Estimate progress within current lap (0-100%)
         const lapProgress = speedMs > 0
@@ -159,14 +145,11 @@ export function RealClassificationBeta() {
           baseDistanceM,
           totalDistanceM,
           metersExtra,
-          missingPits,
-          pitPenaltyM,
+          pitBonusM,
+          totalPitTimeMs,
           adjustedDistanceM,
           lapProgress,
           interpolationMethod,
-          maxPits,
-          effectivePitTimeS,
-          observedPitCount: observedPitTimesMs.length,
         };
       })
       .sort((a, b) => b.adjustedDistanceM - a.adjustedDistanceM);
@@ -194,14 +177,8 @@ export function RealClassificationBeta() {
           <span className="text-[9px] bg-accent/20 text-accent px-1.5 py-0.5 rounded-full font-bold uppercase">Beta</span>
         </div>
         <p className="text-[11px] text-neutral-400">
-          Posiciones calculadas por distancia recorrida, interpolando posicion entre vueltas usando el reloj de carrera (countdown).
-          {" "}Se penaliza a karts con menos paradas que el lider en pits
-          {adjusted.length > 0 && adjusted[0].maxPits > 0
-            ? <> (actualmente <span className="text-white font-medium">{adjusted[0].maxPits} parada{adjusted[0].maxPits !== 1 ? "s" : ""}</span>,
-                  pit time: <span className="text-white font-medium">{Math.round(adjusted[0].effectivePitTimeS)}s</span>
-                  {adjusted[0].observedPitCount > 0 ? " observado" : " config"}).</>
-            : <> (nadie ha parado todavia — sin penalizacion).</>
-          }
+          Posiciones calculadas por distancia recorrida ajustada. A los karts que han parado se les bonifica la distancia que habrian recorrido durante sus paradas
+          (usando el tiempo real de cada pit y su velocidad media).
         </p>
       </div>
 
@@ -217,7 +194,7 @@ export function RealClassificationBeta() {
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">{t("race.driver")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">Vlts</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">{t("race.pit")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">{t("adjusted.missingPits")}</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right" title="Distancia bonificada por tiempo en pits">Bonus</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Dist. (m)</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("adjusted.gapSeconds")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("adjusted.intSeconds")}</th>
@@ -299,10 +276,10 @@ export function RealClassificationBeta() {
                     )}
                   </td>
 
-                  {/* Missing pits */}
-                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center">
-                    {kart.missingPits > 0 ? (
-                      <span className="text-orange-400 font-medium">{kart.missingPits}</span>
+                  {/* Pit bonus */}
+                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-right font-mono text-xs">
+                    {kart.pitBonusM > 0 ? (
+                      <span className="text-green-400">+{Math.round(kart.pitBonusM).toLocaleString()}</span>
                     ) : (
                       <span className="text-neutral-700">0</span>
                     )}
@@ -361,8 +338,7 @@ export function RealClassificationBeta() {
       <div className="bg-surface/50 rounded-lg p-2 border border-border/50">
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-neutral-600">
           <span>Circuito: <span className="text-neutral-400 font-mono">{circuitLengthM}m</span></span>
-          <span>Pit time: <span className="text-neutral-400 font-mono">{Math.round(adjusted[0]?.effectivePitTimeS ?? pitTimeS)}s{(adjusted[0]?.observedPitCount ?? 0) > 0 ? ` (obs. ${adjusted[0].observedPitCount} pits)` : " (config)"}</span></span>
-          <span>Max pits: <span className="text-neutral-400 font-mono">{adjusted[0]?.maxPits ?? 0}</span></span>
+          <span>Modelo: <span className="text-green-500 font-mono">pit-bonus</span></span>
           <span>Countdown: <span className="text-neutral-400 font-mono">{Math.round(countdownMs / 1000)}s</span></span>
           <span>Metodo: {(() => {
             const methods = adjusted.map((k) => k.interpolationMethod);
