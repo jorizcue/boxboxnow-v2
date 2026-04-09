@@ -53,7 +53,7 @@ export function useReplayTime(): string {
     setDisplay(formatTime(lastServerSecsRef.current));
   }, [serverTime]);
 
-  // Tick at 200ms intervals, advancing at replay speed
+  // Tick at 1s intervals, advancing at replay speed
   useEffect(() => {
     if (!replayActive || replayPaused || !serverTime) return;
 
@@ -62,7 +62,7 @@ export function useReplayTime(): string {
       const simElapsedSecs = (elapsedWallMs * (replaySpeed || 1)) / 1000;
       const currentSecs = lastServerSecsRef.current + Math.floor(simElapsedSecs);
       setDisplay(formatTime(currentSecs));
-    }, 200);
+    }, 1000);
 
     return () => clearInterval(interval);
   }, [replayActive, replayPaused, serverTime, replaySpeed]);

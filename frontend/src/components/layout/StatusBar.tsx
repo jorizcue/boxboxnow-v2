@@ -44,13 +44,15 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   const setReplayStatus = useRaceStore((s) => s.setReplayStatus);
   const replayTime = useReplayTime();
 
+  // Optimistic UI: update local state immediately, then send to server
   const handlePauseResume = useCallback(async () => {
+    setReplayStatus(replayActive, !replayPaused);
     try { await api.pauseReplay(); } catch {}
-  }, []);
+  }, [replayActive, replayPaused, setReplayStatus]);
 
   const handleStop = useCallback(async () => {
+    setReplayStatus(false);
     try {
-      setReplayStatus(false);
       await api.stopReplay();
       requestWsReconnect();
     } catch {}
@@ -61,8 +63,9 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   }, [replayStartBlock]);
 
   const handleSpeedChange = useCallback(async (speed: number) => {
+    setReplayStatus(replayActive, replayPaused, undefined, undefined, undefined, speed);
     try { await api.setReplaySpeed(speed); } catch {}
-  }, []);
+  }, [replayActive, replayPaused, setReplayStatus]);
 
   const handleProgressBarClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (replayTotalBlocks <= 0) return;

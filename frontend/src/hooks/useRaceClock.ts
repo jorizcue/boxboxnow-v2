@@ -43,7 +43,7 @@ export function useRaceClock(): number {
     }
   }, [replayPaused]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Tick at 200ms intervals (smooth), applying replay speed
+  // Tick at 1s intervals, applying replay speed
   useEffect(() => {
     if (serverCountdownMs === 0 || replayPaused) return;
 
@@ -55,7 +55,7 @@ export function useRaceClock(): number {
       const serverVal = lastServerRef.current;
 
       setLocalMs(Math.max(0, serverVal - simElapsed));
-    }, 200);
+    }, 1000);
 
     return () => clearInterval(interval);
   }, [serverCountdownMs, replayPaused, replayActive, replaySpeed]);

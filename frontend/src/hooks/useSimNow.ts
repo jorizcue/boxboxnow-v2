@@ -19,7 +19,7 @@ export function useSimNow(): { now: number; speed: number } {
 
   useEffect(() => {
     if (replayPaused) return;
-    const interval = setInterval(() => setNow(Date.now() / 1000), 200);
+    const interval = setInterval(() => setNow(Date.now() / 1000), 1000);
     return () => clearInterval(interval);
   }, [replayPaused]);
 
