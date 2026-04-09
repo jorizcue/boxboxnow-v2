@@ -105,6 +105,20 @@ async def init_db():
         """))
 
 
+        # Add email, google_id, stripe_customer_id to users
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN email VARCHAR(255)"))
+        except Exception:
+            pass
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN google_id VARCHAR(255)"))
+        except Exception:
+            pass
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN stripe_customer_id VARCHAR(255)"))
+        except Exception:
+            pass
+
         # Seed default tab access for all users (basic tabs)
         # This ensures existing users get access to all standard tabs
         basic_tabs = ["race", "pit", "live", "adjusted", "driver", "config", "replay", "analytics"]

@@ -28,6 +28,20 @@ class Settings(BaseSettings):
     default_laps_discard: int = 2
     default_lap_differential: float = 1.15
 
+    # Stripe
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_basic_monthly_price_id: str = ""
+    stripe_basic_annual_price_id: str = ""
+    stripe_pro_monthly_price_id: str = ""
+    stripe_pro_annual_price_id: str = ""
+    stripe_event_price_id: str = ""
+    frontend_url: str = "http://localhost:3000"
+
+    # Google OAuth
+    google_client_id: str = ""
+    google_client_secret: str = ""
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @property

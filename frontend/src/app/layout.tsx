@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "BoxboxNow - Race Strategy",
-  description: "Real-time karting race strategy dashboard",
+  title: "BoxBoxNow - Estrategia de Karting en Tiempo Real",
+  description:
+    "Monitoriza posiciones, optimiza paradas en boxes y toma decisiones estrategicas con datos en vivo. La herramienta de los equipos profesionales de karting endurance.",
+  keywords:
+    "karting, estrategia, tiempo real, endurance, boxes, pit stop, clasificacion, telemetria",
 };
 
 export default function RootLayout({

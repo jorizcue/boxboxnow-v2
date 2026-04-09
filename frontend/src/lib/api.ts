@@ -265,6 +265,23 @@ export const api = {
     return fetchApi<any[]>(`/api/analytics/race-logs?${params}`);
   },
 
+  // Registration
+  register: (email: string, username: string, password: string) =>
+    fetchRaw<any>("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ email, username, password }),
+    }),
+
+  // Stripe
+  createCheckoutSession: (priceId: string, circuitId?: number) =>
+    fetchApi<{ checkout_url: string; session_id: string }>("/api/stripe/create-checkout-session", {
+      method: "POST",
+      body: JSON.stringify({ price_id: priceId, circuit_id: circuitId }),
+    }),
+  getSubscriptions: () => fetchApi<any[]>("/api/stripe/subscriptions"),
+  getCustomerPortal: () =>
+    fetchApi<{ url: string }>("/api/stripe/customer-portal", { method: "POST" }),
+
   // GPS Telemetry
   saveGpsLaps: (laps: any[]) =>
     fetchApi("/api/gps/laps", { method: "POST", body: JSON.stringify({ laps }) }),

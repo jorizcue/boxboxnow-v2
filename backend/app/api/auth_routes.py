@@ -33,7 +33,7 @@ from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAc
 from sqlalchemy.orm import selectinload
 from app.models.pydantic_models import (
     LoginRequest, LoginResponse, UserOut, DeviceSessionOut,
-    MfaSetupResponse, MfaVerifyRequest,
+    MfaSetupResponse, MfaVerifyRequest, RegisterRequest,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -194,14 +194,27 @@ def _user_out(user: User) -> UserOut:
         tabs = ALL_TABS
     else:
         tabs = [ta.tab for ta in (user.tab_access or [])]
+
+    # Check active subscription
+    has_sub = user.is_admin  # admins always have access
+    if not has_sub and hasattr(user, 'subscriptions'):
+        from datetime import datetime as dt_cls
+        now = dt_cls.now(timezone.utc)
+        has_sub = any(
+            s.status == "active" and (s.current_period_end is None or s.current_period_end > now)
+            for s in (user.subscriptions or [])
+        )
+
     return UserOut(
         id=user.id,
         username=user.username,
+        email=getattr(user, 'email', None),
         is_admin=user.is_admin,
         max_devices=user.max_devices,
         mfa_enabled=user.mfa_enabled or False,
         mfa_required=user.mfa_required or False,
         tab_access=tabs,
+        has_active_subscription=has_sub,
         created_at=user.created_at,
     )
 
@@ -227,6 +240,64 @@ async def _cleanup_stale_sessions(db: AsyncSession, user_id: int):
         )
     )
     await db.commit()
+
+
+# --- Registration ---
+
+@router.post("/register", response_model=LoginResponse)
+async def register(data: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """Public registration. Creates account + auto-login."""
+    login_limiter.check(request.client.host if request.client else "unknown")
+
+    # Check username uniqueness
+    existing = await db.execute(select(User).where(User.username == data.username))
+    if existing.scalar_one_or_none():
+        raise HTTPException(409, "El nombre de usuario ya existe")
+
+    # Check email uniqueness
+    existing_email = await db.execute(select(User).where(User.email == data.email))
+    if existing_email.scalar_one_or_none():
+        raise HTTPException(409, "El email ya está registrado")
+
+    # Create user
+    user = User(
+        username=data.username,
+        email=data.email,
+        password_hash=hash_password(data.password),
+        is_admin=False,
+        max_devices=2,
+    )
+    db.add(user)
+    await db.flush()
+
+    # Assign basic tabs
+    basic_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config"]
+    for tab in basic_tabs:
+        db.add(UserTabAccess(user_id=user.id, tab=tab))
+    await db.commit()
+
+    # Auto-login: create device session
+    device_name, ip_address = _extract_device_info(request)
+    session_token = secrets.token_hex(32)
+    device_session = DeviceSession(
+        session_token=session_token, user_id=user.id,
+        device_name=device_name, ip_address=ip_address,
+    )
+    db.add(device_session)
+    await db.commit()
+
+    # Reload with tab_access
+    result = await db.execute(
+        select(User).where(User.id == user.id).options(selectinload(User.tab_access))
+    )
+    user = result.scalar_one()
+
+    access_token = create_token(user.id, user.username, user.is_admin, session_token)
+    return LoginResponse(
+        access_token=access_token,
+        session_token=session_token,
+        user=_user_out(user),
+    )
 
 
 # --- Login ---
@@ -259,21 +330,8 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
     # The frontend will show a mandatory MFA setup screen based on
     # user.mfa_required && !user.mfa_enabled in the response.
 
-    # Non-admin users must have at least one active circuit access
-    if not user.is_admin:
-        now = datetime.now(timezone.utc)
-        access_result = await db.execute(
-            select(UserCircuitAccess.id).where(
-                UserCircuitAccess.user_id == user.id,
-                UserCircuitAccess.valid_from <= now,
-                UserCircuitAccess.valid_until >= now,
-            ).limit(1)
-        )
-        if not access_result.scalar_one_or_none():
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN,
-                "No tienes acceso a ningun circuito. Contacta con el administrador."
-            )
+    # Circuit access check removed: subscription gate is handled in the frontend.
+    # All authenticated users can login regardless of circuit access.
 
     # Cleanup stale sessions first
     await _cleanup_stale_sessions(db, user.id)
@@ -347,6 +405,155 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
         session_token=session_token,
         user=_user_out(user),
     )
+
+
+# --- Google OAuth ---
+
+@router.get("/google")
+async def google_login(request: Request):
+    """Redirect to Google OAuth."""
+    settings = get_settings()
+    if not settings.google_client_id:
+        raise HTTPException(501, "Google login not configured")
+
+    redirect_uri = f"{'https' if 'localhost' not in str(request.url) else 'http'}://{request.headers.get('host', 'localhost:8000')}/api/auth/google/callback"
+
+    from urllib.parse import urlencode
+    params = {
+        "client_id": settings.google_client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+    }
+    url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url)
+
+
+@router.get("/google/callback")
+async def google_callback(code: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """Handle Google OAuth callback."""
+    import httpx
+    settings = get_settings()
+
+    redirect_uri = f"{'https' if 'localhost' not in str(request.url) else 'http'}://{request.headers.get('host', 'localhost:8000')}/api/auth/google/callback"
+
+    # Exchange code for tokens
+    async with httpx.AsyncClient() as client:
+        token_response = await client.post("https://oauth2.googleapis.com/token", data={
+            "code": code,
+            "client_id": settings.google_client_id,
+            "client_secret": settings.google_client_secret,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+        })
+
+    if token_response.status_code != 200:
+        raise HTTPException(400, "Failed to authenticate with Google")
+
+    tokens = token_response.json()
+
+    # Get user info
+    async with httpx.AsyncClient() as client:
+        userinfo_response = await client.get(
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers={"Authorization": f"Bearer {tokens['access_token']}"},
+        )
+
+    if userinfo_response.status_code != 200:
+        raise HTTPException(400, "Failed to get user info from Google")
+
+    google_user = userinfo_response.json()
+    google_id = google_user["id"]
+    email = google_user.get("email", "")
+    name = google_user.get("name", email.split("@")[0])
+
+    # Find existing user by google_id or email
+    result = await db.execute(
+        select(User).where((User.google_id == google_id) | (User.email == email)).options(selectinload(User.tab_access))
+    )
+    user = result.scalar_one_or_none()
+
+    if user:
+        # Update google_id if not set (email match)
+        if not user.google_id:
+            user.google_id = google_id
+            await db.commit()
+    else:
+        # Create new user
+        # Generate unique username from Google name
+        import re as re_mod
+        base_username = name.lower().replace(" ", ".").replace("@", ".")[:30]
+        base_username = re_mod.sub(r'[^a-z0-9._-]', '', base_username) or "user"
+        username = base_username
+        counter = 1
+        while True:
+            existing = await db.execute(select(User).where(User.username == username))
+            if not existing.scalar_one_or_none():
+                break
+            username = f"{base_username}{counter}"
+            counter += 1
+
+        # Google users get a random password (they login via Google)
+        import secrets as sec
+        random_pass = sec.token_hex(32)
+
+        user = User(
+            username=username,
+            email=email,
+            google_id=google_id,
+            password_hash=hash_password(random_pass),
+            is_admin=False,
+            max_devices=2,
+        )
+        db.add(user)
+        await db.flush()
+
+        # Assign basic tabs
+        basic_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config"]
+        for tab in basic_tabs:
+            db.add(UserTabAccess(user_id=user.id, tab=tab))
+        await db.commit()
+
+        # Reload with relationships
+        result = await db.execute(
+            select(User).where(User.id == user.id).options(selectinload(User.tab_access))
+        )
+        user = result.scalar_one()
+
+    # Cleanup stale sessions
+    await _cleanup_stale_sessions(db, user.id)
+
+    # Create device session
+    device_name, ip_address = _extract_device_info(request)
+    session_token = secrets.token_hex(32)
+    device_session = DeviceSession(
+        session_token=session_token, user_id=user.id,
+        device_name=device_name, ip_address=ip_address,
+    )
+    db.add(device_session)
+    await db.commit()
+
+    access_token = create_token(user.id, user.username, user.is_admin, session_token)
+
+    # Redirect to frontend with tokens as query params (frontend will extract and store)
+    from fastapi.responses import RedirectResponse
+    from urllib.parse import urlencode
+    import json
+    frontend_url = settings.frontend_url
+    params = urlencode({
+        "token": access_token,
+        "session_token": session_token,
+        "user": json.dumps({
+            "id": user.id, "username": user.username,
+            "is_admin": user.is_admin, "max_devices": user.max_devices,
+            "mfa_enabled": user.mfa_enabled or False,
+            "mfa_required": user.mfa_required or False,
+            "tab_access": [ta.tab for ta in (user.tab_access or [])] if not user.is_admin else ALL_TABS,
+        }),
+    })
+    return RedirectResponse(f"{frontend_url}/login?oauth=google&{params}")
 
 
 # --- Session Management (user) ---

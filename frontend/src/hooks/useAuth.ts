@@ -6,11 +6,13 @@ import { persist } from "zustand/middleware";
 interface AuthUser {
   id: number;
   username: string;
+  email?: string;
   is_admin: boolean;
   max_devices: number;
   mfa_enabled: boolean;
   mfa_required: boolean;
   tab_access: string[];
+  has_active_subscription?: boolean;
 }
 
 interface AuthStore {

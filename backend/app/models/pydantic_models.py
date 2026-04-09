@@ -20,11 +20,13 @@ class TokenResponse(BaseModel):
 class UserOut(BaseModel):
     id: int
     username: str
+    email: str | None = None
     is_admin: bool
     max_devices: int = 1
     mfa_enabled: bool = False
     mfa_required: bool = False
     tab_access: list[str] = []
+    has_active_subscription: bool = False
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
@@ -37,6 +39,69 @@ class MfaSetupResponse(BaseModel):
 
 class MfaVerifyRequest(BaseModel):
     code: str
+
+
+class RegisterRequest(BaseModel):
+    email: str
+    username: str
+    password: str
+
+    @field_validator("email")
+    @classmethod
+    def valid_email(cls, v: str) -> str:
+        if not re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", v):
+            raise ValueError("Invalid email address")
+        return v.lower()
+
+    @field_validator("username")
+    @classmethod
+    def valid_username(cls, v: str) -> str:
+        if len(v) < 3:
+            raise ValueError("Username must be at least 3 characters")
+        if len(v) > 50:
+            raise ValueError("Username too long")
+        if not re.match(r"^[a-zA-Z0-9_.-]+$", v):
+            raise ValueError("Username can only contain letters, numbers, dots, hyphens and underscores")
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[0-9]", v):
+            raise ValueError("Password must contain at least one number")
+        return v
+
+
+class CheckoutSessionRequest(BaseModel):
+    price_id: str
+    circuit_id: int | None = None
+
+
+class CheckoutSessionResponse(BaseModel):
+    checkout_url: str
+    session_id: str
+
+
+class SubscriptionOut(BaseModel):
+    id: int
+    plan_type: str
+    status: str
+    circuit_id: int | None
+    circuit_name: str | None = None
+    current_period_start: datetime | None
+    current_period_end: datetime | None
+    cancel_at_period_end: bool
+    created_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class CustomerPortalResponse(BaseModel):
+    url: str
 
 
 class UserCreate(BaseModel):

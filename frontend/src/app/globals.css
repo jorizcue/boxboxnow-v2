@@ -152,3 +152,20 @@ button {
   0%, 100% { transform: rotate(-0.5deg); }
   50% { transform: rotate(0.5deg); }
 }
+
+/* Landing page */
+html { scroll-behavior: smooth; }
+
+@keyframes gridMove {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(40px); }
+}
+
+.animate-grid { animation: gridMove 3s ease-in-out infinite alternate; }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }

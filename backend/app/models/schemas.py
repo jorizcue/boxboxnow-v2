@@ -15,6 +15,9 @@ class User(Base):
     mfa_secret = Column(String, nullable=True)
     mfa_enabled = Column(Boolean, default=False)
     mfa_required = Column(Boolean, default=False)  # Admin forces user to enable MFA
+    email = Column(String(255), unique=True, nullable=True, index=True)
+    google_id = Column(String(255), unique=True, nullable=True, index=True)
+    stripe_customer_id = Column(String(255), unique=True, nullable=True, index=True)
     created_at = Column(DateTime, server_default=func.now())
 
     circuit_access = relationship("UserCircuitAccess", back_populates="user", cascade="all, delete-orphan")
@@ -274,3 +277,23 @@ class GpsTelemetryLap(Base):
 
     gps_source = Column(String, nullable=True)         # "racebox" or "phone"
     recorded_at = Column(DateTime, server_default=func.now())
+
+
+class Subscription(Base):
+    """Tracks Stripe subscriptions for users."""
+    __tablename__ = "subscriptions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    stripe_subscription_id = Column(String(255), unique=True, nullable=True)
+    stripe_price_id = Column(String(255), nullable=True)
+    plan_type = Column(String(50), nullable=False)  # "basic_monthly", "basic_annual", "pro_monthly", "pro_annual", "event"
+    status = Column(String(50), nullable=False, default="active")  # "active", "canceled", "past_due", "expired"
+    circuit_id = Column(Integer, ForeignKey("circuits.id"), nullable=True)  # Which circuit this sub covers
+    current_period_start = Column(DateTime, nullable=True)
+    current_period_end = Column(DateTime, nullable=True)
+    cancel_at_period_end = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    user = relationship("User", backref="subscriptions")
+    circuit = relationship("Circuit")
