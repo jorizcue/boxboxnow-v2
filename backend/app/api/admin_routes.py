@@ -79,8 +79,13 @@ async def update_user(user_id: int, data: UserUpdate, admin: User = Depends(requ
         user.mfa_required = data.mfa_required
 
     await db.commit()
-    await db.refresh(user)
-    return user
+
+    # Reload with tab_access relationship (required for UserOut serialization)
+    result = await db.execute(
+        select(User).options(selectinload(User.tab_access)).where(User.id == user_id)
+    )
+    user = result.scalar_one()
+    return _user_out(user)
 
 
 @router.post("/users/{user_id}/mfa/reset")
