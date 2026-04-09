@@ -9,7 +9,8 @@ RUN pip install --no-cache-dir \
     "sqlalchemy[asyncio]" aiosqlite \
     beautifulsoup4 httpx pandas numpy \
     jenkspy scikit-learn pydantic-settings \
-    python-dotenv bcrypt PyJWT
+    python-dotenv bcrypt PyJWT \
+    pyotp "qrcode[pil]"
 
 COPY . .
 RUN mkdir -p data/logs
