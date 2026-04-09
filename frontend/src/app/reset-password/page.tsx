@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
   const [password, setPassword] = useState("");
@@ -58,6 +58,82 @@ export default function ResetPasswordPage() {
   };
 
   return (
+    <div className="bg-surface rounded-2xl p-5 sm:p-8 border border-border">
+      {success ? (
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-accent/10 flex items-center justify-center">
+            <svg className="w-8 h-8 text-accent" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">Contrasena actualizada</h2>
+          <p className="text-neutral-400 text-sm mb-6">
+            Tu contrasena ha sido restablecida correctamente. Ya puedes iniciar sesion.
+          </p>
+          <Link
+            href="/login"
+            className="block w-full bg-accent hover:bg-accent-hover text-black font-semibold py-3 rounded-lg transition-colors tracking-wide"
+          >
+            Ir al login
+          </Link>
+        </div>
+      ) : (
+        <>
+          <h2 className="text-xl font-bold text-white mb-2 text-center">
+            Nueva contrasena
+          </h2>
+          <p className="text-neutral-400 text-sm mb-6 text-center">
+            Introduce tu nueva contrasena.
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">
+                Nueva contrasena
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700 focus:outline-none focus:border-accent/50 transition-colors"
+                placeholder="Min. 8 caracteres"
+                autoFocus
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">
+                Confirmar contrasena
+              </label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700 focus:outline-none focus:border-accent/50 transition-colors"
+                placeholder="Repetir contrasena"
+                required
+              />
+            </div>
+
+            {error && <p className="text-red-400 text-sm">{error}</p>}
+
+            <button
+              type="submit"
+              disabled={loading || !password || !confirmPassword || !token}
+              className="w-full bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed text-black font-semibold py-3 rounded-lg transition-colors tracking-wide"
+            >
+              {loading ? "Actualizando..." : "Restablecer contrasena"}
+            </button>
+          </form>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
     <div className="min-h-screen bg-black flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         {/* Brand header */}
@@ -71,77 +147,13 @@ export default function ResetPasswordPage() {
           </h1>
         </div>
 
-        <div className="bg-surface rounded-2xl p-5 sm:p-8 border border-border">
-          {success ? (
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-accent/10 flex items-center justify-center">
-                <svg className="w-8 h-8 text-accent" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-bold text-white mb-2">Contrasena actualizada</h2>
-              <p className="text-neutral-400 text-sm mb-6">
-                Tu contrasena ha sido restablecida correctamente. Ya puedes iniciar sesion.
-              </p>
-              <Link
-                href="/login"
-                className="block w-full bg-accent hover:bg-accent-hover text-black font-semibold py-3 rounded-lg transition-colors tracking-wide"
-              >
-                Ir al login
-              </Link>
-            </div>
-          ) : (
-            <>
-              <h2 className="text-xl font-bold text-white mb-2 text-center">
-                Nueva contrasena
-              </h2>
-              <p className="text-neutral-400 text-sm mb-6 text-center">
-                Introduce tu nueva contrasena.
-              </p>
-
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                  <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">
-                    Nueva contrasena
-                  </label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700 focus:outline-none focus:border-accent/50 transition-colors"
-                    placeholder="Min. 8 caracteres"
-                    autoFocus
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">
-                    Confirmar contrasena
-                  </label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700 focus:outline-none focus:border-accent/50 transition-colors"
-                    placeholder="Repetir contrasena"
-                    required
-                  />
-                </div>
-
-                {error && <p className="text-red-400 text-sm">{error}</p>}
-
-                <button
-                  type="submit"
-                  disabled={loading || !password || !confirmPassword || !token}
-                  className="w-full bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed text-black font-semibold py-3 rounded-lg transition-colors tracking-wide"
-                >
-                  {loading ? "Actualizando..." : "Restablecer contrasena"}
-                </button>
-              </form>
-            </>
-          )}
-        </div>
+        <Suspense fallback={
+          <div className="bg-surface rounded-2xl p-5 sm:p-8 border border-border text-center">
+            <span className="text-neutral-400 text-sm">Cargando...</span>
+          </div>
+        }>
+          <ResetPasswordForm />
+        </Suspense>
 
         <div className="mt-6 text-center">
           <Link href="/login" className="inline-block text-sm text-neutral-500 hover:text-neutral-300 transition-colors">
