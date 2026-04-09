@@ -181,6 +181,7 @@ export function RealClassificationBeta() {
           <thead className="bg-surface text-neutral-200 sticky top-0 z-10 text-[10px] sm:text-[11px] uppercase tracking-wider">
             <tr>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-6 sm:w-8">#</th>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-8 sm:w-10 text-neutral-500" title="Posición según Apex (WebSocket)">Apex</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left w-8 sm:w-12">{t("race.kart")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">{t("race.team")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">{t("race.driver")}</th>
@@ -219,9 +220,27 @@ export function RealClassificationBeta() {
                     kart.pitStatus === "in_pit" && "opacity-50"
                   )}
                 >
-                  {/* Position */}
+                  {/* Beta position */}
                   <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center font-bold text-base sm:text-lg text-white">
                     {index + 1}
+                  </td>
+
+                  {/* Apex position */}
+                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center">
+                    {kart.position > 0 ? (
+                      <span className={clsx(
+                        "text-xs font-mono font-bold",
+                        kart.position === index + 1
+                          ? "text-neutral-500"
+                          : kart.position > index + 1
+                            ? "text-green-400"   // Apex los tiene peor → beta los sube
+                            : "text-orange-400"  // Apex los tiene mejor → beta los baja
+                      )}>
+                        {kart.position}
+                      </span>
+                    ) : (
+                      <span className="text-neutral-700">-</span>
+                    )}
                   </td>
 
                   {/* Kart number */}
