@@ -7,8 +7,8 @@ from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 
 from app.models.database import get_db
-from app.models.schemas import User, Circuit, UserCircuitAccess, AppSetting, UserTabAccess, DeviceSession
-from sqlalchemy.orm import selectinload
+from app.models.schemas import User, Circuit, UserCircuitAccess, AppSetting, UserTabAccess, DeviceSession, Subscription
+from sqlalchemy.orm import selectinload  # noqa: duplicate import
 from app.models.pydantic_models import (
     UserOut, UserCreate, UserUpdate,
     CircuitOut, CircuitCreate, CircuitUpdate,
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 @router.get("/users", response_model=list[UserOut])
 async def list_users(admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(User).options(selectinload(User.tab_access)).order_by(User.username)
+        select(User).options(selectinload(User.tab_access), selectinload(User.subscriptions)).order_by(User.username)
     )
     return [_user_out(u) for u in result.scalars().all()]
 
@@ -54,7 +54,7 @@ async def create_user(data: UserCreate, admin: User = Depends(require_admin), db
 
     # Reload with tab_access relationship
     result = await db.execute(
-        select(User).options(selectinload(User.tab_access)).where(User.id == user.id)
+        select(User).options(selectinload(User.tab_access), selectinload(User.subscriptions)).where(User.id == user.id)
     )
     user = result.scalar_one()
     return _user_out(user)
@@ -82,7 +82,7 @@ async def update_user(user_id: int, data: UserUpdate, admin: User = Depends(requ
 
     # Reload with tab_access relationship (required for UserOut serialization)
     result = await db.execute(
-        select(User).options(selectinload(User.tab_access)).where(User.id == user_id)
+        select(User).options(selectinload(User.tab_access), selectinload(User.subscriptions)).where(User.id == user_id)
     )
     user = result.scalar_one()
     return _user_out(user)

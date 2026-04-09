@@ -29,7 +29,7 @@ from sqlalchemy import select, func, delete
 
 from app.config import get_settings
 from app.models.database import get_db
-from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess
+from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess, Subscription
 from sqlalchemy.orm import selectinload
 from app.models.pydantic_models import (
     LoginRequest, LoginResponse, UserOut, DeviceSessionOut,
@@ -167,7 +167,7 @@ async def get_current_user(
 
     # Get user with tab_access
     result = await db.execute(
-        select(User).where(User.id == user_id).options(selectinload(User.tab_access))
+        select(User).where(User.id == user_id).options(selectinload(User.tab_access), selectinload(User.subscriptions))
     )
     user = result.scalar_one_or_none()
     if not user:
@@ -195,15 +195,22 @@ def _user_out(user: User) -> UserOut:
     else:
         tabs = [ta.tab for ta in (user.tab_access or [])]
 
-    # Check active subscription
+    # Check active subscription (only if relationship is already loaded to avoid MissingGreenlet)
     has_sub = user.is_admin  # admins always have access
-    if not has_sub and hasattr(user, 'subscriptions'):
-        from datetime import datetime as dt_cls
-        now = dt_cls.now(timezone.utc)
-        has_sub = any(
-            s.status == "active" and (s.current_period_end is None or s.current_period_end > now)
-            for s in (user.subscriptions or [])
-        )
+    if not has_sub:
+        from sqlalchemy.orm import object_session
+        from sqlalchemy import inspect as sa_inspect
+        try:
+            state = sa_inspect(user)
+            if 'subscriptions' in state.dict:
+                # Relationship already loaded — safe to access
+                now = datetime.now(timezone.utc)
+                has_sub = any(
+                    s.status == "active" and (s.current_period_end is None or s.current_period_end > now)
+                    for s in (user.subscriptions or [])
+                )
+        except Exception:
+            pass
 
     return UserOut(
         id=user.id,
@@ -288,7 +295,7 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
 
     # Reload with tab_access
     result = await db.execute(
-        select(User).where(User.id == user.id).options(selectinload(User.tab_access))
+        select(User).where(User.id == user.id).options(selectinload(User.tab_access), selectinload(User.subscriptions))
     )
     user = result.scalar_one()
 
@@ -307,7 +314,7 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
     login_limiter.check(request.client.host if request.client else "unknown")
     # Validate credentials
     result = await db.execute(
-        select(User).where(User.username == data.username).options(selectinload(User.tab_access))
+        select(User).where(User.username == data.username).options(selectinload(User.tab_access), selectinload(User.subscriptions))
     )
     user = result.scalar_one_or_none()
 
@@ -471,7 +478,7 @@ async def google_callback(code: str, request: Request, db: AsyncSession = Depend
 
     # Find existing user by google_id or email
     result = await db.execute(
-        select(User).where((User.google_id == google_id) | (User.email == email)).options(selectinload(User.tab_access))
+        select(User).where((User.google_id == google_id) | (User.email == email)).options(selectinload(User.tab_access), selectinload(User.subscriptions))
     )
     user = result.scalar_one_or_none()
 
@@ -518,7 +525,7 @@ async def google_callback(code: str, request: Request, db: AsyncSession = Depend
 
         # Reload with relationships
         result = await db.execute(
-            select(User).where(User.id == user.id).options(selectinload(User.tab_access))
+            select(User).where(User.id == user.id).options(selectinload(User.tab_access), selectinload(User.subscriptions))
         )
         user = result.scalar_one()
 
