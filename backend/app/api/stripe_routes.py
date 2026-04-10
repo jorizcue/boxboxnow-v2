@@ -374,7 +374,7 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
         # One-time payment (event)
         # Parse event dates from metadata to determine access window
         now = datetime.now(timezone.utc)
-        event_dates_str = meta.get("event_dates", "")
+        event_dates_str = metadata.get("event_dates", "")
         if event_dates_str:
             from datetime import date as date_type
             dates = sorted([date_type.fromisoformat(d) for d in event_dates_str.split(",")])
