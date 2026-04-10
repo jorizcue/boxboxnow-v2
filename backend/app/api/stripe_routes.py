@@ -181,13 +181,15 @@ async def create_checkout_session(
 @router.post("/webhook")
 async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     """Handle Stripe webhook events."""
+    import json as _json
+
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
     settings = get_settings()
     s = get_stripe()
 
     try:
-        event = s.Webhook.construct_event(payload, sig_header, settings.stripe_webhook_secret)
+        s.Webhook.construct_event(payload, sig_header, settings.stripe_webhook_secret)
     except ValueError:
         raise HTTPException(400, "Invalid payload")
     except Exception as e:
@@ -196,10 +198,12 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         logger.error(f"Stripe webhook signature error: {e}")
         raise HTTPException(400, "Webhook verification failed")
 
-    event_type = event["type"]
-    data = event["data"]["object"]
+    # Parse raw JSON to plain dicts — stripe-python v15 StripeObjects don't support .get()
+    raw_event = _json.loads(payload)
+    event_type = raw_event["type"]
+    data = raw_event["data"]["object"]
 
-    logger.info(f"Stripe webhook received: {event_type}")
+    logger.info(f"Stripe webhook received: {event_type} (id={raw_event.get('id', '?')})")
 
     try:
         if event_type == "checkout.session.completed":
