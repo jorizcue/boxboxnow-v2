@@ -19,9 +19,12 @@ module.exports = {
         'tier-50': '#e5d43a',
         'tier-25': '#e59a2e',
         'tier-1': '#e54444',
+        // Landing extras
+        'gold': '#e5c43a',
       },
       fontFamily: {
-        sans: ['Space Grotesk', 'system-ui', 'sans-serif'],
+        sans: ['Outfit', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
       },
       keyframes: {
         boxFlash: {

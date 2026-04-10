@@ -75,6 +75,19 @@ function groupPlans(raw: PlanData[]): GroupedPlan[] {
   return Array.from(map.values()).sort((a, b) => a.sort_order - b.sort_order);
 }
 
+const tierColors: Record<string, string> = {
+  basic: "from-muted/30 to-muted/10",
+  pro: "from-accent to-accent-hover",
+  event: "from-gold to-yellow-500",
+};
+
+function getTierGradient(baseType: string): string {
+  for (const key of Object.keys(tierColors)) {
+    if (baseType.toLowerCase().includes(key)) return tierColors[key];
+  }
+  return tierColors.basic;
+}
+
 export function PricingToggle() {
   const [annual, setAnnual] = useState(false);
   const [plans, setPlans] = useState<GroupedPlan[]>([]);
@@ -114,41 +127,43 @@ export function PricingToggle() {
       {/* Toggle */}
       <div className="flex items-center justify-center gap-4 mb-16">
         <span
-          className={`text-sm font-medium transition-colors ${
-            !annual ? "text-white" : "text-muted/50"
+          className={`text-sm font-medium transition-colors duration-200 ${
+            !annual ? "text-white" : "text-muted/30"
           }`}
         >
           Mensual
         </span>
         <button
           onClick={() => setAnnual(!annual)}
-          className={`relative h-7 w-14 rounded-full transition-colors ${
-            annual ? "bg-accent" : "bg-border"
+          className={`relative h-8 w-16 rounded-full transition-all duration-300 ${
+            annual
+              ? "bg-accent shadow-[0_0_20px_rgba(159,229,86,0.2)]"
+              : "bg-border/60"
           }`}
           aria-label="Cambiar entre mensual y anual"
         >
           <span
-            className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white transition-transform shadow-md ${
-              annual ? "translate-x-7" : ""
+            className={`absolute top-1 left-1 h-6 w-6 rounded-full bg-white shadow-md transition-all duration-300 ${
+              annual ? "translate-x-8" : ""
             }`}
           />
         </button>
         <span
-          className={`text-sm font-medium transition-colors ${
-            annual ? "text-white" : "text-muted/50"
+          className={`text-sm font-medium transition-colors duration-200 ${
+            annual ? "text-white" : "text-muted/30"
           }`}
         >
           Anual
         </span>
         {annual && (
-          <span className="rounded-full bg-accent/20 px-3 py-1 text-xs font-semibold text-accent">
+          <span className="rounded-full bg-accent/15 border border-accent/20 px-3 py-1 text-xs font-bold text-accent font-mono">
             -17%
           </span>
         )}
       </div>
 
       {/* Cards */}
-      <div className={`grid gap-6 max-w-5xl mx-auto ${
+      <div className={`grid gap-5 max-w-5xl mx-auto items-start ${
         plans.length === 1 ? "md:grid-cols-1 max-w-sm" :
         plans.length === 2 ? "md:grid-cols-2 max-w-3xl" :
         "md:grid-cols-3"
@@ -156,79 +171,98 @@ export function PricingToggle() {
         {plans.map((plan) => (
           <div
             key={plan.base_type}
-            className={`relative rounded-2xl border p-8 transition-all duration-300 hover:-translate-y-1 ${
+            className={`relative rounded-2xl border bg-surface overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
               plan.is_popular
-                ? "border-accent bg-surface shadow-[0_0_40px_rgba(159,229,86,0.1)]"
-                : "border-border bg-surface hover:border-border/80"
+                ? "border-accent/40 shadow-[0_0_50px_rgba(159,229,86,0.08)] md:scale-[1.03]"
+                : "border-border/50 hover:border-border"
             }`}
           >
+            {/* Top gradient bar */}
+            <div className={`h-1 bg-gradient-to-r ${getTierGradient(plan.base_type)}`} />
+
             {plan.is_popular && (
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-accent px-4 py-1 text-xs font-bold text-black">
-                Popular
+              <div className="absolute top-4 right-4">
+                <span className="rounded-full bg-accent px-3 py-1 text-[10px] font-bold text-black uppercase tracking-wider">
+                  Popular
+                </span>
               </div>
             )}
-            <h3 className="text-lg font-semibold text-white mb-2">
-              {plan.display_name}
-            </h3>
-            {plan.description && (
-              <p className="text-sm text-muted/50 mb-2">{plan.description}</p>
-            )}
-            <div className="mb-6">
-              <span className="text-4xl font-bold text-white">
-                {plan.is_event
-                  ? `${plan.price_event ?? 0}\u20AC`
-                  : annual
-                  ? `${plan.price_annual ?? 0}\u20AC`
-                  : `${plan.price_monthly ?? 0}\u20AC`}
-              </span>
-              <span className="text-muted/50 ml-1">
-                {plan.is_event ? "/evento" : annual ? "/a\u00F1o" : "/mes"}
-              </span>
+
+            <div className="p-7">
+              <h3 className="text-lg font-bold text-white">
+                {plan.display_name}
+              </h3>
+              {plan.description && (
+                <p className="text-sm text-muted/40 mt-1">{plan.description}</p>
+              )}
+
+              <div className="mt-5 mb-7">
+                <div className="flex items-baseline gap-1">
+                  <span className="stat-number text-4xl font-bold text-white">
+                    {plan.is_event
+                      ? `${plan.price_event ?? 0}`
+                      : annual
+                      ? `${plan.price_annual ?? 0}`
+                      : `${plan.price_monthly ?? 0}`}
+                  </span>
+                  <span className="text-lg text-muted/40">&euro;</span>
+                  <span className="text-sm text-muted/30 ml-1">
+                    {plan.is_event ? "/evento" : annual ? "/a\u00F1o" : "/mes"}
+                  </span>
+                </div>
+                {annual && !plan.is_event && plan.price_monthly && (
+                  <p className="font-mono text-xs text-muted/25 mt-1">
+                    equiv. {Math.round((plan.price_annual ?? 0) / 12)}&euro;/mes
+                  </p>
+                )}
+              </div>
+
+              <ul className="space-y-3 mb-8">
+                {plan.features.map((f) => (
+                  <li key={f} className="flex items-start gap-3 text-sm text-muted/50">
+                    <svg
+                      className="mt-0.5 h-4 w-4 shrink-0 text-accent/70"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+
+              <a
+                href={planLink(plan)}
+                className={`block w-full rounded-xl py-3.5 text-center text-sm font-semibold transition-all duration-200 ${
+                  plan.is_popular
+                    ? "bg-accent text-black hover:bg-accent-hover hover:shadow-[0_0_30px_rgba(159,229,86,0.2)]"
+                    : "border border-border/50 text-muted/70 hover:border-accent/40 hover:text-accent"
+                }`}
+              >
+                {plan.is_event ? "Comprar evento" : "Empezar ahora"}
+              </a>
             </div>
-            <ul className="mb-8 space-y-3">
-              {plan.features.map((f) => (
-                <li key={f} className="flex items-start gap-3 text-sm text-muted/70">
-                  <svg
-                    className="mt-0.5 h-4 w-4 shrink-0 text-accent"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <a
-              href={planLink(plan)}
-              className={`block w-full rounded-lg py-3 text-center text-sm font-semibold transition-colors ${
-                plan.is_popular
-                  ? "bg-accent text-black hover:bg-accent-hover"
-                  : "border border-border text-white hover:border-accent hover:text-accent"
-              }`}
-            >
-              {plan.is_event ? "Comprar evento" : "Empezar ahora"}
-            </a>
           </div>
         ))}
       </div>
 
       {/* Extra notes */}
-      <div className="mt-12 text-center space-y-2">
-        <p className="text-sm text-muted/50">
+      <div className="mt-14 text-center space-y-2">
+        <p className="text-sm text-muted/30">
           Circuitos adicionales desde 15{"\u20AC"}/mes
         </p>
-        <p className="text-sm text-muted/50">
-          {"\u00BF"}Eres un circuito?{" "}
+        <p className="text-sm text-muted/30">
+          &iquest;Eres un circuito?{" "}
           <a
             href="mailto:contacto@boxboxnow.com"
-            className="text-accent hover:underline"
+            className="text-accent/70 hover:text-accent hover:underline transition-colors"
           >
             Contacta para planes Enterprise
           </a>

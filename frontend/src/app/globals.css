@@ -2,13 +2,160 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 body {
   background-color: #000000;
   color: #e5e5e5;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Outfit', sans-serif;
 }
+
+/* ==================== LANDING PAGE ==================== */
+
+html { scroll-behavior: smooth; }
+
+/* Noise texture overlay */
+.noise-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* Hero speed lines */
+@keyframes speedLine {
+  0% { transform: translateX(-100%) skewX(-15deg); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateX(200vw) skewX(-15deg); opacity: 0; }
+}
+
+.speed-line {
+  position: absolute;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(159,229,86,0.15), transparent);
+  animation: speedLine linear infinite;
+}
+
+/* Live ticker scroll */
+@keyframes tickerScroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.ticker-track {
+  animation: tickerScroll 30s linear infinite;
+}
+
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+
+/* Marquee for trust bar */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  animation: marquee 20s linear infinite;
+}
+
+/* Glow pulse on CTA */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(159,229,86,0.2), 0 0 60px rgba(159,229,86,0.08); }
+  50% { box-shadow: 0 0 30px rgba(159,229,86,0.35), 0 0 80px rgba(159,229,86,0.15); }
+}
+
+.glow-pulse {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* LED indicator glow */
+.led-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #9fe556;
+  box-shadow: 0 0 6px rgba(159,229,86,0.6), 0 0 12px rgba(159,229,86,0.3);
+}
+
+/* Scroll reveal animation */
+@keyframes revealUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes revealScale {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.reveal-up {
+  animation: revealUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+.reveal-scale {
+  animation: revealScale 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+/* Hero fade in */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
+
+/* Animated grid (legacy, kept for dashboard) */
+@keyframes gridMove {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(40px); }
+}
+.animate-grid { animation: gridMove 3s ease-in-out infinite alternate; }
+
+/* Mini race table animation */
+@keyframes dataFlicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Gradient border card */
+.gradient-border {
+  position: relative;
+  background: #111111;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(159,229,86,0.3), transparent 50%, rgba(159,229,86,0.1));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Stat number mono styling */
+.stat-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* ==================== DASHBOARD (unchanged) ==================== */
 
 /* Racing table animations */
 .kart-row-update {
@@ -152,20 +299,3 @@ button {
   0%, 100% { transform: rotate(-0.5deg); }
   50% { transform: rotate(0.5deg); }
 }
-
-/* Landing page */
-html { scroll-behavior: smooth; }
-
-@keyframes gridMove {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(40px); }
-}
-
-.animate-grid { animation: gridMove 3s ease-in-out infinite alternate; }
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }

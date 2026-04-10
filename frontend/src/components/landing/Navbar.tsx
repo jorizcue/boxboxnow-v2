@@ -20,9 +20,9 @@ export function Navbar() {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         scrolled
-          ? "bg-black/80 backdrop-blur-xl border-b border-border"
+          ? "bg-black/70 backdrop-blur-xl border-b border-border/30"
           : "bg-transparent"
       }`}
     >
@@ -38,7 +38,7 @@ export function Navbar() {
             <a
               key={link.href}
               href={link.href}
-              className="text-sm text-muted/70 hover:text-white transition-colors"
+              className="text-sm text-muted/40 hover:text-white transition-colors duration-200"
             >
               {link.label}
             </a>
@@ -49,13 +49,13 @@ export function Navbar() {
         <div className="hidden md:flex items-center gap-3">
           <a
             href="/login"
-            className="rounded-lg px-4 py-2 text-sm font-medium text-muted hover:text-white transition-colors"
+            className="rounded-lg px-4 py-2 text-sm font-medium text-muted/50 hover:text-white transition-colors"
           >
             Iniciar sesion
           </a>
           <a
             href="/register"
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black hover:bg-accent-hover transition-colors"
+            className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-black hover:bg-accent-hover transition-all duration-200"
           >
             Empezar
           </a>
