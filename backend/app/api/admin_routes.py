@@ -1,13 +1,16 @@
 """Admin routes: manage users, circuits, circuit access, and CircuitHub."""
 
+import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
+
+logger = logging.getLogger(__name__)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 
 from app.models.database import get_db
-from app.models.schemas import User, Circuit, UserCircuitAccess, AppSetting, UserTabAccess, DeviceSession, Subscription
+from app.models.schemas import User, Circuit, UserCircuitAccess, AppSetting, UserTabAccess, DeviceSession, Subscription, ProductTabConfig
 from sqlalchemy.orm import selectinload  # noqa: duplicate import
 from app.models.pydantic_models import (
     UserOut, UserCreate, UserUpdate,
@@ -439,12 +442,20 @@ PLATFORM_SETTINGS_KEYS = [
     "trial_days",           # 0 = trial disabled
     "trial_banner_days",    # Show banner when N days or less remain
     "trial_email_days",     # Send reminder email N days before expiry
+    "default_tabs",         # JSON array: tabs for new users (no purchase)
+    "default_max_devices",  # Max devices for new users
+    "trial_tabs",           # JSON array: tabs granted during trial
+    "trial_max_devices",    # Max devices during trial
 ]
 
 PLATFORM_DEFAULTS = {
     "trial_days": "14",
     "trial_banner_days": "7",
     "trial_email_days": "3",
+    "default_tabs": '["race","pit","live","config","adjusted","adjusted-beta","driver","driver-config"]',
+    "default_max_devices": "2",
+    "trial_tabs": '["race","pit","live","config","adjusted","adjusted-beta","driver","driver-config","replay","analytics","insights"]',
+    "trial_max_devices": "2",
 }
 
 
@@ -479,3 +490,167 @@ async def update_platform_settings(request: Request, admin: User = Depends(requi
             updated[key] = value
     await db.commit()
     return updated
+
+
+# --- Product Tab Config ---
+
+@router.get("/product-config")
+async def list_product_configs(admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """List all product-to-tab configurations."""
+    import json as _json
+    result = await db.execute(select(ProductTabConfig).order_by(ProductTabConfig.sort_order))
+    configs = result.scalars().all()
+    return [
+        {
+            "id": c.id,
+            "stripe_product_id": c.stripe_product_id,
+            "plan_type": c.plan_type,
+            "tabs": _json.loads(c.tabs) if c.tabs else [],
+            "max_devices": c.max_devices,
+            "display_name": c.display_name,
+            "description": c.description,
+            "features": _json.loads(c.features) if c.features else [],
+            "price_monthly": c.price_monthly,
+            "price_annual": c.price_annual,
+            "is_popular": c.is_popular,
+            "is_visible": c.is_visible,
+            "sort_order": c.sort_order,
+        }
+        for c in configs
+    ]
+
+
+@router.post("/product-config")
+async def create_product_config(request: Request, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """Create a product-to-tab configuration."""
+    import json as _json
+    body = await request.json()
+
+    existing = await db.execute(
+        select(ProductTabConfig).where(ProductTabConfig.stripe_product_id == body.get("stripe_product_id", ""))
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(409, "Product config already exists for this Stripe product")
+
+    config = ProductTabConfig(
+        stripe_product_id=body["stripe_product_id"],
+        plan_type=body.get("plan_type", ""),
+        tabs=_json.dumps(body.get("tabs", [])),
+        max_devices=body.get("max_devices", 1),
+        display_name=body.get("display_name", ""),
+        description=body.get("description"),
+        features=_json.dumps(body.get("features", [])),
+        price_monthly=body.get("price_monthly"),
+        price_annual=body.get("price_annual"),
+        is_popular=body.get("is_popular", False),
+        is_visible=body.get("is_visible", True),
+        sort_order=body.get("sort_order", 0),
+    )
+    db.add(config)
+    await db.commit()
+    await db.refresh(config)
+
+    return {
+        "id": config.id,
+        "stripe_product_id": config.stripe_product_id,
+        "plan_type": config.plan_type,
+        "tabs": _json.loads(config.tabs) if config.tabs else [],
+        "max_devices": config.max_devices,
+        "display_name": config.display_name,
+        "description": config.description,
+        "features": _json.loads(config.features) if config.features else [],
+        "price_monthly": config.price_monthly,
+        "price_annual": config.price_annual,
+        "is_popular": config.is_popular,
+        "is_visible": config.is_visible,
+        "sort_order": config.sort_order,
+    }
+
+
+@router.put("/product-config/{config_id}")
+async def update_product_config(config_id: int, request: Request, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """Update a product-to-tab configuration."""
+    import json as _json
+    result = await db.execute(select(ProductTabConfig).where(ProductTabConfig.id == config_id))
+    config = result.scalar_one_or_none()
+    if not config:
+        raise HTTPException(404, "Product config not found")
+
+    body = await request.json()
+
+    if "stripe_product_id" in body:
+        config.stripe_product_id = body["stripe_product_id"]
+    if "plan_type" in body:
+        config.plan_type = body["plan_type"]
+    if "tabs" in body:
+        config.tabs = _json.dumps(body["tabs"])
+    if "max_devices" in body:
+        config.max_devices = body["max_devices"]
+    if "display_name" in body:
+        config.display_name = body["display_name"]
+    if "description" in body:
+        config.description = body["description"]
+    if "features" in body:
+        config.features = _json.dumps(body["features"])
+    if "price_monthly" in body:
+        config.price_monthly = body["price_monthly"]
+    if "price_annual" in body:
+        config.price_annual = body["price_annual"]
+    if "is_popular" in body:
+        config.is_popular = body["is_popular"]
+    if "is_visible" in body:
+        config.is_visible = body["is_visible"]
+    if "sort_order" in body:
+        config.sort_order = body["sort_order"]
+
+    await db.commit()
+    return {
+        "id": config.id,
+        "stripe_product_id": config.stripe_product_id,
+        "plan_type": config.plan_type,
+        "tabs": _json.loads(config.tabs) if config.tabs else [],
+        "max_devices": config.max_devices,
+        "display_name": config.display_name,
+        "description": config.description,
+        "features": _json.loads(config.features) if config.features else [],
+        "price_monthly": config.price_monthly,
+        "price_annual": config.price_annual,
+        "is_popular": config.is_popular,
+        "is_visible": config.is_visible,
+        "sort_order": config.sort_order,
+    }
+
+
+@router.delete("/product-config/{config_id}")
+async def delete_product_config(config_id: int, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """Delete a product-to-tab configuration."""
+    result = await db.execute(select(ProductTabConfig).where(ProductTabConfig.id == config_id))
+    config = result.scalar_one_or_none()
+    if not config:
+        raise HTTPException(404, "Product config not found")
+    await db.delete(config)
+    await db.commit()
+    return {"ok": True}
+
+
+@router.get("/stripe-products")
+async def list_stripe_products(admin: User = Depends(require_admin)):
+    """List active products from Stripe API for the admin dropdown."""
+    import stripe as _stripe
+    from app.config import get_settings
+    settings = get_settings()
+    _stripe.api_key = settings.stripe_secret_key
+
+    try:
+        products = _stripe.Product.list(active=True, limit=100)
+        return [
+            {
+                "id": p.id,
+                "name": p.name,
+                "description": p.description,
+            }
+            for p in products.data
+        ]
+    except Exception as e:
+        logger.error(f"Failed to list Stripe products: {e}")
+        raise HTTPException(500, "Failed to fetch Stripe products")
