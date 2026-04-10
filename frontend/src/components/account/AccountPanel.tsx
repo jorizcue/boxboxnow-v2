@@ -70,6 +70,17 @@ function statusBadge(sub: Sub) {
   );
 }
 
+/** Given a plan_type, return the alternate billing interval plan */
+function getAlternatePlan(planType: string): { plan: string; label: string } | null {
+  const swaps: Record<string, { plan: string; label: string }> = {
+    basic_monthly: { plan: "basic_annual", label: "Basico Anual" },
+    basic_annual: { plan: "basic_monthly", label: "Basico Mensual" },
+    pro_monthly: { plan: "pro_annual", label: "Pro Anual" },
+    pro_annual: { plan: "pro_monthly", label: "Pro Mensual" },
+  };
+  return swaps[planType] || null;
+}
+
 export function AccountPanel() {
   const { user } = useAuth();
   const [subs, setSubs] = useState<Sub[]>([]);
@@ -121,6 +132,28 @@ export function AccountPanel() {
     }
   };
 
+  const handleSwitchPlan = async (subId: number, newPlan: string, newLabel: string) => {
+    if (!confirm(`Cambiar a ${newLabel}? El cambio se aplicara en la proxima renovacion.`)) return;
+    setActionLoading(subId);
+    try {
+      await api.switchPlan(subId, newPlan);
+      await loadData();
+    } catch {
+      alert("Error al cambiar el plan");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleOpenPortal = async () => {
+    try {
+      const data = await api.getCustomerPortal();
+      window.location.href = data.url;
+    } catch {
+      alert("Error al abrir el portal de pagos");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -132,11 +165,19 @@ export function AccountPanel() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-xl font-bold text-white">Mi cuenta</h2>
-        <p className="text-sm text-neutral-400 mt-1">
-          {user?.username} {user?.email ? `· ${user.email}` : ""}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-white">Mi cuenta</h2>
+          <p className="text-sm text-neutral-400 mt-1">
+            {user?.username} {user?.email ? `· ${user.email}` : ""}
+          </p>
+        </div>
+        <button
+          onClick={handleOpenPortal}
+          className="shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-neutral-300 hover:text-white hover:border-neutral-500 transition-colors"
+        >
+          Metodo de pago
+        </button>
       </div>
 
       {/* Tab switcher */}
@@ -195,7 +236,19 @@ export function AccountPanel() {
                       </p>
                     )}
                   </div>
-                  <div className="shrink-0">
+                  <div className="shrink-0 flex flex-col gap-1.5">
+                    {sub.status === "active" && !sub.cancel_at_period_end && sub.plan_type !== "trial" && (() => {
+                      const alt = getAlternatePlan(sub.plan_type);
+                      return alt ? (
+                        <button
+                          onClick={() => handleSwitchPlan(sub.id, alt.plan, alt.label)}
+                          disabled={actionLoading === sub.id}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+                        >
+                          {actionLoading === sub.id ? "..." : `Cambiar a ${alt.label.split(" ").pop()}`}
+                        </button>
+                      ) : null;
+                    })()}
                     {sub.status === "active" && !sub.cancel_at_period_end && sub.plan_type !== "trial" && (
                       <button
                         onClick={() => handleCancel(sub.id)}

@@ -208,6 +208,8 @@ export function DriverView() {
   const [showGpsSetup, setShowGpsSetup] = useState(false);
   const [hideCalBanner, setHideCalBanner] = useState(false);
   const [calibrationSkipped, setCalibrationSkipped] = useState(false);
+  const [brightness, setBrightness] = useState(100);
+  const [showBrightness, setShowBrightness] = useState(false);
 
   const { dragging, registerRect, onTouchStart, onTouchMove, onTouchEnd } =
     useTouchDrag(driverCfg.cardOrder, driverCfg.setCardOrder);
@@ -700,7 +702,10 @@ export function DriverView() {
   };
 
   return (
-    <div className="min-h-screen bg-black flex flex-col select-none">
+    <div
+      className="min-h-screen bg-black flex flex-col select-none"
+      style={brightness !== 100 ? { filter: `brightness(${brightness / 100}) contrast(${1 + (brightness - 100) / 200})` } : undefined}
+    >
       {/* BOX alert overlay */}
       {boxAlert.active && (
         <div
@@ -779,6 +784,18 @@ export function DriverView() {
               )}
             </>
           )}
+          {/* Brightness control */}
+          <button
+            onClick={() => setShowBrightness(!showBrightness)}
+            className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+              brightness > 100 ? "bg-yellow-900/40 text-yellow-400 border border-yellow-700/40" : "text-neutral-500 hover:text-neutral-300"
+            }`}
+            title="Brillo"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+            </svg>
+          </button>
           <button
             onClick={() => setEditMode(!editMode)}
             className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded transition-colors ${
@@ -789,6 +806,31 @@ export function DriverView() {
           </button>
         </div>
       </div>
+
+      {/* Brightness slider */}
+      {showBrightness && (
+        <div className="flex items-center gap-3 px-3 py-2 bg-surface border-b border-border/20">
+          <span className="text-[10px] text-neutral-400 uppercase tracking-wider shrink-0">Brillo</span>
+          <input
+            type="range"
+            min={100}
+            max={250}
+            step={10}
+            value={brightness}
+            onChange={(e) => setBrightness(Number(e.target.value))}
+            className="flex-1 h-1.5 accent-yellow-400"
+          />
+          <span className="text-[10px] text-neutral-400 font-mono w-8 text-right">{brightness}%</span>
+          {brightness !== 100 && (
+            <button
+              onClick={() => setBrightness(100)}
+              className="text-[10px] text-neutral-500 hover:text-white"
+            >
+              Reset
+            </button>
+          )}
+        </div>
+      )}
 
       {/* GPS setup panel (finish line) */}
       {showGpsSetup && gpsConnected && (

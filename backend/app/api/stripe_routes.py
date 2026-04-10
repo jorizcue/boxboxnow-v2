@@ -118,9 +118,23 @@ async def list_circuits_for_checkout(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all circuits available for subscription purchase."""
+    """List circuits available for subscription — excludes circuits the user already has an active subscription for."""
+    # Get circuit IDs with active subscriptions
+    active_result = await db.execute(
+        select(Subscription.circuit_id).where(
+            Subscription.user_id == user.id,
+            Subscription.status.in_(("active", "trialing")),
+            Subscription.circuit_id.isnot(None),
+        )
+    )
+    active_circuit_ids = {row[0] for row in active_result.fetchall()}
+
     result = await db.execute(select(Circuit).order_by(Circuit.name))
-    return [{"id": c.id, "name": c.name} for c in result.scalars().all()]
+    return [
+        {"id": c.id, "name": c.name}
+        for c in result.scalars().all()
+        if c.id not in active_circuit_ids
+    ]
 
 
 @router.post("/create-checkout-session")
@@ -145,6 +159,17 @@ async def create_checkout_session(
 
     if not circuit_id:
         raise HTTPException(400, "circuit_id required")
+
+    # Prevent duplicate subscription for same circuit
+    existing = await db.execute(
+        select(Subscription).where(
+            Subscription.user_id == user.id,
+            Subscription.circuit_id == circuit_id,
+            Subscription.status.in_(("active", "trialing")),
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(400, "Ya tienes una suscripcion activa para este circuito")
 
     settings = get_settings()
     s = get_stripe()
@@ -608,6 +633,57 @@ async def reactivate_subscription(
     sub.cancel_at_period_end = False
     await db.commit()
     return {"ok": True, "cancel_at_period_end": False}
+
+
+@router.post("/subscriptions/{sub_id}/switch-plan")
+async def switch_plan(
+    sub_id: int,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Switch subscription plan (e.g. monthly↔annual). Applies at next renewal."""
+    body = await request.json()
+    new_plan = body.get("plan")  # e.g. "basic_annual", "pro_monthly"
+    if not new_plan:
+        raise HTTPException(400, "plan required")
+
+    new_price_id = _plan_to_price(new_plan)
+    if not new_price_id:
+        raise HTTPException(400, f"Unknown plan: {new_plan}")
+
+    s = get_stripe()
+    result = await db.execute(
+        select(Subscription).where(Subscription.id == sub_id, Subscription.user_id == user.id)
+    )
+    sub = result.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(404, "Subscription not found")
+    if sub.status not in ("active", "trialing"):
+        raise HTTPException(400, "Subscription is not active")
+    if not sub.stripe_subscription_id:
+        raise HTTPException(400, "No Stripe subscription linked")
+
+    # Get current subscription item ID from Stripe
+    stripe_sub = s.Subscription.retrieve(sub.stripe_subscription_id, expand=["items.data"])
+    if not stripe_sub.get("items") or not stripe_sub["items"]["data"]:
+        raise HTTPException(400, "No subscription items found")
+
+    item_id = stripe_sub["items"]["data"][0]["id"]
+
+    # Schedule price change at next renewal (no proration)
+    s.Subscription.modify(
+        sub.stripe_subscription_id,
+        items=[{"id": item_id, "price": new_price_id}],
+        proration_behavior="none",
+    )
+
+    # Update local record
+    sub.plan_type = new_plan
+    sub.stripe_price_id = new_price_id
+    await db.commit()
+
+    return {"ok": True, "new_plan": new_plan}
 
 
 @router.get("/invoices")
