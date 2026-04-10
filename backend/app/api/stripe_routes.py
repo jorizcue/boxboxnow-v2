@@ -256,20 +256,21 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
             for trial_sub in trial_result.scalars().all():
                 trial_sub.status = "canceled"
 
-            # Retrieve subscription from Stripe for period dates and price_id
+            # Retrieve subscription from Stripe for price_id and calculate period
             stripe_price_id = None
-            period_start = None
+            period_start = datetime.now(timezone.utc)
             period_end = None
             try:
                 sub_obj = s.Subscription.retrieve(sub_id, expand=["items.data"])
-                if sub_obj.current_period_start:
-                    period_start = datetime.fromtimestamp(sub_obj.current_period_start, tz=timezone.utc)
-                if sub_obj.current_period_end:
-                    period_end = datetime.fromtimestamp(sub_obj.current_period_end, tz=timezone.utc)
+                if sub_obj.get("start_date"):
+                    period_start = datetime.fromtimestamp(sub_obj["start_date"], tz=timezone.utc)
+                # Calculate period_end from plan interval (Stripe v15+ removed current_period_end)
+                period_end = _calc_plan_valid_until(plan_type, period_start)
                 if sub_obj.items and sub_obj.items.data:
                     stripe_price_id = sub_obj.items.data[0].price.id
             except Exception as e:
                 logger.warning(f"Could not retrieve subscription details: {e}")
+                period_end = _calc_plan_valid_until(plan_type, period_start)
 
             sub = Subscription(
                 user_id=user_id,
@@ -360,24 +361,21 @@ async def _handle_invoice_paid(invoice_data: dict, db: AsyncSession):
     )
     sub = result.scalar_one_or_none()
     if sub:
-        # Get correct period dates from the Stripe subscription object (not the invoice,
-        # which has period_start == period_end for the initial invoice)
+        # Calculate period from Stripe subscription start_date + plan interval
+        # (Stripe v15+ removed current_period_start/end from Subscription object)
         import stripe as s
+        now = datetime.now(timezone.utc)
         try:
             stripe_sub = s.Subscription.retrieve(sub_id)
-            if stripe_sub.current_period_start:
-                sub.current_period_start = datetime.fromtimestamp(stripe_sub.current_period_start, tz=timezone.utc)
-            if stripe_sub.current_period_end:
-                sub.current_period_end = datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc)
+            if stripe_sub.get("start_date"):
+                sub.current_period_start = datetime.fromtimestamp(stripe_sub["start_date"], tz=timezone.utc)
+            else:
+                sub.current_period_start = now
+            sub.current_period_end = _calc_plan_valid_until(sub.plan_type, sub.current_period_start)
         except Exception as e:
-            logger.warning(f"Could not retrieve subscription period from Stripe: {e}")
-            # Fallback to invoice dates
-            period_start = invoice_data.get("period_start")
-            period_end = invoice_data.get("period_end")
-            if period_start:
-                sub.current_period_start = datetime.fromtimestamp(period_start, tz=timezone.utc)
-            if period_end:
-                sub.current_period_end = datetime.fromtimestamp(period_end, tz=timezone.utc)
+            logger.warning(f"Could not retrieve subscription from Stripe: {e}")
+            sub.current_period_start = now
+            sub.current_period_end = _calc_plan_valid_until(sub.plan_type, now)
 
         sub.status = "active"
 
