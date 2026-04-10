@@ -174,8 +174,66 @@ async def init_db():
             await conn.execute(text("ALTER TABLE product_tab_config ADD COLUMN billing_interval VARCHAR(20)"))
         except Exception:
             pass
-        # Remove old unique constraint on stripe_product_id by recreating table if needed
-        # (SQLite doesn't support DROP CONSTRAINT — the new create_all handles it for fresh DBs)
+        # SQLite can't DROP CONSTRAINT — recreate table to remove UNIQUE on stripe_product_id
+        try:
+            result = await conn.execute(text("PRAGMA index_list('product_tab_config')"))
+            indexes = result.fetchall()
+            has_old_unique = any(
+                "stripe_product_id" in str(idx) and idx[2] == 1  # idx[2]=1 means unique
+                for idx in indexes
+            )
+            if not has_old_unique:
+                # Also check via index_info for auto-generated unique index names
+                for idx in indexes:
+                    if idx[2] == 1:  # unique index
+                        idx_info = await conn.execute(text(f"PRAGMA index_info('{idx[1]}')"))
+                        cols = [row[2] for row in idx_info.fetchall()]
+                        if cols == ["stripe_product_id"]:
+                            has_old_unique = True
+                            break
+
+            if has_old_unique:
+                logger.info("Migrating product_tab_config: removing UNIQUE on stripe_product_id")
+                await conn.execute(text("""
+                    CREATE TABLE product_tab_config_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        stripe_product_id VARCHAR(255) NOT NULL,
+                        stripe_price_id VARCHAR(255) NOT NULL UNIQUE,
+                        plan_type VARCHAR(50) NOT NULL UNIQUE,
+                        tabs TEXT NOT NULL DEFAULT '[]',
+                        max_devices INTEGER NOT NULL DEFAULT 1,
+                        display_name VARCHAR(100) NOT NULL DEFAULT '',
+                        description TEXT,
+                        features TEXT DEFAULT '[]',
+                        price_amount FLOAT,
+                        billing_interval VARCHAR(20),
+                        is_popular BOOLEAN NOT NULL DEFAULT 0,
+                        is_visible BOOLEAN NOT NULL DEFAULT 1,
+                        sort_order INTEGER NOT NULL DEFAULT 0
+                    )
+                """))
+                await conn.execute(text("""
+                    INSERT INTO product_tab_config_new
+                        (id, stripe_product_id, stripe_price_id, plan_type, tabs, max_devices,
+                         display_name, description, features, price_amount, billing_interval,
+                         is_popular, is_visible, sort_order)
+                    SELECT id, stripe_product_id,
+                           COALESCE(stripe_price_id, ''),
+                           COALESCE(plan_type, stripe_product_id),
+                           tabs, max_devices,
+                           display_name, description, features,
+                           COALESCE(price_amount, 0), COALESCE(billing_interval, 'month'),
+                           is_popular, is_visible, sort_order
+                    FROM product_tab_config
+                """))
+                await conn.execute(text("DROP TABLE product_tab_config"))
+                await conn.execute(text("ALTER TABLE product_tab_config_new RENAME TO product_tab_config"))
+                # Recreate non-unique index on stripe_product_id
+                await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_product_tab_config_stripe_product_id ON product_tab_config (stripe_product_id)"))
+                await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_product_tab_config_stripe_price_id ON product_tab_config (stripe_price_id)"))
+                logger.info("product_tab_config migration complete")
+        except Exception as e:
+            logger.warning(f"product_tab_config migration check: {e}")
 
         # Seed default/trial tab configuration in app_settings
         new_settings_defaults = {
