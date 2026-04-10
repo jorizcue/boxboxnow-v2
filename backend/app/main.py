@@ -23,6 +23,7 @@ from app.api.analytics_routes import router as analytics_router
 from app.api.gps_routes import router as gps_router
 from app.api.stripe_routes import router as stripe_router
 from app.ws.server import router as ws_router
+from app.api.public_routes import router as public_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -109,6 +110,7 @@ app.include_router(analytics_router)
 app.include_router(gps_router)
 app.include_router(stripe_router)
 app.include_router(ws_router)
+app.include_router(public_router)
 
 
 @app.get("/health")
