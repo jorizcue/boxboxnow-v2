@@ -238,6 +238,25 @@ class AppSetting(Base):
     value = Column(String(500), nullable=False)
 
 
+class ProductTabConfig(Base):
+    """Maps a Stripe product to the capabilities it grants and pricing display info."""
+    __tablename__ = "product_tab_config"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    stripe_product_id = Column(String(255), unique=True, nullable=False, index=True)
+    plan_type = Column(String(50), nullable=False)  # basic_monthly, basic_annual, pro_monthly, pro_annual, event
+    tabs = Column(Text, nullable=False, default="[]")  # JSON array of tab slugs
+    max_devices = Column(Integer, nullable=False, default=1)
+    display_name = Column(String(100), nullable=False, default="")
+    description = Column(Text, nullable=True)
+    features = Column(Text, nullable=True, default="[]")  # JSON array of feature strings
+    price_monthly = Column(Float, nullable=True)
+    price_annual = Column(Float, nullable=True)
+    is_popular = Column(Boolean, default=False, nullable=False)
+    is_visible = Column(Boolean, default=True, nullable=False)
+    sort_order = Column(Integer, default=0, nullable=False)
+
+
 class DeviceSession(Base):
     """
     Tracks active device sessions per user (OTT-style concurrent device control).

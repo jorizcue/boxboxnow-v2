@@ -161,6 +161,21 @@ async def init_db():
                 )
             """), {"parent_tab": parent_tab, "new_tab": new_tab})
 
+        # Seed default/trial tab configuration in app_settings
+        new_settings_defaults = {
+            "default_tabs": '["race","pit","live","config","adjusted","adjusted-beta","driver","driver-config"]',
+            "default_max_devices": "2",
+            "trial_tabs": '["race","pit","live","config","adjusted","adjusted-beta","driver","driver-config","replay","analytics","insights"]',
+            "trial_max_devices": "2",
+        }
+        for key, default_value in new_settings_defaults.items():
+            result = await conn.execute(text(f"SELECT key FROM app_settings WHERE key = :key"), {"key": key})
+            if not result.fetchone():
+                await conn.execute(
+                    text("INSERT INTO app_settings (key, value) VALUES (:key, :value)"),
+                    {"key": key, "value": default_value},
+                )
+
 
 async def get_db():
     async with async_session() as session:
