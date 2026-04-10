@@ -27,6 +27,7 @@ class User(Base):
     race_sessions = relationship("RaceSession", back_populates="user", cascade="all, delete-orphan")
     device_sessions = relationship("DeviceSession", back_populates="user", cascade="all, delete-orphan")
     gps_laps = relationship("GpsTelemetryLap", backref="user", cascade="all, delete-orphan")
+    subscriptions = relationship("Subscription", back_populates="user", cascade="all, delete-orphan")
 
 
 class Circuit(Base):
@@ -297,5 +298,5 @@ class Subscription(Base):
     cancel_at_period_end = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
 
-    user = relationship("User", backref="subscriptions")
+    user = relationship("User", back_populates="subscriptions")
     circuit = relationship("Circuit")
