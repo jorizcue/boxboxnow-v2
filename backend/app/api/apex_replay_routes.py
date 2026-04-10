@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from fastapi.responses import FileResponse, HTMLResponse
 
-from app.apex.replay import ReplayEngine
+from app.apex.replay import parse_log_file
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/apex-replay", tags=["apex-replay"])
@@ -25,6 +25,11 @@ MIME_TYPES = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
     ".html": "text/html",
+    ".ttf": "font/ttf",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+    ".eot": "application/vnd.ms-fontobject",
+    ".svg": "image/svg+xml",
 }
 
 
@@ -37,12 +42,37 @@ async def apex_viewer():
     return FileResponse(html_path, media_type="text/html")
 
 
-@router.get("/static/{filename}")
-async def apex_static(filename: str):
-    """Serve static assets (JS, CSS, images)."""
-    # Prevent path traversal
+@router.get("/static/{filepath:path}")
+async def apex_static(filepath: str):
+    """Serve static assets (JS, CSS, images, fonts)."""
+    clean = Path(filepath)
+    if ".." in clean.parts:
+        return HTMLResponse("Forbidden", status_code=403)
+    file_path = STATIC_DIR / clean
+    if not file_path.exists() or not file_path.is_file():
+        return HTMLResponse("Not found", status_code=404)
+    suffix = file_path.suffix.lower()
+    media_type = MIME_TYPES.get(suffix, "application/octet-stream")
+    return FileResponse(file_path, media_type=media_type)
+
+
+@router.get("/fonts/{filename}")
+async def apex_fonts(filename: str):
+    """Serve font files (CSS references ../fonts/ relative to static/)."""
     safe_name = Path(filename).name
-    file_path = STATIC_DIR / safe_name
+    file_path = STATIC_DIR / "fonts" / safe_name
+    if not file_path.exists():
+        return HTMLResponse("Not found", status_code=404)
+    suffix = file_path.suffix.lower()
+    media_type = MIME_TYPES.get(suffix, "application/octet-stream")
+    return FileResponse(file_path, media_type=media_type)
+
+
+@router.get("/images/{filename}")
+async def apex_images(filename: str):
+    """Serve image files (CSS references ../images/ relative to static/)."""
+    safe_name = Path(filename).name
+    file_path = STATIC_DIR / "images" / safe_name
     if not file_path.exists():
         return HTMLResponse("Not found", status_code=404)
     suffix = file_path.suffix.lower()
@@ -91,8 +121,7 @@ async def apex_replay_ws(
     logger.info(f"Apex replay WS: {filepath} from block {start_block} at {speed}x")
 
     # Parse the log file
-    engine = ReplayEngine()
-    blocks = engine._parse_log_file(filepath)
+    blocks = parse_log_file(filepath)
 
     if not blocks:
         await websocket.send_text("msg||No data in log file")

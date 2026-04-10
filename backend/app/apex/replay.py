@@ -23,6 +23,60 @@ from app.apex.parser import ApexMessageParser
 logger = logging.getLogger(__name__)
 
 
+def open_log_file(filepath: str):
+    """Open a log file, supporting both plain .log and .log.gz."""
+    if filepath.endswith(".gz"):
+        return gzip.open(filepath, "rt", encoding="utf-8", errors="replace")
+    return open(filepath, "r", encoding="utf-8", errors="replace")
+
+
+def try_parse_timestamp(line: str) -> datetime | None:
+    """Try to parse a line as a timestamp."""
+    try:
+        return datetime.strptime(line, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+
+
+def parse_log_file(filepath: str) -> list[tuple[datetime, str]]:
+    """Parse a log file into (timestamp, message_block) tuples.
+    Supports both .log and .log.gz files."""
+    blocks = []
+    current_timestamp = None
+    current_lines: list[str] = []
+
+    with open_log_file(filepath) as f:
+        for line in f:
+            line = line.rstrip("\n")
+
+            ts = try_parse_timestamp(line.strip())
+            if ts is not None:
+                if current_timestamp and current_lines:
+                    message = "\n".join(current_lines)
+                    if message.strip():
+                        blocks.append((current_timestamp, message))
+                current_timestamp = ts
+                current_lines = []
+                continue
+
+            if not line.strip():
+                if current_timestamp and current_lines:
+                    message = "\n".join(current_lines)
+                    if message.strip():
+                        blocks.append((current_timestamp, message))
+                    current_lines = []
+                continue
+
+            current_lines.append(line)
+
+    if current_timestamp and current_lines:
+        message = "\n".join(current_lines)
+        if message.strip():
+            blocks.append((current_timestamp, message))
+
+    return blocks
+
+
 class ReplayEngine:
     """Replays .log files through the Apex message parser."""
 
@@ -352,56 +406,10 @@ class ReplayEngine:
         logger.info("Replay completed")
 
     def _open_log_file(self, filepath: str):
-        """Open a log file, supporting both plain .log and .log.gz."""
-        if filepath.endswith(".gz"):
-            return gzip.open(filepath, "rt", encoding="utf-8", errors="replace")
-        return open(filepath, "r", encoding="utf-8", errors="replace")
+        return open_log_file(filepath)
 
     def _parse_log_file(self, filepath: str) -> list[tuple[datetime, str]]:
-        """Parse a log file into (timestamp, message_block) tuples.
-        Supports both .log and .log.gz files."""
-        blocks = []
-        current_timestamp = None
-        current_lines = []
-
-        with self._open_log_file(filepath) as f:
-            for line in f:
-                line = line.rstrip("\n")
-
-                # Try to parse as timestamp
-                ts = self._try_parse_timestamp(line.strip())
-                if ts is not None:
-                    # Save previous block if exists
-                    if current_timestamp and current_lines:
-                        message = "\n".join(current_lines)
-                        if message.strip():
-                            blocks.append((current_timestamp, message))
-                    current_timestamp = ts
-                    current_lines = []
-                    continue
-
-                # Empty line = block separator
-                if not line.strip():
-                    if current_timestamp and current_lines:
-                        message = "\n".join(current_lines)
-                        if message.strip():
-                            blocks.append((current_timestamp, message))
-                        current_lines = []
-                    continue
-
-                current_lines.append(line)
-
-        # Don't forget the last block
-        if current_timestamp and current_lines:
-            message = "\n".join(current_lines)
-            if message.strip():
-                blocks.append((current_timestamp, message))
-
-        return blocks
+        return parse_log_file(filepath)
 
     def _try_parse_timestamp(self, line: str) -> datetime | None:
-        """Try to parse a line as a timestamp."""
-        try:
-            return datetime.strptime(line, "%Y-%m-%d %H:%M:%S")
-        except ValueError:
-            return None
+        return try_parse_timestamp(line)
