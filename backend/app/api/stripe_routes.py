@@ -790,8 +790,22 @@ async def cancel_subscription(
         raise HTTPException(404, "Subscription not found")
     if sub.status not in ("active", "trialing"):
         raise HTTPException(400, "Subscription is not active")
+
     if not sub.stripe_subscription_id:
-        raise HTTPException(400, "No Stripe subscription linked")
+        # One-time payment (event): cancel immediately — revoke access
+        sub.status = "canceled"
+        if sub.circuit_id:
+            access_result = await db.execute(
+                select(UserCircuitAccess).where(
+                    UserCircuitAccess.user_id == user.id,
+                    UserCircuitAccess.circuit_id == sub.circuit_id,
+                )
+            )
+            access = access_result.scalar_one_or_none()
+            if access:
+                access.valid_until = datetime.now(timezone.utc)
+        await db.commit()
+        return {"ok": True, "canceled": True}
 
     s.Subscription.modify(sub.stripe_subscription_id, cancel_at_period_end=True)
     sub.cancel_at_period_end = True
