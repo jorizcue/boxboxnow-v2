@@ -28,8 +28,8 @@ async def list_plans(db: AsyncSession = Depends(get_db)):
             "display_name": c.display_name,
             "description": c.description,
             "features": _json.loads(c.features) if c.features else [],
-            "price_monthly": c.price_monthly,
-            "price_annual": c.price_annual,
+            "price_amount": c.price_amount,
+            "billing_interval": c.billing_interval,
             "is_popular": c.is_popular,
             "sort_order": c.sort_order,
         }

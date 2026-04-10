@@ -262,18 +262,17 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
             if circuit_id:
                 await _grant_circuit_access(db, user_id, circuit_id, plan_type)
 
-            # Update user plan capabilities
-            # Extract stripe_product_id from subscription items
-            stripe_product_id = None
+            # Update user plan capabilities — extract price_id from subscription
+            stripe_price_id = None
             if sub_id:
                 try:
                     sub_obj = s.Subscription.retrieve(sub_id, expand=["items.data"])
                     if sub_obj.items and sub_obj.items.data:
-                        stripe_product_id = sub_obj.items.data[0].price.product
+                        stripe_price_id = sub_obj.items.data[0].price.id
                 except Exception as e:
-                    logger.warning(f"Could not retrieve subscription product_id: {e}")
+                    logger.warning(f"Could not retrieve subscription price_id: {e}")
 
-            await _apply_plan_to_user(user_id, plan_type, db, stripe_product_id=stripe_product_id)
+            await _apply_plan_to_user(user_id, plan_type, db, stripe_price_id=stripe_price_id)
             await db.commit()
 
             # Send confirmation email with circuit name
@@ -307,18 +306,18 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
         if circuit_id:
             await _grant_circuit_access(db, user_id, circuit_id, plan_type)
 
-        # Extract product_id from checkout session line items
-        stripe_product_id = None
+        # Extract price_id from checkout session line items
+        stripe_price_id = None
         checkout_id = session_data.get("id")
         if checkout_id:
             try:
                 line_items = s.checkout.Session.list_line_items(checkout_id)
                 if line_items.data:
-                    stripe_product_id = line_items.data[0].price.product
+                    stripe_price_id = line_items.data[0].price.id
             except Exception as e:
-                logger.warning(f"Could not retrieve checkout product_id: {e}")
+                logger.warning(f"Could not retrieve checkout price_id: {e}")
 
-        await _apply_plan_to_user(user_id, plan_type, db, stripe_product_id=stripe_product_id)
+        await _apply_plan_to_user(user_id, plan_type, db, stripe_price_id=stripe_price_id)
         await db.commit()
 
         # Send event confirmation email
@@ -422,11 +421,11 @@ async def _handle_subscription_deleted(sub_data: dict, db: AsyncSession):
         logger.info(f"Subscription deleted: sub={sub_id} user={sub.user_id} circuit={sub.circuit_id}")
 
 
-async def _apply_plan_to_user(user_id: int, plan_type: str, db: AsyncSession, stripe_product_id: str | None = None):
+async def _apply_plan_to_user(user_id: int, plan_type: str, db: AsyncSession, stripe_price_id: str | None = None):
     """Apply plan capabilities to user (max_devices, tab access).
 
-    Reads from product_tab_config table if stripe_product_id is provided.
-    Falls back to PLAN_CONFIG dict for backwards compatibility.
+    Looks up product_tab_config by stripe_price_id first.
+    Falls back to plan_type lookup, then hardcoded PLAN_CONFIG.
     """
     import json as _json
     from app.models.schemas import UserTabAccess, ProductTabConfig
@@ -434,17 +433,29 @@ async def _apply_plan_to_user(user_id: int, plan_type: str, db: AsyncSession, st
     tabs: list[str] = []
     max_devices: int = 1
 
-    # Try DB config first (by stripe_product_id)
-    if stripe_product_id:
+    # Try DB config first (by stripe_price_id)
+    if stripe_price_id:
         result = await db.execute(
-            select(ProductTabConfig).where(ProductTabConfig.stripe_product_id == stripe_product_id)
+            select(ProductTabConfig).where(ProductTabConfig.stripe_price_id == stripe_price_id)
         )
         config_row = result.scalar_one_or_none()
         if config_row:
             tabs = _json.loads(config_row.tabs) if config_row.tabs else []
             max_devices = config_row.max_devices
         else:
-            logger.warning(f"No product_tab_config for stripe_product_id={stripe_product_id}, falling back to PLAN_CONFIG")
+            logger.warning(f"No product_tab_config for stripe_price_id={stripe_price_id}, trying plan_type")
+
+    # Try DB config by plan_type
+    if not tabs and plan_type:
+        result = await db.execute(
+            select(ProductTabConfig).where(ProductTabConfig.plan_type == plan_type)
+        )
+        config_row = result.scalar_one_or_none()
+        if config_row:
+            tabs = _json.loads(config_row.tabs) if config_row.tabs else []
+            max_devices = config_row.max_devices
+        else:
+            logger.warning(f"No product_tab_config for plan_type={plan_type}, falling back to PLAN_CONFIG")
 
     # Fallback to hardcoded PLAN_CONFIG if DB didn't match
     if not tabs:

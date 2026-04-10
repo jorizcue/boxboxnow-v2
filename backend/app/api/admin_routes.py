@@ -494,54 +494,70 @@ async def update_platform_settings(request: Request, admin: User = Depends(requi
 
 # --- Product Tab Config ---
 
+
+def _serialize_config(c, _json) -> dict:
+    """Serialize a ProductTabConfig row to dict."""
+    return {
+        "id": c.id,
+        "stripe_product_id": c.stripe_product_id,
+        "stripe_price_id": c.stripe_price_id,
+        "plan_type": c.plan_type,
+        "tabs": _json.loads(c.tabs) if c.tabs else [],
+        "max_devices": c.max_devices,
+        "display_name": c.display_name,
+        "description": c.description,
+        "features": _json.loads(c.features) if c.features else [],
+        "price_amount": c.price_amount,
+        "billing_interval": c.billing_interval,
+        "is_popular": c.is_popular,
+        "is_visible": c.is_visible,
+        "sort_order": c.sort_order,
+    }
+
+
 @router.get("/product-config")
 async def list_product_configs(admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     """List all product-to-tab configurations."""
     import json as _json
     result = await db.execute(select(ProductTabConfig).order_by(ProductTabConfig.sort_order))
-    configs = result.scalars().all()
-    return [
-        {
-            "id": c.id,
-            "stripe_product_id": c.stripe_product_id,
-            "plan_type": c.plan_type,
-            "tabs": _json.loads(c.tabs) if c.tabs else [],
-            "max_devices": c.max_devices,
-            "display_name": c.display_name,
-            "description": c.description,
-            "features": _json.loads(c.features) if c.features else [],
-            "price_monthly": c.price_monthly,
-            "price_annual": c.price_annual,
-            "is_popular": c.is_popular,
-            "is_visible": c.is_visible,
-            "sort_order": c.sort_order,
-        }
-        for c in configs
-    ]
+    return [_serialize_config(c, _json) for c in result.scalars().all()]
 
 
 @router.post("/product-config")
 async def create_product_config(request: Request, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    """Create a product-to-tab configuration."""
+    """Create a product-to-tab configuration (one per Stripe price)."""
     import json as _json
     body = await request.json()
 
-    existing = await db.execute(
-        select(ProductTabConfig).where(ProductTabConfig.stripe_product_id == body.get("stripe_product_id", ""))
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(409, "Product config already exists for this Stripe product")
+    # Check unique stripe_price_id
+    price_id = body.get("stripe_price_id", "")
+    if price_id:
+        existing = await db.execute(
+            select(ProductTabConfig).where(ProductTabConfig.stripe_price_id == price_id)
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(409, "Ya existe una configuracion para este precio de Stripe")
+
+    # Check unique plan_type
+    plan_type = body.get("plan_type", "")
+    if plan_type:
+        existing = await db.execute(
+            select(ProductTabConfig).where(ProductTabConfig.plan_type == plan_type)
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(409, f"Ya existe una configuracion para el tipo de plan '{plan_type}'")
 
     config = ProductTabConfig(
-        stripe_product_id=body["stripe_product_id"],
-        plan_type=body.get("plan_type", ""),
+        stripe_product_id=body.get("stripe_product_id", ""),
+        stripe_price_id=price_id,
+        plan_type=plan_type,
         tabs=_json.dumps(body.get("tabs", [])),
         max_devices=body.get("max_devices", 1),
         display_name=body.get("display_name", ""),
         description=body.get("description"),
         features=_json.dumps(body.get("features", [])),
-        price_monthly=body.get("price_monthly"),
-        price_annual=body.get("price_annual"),
+        price_amount=body.get("price_amount"),
+        billing_interval=body.get("billing_interval"),
         is_popular=body.get("is_popular", False),
         is_visible=body.get("is_visible", True),
         sort_order=body.get("sort_order", 0),
@@ -549,22 +565,7 @@ async def create_product_config(request: Request, admin: User = Depends(require_
     db.add(config)
     await db.commit()
     await db.refresh(config)
-
-    return {
-        "id": config.id,
-        "stripe_product_id": config.stripe_product_id,
-        "plan_type": config.plan_type,
-        "tabs": _json.loads(config.tabs) if config.tabs else [],
-        "max_devices": config.max_devices,
-        "display_name": config.display_name,
-        "description": config.description,
-        "features": _json.loads(config.features) if config.features else [],
-        "price_monthly": config.price_monthly,
-        "price_annual": config.price_annual,
-        "is_popular": config.is_popular,
-        "is_visible": config.is_visible,
-        "sort_order": config.sort_order,
-    }
+    return _serialize_config(config, _json)
 
 
 @router.put("/product-config/{config_id}")
@@ -578,47 +579,25 @@ async def update_product_config(config_id: int, request: Request, admin: User = 
 
     body = await request.json()
 
-    if "stripe_product_id" in body:
-        config.stripe_product_id = body["stripe_product_id"]
-    if "plan_type" in body:
-        config.plan_type = body["plan_type"]
+    for field in ("stripe_product_id", "stripe_price_id", "plan_type", "display_name", "description", "billing_interval"):
+        if field in body:
+            setattr(config, field, body[field])
     if "tabs" in body:
         config.tabs = _json.dumps(body["tabs"])
-    if "max_devices" in body:
-        config.max_devices = body["max_devices"]
-    if "display_name" in body:
-        config.display_name = body["display_name"]
-    if "description" in body:
-        config.description = body["description"]
     if "features" in body:
         config.features = _json.dumps(body["features"])
-    if "price_monthly" in body:
-        config.price_monthly = body["price_monthly"]
-    if "price_annual" in body:
-        config.price_annual = body["price_annual"]
-    if "is_popular" in body:
-        config.is_popular = body["is_popular"]
-    if "is_visible" in body:
-        config.is_visible = body["is_visible"]
-    if "sort_order" in body:
-        config.sort_order = body["sort_order"]
+    for field in ("max_devices", "sort_order"):
+        if field in body:
+            setattr(config, field, body[field])
+    for field in ("price_amount",):
+        if field in body:
+            setattr(config, field, body[field])
+    for field in ("is_popular", "is_visible"):
+        if field in body:
+            setattr(config, field, body[field])
 
     await db.commit()
-    return {
-        "id": config.id,
-        "stripe_product_id": config.stripe_product_id,
-        "plan_type": config.plan_type,
-        "tabs": _json.loads(config.tabs) if config.tabs else [],
-        "max_devices": config.max_devices,
-        "display_name": config.display_name,
-        "description": config.description,
-        "features": _json.loads(config.features) if config.features else [],
-        "price_monthly": config.price_monthly,
-        "price_annual": config.price_annual,
-        "is_popular": config.is_popular,
-        "is_visible": config.is_visible,
-        "sort_order": config.sort_order,
-    }
+    return _serialize_config(config, _json)
 
 
 @router.delete("/product-config/{config_id}")
@@ -635,7 +614,7 @@ async def delete_product_config(config_id: int, admin: User = Depends(require_ad
 
 @router.get("/stripe-products")
 async def list_stripe_products(admin: User = Depends(require_admin)):
-    """List active products from Stripe API for the admin dropdown."""
+    """List active products from Stripe API with their prices."""
     import stripe as _stripe
     from app.config import get_settings
     settings = get_settings()
@@ -643,14 +622,28 @@ async def list_stripe_products(admin: User = Depends(require_admin)):
 
     try:
         products = _stripe.Product.list(active=True, limit=100)
-        return [
-            {
+        # Fetch prices for each product
+        result = []
+        for p in products.data:
+            prices = _stripe.Price.list(product=p.id, active=True, limit=20)
+            result.append({
                 "id": p.id,
                 "name": p.name,
                 "description": p.description,
-            }
-            for p in products.data
-        ]
+                "prices": [
+                    {
+                        "id": pr.id,
+                        "unit_amount": pr.unit_amount,  # in cents
+                        "currency": pr.currency,
+                        "recurring": {
+                            "interval": pr.recurring.interval if pr.recurring else None,
+                        } if pr.recurring else None,
+                        "type": pr.type,  # "recurring" or "one_time"
+                    }
+                    for pr in prices.data
+                ],
+            })
+        return result
     except Exception as e:
         logger.error(f"Failed to list Stripe products: {e}")
         raise HTTPException(500, "Failed to fetch Stripe products")

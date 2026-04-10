@@ -161,6 +161,22 @@ async def init_db():
                 )
             """), {"parent_tab": parent_tab, "new_tab": new_tab})
 
+        # Migrate product_tab_config: add stripe_price_id, price_amount, billing_interval columns
+        try:
+            await conn.execute(text("ALTER TABLE product_tab_config ADD COLUMN stripe_price_id VARCHAR(255)"))
+        except Exception:
+            pass
+        try:
+            await conn.execute(text("ALTER TABLE product_tab_config ADD COLUMN price_amount FLOAT"))
+        except Exception:
+            pass
+        try:
+            await conn.execute(text("ALTER TABLE product_tab_config ADD COLUMN billing_interval VARCHAR(20)"))
+        except Exception:
+            pass
+        # Remove old unique constraint on stripe_product_id by recreating table if needed
+        # (SQLite doesn't support DROP CONSTRAINT — the new create_all handles it for fresh DBs)
+
         # Seed default/trial tab configuration in app_settings
         new_settings_defaults = {
             "default_tabs": '["race","pit","live","config","adjusted","adjusted-beta","driver","driver-config"]',

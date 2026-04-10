@@ -8,86 +8,65 @@ interface PlanData {
   display_name: string;
   description: string | null;
   features: string[];
+  price_amount: number | null;
+  billing_interval: string | null;  // "month", "year", "one_time"
+  is_popular: boolean;
+  sort_order: number;
+}
+
+/** Grouped plan for display — one card can have monthly + annual prices */
+interface GroupedPlan {
+  base_type: string;
+  display_name: string;
+  description: string | null;
+  features: string[];
   price_monthly: number | null;
   price_annual: number | null;
+  price_event: number | null;
   is_popular: boolean;
+  is_event: boolean;
   sort_order: number;
 }
 
 // Hardcoded fallback if API is unavailable
 const FALLBACK_PLANS: PlanData[] = [
-  {
-    plan_type: "basic_monthly",
-    display_name: "Basico",
-    description: null,
-    features: [
-      "1 circuito incluido",
-      "Posiciones en tiempo real",
-      "Gestion de boxes",
-      "Clasificacion real",
-      "Vista de piloto",
-      "Hasta 2 dispositivos",
-    ],
-    price_monthly: 49,
-    price_annual: 490,
-    is_popular: false,
-    sort_order: 1,
-  },
-  {
-    plan_type: "pro_monthly",
-    display_name: "Pro",
-    description: null,
-    features: [
-      "1 circuito incluido",
-      "Todo en Basico +",
-      "Analitica de karts",
-      "GPS Insights",
-      "Replay de carreras",
-      "Hasta 5 dispositivos",
-      "Soporte prioritario",
-    ],
-    price_monthly: 79,
-    price_annual: 790,
-    is_popular: true,
-    sort_order: 2,
-  },
-  {
-    plan_type: "event",
-    display_name: "Evento",
-    description: null,
-    features: [
-      "Acceso completo 48h",
-      "1 circuito",
-      "Todas las funcionalidades",
-      "Hasta 3 dispositivos",
-      "Sin compromiso",
-    ],
-    price_monthly: 50,
-    price_annual: 50,
-    is_popular: false,
-    sort_order: 3,
-  },
+  { plan_type: "basic_monthly", display_name: "Basico", description: null, features: ["1 circuito incluido", "Posiciones en tiempo real", "Gestion de boxes", "Clasificacion real", "Vista de piloto", "Hasta 2 dispositivos"], price_amount: 49, billing_interval: "month", is_popular: false, sort_order: 1 },
+  { plan_type: "basic_annual", display_name: "Basico", description: null, features: ["1 circuito incluido", "Posiciones en tiempo real", "Gestion de boxes", "Clasificacion real", "Vista de piloto", "Hasta 2 dispositivos"], price_amount: 490, billing_interval: "year", is_popular: false, sort_order: 1 },
+  { plan_type: "pro_monthly", display_name: "Pro", description: null, features: ["1 circuito incluido", "Todo en Basico +", "Analitica de karts", "GPS Insights", "Replay de carreras", "Hasta 5 dispositivos", "Soporte prioritario"], price_amount: 79, billing_interval: "month", is_popular: true, sort_order: 2 },
+  { plan_type: "pro_annual", display_name: "Pro", description: null, features: ["1 circuito incluido", "Todo en Basico +", "Analitica de karts", "GPS Insights", "Replay de carreras", "Hasta 5 dispositivos", "Soporte prioritario"], price_amount: 790, billing_interval: "year", is_popular: true, sort_order: 2 },
+  { plan_type: "event", display_name: "Evento", description: null, features: ["Acceso completo 48h", "1 circuito", "Todas las funcionalidades", "Hasta 3 dispositivos", "Sin compromiso"], price_amount: 50, billing_interval: "one_time", is_popular: false, sort_order: 3 },
 ];
 
 /**
- * Group plans by base type for the pricing toggle.
- * Monthly/annual variants of the same base plan show as one card.
- * Event plans have no annual variant.
+ * Group per-price plans into display cards.
+ * Monthly/annual rows of the same base product merge into one card.
  */
-function groupPlans(raw: PlanData[]): PlanData[] {
-  const map = new Map<string, PlanData>();
+function groupPlans(raw: PlanData[]): GroupedPlan[] {
+  const map = new Map<string, GroupedPlan>();
 
   for (const p of raw) {
     const base = p.plan_type.replace(/_monthly$/, "").replace(/_annual$/, "");
+    const isEvent = p.billing_interval === "one_time" || p.plan_type === "event";
 
     if (!map.has(base)) {
-      map.set(base, { ...p });
+      map.set(base, {
+        base_type: base,
+        display_name: p.display_name,
+        description: p.description,
+        features: p.features,
+        price_monthly: p.billing_interval === "month" ? p.price_amount : null,
+        price_annual: p.billing_interval === "year" ? p.price_amount : null,
+        price_event: isEvent ? p.price_amount : null,
+        is_popular: p.is_popular,
+        is_event: isEvent,
+        sort_order: p.sort_order,
+      });
     } else {
       const existing = map.get(base)!;
-      if (p.price_monthly != null && existing.price_monthly == null)
-        existing.price_monthly = p.price_monthly;
-      if (p.price_annual != null && existing.price_annual == null)
-        existing.price_annual = p.price_annual;
+      if (p.billing_interval === "month" && existing.price_monthly == null)
+        existing.price_monthly = p.price_amount;
+      if (p.billing_interval === "year" && existing.price_annual == null)
+        existing.price_annual = p.price_amount;
       if (p.is_popular) existing.is_popular = true;
       if (p.features.length > existing.features.length) existing.features = p.features;
     }
@@ -98,7 +77,7 @@ function groupPlans(raw: PlanData[]): PlanData[] {
 
 export function PricingToggle() {
   const [annual, setAnnual] = useState(false);
-  const [plans, setPlans] = useState<PlanData[]>([]);
+  const [plans, setPlans] = useState<GroupedPlan[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -117,12 +96,9 @@ export function PricingToggle() {
       .finally(() => setLoading(false));
   }, []);
 
-  const isEvent = (p: PlanData) => p.plan_type === "event";
-
-  const planLink = (p: PlanData) => {
-    const base = p.plan_type.replace(/_monthly$/, "").replace(/_annual$/, "");
-    if (isEvent(p)) return `/register?plan=event`;
-    return `/register?plan=${base}${annual ? "_annual" : "_monthly"}`;
+  const planLink = (p: GroupedPlan) => {
+    if (p.is_event) return `/register?plan=event`;
+    return `/register?plan=${p.base_type}${annual ? "_annual" : "_monthly"}`;
   };
 
   if (loading) {
@@ -179,7 +155,7 @@ export function PricingToggle() {
       }`}>
         {plans.map((plan) => (
           <div
-            key={plan.plan_type}
+            key={plan.base_type}
             className={`relative rounded-2xl border p-8 transition-all duration-300 hover:-translate-y-1 ${
               plan.is_popular
                 ? "border-accent bg-surface shadow-[0_0_40px_rgba(159,229,86,0.1)]"
@@ -199,14 +175,14 @@ export function PricingToggle() {
             )}
             <div className="mb-6">
               <span className="text-4xl font-bold text-white">
-                {isEvent(plan)
-                  ? `${plan.price_monthly ?? 0}\u20AC`
+                {plan.is_event
+                  ? `${plan.price_event ?? 0}\u20AC`
                   : annual
                   ? `${plan.price_annual ?? 0}\u20AC`
                   : `${plan.price_monthly ?? 0}\u20AC`}
               </span>
               <span className="text-muted/50 ml-1">
-                {isEvent(plan) ? "/evento" : annual ? "/ano" : "/mes"}
+                {plan.is_event ? "/evento" : annual ? "/a\u00F1o" : "/mes"}
               </span>
             </div>
             <ul className="mb-8 space-y-3">
@@ -237,7 +213,7 @@ export function PricingToggle() {
                   : "border border-border text-white hover:border-accent hover:text-accent"
               }`}
             >
-              {isEvent(plan) ? "Comprar evento" : "Empezar ahora"}
+              {plan.is_event ? "Comprar evento" : "Empezar ahora"}
             </a>
           </div>
         ))}

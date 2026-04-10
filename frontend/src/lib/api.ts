@@ -307,7 +307,7 @@ export const api = {
   deleteProductConfig: (id: number) =>
     fetchApi<any>(`/api/admin/product-config/${id}`, { method: "DELETE" }),
   getStripeProducts: () =>
-    fetchApi<{ id: string; name: string; description: string | null }[]>("/api/admin/stripe-products"),
+    fetchApi<any[]>("/api/admin/stripe-products"),
 
   // Public plans (no auth)
   getPlans: () =>
@@ -316,8 +316,8 @@ export const api = {
       display_name: string;
       description: string | null;
       features: string[];
-      price_monthly: number | null;
-      price_annual: number | null;
+      price_amount: number | null;
+      billing_interval: string | null;
       is_popular: boolean;
       sort_order: number;
     }[]>("/api/plans"),

@@ -239,19 +239,26 @@ class AppSetting(Base):
 
 
 class ProductTabConfig(Base):
-    """Maps a Stripe product to the capabilities it grants and pricing display info."""
+    """Maps a Stripe price to the capabilities it grants and pricing display info.
+
+    Each Stripe product can have multiple prices (monthly/annual). Each price
+    gets its own row with a unique plan_type (e.g., basic_monthly, basic_annual).
+    Rows sharing the same stripe_product_id represent the same product at different
+    billing intervals.
+    """
     __tablename__ = "product_tab_config"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    stripe_product_id = Column(String(255), unique=True, nullable=False, index=True)
-    plan_type = Column(String(50), nullable=False)  # basic_monthly, basic_annual, pro_monthly, pro_annual, event
+    stripe_product_id = Column(String(255), nullable=False, index=True)  # NOT unique — shared across prices
+    stripe_price_id = Column(String(255), unique=True, nullable=False, index=True)  # Unique per price
+    plan_type = Column(String(50), nullable=False, unique=True)  # basic_monthly, basic_annual, etc. — unique
     tabs = Column(Text, nullable=False, default="[]")  # JSON array of tab slugs
     max_devices = Column(Integer, nullable=False, default=1)
     display_name = Column(String(100), nullable=False, default="")
     description = Column(Text, nullable=True)
     features = Column(Text, nullable=True, default="[]")  # JSON array of feature strings
-    price_monthly = Column(Float, nullable=True)
-    price_annual = Column(Float, nullable=True)
+    price_amount = Column(Float, nullable=True)  # Price in EUR for this specific interval
+    billing_interval = Column(String(20), nullable=True)  # "month", "year", "one_time"
     is_popular = Column(Boolean, default=False, nullable=False)
     is_visible = Column(Boolean, default=True, nullable=False)
     sort_order = Column(Integer, default=0, nullable=False)
