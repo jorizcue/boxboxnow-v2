@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+
+<html data-version="2.0.0">
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=0.8, maximum-scale=1, user-scalable=yes" />
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta http-equiv="Cache-Control" content="no-cache" />
+        <meta http-equiv="Pragma" content="no-cache" />
+        <meta http-equiv="Expires" content="0" />
+        <meta name="copyright" content="Apex Timing"/>
+        <meta name="Author" content="Apex Timing"/> 
+        <meta name="Designer" content="Apex Timing"/>
+        <meta name="description" content="Empresa Apex Timing, software de gestión comercial y cronometraje para centros de karting, registro en línea, sistema de reservas, punto de venta, servicio de e-mailing. Display recórds y mejores tiempos en su sitio web o aplicación móvil."/>
+        <title>BBN Replay - Live Timing</title>
+
+        <link href="/api/apex-replay/static/styles_flags_live_timing.css" rel="stylesheet" type="text/css" />
+
+        <link href="/api/apex-replay/static/styles_live_timing.min.css" rel="stylesheet" type="text/css" />
+
+        <link href="/api/apex-replay/static/styles_live_timing_custom.css" rel="stylesheet" type="text/css" />
+
+		<script type="text/javascript" src="/api/apex-replay/static/javascript_live_timing.min.js"></script>  
+
+        
+        <script type="text/javascript">
+            // BBN Replay config - overrides Apex defaults
+            var configPort = 8090;
+            var configGMT = 1;
+            var fullscreen = true;
+            var title = 'BBN Replay';
+            var logo_title = 'BoxBoxNow';
+            var use_kartcom_photo = false;
+            var use_sws_photo = false;
+            var driver_photo_url = '';
+
+            // Parse query params for replay config
+            (function() {
+                var params = new URLSearchParams(window.location.search);
+                var filename = params.get('filename') || '';
+                var circuit_dir = params.get('circuit_dir') || '';
+                var start_block = parseInt(params.get('start_block') || '0');
+                var speed = parseFloat(params.get('speed') || '1');
+
+                // Build WebSocket URL for our replay endpoint
+                var proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                var wsUrl = proto + '//' + window.location.host +
+                    '/api/apex-replay/ws?filename=' + encodeURIComponent(filename) +
+                    '&start_block=' + start_block +
+                    '&speed=' + speed;
+                if (circuit_dir) {
+                    wsUrl += '&circuit_dir=' + encodeURIComponent(circuit_dir);
+                }
+                window.bbn_ws_url = wsUrl;
+
+                // Override configHost so the original JS doesn't try to connect elsewhere
+                var configHost = window.location.hostname;
+            })();
+        </script>
+
+
+    </head>
+
+
+
+    <body onresize="resize()"  id="body">
+
+    <!-- [if lte IE 8]>
+        <div style="color:#FFEF00; text-align:center; padding-top:40px; padding-bottom:40px;">Your browser is up-to-date.<br>Live Timing may not function properly. <br> Please update your browser or switch to a recommended browser : <br> Google Chrome or Mozilla Firefox<br></div>
+    <![endif]-->
+
+    <div id='flashobject'></div>
+
+    <div id="live" name="live">    
+
+
+        <div id="global"> 
+
+            <div id="title_bar" class="title">
+                <div id="live_menu">
+                    <div class="live_menu_button" onclick="show_lives_list()"></div>
+                    <ul class="previous_lives">
+                        <!-- <li data-live="" onclick="show_previous_live(this)">Live Timing</li> -->
+                    </ul>
+                </div>
+                <div data-id="title1"></div>
+                <div data-id="title2"></div>
+
+                <a href="" class="link_fullscreen" target="_blank">
+                   <div class="fullscreen_button"></div>
+                </a>
+
+                <div id="options">
+                    <div class="options_button" onclick="show_options_list()"></div>
+                    <ul>
+                        <li class="option_live_tracking" onclick="display_tracking_effect()">Live Tracking <span class="on_off tracking_effect" data-value="1"><span></span></span></li>
+                        <li class="option_ranking_effect" onclick="display_ranking_effect()">Ranking Effects <span class="on_off rancking_effect" data-value="1"><span></span></span></li>
+                        <li class="option_qrcode" onclick="show_qrcode()">Share</li>
+                        <li class="option_help" onclick="show_help()">Help</li>
+                    </ul>
+                </div>
+
+            </div>
+
+            <table class="global_table">
+                <tbody>
+                    <tr>
+                        <td class="global_table_col1">
+                            <div class="col1">
+                                <table class="dyna">
+                                    <tbody>
+                                        <tr>
+                                            <td data-id="dyn1"></td>
+                                            <td data-id="light" class=""></td>
+                                            <td data-id="dyn2"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <div id="grid">
+                                    <div class="div_tgrid" style="height: 70px;">
+                                        <table id="tgrid">
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div id="driver_data">
+
+                                    <div class="go_live"><span class="head" onclick="go_live()">Back to Live Timing<!-- Live Timing --></span></div>
+
+                                    <div class="driver_infos_graphic">
+                                        <div class="driver_infos">
+                                        <!-- <div class="div_driver">
+                                                <div class="infos">
+                                                    <div class="kart" style="background-color:#01B3FE;">21</div>
+                                                    <div class="flag" data-nat="GBR"></div>
+                                                    <div class="driver">TEAM F1</div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div class="infos">
+                                                    <div class="flag" data-nat=""></div>
+                                                    <div data-type="class"><span>A1</span></div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div class="infos">
+                                                    <div class="flag" data-nat=""></div>
+                                                    <div data-type="club"><span>F1 Racing Team</span></div>
+                                                </div>
+                                            </div> -->
+                                        </div>
+
+                                        <div class="graphic_lap_time">
+                                            <div class="graphic_lap_time_padding">
+                                                <div class="graphic"></div>
+                                                <div class="information_bubble">
+                                                    <div class="time">36.236</div>
+                                                    <div class="gap">+1.125</div>
+                                                    <div class="triangle"></div>
+                                                </div>
+                                                <div class="lap">4</div>
+                                                <div class="legend">
+                                                    <div data-type="lap_time" onclick="select_graphic_lap_time_type(this)" class="active">Lap</div>
+                                                    <div data-type="sector_1" onclick="select_graphic_lap_time_type(this)">S1</div>
+                                                    <div data-type="sector_2" onclick="select_graphic_lap_time_type(this)">S2</div>
+                                                    <div data-type="sector_3" onclick="select_graphic_lap_time_type(this)">S3</div>
+                                                    <!-- <select class="laps_type" onchange="load_graphic_lap_time()">
+                                                        <option value="lap_time">Laps Time</option>
+                                                        <option value="sector_1">Secteur 1</option>
+                                                        <option value="sector_2">Secteur 2</option>
+                                                        <option value="sector_3">Secteur 3</option>
+                                                    </select> -->
+                                                </div>
+                                                <div class="legend_2">Laps</div>
+                                                <div class="show_more" onclick="show_more_graphic_laps_time()"></div>
+                                                <div class="show_less" onclick="show_less_graphic_laps_time()"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="compare_laps_time">
+                                        <div class="left">
+                                            <div class="laps_time active" onclick="show_driver_laps()">Laps</div>
+                                            <div class="pits_time" onclick="show_driver_pits()">Pits</div>
+                                        </div>
+
+                                        <div class="right">
+                                            <div class="compare_driver_title">Compare:</div>
+                                            <div class="compare_driver_select">
+                                                <div class="driver_selected" data-driver="" onclick="display_compare_laps_time_driver_select()">
+                                                    <div class="rank" data-rank="1"></div>
+                                                    <div class="kart">15</div>
+                                                    <div class="driver">Cédric</div>
+                                                </div>
+                                                <ul>
+                                                    <li data-driver="" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="1"></div>
+                                                        <div class="kart">15</div>
+                                                        <div class="driver">Cédric</div>
+                                                    </li>
+                                                    <li data-driver="1" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="1"></div>
+                                                        <div class="kart">15</div>
+                                                        <div class="driver">Cédric</div>
+                                                    </li>
+                                                    <li data-driver="2" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="2"></div>
+                                                        <div class="kart">15</div>
+                                                        <div class="driver">Cédric Cédric Cédric Cédric</div>
+                                                    </li>
+                                                    <li data-driver="3" class="driver_1" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="3"></div>
+                                                        <div class="kart">150</div>
+                                                        <div class="driver">Cédric</div>
+                                                    </li>
+                                                    <li data-driver="4" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="4"></div>
+                                                        <div class="kart">15</div>
+                                                        <div class="driver">Cédric</div>
+                                                    </li>
+                                                    <li data-driver="5" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="5"></div>
+                                                        <div class="kart">15</div>
+                                                        <div class="driver">Cédric</div>
+                                                    </li>
+                                                    <li data-driver="1" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="1"></div>
+                                                        <div class="kart">15</div>
+                                                        <div class="driver">Cédric</div>
+                                                    </li>
+                                                    <li data-driver="2" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="2"></div>
+                                                        <div class="kart">15</div>
+                                                        <div class="driver">Cédric Cédric Cédric Cédric</div>
+                                                    </li>
+                                                    <li data-driver="3" class="row_selection" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="3"></div>
+                                                        <div class="kart">150</div>
+                                                        <div class="driver">Cédric</div>
+                                                    </li>
+                                                    <li data-driver="4" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="4"></div>
+                                                        <div class="kart">15</div>
+                                                        <div class="driver">Cédric</div>
+                                                    </li>
+                                                    <li data-driver="5" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="5"></div>
+                                                        <div class="kart">15</div>
+                                                        <div class="driver">Cédric</div>
+                                                    </li>
+                                                    <li data-driver="1" class="driver_2" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="1"></div>
+                                                        <div class="kart">15</div>
+                                                        <div class="driver">Cédric</div>
+                                                    </li>
+                                                    <li data-driver="2" class="row_selection" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="2"></div>
+                                                        <div class="kart">15</div>
+                                                        <div class="driver">Cédric Cédric Cédric Cédric</div>
+                                                    </li>
+                                                    <li data-driver="3" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="3"></div>
+                                                        <div class="kart">150</div>
+                                                        <div class="driver">Cédric</div>
+                                                    </li>
+                                                    <li data-driver="4" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="4"></div>
+                                                        <div class="kart">15</div>
+                                                        <div class="driver">Cédric</div>
+                                                    </li>
+                                                    <li data-driver="5" onclick="compare_laps_time(this)">
+                                                        <div class="rank" data-rank="5"></div>
+                                                        <div class="kart">15</div>
+                                                        <div class="driver">Cédric</div>
+                                                    </li>
+                                                </ul>
+                                            </div>
+<!--                                             <select onchange="compare_laps_time(this)"></select>
+                                            <div class="previous_driver" onclick="select_laps_time_previous_driver(this)">Driver in front</div>
+                                            <div class="next_driver" onclick="select_laps_time_next_driver(this)">Driver behind</div> -->
+                                        </div>
+                                    </div>
+
+                                    <div class="block_driver_lap_time">
+                                        <div class="header_driver_lap_time">
+                                            <table>
+                                                <thead>
+                                                    <tr class="head">
+                                                        <th class="lap">Lap</th>
+                                                        <th class="empty"></th>
+                                                        <th class="sector_1 sector">S1</th>
+                                                        <th class="sector_1_delta delta"></th>
+                                                        <th class="empty"></th>
+                                                        <th class="sector_2 sector">S2</th>
+                                                        <th class="sector_2_delta delta"></th>
+                                                        <th class="empty"></th>
+                                                        <th class="sector_3 sector">S3</th>
+                                                        <th class="sector_3_delta delta"></th>
+                                                        <th class="empty"></th>
+                                                        <th class="lap_time">Time</th>
+                                                        <th class="lap_time_delta delta"></th>
+                                                        <th class="empty"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td class="lap">Best</td>
+                                                        <td class="empty"></td>
+                                                        <td class="sector_1 sector">-</td>
+                                                        <td class="sector_1_delta delta"></td>
+                                                        <td class="empty"></td>
+                                                        <td class="sector_2 sector">-</td>
+                                                        <td class="sector_2_delta delta"></td>
+                                                        <td class="empty"></td>
+                                                        <td class="sector_3 sector">-</td>
+                                                        <td class="sector_3_delta delta"></td>
+                                                        <td class="empty"></td>
+                                                        <td class="lap_time">-</td>
+                                                        <td class="lap_time_delta delta"></td>
+                                                        <td class="empty"></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <div class="div_driver_lap_time">
+                                            <table class="driver_lap_time">
+                                                <tbody>
+                                                    <tr class="odd">
+                                                        <td class="lap">24</td>
+                                                        <td class="sector_1">16.368</td>
+                                                        <td class="sector_2">16.368</td>
+                                                        <td class="sector_3">16.368</td>
+                                                        <td class="lap_time">16.368</td>
+                                                    </tr>
+                                                    <tr class="even">
+                                                        <td class="lap">23</td>
+                                                        <td class="sector_1">16.368</td>
+                                                        <td class="sector_2">16.368</td>
+                                                        <td class="sector_3">16.368</td>
+                                                        <td class="lap_time">16.368</td>
+                                                    </tr>
+                                                    <tr class="odd">
+                                                        <td class="lap">22</td>
+                                                        <td class="sector_1">16.368</td>
+                                                        <td class="sector_2">16.368</td>
+                                                        <td class="sector_3">16.368</td>
+                                                        <td class="lap_time">16.368</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                            <div class="show_more" onclick="show_more_driver_1_laps_time(this)">+ Show More</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="block_driver_pit_time">
+                                        <div class="header_driver_pit_time">
+                                            <table>
+                                                <thead>
+                                                    <tr class="head">
+                                                        <th class="count"></th>
+                                                        <th class="lap">Lap</th>
+                                                        <th class="in_time">Hour</th>
+                                                        <th class="out_time">Out</th>
+                                                        <th class="track_time">On track</th>
+                                                        <th class="laps">Laps</th>
+                                                        <th class="driver">Driver</th>
+                                                        <th class="total_time">Total</th>
+                                                        <th class="pit_time">Pit time</th>
+                                                    </tr>
+                                                </thead>
+                                            </table>
+                                        </div>
+
+                                        <div class="div_driver_pit_time">
+                                            <table class="driver_pit_time">
+                                                <tbody>
+                                                    <!-- <tr class="odd">
+                                                        <td class="count">1</td>
+                                                        <td class="lap">33</td>
+                                                        <td class="in_time">22:55</td>
+                                                        <td class="out_time">1:18:11</td>
+                                                        <td class="pit_time">16.203</td>
+                                                        <td class="track_time">18:04</td>
+                                                        <td class="laps">29</td>
+                                                        <td class="driver">Cédric Maiano</td>
+                                                        <td class="total_time">22:55</td>
+                                                    </tr>
+                                                    <tr class="even">
+                                                        <td class="count">1</td>
+                                                        <td class="lap">33</td>
+                                                        <td class="in_time">22:55</td>
+                                                        <td class="out_time">1:18:11</td>
+                                                        <td class="pit_time">16.203</td>
+                                                        <td class="track_time">18:04</td>
+                                                        <td class="laps">29</td>
+                                                        <td class="driver">Cédric Maiano</td>
+                                                        <td class="total_time">22:55</td>
+                                                    </tr> -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>  
+                        </td>
+                        <td class="width_1920 global_table_col2 ">
+                            
+                            <div class="col2">
+                                <div class="weather">
+                                    <table>
+                                        <tbody>
+                                            <tr>
+                                                <td rowspan="2" data-id="wth1" class=""></td>
+                                                <td data-id="wth2"></td>
+                                            </tr>
+                                            <tr>
+                                                <td data-id="wth3"></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+
+                                <div>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th data-id="track" width="100%"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="track_image">
+                                            <tr>
+                                                <td class="track_d"><!-- logo --></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <div class="tracking">
+                                        <svg viewBox="100 100 400 400" preserveAspectRatio="xMidYMid meet" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+                                            <g class="image"><image xlink:href=""/></g>
+                                            <g class="track"></g>
+                                            <g class="drivers"></g>
+                                        </svg>
+                                    </div>
+                                </div>
+
+                                <div data-id="best">
+                                    <div data-id="gridb">
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th width="100%"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <th width="100%" height="90px"></th>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+
+                                <div>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th data-id="chp"></th>
+                                            </tr>
+                                        </thead>
+                                    </table>
+
+
+                                    <table>
+                                        <tbody data-id="gridc">
+                                            <tr>
+                                                <td>
+                                                    <a class="logo"></a>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+
+<!--                                     <div class="div_mobile">
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th data-id="mobile_t">On Board</th>
+                                                    <th data-id="effects">Energy Saver</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td data-id="mobile_d"><a href="#onboard" onclick="create_select_option(),show_mobile_version();"></a></td>
+                                                    <td class="battery" onclick="safe_battery()"></td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div> -->
+
+
+                                </div>
+
+
+                                <div class="t_comments" style="visibility: visible;">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th data-id="comments">Comments</th>
+                                            </tr>
+                                        </thead>
+                                    </table>
+                                </div>
+                                <div class="comments">
+                                    <div data-id="com">
+
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+
+
+       
+
+
+            <div class="width_992 message"><p data-id="msg"></p></div>
+
+            <div class="width_992 block_width_992">
+                <table class="table_in_footer">
+                    <tbody>
+                        <tr>
+                            <td class="td_comments">
+                                <div calss="t_comments"> 
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th data-id="comments">Comments</th>
+                                            </tr>
+                                        </thead>
+                                    </table> 
+                                </div>
+                                <div class="comments"> 
+                                    <div data-id="com">
+<!--                                         <p><b>09:53</b> : <span data-flag="pena_5"></span><span class="com_no">123</span>+5 secondes</p>
+                                        <p><b>09:32</b> : coucou</p>
+                                        <p><b>09:45</b> : <span data-flag="green"></span>Start flag</p>
+                                        <p><b>09:53</b> : <span data-flag="yellow"></span>Yellow flag</p>
+                                        <p><b>09:53</b> : <span data-flag="msg"></span>Hello</p>
+                                        <p><b>09:53</b> : <span data-flag="msg_warning"></span>Good Morning</p>
+                                        <p><b>09:32</b> : coucou</p>
+                                        <p><b>09:32</b> : coucou</p> -->
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td data-id="best">
+                                <div data-id="gridb">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th width="100%"></th>
+                                            </tr>
+                                        </thead>
+                                    </table> 
+                                </div>
+                            </td>
+
+       <!--                      <td class="td_tchp">
+                                <div class="div_tchp">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th data-id="chp"></th>
+                                            </tr>
+                                        </thead>
+                                    </table>
+                                    <table> 
+                                        <tbody data-id="gridc">
+                                            <tr>
+                                                <td>
+                                                    <a class="logo"></a>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td> -->
+                            <td class="td_tchp">
+                                <div class="div_tchp">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th data-id="track"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="track_image">
+                                            <td>
+                                                <div class="track_d"></div>
+                                            </td>
+                                        </tbody>
+                                    </table>
+                                    <div class="tracking">
+                                        <svg viewBox="100 100 400 400" preserveAspectRatio="xMidYMid meet" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+                                            <g class="image"><image xlink:href=""/></g>
+                                            <g class="track"></g>
+                                            <g class="drivers"></g>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <table class="map_and_weather">
+                    <thead>
+                        <tr>
+                            <!-- <th data-id="track"></th> -->
+                            <th data-id="chp"></th>
+                            <th></th>
+<!--                             <th data-id="mobile_t">On Board</th>
+                            <th data-id="effects">Energy Saver</th> -->
+                        </tr>
+                    </thead>
+                    <tbody class="table_in_footer_2">
+                        <tr>
+               <!--              <td>
+                                <div class="track_d"></div>
+                            </td> -->
+                            <td>
+                                <div>
+<!--                                     <table>
+                                        <thead>
+                                            <tr>
+                                                
+                                            </tr>
+                                        </thead>
+                                    </table> -->
+                                    <table> 
+                                        <tbody data-id="gridc">
+                                            <tr>
+                                                <td>
+                                                    <a class="logo"></a>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+
+                            <td class="td_weather">
+                                <div class="weather">
+                                    <table>
+                                        <tbody>
+                                            <tr>
+                                                <td rowspan="2" data-id="wth1" class=""></td>
+                                                <td data-id="wth2"></td>
+                                            </tr>
+                                            <tr>
+                                                <td data-id="wth3"></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+
+<!--                             <td class="td_mobile">
+                                <a data-id="mobile_d" href="#onboard" onclick="create_select_option(),show_mobile_version();"></a>
+                            </td> 
+
+                            <td class="td_battery">
+                                <div class="battery" onclick="safe_battery()"></div>
+                            </td>   
+                            -->
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+
+            <div class="width_750 block_width_750">
+                <div class="div_comments">
+                    <div class="t_comments" style="visibility: visible;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th data-id="comments">Comments</th>
+                                </tr>
+                            </thead>
+                        </table>
+                    </div>
+                    <div class="comments">
+                        <div data-id="com"></div>
+                    </div>
+                </div>
+
+
+                <table class="table_in_footer">
+                    <tbody>
+                        <tr>
+                            <td data-id="best">
+                                <div data-id="gridb">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th width="100%"></th>
+                                            </tr>
+                                        </thead>
+                                    </table>
+                                </div>
+                            </td>
+
+                            <td class="td_tchp">
+                                <div class="div_tchp">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th data-id="track"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="track_image">
+                                            <tr>
+                                                <td class="track_d"></td>
+                                            </tr>                                            
+                                        </tbody>
+                                    </table>
+                                    <div class="tracking">
+                                        <svg viewBox="100 100 400 400" preserveAspectRatio="xMidYMid meet" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+                                            <g class="image"><image xlink:href=""/></g>
+                                            <g class="track"></g>
+                                            <g class="drivers"></g>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </td>
+                            <!-- <td class="td_tchp">
+                                <div class="div_tchp">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th data-id="chp"></th>
+                                            </tr>
+                                        </thead>
+                                    </table>
+                                    <table>
+                                         <tbody data-id="gridc">
+                                            <tr>
+                                                <td>
+                                                    <a class="logo"></a>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td> -->
+                        </tr>
+                    </tbody>
+                </table>
+
+
+                <table class="map_and_weather">
+                    <thead>
+                        <tr>
+                            <!-- <th data-id="track"></th> -->
+                            <th data-id="chp"></th>
+
+                            <th></th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <tr>
+                            <!-- <td class="track_d"></td> -->
+                            <td class="td_tchp">
+                                <div class="div_tchp">
+                                    <!-- <table>
+                                        <thead>
+                                            <tr>
+                                                <th data-id="chp"></th>
+                                            </tr>
+                                        </thead>
+                                    </table> -->
+                                    <table>
+                                         <tbody data-id="gridc">
+                                            <tr>
+                                                <td>
+                                                    <a class="logo"></a>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+       
+                            <td class="td_weather">
+                                <div class="weather">
+                                    <table>
+                                        <tbody>
+                                            <tr>
+                                                <td rowspan="2" data-id="wth1" class=""></td>
+                                                <td data-id="wth2"></td>
+                                            </tr>
+                                            <tr>
+                                                <td data-id="wth3"></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+<!--                 <table class="mobile_and_battery">
+                    <thead>
+                        <tr>
+                            <td data-id="mobile_t">On Board</td>
+                            <td data-id="effects">Energy Savers</td>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <tr>
+                            <td class="td_mobile">
+                                <a data-id="mobile_d" href="#onboard" onclick="create_select_option(),show_mobile_version();"></td>
+                            </td>
+                            <td>
+                                <div class="battery" onclick="safe_battery()"></div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table> -->
+
+            </div>
+
+
+
+
+
+
+            <div>
+                <table id="t6">
+                    <tbody>
+                        <tr>
+                            <td id="connection" class="by">CONNECTING...</td>
+                            <td class="width_1920 message"><p data-id="msg"></p></td>
+                            <td id="local_time"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            <div class="div_messages hide">
+                <p data-id="msg"></p>
+            </div>
+
+
+            <div class="div_on_board_button hide">
+                <a class="on_board_button" href="#onboard" onclick="create_select_option(),show_mobile_version();"><div class="triangle"></div>On Board</a>
+            </div>
+
+
+
+
+
+
+
+            <div class="div_effect_message">
+                <div class="effect_message">Effetcs ON</div>
+            </div>
+
+            <div class="div_link">
+                <a class="div_link" href="http://www.apex-timing.com/" target="_blank">© Apex Timing 2012-2015</a>
+            </div>
+        </div>
+    </div>
+
+
+
+
+
+
+
+
+
+
+
+    <!-- Mobile -->
+        <div class="block_mobile">
+            <div class="block_onboard_progress_lap">
+                <div class="onboard_progress_lap"></div>
+            </div>
+            <div class="mobile_header" >
+                <h1>On Board</h1>
+                <a href="#live" onclick="show_live()"><div class="triangle"></div>Live Timing</a>
+                <div class="div_driver_select">
+                    <div id="driver_button" onclick="select_driver_focus()">Driver</div>
+                    <select id="driver_select" onchange="select_driver(this)" multiple>
+                    </select>
+                </div>
+            </div>
+
+            <div  id="onboard" name="onboard" title="On Board">
+
+            </div>
+        </div>
+
+
+
+    <!-- Pop up Menu --> 
+    <div class="pop_up_line_menu" data-line_id="">
+        <div class="driver_infos">
+            <div class="div_driver">
+                <div class="infos">
+                    <div class="kart" style="background-color:#09CE0E;">105</div>
+                    <div class="flag" data-nat="ITA"></div>
+                    <div class="driver">Ippolito, Paolo</div>
+                </div>
+            </div>
+            <div>
+                <div class="infos">
+                    <div class="flag" data-nat="ITA"></div>
+                    <div data-type="entrant"><span>CRG SpA</span></div>
+                </div>
+            </div>
+            <div>
+                <div class="infos">
+                    <div class="flag" data-nat=""></div>
+                    <div data-type="eq"><span>CRG  /  TM Racing  /  B'stone</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="buttons">
+            <div class="select_line" onclick="select_line()"></div>
+            <div class="on_board" onclick="go_onboard()">On Board</div>
+            <div class="driver_data" onclick="show_driver_laps_time(this)">Statistics</div>
+        </div>
+        <div class="arrow"></div>
+    </div>   
+
+
+
+
+
+    <div class="pop_up">
+
+
+         <div class="pop_up_help">
+            <div class="close" onclick="hide_pop_up()"></div>
+            <div class="title">Live Timing Help</div>
+            <div class="follow">
+                <iframe src="https://www.facebook.com/plugins/like.php?href=https%3A%2F%2Fwww.facebook.com%2Fapex.timing%2F&width=142&layout=button&action=like&size=small&share=true&height=65&appId" width="142" height="65" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowTransparency="true" allow="encrypted-media"></iframe>
+                <p>Follow us on Facebook: </p>
+            </div>
+            <table>
+                <tbody>
+                    <tr>
+                        <td class="grid_status"><img src="../commonv2/images/st_in.png" draggable="false"></td>
+                        <td>Grid status</td>
+                        <td>Pit in</td>
+                    </tr>
+                    <tr>
+                        <td class="grid_status"><img src="../commonv2/images/st_out.png" draggable="false"></td>
+                        <td>Grid status</td>
+                        <td>Pit out</td>
+                    </tr>
+                    <tr>
+                        <td class="grid_status"><img src="../commonv2/images/st_run.png" draggable="false"></td>
+                        <td>Grid status</td>
+                        <td>Position not changed</td>
+                    </tr>
+                    <tr>
+                        <td class="grid_status"><img src="../commonv2/images/st_l.png" draggable="false"></td>
+                        <td>Grid status</td>
+                        <td>In sprint races, not in the leader lap</td>
+                    </tr>
+                    <tr>
+                        <td class="grid_status"><img src="../commonv2/images/st_stop.png" draggable="false"></td>
+                        <td>Grid status</td>
+                        <td>Stopped</td>
+                    </tr>
+                    <tr>
+                        <td class="grid_status"><img src="../commonv2/images/st_finish.png" draggable="false"></td>
+                        <td>Grid status</td>
+                        <td>Received checkered flag</td>
+                    </tr>
+                    <tr>
+                        <td class="grid_position"><img src="../commonv2/images/st_up.png" draggable="false"></td>
+                        <td>Grid status</td>
+                        <td>Gain position(s)</td>
+                    </tr>
+                    <tr>
+                        <td class="grid_position"><img src="../commonv2/images/st_down.png" draggable="false"></td>
+                        <td>Grid status</td>
+                        <td>Lost position(s)</td>
+                    </tr>
+                    <tr>
+                        <td class="grid_position"><img src="../commonv2/images/st_up_number.png" draggable="false"></td>
+                        <td>Grid Position</td>
+                        <td>Difference between current position and grid</td>
+                    </tr>
+                    <tr>
+                        <td class="grid_position"><img src="../commonv2/images/st_down_number.png" draggable="false"></td>
+                        <td>Grid Position</td>
+                        <td>Difference between current position and grid</td>
+                    </tr>
+                    <tr>
+                        <td><span class="tb">56.235</span></td>
+                        <td>Lap times and sector times</td>
+                        <td>Overall best time</td>
+                    </tr>
+                    <tr>
+                        <td><span class="ti">56.235</span></td>
+                        <td>Lap times and sector times</td>
+                        <td>Personnal best time</td>
+                    </tr>
+                    <tr>
+                        <td><span class="tn">56.235</span></td>
+                        <td>Lap times and sector times</td>
+                        <td>Default time</td>
+                    </tr>
+                    <tr>
+                        <td><span class="to">56.235</span></td>
+                        <td>Pit time</td>
+                        <td>Pit time</td>
+                    </tr>
+                    <tr>
+                        <td>Gap</td>
+                        <td>Grid field</td>
+                        <td>Gap to the leader</td>
+                    </tr>
+                    <tr>
+                        <td>Interval</td>
+                        <td>Grid field</td>
+                        <td>Gap to the position just ahead</td>
+                    </tr>
+                    <tr>
+                        <td>Delta</td>
+                        <td>Grid field</td>
+                        <td>Lap time difference with the position just ahead</td>
+                    </tr>
+                    <tr>
+                        <td>On Track</td>
+                        <td>Grid field</td>
+                        <td>Live time on track (h:m) or Live pit time (m:s)</td>
+                    </tr>
+                    <tr>
+                        <td class="menu"><img src="../commonv2/images/menu.png" draggable="false"></td>
+                        <td>Option</td>
+                        <td>Menu for driver/team (Click on the grid)</td>
+                    </tr>
+                    <tr>
+                        <td class="menu_button button_menu_follow"><img src="../commonv2/images/menu_follow.png" draggable="false"></td>
+                        <td>Follow</td>
+                        <td>Follow and highlight the driver/team</td>
+                    </tr>
+                    <tr>
+                        <td class="menu_button button_menu_data"><img src="../commonv2/images/menu_data.png" draggable="false"></td>
+                        <td>Data</td>
+                        <td>Access to all data (lap analysis, pits summary..)</td>
+                    </tr>
+                    <tr>
+                        <td class="menu_button button_menu_on_board"><img src="../commonv2/images/menu_on_board.png" draggable="false"></td>
+                        <td>On Board</td>
+                        <td>Access to OnBoard view</td>
+                    </tr>
+                    <tr>
+                        <td class="effects"><img src="../commonv2/images/menu_live_tracking.png" draggable="false"></td>
+                        <td>Live tracking</td>
+                        <td>Enable/disable Live Tracking<br>Disabling may save battery</td>
+                    </tr>
+                    <tr>
+                        <td class="effects"><img src="../commonv2/images/menu_ranking_effects.png" draggable="false"></td>
+                        <td>Raking effects</td>
+                        <td>Enable/Disable Ranking Effects (new passing, position change and progress bar)<br>Disabling may save battery</td>
+                    </tr>
+                    <tr>
+                        <td class="previous_live"><img src="../commonv2/images/menu_previous_live.png" draggable="false"></td>
+                        <td>Snapshots</td>
+                        <td>Go back to previous live snapshots<br><b>For information purposes, no official / regulatory value</b></td>
+                    </tr>
+                    <tr>
+                        <td class="zoom"><img src="../commonv2/images/menu_zoom_more.png" draggable="false"></td>
+                        <td>Zoom In</td>
+                        <td>Larger live timing / possibly less data displayed</td>
+                    </tr>
+                    <tr>
+                        <td class="zoom"><img src="../commonv2/images/menu_zoom_less.png" draggable="false"></td>
+                        <td>Zoom Out</td>
+                        <td>Smaller live timing / possibly more data displayed</td>
+                    </tr>
+                    <tr>
+                        <td class="zoom"><img src="../commonv2/images/menu_zoom_default.png" draggable="false"></td>
+                        <td>Zoom Reset</td>
+                        <td>Browser zoom by default</td>
+                    </tr>
+                </tbody>             
+            </table>
+            <!-- <div class="info">For information purposes. No official / regulatory value.</div> -->
+        </div>
+
+
+        <div class="pop_up_qrcode">
+            <div class="close" onclick="hide_pop_up()"></div>
+            <div class="title">Share Live Timing</div>
+            <div class="qrcode"></div>
+        </div>
+
+
+
+    </div>
+
+        
+
+
+    </body>
+</html>

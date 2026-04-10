@@ -1,0 +1,85 @@
+
+/* ---------  Title  --------- */
+.title, #t6, .width_750.message, .width_992.message{
+	background-color: rgb(20, 54, 100);
+	background: rgb(20, 54, 100);
+	background: -webkit-linear-gradient( top, rgb(20, 54, 100), rgb(20, 54, 100));
+	background: -moz-linear-gradient( top, rgb(20, 54, 100), rgb(20, 54, 100));
+	background: -ms-linear-gradient( top, rgb(20, 54, 100), rgb(20, 54, 100));
+	background: -o-linear-gradient( top, rgb(20, 54, 100), rgb(20, 54, 100));
+	background: linear-gradient( top, rgb(20, 54, 100), rgb(20, 54, 100));
+	color: rgb(255, 255, 255);
+	text-shadow: ;
+}
+
+
+/* ---------  Progress Lap  --------- */
+.progress_lap, .onboard_progress_lap{
+	background-color: rgb(63, 118, 160);
+	background: rgb(63, 118, 160);
+	background: -webkit-gradient(linear, left top, right top, color-stop(0%,rgba(0,0,0,0)), color-stop(86%,rgb(63, 118, 160)));
+	background: -webkit-linear-gradient(left, rgba(0,0,0,0) 0%, rgb(63, 118, 160) 86%);
+	background: -o-linear-gradient(left, rgba(0,0,0,0) 0%, rgb(63, 118, 160) 86%);
+	background: -ms-linear-gradient(left, rgba(0,0,0,0) 0%, rgb(63, 118, 160) 86%);
+	background: linear-gradient(to right, rgba(0,0,0,0) 0%, rgb(63, 118, 160) 86%);
+}
+
+
+/* ---------  Table Header  --------- */
+.head, thead, .sectors thead, .sectors thead p, .sectors .sector1, .sectors .sector2, .sectors .sector3, .sectors .sector1 p, .sectors .sector2 p, .sectors .sector3 p, .width_750 .map_and_weather *[data-id="track"], .width_750 .map_and_weather *[data-id="mobile_t"], .width_750 .t_comments *[data-id="t_com"], .width_750 .table_in_footer th, .width_992 .t_comments .t_com, .width_992 .table_in_footer th, .width_992 *[data-id="track"], .width_992 *[data-id="mobile_t"]{
+	background-color: rgb(20, 54, 100);
+	color: rgb(255, 255, 255);
+	text-shadow: ;
+}
+
+
+/* ---------  No Kart Color  --------- */
+#grid .no div, .comments .com_no{
+	border-color: transparent transparent rgb(63, 118, 160) transparent;
+	color: rgb(255, 255, 255);
+}
+
+
+/* ---------  Pass Effects / Row Selection  --------- */
+.row_selection{
+	background-color: #666666;
+}
+
+.pass_effect, #onboard .pass_effect_2, #onboard .pass_effect{
+	background-color: #3f76a0;
+}
+
+.pass_effect_2{
+	background-color: rgba(63,118,159, 0.5); /* même couleur que .pass_effect avec une alpha de 0.5 */
+}
+
+.pass_effect_selected{
+	background-color: #526e83; /* ou couleur entre .pass_effect et .row_selection ou même couleur que .pass_effect */
+}
+
+
+/* ---------  Grid Border Right  --------- */
+.global_table .global_table_col2 .col2, .width_750 *[data-id="best"], .width_992 .table_in_footer *[data-id="best"], .width_992 .table_in_footer .td_tchp{
+	border-color: rgb(63, 118, 160);
+}
+
+
+/* ---------  Onboard Selected Button  --------- */
+#div_driver_button .driver_button.selected{
+	background-color: rgb(55, 55, 55);
+}
+
+
+
+
+
+/* ---------  Track  --------- */
+.track_d{
+	background-image:url(/api/apex-replay/static/track.png);
+}
+
+/* ---------  Logo  --------- */
+a.logo{
+	background-image:url(/api/apex-replay/static/logo.png);
+}
+
