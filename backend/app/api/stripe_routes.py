@@ -94,8 +94,15 @@ async def _grant_circuit_access(
     existing = result.scalar_one_or_none()
     if existing:
         # Extend: use the later of current valid_until or new valid_until
-        existing.valid_until = max(existing.valid_until, valid_until) if existing.valid_until else valid_until
-        if existing.valid_from > now:
+        # Normalize naive datetimes from SQLite to UTC-aware before comparing
+        ex_until = existing.valid_until
+        if ex_until and ex_until.tzinfo is None:
+            ex_until = ex_until.replace(tzinfo=timezone.utc)
+        existing.valid_until = max(ex_until, valid_until) if ex_until else valid_until
+        ex_from = existing.valid_from
+        if ex_from and ex_from.tzinfo is None:
+            ex_from = ex_from.replace(tzinfo=timezone.utc)
+        if ex_from and ex_from > now:
             existing.valid_from = now
     else:
         db.add(UserCircuitAccess(
