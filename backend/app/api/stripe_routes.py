@@ -210,7 +210,7 @@ async def create_checkout_session(
         }
 
     # Use embedded UI mode — returns client_secret for frontend Stripe.js
-    session_params["ui_mode"] = "embedded"
+    session_params["ui_mode"] = "embedded_page"
     session_params["return_url"] = f"{settings.frontend_url}/dashboard?checkout=success&session_id={{CHECKOUT_SESSION_ID}}"
     # Remove success/cancel URLs (not used in embedded mode)
     session_params.pop("success_url", None)
