@@ -200,7 +200,7 @@ function useBoxAlert() {
 
 export function DriverView() {
   const t = useT();
-  const { karts, config, fifo, connected, countdownMs } = useRaceStore();
+  const { karts, config, fifo, connected, countdownMs, durationMs, raceFinished } = useRaceStore();
   const { now, speed } = useSimNow();
   const raceClock = useRaceClock();
   const driverCfg = useDriverConfig();
@@ -245,8 +245,6 @@ export function DriverView() {
 
   const circuitLengthM = config.circuitLengthM || 1100;
   const pitTimeS = config.pitTimeS || 0;
-  const durationMs = useRaceStore((s) => s.durationMs);
-  const raceFinished = useRaceStore((s) => s.raceFinished);
   // Kart number: user override from driver config, fallback to race session config
   const ourKart = driverCfg.selectedKartNumber ?? config.ourKartNumber;
 
@@ -367,6 +365,17 @@ export function DriverView() {
     dragOverItem.current = null;
   }, [driverCfg.cardOrder]);
 
+  // Laps to max stint (must be before early returns to satisfy Rules of Hooks)
+  const lapsToMaxStint = useMemo(() => {
+    if (!ourKart || ourKart <= 0 || raceClock === 0 || raceFinished) return null;
+    const kart = karts.find((k) => k.kartNumber === ourKart);
+    if (!kart || kart.avgLapMs <= 0) return null;
+    const stintStart = kart.stintStartCountdownMs || durationMs || raceClock;
+    const stintSec = Math.max(0, stintStart - raceClock) / 1000;
+    const timeToMax = Math.max(0, config.maxStintMin * 60 - stintSec);
+    return timeToMax / (kart.avgLapMs / 1000);
+  }, [karts, ourKart, raceClock, durationMs, raceFinished, config.maxStintMin]);
+
   /* ---------- Waiting for data / no kart ---------- */
   const hasReceivedData = karts.length > 0 || config.ourKartNumber > 0;
 
@@ -412,17 +421,6 @@ export function DriverView() {
 
   // Avg lap 20 from kart data
   const avgLap20Ms = paceDisplay?.avgLapMs ?? 0;
-
-  // Laps to max stint
-  const lapsToMaxStint = useMemo(() => {
-    if (!ourKart || ourKart <= 0 || raceClock === 0 || raceFinished) return null;
-    const kart = karts.find((k) => k.kartNumber === ourKart);
-    if (!kart || kart.avgLapMs <= 0) return null;
-    const stintStart = kart.stintStartCountdownMs || durationMs || raceClock;
-    const stintSec = Math.max(0, stintStart - raceClock) / 1000;
-    const timeToMax = Math.max(0, config.maxStintMin * 60 - stintSec);
-    return timeToMax / (kart.avgLapMs / 1000);
-  }, [karts, ourKart, raceClock, durationMs, raceFinished, config.maxStintMin]);
 
   const cards: Record<DriverCardId, { label: string; content: React.ReactNode; accent: string }> = {
     raceTimer: {
@@ -918,6 +916,7 @@ export function DriverView() {
             })
             .map((cardId, index) => {
             const card = cards[cardId];
+            if (!card) return null;
             const isDragging = dragging === index;
             return (
               <div
