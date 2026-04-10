@@ -56,14 +56,18 @@ def _plan_to_price(plan: str) -> str | None:
     return mapping.get(plan)
 
 
-# Duration per plan type for circuit access
-_PLAN_DURATION = {
-    "basic_monthly": timedelta(days=33),     # ~1 month + 3 days grace
-    "basic_annual": timedelta(days=368),     # ~1 year + 3 days grace
-    "pro_monthly": timedelta(days=33),
-    "pro_annual": timedelta(days=368),
-    "event": timedelta(hours=48),
-}
+def _calc_plan_valid_until(plan_type: str, from_date: datetime) -> datetime:
+    """Calculate valid_until using exact calendar month/year arithmetic."""
+    from dateutil.relativedelta import relativedelta
+
+    if plan_type in ("basic_monthly", "pro_monthly"):
+        return from_date + relativedelta(months=1)
+    elif plan_type in ("basic_annual", "pro_annual"):
+        return from_date + relativedelta(years=1)
+    elif plan_type == "event":
+        return from_date + timedelta(hours=48)
+    else:
+        return from_date + relativedelta(months=1)
 
 
 async def _grant_circuit_access(
@@ -72,13 +76,13 @@ async def _grant_circuit_access(
 ):
     """Grant or extend circuit access for a user based on plan type."""
     now = datetime.now(timezone.utc)
-    duration = _PLAN_DURATION.get(plan_type, timedelta(days=33))
 
-    # If we have an explicit period_end from Stripe, use it + 3 days grace
+    # If we have an explicit period_end from Stripe invoice, use it + 3 days grace
     if period_end:
         valid_until = period_end + timedelta(days=3)
     else:
-        valid_until = now + duration
+        # Initial grant: exact calendar month/year from now
+        valid_until = _calc_plan_valid_until(plan_type, now)
 
     # Upsert: update existing or create new
     result = await db.execute(
