@@ -10,6 +10,7 @@ import { useT } from "@/lib/i18n";
 import { useRaceBox, useRaceBoxStore } from "@/hooks/useRaceBox";
 import { usePhoneGps } from "@/hooks/usePhoneGps";
 import { useDriverConfig, ALL_DRIVER_CARDS, DEFAULT_CARD_ORDER, type DriverCardId } from "@/hooks/useDriverConfig";
+import { useAuth } from "@/hooks/useAuth";
 import { GForceRadar } from "@/components/driver/GForceRadar";
 // Config panel moved to separate sidebar tab (driver-config)
 import { useGpsTelemetrySave } from "@/hooks/useGpsTelemetrySave";
@@ -204,6 +205,13 @@ export function DriverView() {
   const { now, speed } = useSimNow();
   const raceClock = useRaceClock();
   const driverCfg = useDriverConfig();
+  const { user } = useAuth();
+
+  // Hydrate driver config for current user (per-user localStorage)
+  useEffect(() => {
+    driverCfg.hydrateForUser(user?.id ?? null);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [editMode, setEditMode] = useState(false);
   const [showGpsSetup, setShowGpsSetup] = useState(false);
   const [hideCalBanner, setHideCalBanner] = useState(false);

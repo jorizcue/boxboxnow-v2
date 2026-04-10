@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "@/lib/api";
 import { useDriverConfig, ALL_DRIVER_CARDS, type DriverCardId } from "@/hooks/useDriverConfig";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Circuit {
   id: number;
@@ -19,8 +20,14 @@ interface Circuit {
  */
 export function DriverConfigTab() {
   const config = useDriverConfig();
+  const { user } = useAuth();
   const [circuits, setCircuits] = useState<Circuit[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Hydrate driver config for current user
+  useEffect(() => {
+    config.hydrateForUser(user?.id ?? null);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     api.getMyCircuits()

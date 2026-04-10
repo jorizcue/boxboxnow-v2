@@ -542,6 +542,10 @@ async def list_subscriptions(
 ):
     """List user's subscriptions."""
     from sqlalchemy.orm import selectinload
+
+    # Fetch prices from Stripe for active subscriptions
+    s = get_stripe()
+    stripe_prices: dict[str, dict] = {}  # stripe_sub_id -> {amount, currency, interval}
     result = await db.execute(
         select(Subscription)
         .where(Subscription.user_id == user.id)
@@ -549,19 +553,37 @@ async def list_subscriptions(
         .order_by(Subscription.created_at.desc())
     )
     subs = result.scalars().all()
+
+    # Batch-fetch Stripe subscription data for price info
+    for sub in subs:
+        if sub.stripe_subscription_id and sub.status in ("active", "trialing"):
+            try:
+                stripe_sub = s.Subscription.retrieve(sub.stripe_subscription_id)
+                if stripe_sub.get("items") and stripe_sub["items"]["data"]:
+                    item = stripe_sub["items"]["data"][0]
+                    price = item.get("price", {})
+                    stripe_prices[sub.stripe_subscription_id] = {
+                        "amount": price.get("unit_amount", 0) / 100,
+                        "currency": price.get("currency", "eur"),
+                        "interval": price.get("recurring", {}).get("interval", "month"),
+                    }
+            except Exception:
+                pass
+
     return [
         {
-            "id": s.id,
-            "plan_type": s.plan_type,
-            "status": s.status,
-            "circuit_id": s.circuit_id,
-            "circuit_name": s.circuit.name if s.circuit else None,
-            "current_period_start": s.current_period_start.isoformat() if s.current_period_start else None,
-            "current_period_end": s.current_period_end.isoformat() if s.current_period_end else None,
-            "cancel_at_period_end": s.cancel_at_period_end,
-            "created_at": s.created_at.isoformat() if s.created_at else None,
+            "id": s_row.id,
+            "plan_type": s_row.plan_type,
+            "status": s_row.status,
+            "circuit_id": s_row.circuit_id,
+            "circuit_name": s_row.circuit.name if s_row.circuit else None,
+            "current_period_start": s_row.current_period_start.isoformat() if s_row.current_period_start else None,
+            "current_period_end": s_row.current_period_end.isoformat() if s_row.current_period_end else None,
+            "cancel_at_period_end": s_row.cancel_at_period_end,
+            "created_at": s_row.created_at.isoformat() if s_row.created_at else None,
+            **(stripe_prices.get(s_row.stripe_subscription_id, {})),
         }
-        for s in subs
+        for s_row in subs
     ]
 
 
@@ -665,18 +687,24 @@ async def switch_plan(
         raise HTTPException(400, "No Stripe subscription linked")
 
     # Get current subscription item ID from Stripe
-    stripe_sub = s.Subscription.retrieve(sub.stripe_subscription_id, expand=["items.data"])
+    try:
+        stripe_sub = s.Subscription.retrieve(sub.stripe_subscription_id, expand=["items"])
+    except Exception as e:
+        raise HTTPException(400, f"Could not retrieve Stripe subscription: {e}")
     if not stripe_sub.get("items") or not stripe_sub["items"]["data"]:
         raise HTTPException(400, "No subscription items found")
 
     item_id = stripe_sub["items"]["data"][0]["id"]
 
-    # Schedule price change at next renewal (no proration)
-    s.Subscription.modify(
-        sub.stripe_subscription_id,
-        items=[{"id": item_id, "price": new_price_id}],
-        proration_behavior="none",
-    )
+    # Change price immediately without proration
+    try:
+        s.Subscription.modify(
+            sub.stripe_subscription_id,
+            items=[{"id": item_id, "price": new_price_id}],
+            proration_behavior="none",
+        )
+    except Exception as e:
+        raise HTTPException(400, f"Stripe error: {e}")
 
     # Update local record
     sub.plan_type = new_plan

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 
 interface Sub {
   id: number;
@@ -14,6 +15,9 @@ interface Sub {
   current_period_end: string | null;
   cancel_at_period_end: boolean;
   created_at: string | null;
+  amount?: number;
+  currency?: string;
+  interval?: string;
 }
 
 interface Invoice {
@@ -46,6 +50,13 @@ function planLabel(planType: string): string {
     trial: "Prueba gratuita",
   };
   return labels[planType] || planType;
+}
+
+function formatPrice(amount?: number, currency?: string, interval?: string): string | null {
+  if (amount == null) return null;
+  const sym = currency === "eur" ? "\u20AC" : currency?.toUpperCase() || "\u20AC";
+  const per = interval === "year" ? "/año" : "/mes";
+  return `${amount.toFixed(2)}${sym}${per}`;
 }
 
 function statusBadge(sub: Sub) {
@@ -83,6 +94,7 @@ function getAlternatePlan(planType: string): { plan: string; label: string } | n
 
 export function AccountPanel() {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [subs, setSubs] = useState<Sub[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,7 +120,14 @@ export function AccountPanel() {
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleCancel = async (subId: number) => {
-    if (!confirm("Se cancelara la renovacion automatica. Seguiras teniendo acceso hasta el final del periodo actual. Confirmar?")) return;
+    const ok = await confirm({
+      title: "Cancelar suscripción",
+      message: "Se cancelará la renovación automática. Seguirás teniendo acceso hasta el final del periodo actual.",
+      confirmText: "Cancelar suscripción",
+      cancelText: "Volver",
+      danger: true,
+    });
+    if (!ok) return;
     setActionLoading(subId);
     try {
       await api.cancelSubscription(subId);
@@ -133,7 +152,13 @@ export function AccountPanel() {
   };
 
   const handleSwitchPlan = async (subId: number, newPlan: string, newLabel: string) => {
-    if (!confirm(`Cambiar a ${newLabel}? El cambio se aplicara en la proxima renovacion.`)) return;
+    const ok = await confirm({
+      title: "Cambiar de plan",
+      message: `¿Cambiar a ${newLabel}? El cambio se aplicará de forma inmediata.`,
+      confirmText: `Cambiar a ${newLabel.split(" ").pop()}`,
+      cancelText: "Cancelar",
+    });
+    if (!ok) return;
     setActionLoading(subId);
     try {
       await api.switchPlan(subId, newPlan);
@@ -174,9 +199,12 @@ export function AccountPanel() {
         </div>
         <button
           onClick={handleOpenPortal}
-          className="shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-neutral-300 hover:text-white hover:border-neutral-500 transition-colors"
+          className="shrink-0 flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl bg-white/[0.06] border border-border text-neutral-200 hover:text-white hover:bg-white/[0.1] hover:border-neutral-500 transition-all"
         >
-          Metodo de pago
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+          </svg>
+          Gestionar métodos de pago
         </button>
       </div>
 
@@ -215,62 +243,68 @@ export function AccountPanel() {
               </a>
             </div>
           ) : (
-            subs.map((sub) => (
-              <div key={sub.id} className="bg-surface border border-border rounded-xl p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-white">{planLabel(sub.plan_type)}</span>
-                      {statusBadge(sub)}
+            subs.map((sub) => {
+              const price = formatPrice(sub.amount, sub.currency, sub.interval);
+              return (
+                <div key={sub.id} className="bg-surface border border-border rounded-xl p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-white">{planLabel(sub.plan_type)}</span>
+                        {statusBadge(sub)}
+                        {price && (
+                          <span className="text-sm font-mono text-accent">{price}</span>
+                        )}
+                      </div>
+                      {sub.circuit_name && (
+                        <p className="text-sm text-neutral-400 mt-1">Circuito: {sub.circuit_name}</p>
+                      )}
+                      <div className="flex gap-4 mt-2 text-xs text-neutral-500">
+                        <span>Inicio: {formatDate(sub.current_period_start)}</span>
+                        <span>Fin periodo: {formatDate(sub.current_period_end)}</span>
+                      </div>
+                      {sub.cancel_at_period_end && (
+                        <p className="text-xs text-orange-400 mt-2">
+                          No se renovará. Acceso hasta {formatDate(sub.current_period_end)}.
+                        </p>
+                      )}
                     </div>
-                    {sub.circuit_name && (
-                      <p className="text-sm text-neutral-400 mt-1">Circuito: {sub.circuit_name}</p>
-                    )}
-                    <div className="flex gap-4 mt-2 text-xs text-neutral-500">
-                      <span>Inicio: {formatDate(sub.current_period_start)}</span>
-                      <span>Fin periodo: {formatDate(sub.current_period_end)}</span>
-                    </div>
-                    {sub.cancel_at_period_end && (
-                      <p className="text-xs text-orange-400 mt-2">
-                        No se renovara. Acceso hasta {formatDate(sub.current_period_end)}.
-                      </p>
-                    )}
-                  </div>
-                  <div className="shrink-0 flex flex-col gap-1.5">
-                    {sub.status === "active" && !sub.cancel_at_period_end && sub.plan_type !== "trial" && (() => {
-                      const alt = getAlternatePlan(sub.plan_type);
-                      return alt ? (
+                    <div className="shrink-0 flex flex-col gap-1.5">
+                      {sub.status === "active" && !sub.cancel_at_period_end && sub.plan_type !== "trial" && (() => {
+                        const alt = getAlternatePlan(sub.plan_type);
+                        return alt ? (
+                          <button
+                            onClick={() => handleSwitchPlan(sub.id, alt.plan, alt.label)}
+                            disabled={actionLoading === sub.id}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+                          >
+                            {actionLoading === sub.id ? "..." : `Cambiar a ${alt.label.split(" ").pop()}`}
+                          </button>
+                        ) : null;
+                      })()}
+                      {sub.status === "active" && !sub.cancel_at_period_end && sub.plan_type !== "trial" && (
                         <button
-                          onClick={() => handleSwitchPlan(sub.id, alt.plan, alt.label)}
+                          onClick={() => handleCancel(sub.id)}
                           disabled={actionLoading === sub.id}
-                          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
                         >
-                          {actionLoading === sub.id ? "..." : `Cambiar a ${alt.label.split(" ").pop()}`}
+                          {actionLoading === sub.id ? "..." : "Cancelar"}
                         </button>
-                      ) : null;
-                    })()}
-                    {sub.status === "active" && !sub.cancel_at_period_end && sub.plan_type !== "trial" && (
-                      <button
-                        onClick={() => handleCancel(sub.id)}
-                        disabled={actionLoading === sub.id}
-                        className="px-3 py-1.5 text-xs font-medium rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
-                      >
-                        {actionLoading === sub.id ? "..." : "Cancelar"}
-                      </button>
-                    )}
-                    {sub.cancel_at_period_end && sub.status === "active" && (
-                      <button
-                        onClick={() => handleReactivate(sub.id)}
-                        disabled={actionLoading === sub.id}
-                        className="px-3 py-1.5 text-xs font-medium rounded-lg border border-accent/30 text-accent hover:bg-accent/10 transition-colors disabled:opacity-50"
-                      >
-                        {actionLoading === sub.id ? "..." : "Reactivar"}
-                      </button>
-                    )}
+                      )}
+                      {sub.cancel_at_period_end && sub.status === "active" && (
+                        <button
+                          onClick={() => handleReactivate(sub.id)}
+                          disabled={actionLoading === sub.id}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-accent/30 text-accent hover:bg-accent/10 transition-colors disabled:opacity-50"
+                        >
+                          {actionLoading === sub.id ? "..." : "Reactivar"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       )}

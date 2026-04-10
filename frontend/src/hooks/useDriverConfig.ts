@@ -58,14 +58,23 @@ interface DriverConfig {
   setKartNumber: (kart: number | null) => void;
   setCardVisible: (card: DriverCardId, visible: boolean) => void;
   setCardOrder: (order: DriverCardId[]) => void;
+  /** Re-hydrate from localStorage for a specific user */
+  hydrateForUser: (userId: number | null) => void;
 }
 
-const STORAGE_KEY = "bbn-driver-config";
+const STORAGE_PREFIX = "bbn-driver-config";
 
-function loadConfig(): Partial<Pick<DriverConfig, "selectedCircuitId" | "selectedKartNumber" | "visibleCards" | "cardOrder">> {
+/** Current user ID tracked for save operations */
+let _currentUserId: number | null = null;
+
+function storageKey(userId: number | null): string {
+  return userId ? `${STORAGE_PREFIX}-${userId}` : STORAGE_PREFIX;
+}
+
+function loadConfig(userId: number | null): Partial<Pick<DriverConfig, "selectedCircuitId" | "selectedKartNumber" | "visibleCards" | "cardOrder">> {
   if (typeof window === "undefined") return {};
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey(userId));
     if (raw) {
       const data = JSON.parse(raw);
       // Validate card order has all cards — append any missing ones
@@ -77,13 +86,29 @@ function loadConfig(): Partial<Pick<DriverConfig, "selectedCircuitId" | "selecte
       }
       return data;
     }
+    // Migrate from old global key if user-specific key doesn't exist yet
+    if (userId) {
+      const oldRaw = localStorage.getItem(STORAGE_PREFIX);
+      if (oldRaw) {
+        const data = JSON.parse(oldRaw);
+        if (data.cardOrder) {
+          const missing = DEFAULT_CARD_ORDER.filter((c) => !data.cardOrder.includes(c));
+          if (missing.length > 0) data.cardOrder = [...data.cardOrder, ...missing];
+          data.cardOrder = data.cardOrder.filter((c: string) => DEFAULT_CARD_ORDER.includes(c as DriverCardId));
+        }
+        // Save as user-specific and remove old global key
+        localStorage.setItem(storageKey(userId), oldRaw);
+        localStorage.removeItem(STORAGE_PREFIX);
+        return data;
+      }
+    }
   } catch {}
   return {};
 }
 
-function saveConfig(state: Pick<DriverConfig, "selectedCircuitId" | "selectedKartNumber" | "visibleCards" | "cardOrder">) {
+function saveConfig(userId: number | null, state: Pick<DriverConfig, "selectedCircuitId" | "selectedKartNumber" | "visibleCards" | "cardOrder">) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+  localStorage.setItem(storageKey(userId), JSON.stringify({
     selectedCircuitId: state.selectedCircuitId,
     selectedKartNumber: state.selectedKartNumber,
     visibleCards: state.visibleCards,
@@ -95,7 +120,7 @@ const defaultVisible: Record<DriverCardId, boolean> = Object.fromEntries(
   ALL_DRIVER_CARDS.map((c) => [c.id, true])
 ) as Record<DriverCardId, boolean>;
 
-const loaded = loadConfig();
+const loaded = loadConfig(null);
 
 export const useDriverConfig = create<DriverConfig>((set, get) => ({
   selectedCircuitId: loaded.selectedCircuitId ?? null,
@@ -105,19 +130,29 @@ export const useDriverConfig = create<DriverConfig>((set, get) => ({
 
   setCircuitId: (id) => {
     set({ selectedCircuitId: id });
-    saveConfig(get());
+    saveConfig(_currentUserId, get());
   },
   setKartNumber: (kart) => {
     set({ selectedKartNumber: kart });
-    saveConfig(get());
+    saveConfig(_currentUserId, get());
   },
   setCardVisible: (card, visible) => {
     const visibleCards = { ...get().visibleCards, [card]: visible };
     set({ visibleCards });
-    saveConfig(get());
+    saveConfig(_currentUserId, get());
   },
   setCardOrder: (order) => {
     set({ cardOrder: order });
-    saveConfig(get());
+    saveConfig(_currentUserId, get());
+  },
+  hydrateForUser: (userId) => {
+    _currentUserId = userId;
+    const cfg = loadConfig(userId);
+    set({
+      selectedCircuitId: cfg.selectedCircuitId ?? null,
+      selectedKartNumber: cfg.selectedKartNumber ?? null,
+      visibleCards: { ...defaultVisible, ...cfg.visibleCards },
+      cardOrder: cfg.cardOrder ?? DEFAULT_CARD_ORDER,
+    });
   },
 }));
