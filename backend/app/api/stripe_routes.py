@@ -559,13 +559,14 @@ async def list_subscriptions(
         if sub.stripe_subscription_id and sub.status in ("active", "trialing"):
             try:
                 stripe_sub = s.Subscription.retrieve(sub.stripe_subscription_id)
-                if stripe_sub.get("items") and stripe_sub["items"]["data"]:
-                    item = stripe_sub["items"]["data"][0]
-                    price = item.get("price", {})
+                items = stripe_sub.items.data if stripe_sub.items else []
+                if items:
+                    price_obj = items[0].price
+                    recurring = price_obj.recurring
                     stripe_prices[sub.stripe_subscription_id] = {
-                        "amount": price.get("unit_amount", 0) / 100,
-                        "currency": price.get("currency", "eur"),
-                        "interval": price.get("recurring", {}).get("interval", "month"),
+                        "amount": (price_obj.unit_amount or 0) / 100,
+                        "currency": price_obj.currency or "eur",
+                        "interval": recurring.interval if recurring else "month",
                     }
             except Exception:
                 pass
