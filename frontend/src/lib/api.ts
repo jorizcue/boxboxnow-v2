@@ -282,6 +282,19 @@ export const api = {
   getCustomerPortal: () =>
     fetchApi<{ url: string }>("/api/stripe/customer-portal", { method: "POST" }),
 
+  // Platform settings (admin)
+  getPlatformSettings: () =>
+    fetchApi<Record<string, string>>("/api/admin/platform-settings"),
+  updatePlatformSettings: (data: Record<string, string>) =>
+    fetchApi<Record<string, string>>("/api/admin/platform-settings", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  // Trial config (public)
+  getTrialConfig: () =>
+    fetchRaw<{ trial_enabled: boolean; trial_days: number; trial_banner_days: number }>("/api/auth/trial-config"),
+
   // Password reset
   forgotPassword: (email: string) =>
     fetchRaw<{ ok: boolean; message: string }>("/api/auth/forgot-password", {

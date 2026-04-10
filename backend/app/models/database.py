@@ -93,6 +93,11 @@ async def init_db():
         await conn.execute(text("""
             INSERT OR IGNORE INTO app_settings (key, value) VALUES ('kart_analytics_retention_days', '30')
         """))
+        # Platform settings defaults
+        for _key, _val in [("trial_days", "14"), ("trial_banner_days", "7"), ("trial_email_days", "3")]:
+            await conn.execute(text(
+                "INSERT OR IGNORE INTO app_settings (key, value) VALUES (:key, :value)"
+            ), {"key": _key, "value": _val})
 
         # Seed live timing URLs for known circuits
         await conn.execute(text("""

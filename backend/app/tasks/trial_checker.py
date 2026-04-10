@@ -5,9 +5,19 @@ import logging
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select
 from app.models.database import async_session
-from app.models.schemas import Subscription, User
+from app.models.schemas import Subscription, User, AppSetting
 
 logger = logging.getLogger(__name__)
+
+PLATFORM_DEFAULTS = {
+    "trial_email_days": "3",
+}
+
+
+async def _get_setting(db, key: str) -> str:
+    result = await db.execute(select(AppSetting).where(AppSetting.key == key))
+    setting = result.scalar_one_or_none()
+    return setting.value if setting else PLATFORM_DEFAULTS.get(key, "0")
 
 
 async def check_trial_expirations():
@@ -15,27 +25,33 @@ async def check_trial_expirations():
     async with async_session() as db:
         now = datetime.now(timezone.utc)
 
-        # Find trials ending in 3 days (send reminder)
-        three_days = now + timedelta(days=3)
-        two_days = now + timedelta(days=2)
+        # Read configurable email reminder days
+        email_days = int(await _get_setting(db, "trial_email_days"))
 
-        result = await db.execute(
-            select(Subscription).where(
-                Subscription.plan_type == "trial",
-                Subscription.status == "trialing",
-                Subscription.current_period_end >= two_days,
-                Subscription.current_period_end < three_days,
+        if email_days > 0:
+            # Find trials ending within the email_days window (1-day precision)
+            upper = now + timedelta(days=email_days)
+            lower = now + timedelta(days=email_days - 1)
+
+            result = await db.execute(
+                select(Subscription).where(
+                    Subscription.plan_type == "trial",
+                    Subscription.status == "trialing",
+                    Subscription.current_period_end >= lower,
+                    Subscription.current_period_end < upper,
+                )
             )
-        )
-        ending_trials = result.scalars().all()
+            ending_trials = result.scalars().all()
 
-        for trial in ending_trials:
-            user_result = await db.execute(select(User).where(User.id == trial.user_id))
-            user = user_result.scalar_one_or_none()
-            if user and user.email:
-                days_left = max(1, int((trial.current_period_end - now).total_seconds() / 86400))
-                from app.services.email_service import send_trial_ending_email
-                await send_trial_ending_email(user.email, user.username, days_left)
+            for trial in ending_trials:
+                user_result = await db.execute(select(User).where(User.id == trial.user_id))
+                user = user_result.scalar_one_or_none()
+                if user and user.email:
+                    days_left = max(1, int((trial.current_period_end - now).total_seconds() / 86400))
+                    from app.services.email_service import send_trial_ending_email
+                    await send_trial_ending_email(user.email, user.username, days_left)
+        else:
+            ending_trials = []
 
         # Mark expired trials as expired
         result = await db.execute(

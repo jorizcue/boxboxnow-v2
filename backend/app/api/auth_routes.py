@@ -29,7 +29,7 @@ from sqlalchemy import select, func, delete
 
 from app.config import get_settings
 from app.models.database import get_db
-from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess, Subscription, Circuit
+from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess, Subscription, Circuit, AppSetting
 from sqlalchemy.orm import selectinload
 from app.models.pydantic_models import (
     LoginRequest, LoginResponse, UserOut, DeviceSessionOut,
@@ -38,6 +38,32 @@ from app.models.pydantic_models import (
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 security = HTTPBearer()
+
+
+PLATFORM_DEFAULTS = {
+    "trial_days": "14",
+    "trial_banner_days": "7",
+    "trial_email_days": "3",
+}
+
+
+async def _get_platform_setting(db: AsyncSession, key: str) -> str:
+    """Get a platform setting value, returning default if not found."""
+    result = await db.execute(select(AppSetting).where(AppSetting.key == key))
+    setting = result.scalar_one_or_none()
+    return setting.value if setting else PLATFORM_DEFAULTS.get(key, "0")
+
+
+@router.get("/trial-config")
+async def get_trial_config(db: AsyncSession = Depends(get_db)):
+    """Public endpoint: returns trial configuration for the frontend."""
+    trial_days = int(await _get_platform_setting(db, "trial_days"))
+    trial_banner_days = int(await _get_platform_setting(db, "trial_banner_days"))
+    return {
+        "trial_enabled": trial_days > 0,
+        "trial_days": trial_days,
+        "trial_banner_days": trial_banner_days,
+    }
 
 
 class RateLimiter:
@@ -283,31 +309,40 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
     db.add(user)
     await db.flush()
 
-    # Assign all tabs for trial users (full access during trial)
-    trial_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config", "replay", "analytics", "insights"]
-    for tab in trial_tabs:
-        db.add(UserTabAccess(user_id=user.id, tab=tab))
+    # Check trial configuration
+    trial_days = int(await _get_platform_setting(db, "trial_days"))
 
-    # Create 14-day trial subscription
-    trial_end = datetime.now(timezone.utc) + timedelta(days=14)
-    trial_sub = Subscription(
-        user_id=user.id,
-        plan_type="trial",
-        status="trialing",
-        current_period_start=datetime.now(timezone.utc),
-        current_period_end=trial_end,
-    )
-    db.add(trial_sub)
+    if trial_days > 0:
+        # Assign all tabs for trial users (full access during trial)
+        trial_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config", "replay", "analytics", "insights"]
+        for tab in trial_tabs:
+            db.add(UserTabAccess(user_id=user.id, tab=tab))
 
-    # Grant circuit access to all circuits for trial period
-    circuits_result = await db.execute(select(Circuit))
-    for circuit in circuits_result.scalars().all():
-        db.add(UserCircuitAccess(
+        # Create trial subscription with configurable duration
+        trial_end = datetime.now(timezone.utc) + timedelta(days=trial_days)
+        trial_sub = Subscription(
             user_id=user.id,
-            circuit_id=circuit.id,
-            valid_from=datetime.now(timezone.utc),
-            valid_until=trial_end,
-        ))
+            plan_type="trial",
+            status="trialing",
+            current_period_start=datetime.now(timezone.utc),
+            current_period_end=trial_end,
+        )
+        db.add(trial_sub)
+
+        # Grant circuit access to all circuits for trial period
+        circuits_result = await db.execute(select(Circuit))
+        for circuit in circuits_result.scalars().all():
+            db.add(UserCircuitAccess(
+                user_id=user.id,
+                circuit_id=circuit.id,
+                valid_from=datetime.now(timezone.utc),
+                valid_until=trial_end,
+            ))
+    else:
+        # No trial: assign basic tabs only
+        basic_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config"]
+        for tab in basic_tabs:
+            db.add(UserTabAccess(user_id=user.id, tab=tab))
 
     await db.commit()
 
@@ -522,9 +557,13 @@ async def google_callback(code: str, request: Request, db: AsyncSession = Depend
             await db.commit()
     else:
         # Create new user
-        # Generate unique username from Google name
+        # Generate unique username from Google name — transliterate accents
         import re as re_mod
-        base_username = name.lower().replace(" ", ".").replace("@", ".")[:30]
+        import unicodedata
+        # Normalize Unicode: NFD splits accented chars, then strip combining marks
+        normalized_name = unicodedata.normalize("NFD", name)
+        normalized_name = "".join(c for c in normalized_name if unicodedata.category(c) != "Mn")
+        base_username = normalized_name.lower().replace(" ", ".").replace("@", ".")[:30]
         base_username = re_mod.sub(r'[^a-z0-9._-]', '', base_username) or "user"
         username = base_username
         counter = 1
@@ -550,31 +589,40 @@ async def google_callback(code: str, request: Request, db: AsyncSession = Depend
         db.add(user)
         await db.flush()
 
-        # Assign all tabs for trial users
-        trial_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config", "replay", "analytics", "insights"]
-        for tab in trial_tabs:
-            db.add(UserTabAccess(user_id=user.id, tab=tab))
+        # Check trial configuration
+        trial_days = int(await _get_platform_setting(db, "trial_days"))
 
-        # Create 14-day trial subscription
-        trial_end = datetime.now(timezone.utc) + timedelta(days=14)
-        trial_sub = Subscription(
-            user_id=user.id,
-            plan_type="trial",
-            status="trialing",
-            current_period_start=datetime.now(timezone.utc),
-            current_period_end=trial_end,
-        )
-        db.add(trial_sub)
+        if trial_days > 0:
+            # Assign all tabs for trial users
+            trial_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config", "replay", "analytics", "insights"]
+            for tab in trial_tabs:
+                db.add(UserTabAccess(user_id=user.id, tab=tab))
 
-        # Grant circuit access to all circuits for trial period
-        circuits_result = await db.execute(select(Circuit))
-        for circuit in circuits_result.scalars().all():
-            db.add(UserCircuitAccess(
+            # Create trial subscription with configurable duration
+            trial_end = datetime.now(timezone.utc) + timedelta(days=trial_days)
+            trial_sub = Subscription(
                 user_id=user.id,
-                circuit_id=circuit.id,
-                valid_from=datetime.now(timezone.utc),
-                valid_until=trial_end,
-            ))
+                plan_type="trial",
+                status="trialing",
+                current_period_start=datetime.now(timezone.utc),
+                current_period_end=trial_end,
+            )
+            db.add(trial_sub)
+
+            # Grant circuit access to all circuits for trial period
+            circuits_result = await db.execute(select(Circuit))
+            for circuit in circuits_result.scalars().all():
+                db.add(UserCircuitAccess(
+                    user_id=user.id,
+                    circuit_id=circuit.id,
+                    valid_from=datetime.now(timezone.utc),
+                    valid_until=trial_end,
+                ))
+        else:
+            # No trial: assign basic tabs only
+            basic_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config"]
+            for tab in basic_tabs:
+                db.add(UserTabAccess(user_id=user.id, tab=tab))
 
         await db.commit()
 

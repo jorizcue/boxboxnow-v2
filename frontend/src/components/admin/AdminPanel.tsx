@@ -58,6 +58,10 @@ export function AdminHubPanel() {
   return <CircuitHubManager />;
 }
 
+export function AdminPlatformPanel() {
+  return <PlatformSettingsManager />;
+}
+
 const STANDARD_TAB_OPTIONS: [string, string][] = [
   ["race", "Carrera"],
   ["pit", "Box"],
@@ -1078,6 +1082,156 @@ function CircuitHubManager() {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════
+//  Platform Settings Manager
+// ═══════════════════════════════════════════════════
+
+function PlatformSettingsManager() {
+  const [settings, setSettings] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const data = await api.getPlatformSettings();
+      setSettings(data);
+    } catch (e) {
+      console.error("Failed to load platform settings", e);
+    }
+    setLoading(false);
+  };
+
+  const handleChange = (key: string, value: string) => {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+    setSaved(false);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.updatePlatformSettings(settings);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      console.error("Failed to save platform settings", e);
+    }
+    setSaving(false);
+  };
+
+  const trialEnabled = parseInt(settings.trial_days || "0") > 0;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <h2 className="text-lg font-bold text-white mb-6">Configuracion de Plataforma</h2>
+
+      {/* Trial Section */}
+      <div className="bg-surface rounded-xl border border-border p-5 mb-6">
+        <h3 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Prueba Gratuita (Trial)</h3>
+
+        <div className="space-y-4">
+          {/* Trial Days */}
+          <div>
+            <label className="block text-xs text-neutral-400 mb-1.5 uppercase tracking-wider">
+              Dias de prueba gratuita
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min="0"
+                max="365"
+                value={settings.trial_days || "0"}
+                onChange={(e) => handleChange("trial_days", e.target.value)}
+                className="w-24 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50 transition-colors"
+              />
+              <span className="text-xs text-neutral-500">
+                {trialEnabled
+                  ? `Los nuevos usuarios tendran ${settings.trial_days} dias de acceso completo`
+                  : "Trial desactivado — los usuarios deben comprar via Stripe"}
+              </span>
+            </div>
+            <p className="text-[11px] text-neutral-600 mt-1">
+              Pon 0 para desactivar el trial. Los usuarios solo podran acceder comprando una suscripcion.
+            </p>
+          </div>
+
+          {/* Trial Banner Days */}
+          <div className={!trialEnabled ? "opacity-40 pointer-events-none" : ""}>
+            <label className="block text-xs text-neutral-400 mb-1.5 uppercase tracking-wider">
+              Mostrar banner de trial
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min="0"
+                max="365"
+                value={settings.trial_banner_days || "0"}
+                onChange={(e) => handleChange("trial_banner_days", e.target.value)}
+                className="w-24 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50 transition-colors"
+              />
+              <span className="text-xs text-neutral-500">
+                Mostrar banner en el dashboard cuando queden {settings.trial_banner_days || "0"} dias o menos
+              </span>
+            </div>
+          </div>
+
+          {/* Trial Email Days */}
+          <div className={!trialEnabled ? "opacity-40 pointer-events-none" : ""}>
+            <label className="block text-xs text-neutral-400 mb-1.5 uppercase tracking-wider">
+              Email de aviso de fin de trial
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min="0"
+                max="365"
+                value={settings.trial_email_days || "0"}
+                onChange={(e) => handleChange("trial_email_days", e.target.value)}
+                className="w-24 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50 transition-colors"
+              />
+              <span className="text-xs text-neutral-500">
+                Enviar email de aviso {settings.trial_email_days || "0"} dias antes de que expire
+              </span>
+            </div>
+            <p className="text-[11px] text-neutral-600 mt-1">
+              Pon 0 para no enviar emails de aviso.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Save */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm"
+        >
+          {saving ? "Guardando..." : "Guardar cambios"}
+        </button>
+        {saved && (
+          <span className="text-accent text-sm animate-fade-in">
+            Guardado correctamente
+          </span>
+        )}
+      </div>
     </div>
   );
 }

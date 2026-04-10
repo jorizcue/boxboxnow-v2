@@ -12,7 +12,7 @@ import { RaceTable } from "@/components/race/RaceTable";
 import { FifoQueue } from "@/components/pit/FifoQueue";
 import { ClassificationTable } from "@/components/classification/ClassificationTable";
 import { ConfigPanel } from "@/components/config/ConfigPanel";
-import { AdminUsersPanel, AdminCircuitsPanel, AdminHubPanel } from "@/components/admin/AdminPanel";
+import { AdminUsersPanel, AdminCircuitsPanel, AdminHubPanel, AdminPlatformPanel } from "@/components/admin/AdminPanel";
 import { LiveTiming } from "@/components/live/LiveTiming";
 import { AdjustedClassification } from "@/components/classification/AdjustedClassification";
 import { RealClassificationBeta } from "@/components/classification/RealClassificationBeta";
@@ -79,15 +79,21 @@ export default function DashboardPage() {
 
 function TrialBanner() {
   const { user } = useAuth();
-  const router = useRouter();
+  const [bannerDays, setBannerDays] = useState<number | null>(null);
 
-  if (!user?.trial_ends_at || user?.is_admin) return null;
+  useEffect(() => {
+    import("@/lib/api").then(({ api }) =>
+      api.getTrialConfig().then((c) => setBannerDays(c.trial_banner_days)).catch(() => setBannerDays(7))
+    );
+  }, []);
+
+  if (!user?.trial_ends_at || user?.is_admin || bannerDays === null) return null;
 
   const trialEnd = new Date(user.trial_ends_at);
   const now = new Date();
   const daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
 
-  if (daysLeft > 7) return null; // Only show when 7 days or less
+  if (daysLeft > bannerDays) return null;
 
   const urgency = daysLeft <= 3;
 
@@ -152,6 +158,7 @@ function Dashboard({
           {activeTab === "admin-users" && user?.is_admin && userTabs.includes("admin-users") && <AdminUsersPanel />}
           {activeTab === "admin-circuits" && user?.is_admin && userTabs.includes("admin-circuits") && <AdminCircuitsPanel />}
           {activeTab === "admin-hub" && user?.is_admin && userTabs.includes("admin-hub") && <AdminHubPanel />}
+          {activeTab === "admin-platform" && user?.is_admin && <AdminPlatformPanel />}
         </main>
       </div>
     </div>

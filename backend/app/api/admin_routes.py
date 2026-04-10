@@ -431,3 +431,51 @@ async def update_setting(key: str, request: Request, admin: User = Depends(requi
 
     await db.commit()
     return {"key": key, "value": str(value)}
+
+
+# --- Platform Settings (batch) ---
+
+PLATFORM_SETTINGS_KEYS = [
+    "trial_days",           # 0 = trial disabled
+    "trial_banner_days",    # Show banner when N days or less remain
+    "trial_email_days",     # Send reminder email N days before expiry
+]
+
+PLATFORM_DEFAULTS = {
+    "trial_days": "14",
+    "trial_banner_days": "7",
+    "trial_email_days": "3",
+}
+
+
+@router.get("/platform-settings")
+async def get_platform_settings(admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """Get all platform settings as a dict."""
+    result = await db.execute(
+        select(AppSetting).where(AppSetting.key.in_(PLATFORM_SETTINGS_KEYS))
+    )
+    settings = {s.key: s.value for s in result.scalars().all()}
+    # Fill defaults for missing keys
+    for key in PLATFORM_SETTINGS_KEYS:
+        if key not in settings:
+            settings[key] = PLATFORM_DEFAULTS.get(key, "")
+    return settings
+
+
+@router.put("/platform-settings")
+async def update_platform_settings(request: Request, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """Update multiple platform settings at once."""
+    body = await request.json()
+    updated = {}
+    for key in PLATFORM_SETTINGS_KEYS:
+        if key in body:
+            value = str(body[key])
+            result = await db.execute(select(AppSetting).where(AppSetting.key == key))
+            setting = result.scalar_one_or_none()
+            if not setting:
+                db.add(AppSetting(key=key, value=value))
+            else:
+                setting.value = value
+            updated[key] = value
+    await db.commit()
+    return updated
