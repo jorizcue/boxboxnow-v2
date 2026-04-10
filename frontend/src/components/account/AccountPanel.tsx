@@ -121,13 +121,11 @@ export function AccountPanel() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const handleCancel = async (subId: number, isEvent = false) => {
+  const handleCancel = async (subId: number) => {
     const ok = await confirm({
-      title: isEvent ? "Cancelar evento" : "Cancelar suscripción",
-      message: isEvent
-        ? "Se revocará el acceso al circuito de forma inmediata."
-        : "Se cancelará la renovación automática. Seguirás teniendo acceso hasta el final del periodo actual.",
-      confirmText: isEvent ? "Cancelar evento" : "Cancelar suscripción",
+      title: "Cancelar suscripción",
+      message: "Se cancelará la renovación automática. Seguirás teniendo acceso hasta el final del periodo actual.",
+      confirmText: "Cancelar suscripción",
       cancelText: "Volver",
       danger: true,
     });
@@ -292,9 +290,9 @@ export function AccountPanel() {
                           </button>
                         ) : null;
                       })()}
-                      {sub.status === "active" && !sub.cancel_at_period_end && sub.plan_type !== "trial" && (
+                      {sub.status === "active" && !sub.cancel_at_period_end && sub.plan_type !== "trial" && sub.plan_type !== "event" && (
                         <button
-                          onClick={() => handleCancel(sub.id, sub.plan_type === "event")}
+                          onClick={() => handleCancel(sub.id)}
                           disabled={actionLoading === sub.id}
                           className="px-3 py-1.5 text-xs font-medium rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
                         >
