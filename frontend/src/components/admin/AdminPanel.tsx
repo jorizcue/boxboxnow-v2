@@ -1097,23 +1097,69 @@ function PlatformSettingsManager() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  // Product configs
+  const [configs, setConfigs] = useState<any[]>([]);
+  const [stripeProducts, setStripeProducts] = useState<{ id: string; name: string; description: string | null }[]>([]);
+  const [editingConfig, setEditingConfig] = useState<any | null>(null);
+  const [showConfigForm, setShowConfigForm] = useState(false);
+  const [configSaving, setConfigSaving] = useState(false);
+  const confirm = useConfirm();
+
+  // Collapsible sections
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    registration: true,
+    trial: true,
+    products: true,
+  });
+
+  const toggleSection = (key: string) =>
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+
   useEffect(() => {
-    loadSettings();
+    loadAll();
   }, []);
 
-  const loadSettings = async () => {
+  const loadAll = async () => {
     try {
-      const data = await api.getPlatformSettings();
-      setSettings(data);
+      const [settingsData, configsData] = await Promise.all([
+        api.getPlatformSettings(),
+        api.getProductConfigs(),
+      ]);
+      setSettings(settingsData);
+      setConfigs(configsData);
     } catch (e) {
       console.error("Failed to load platform settings", e);
     }
     setLoading(false);
   };
 
+  const loadStripeProducts = async () => {
+    if (stripeProducts.length > 0) return;
+    try {
+      const data = await api.getStripeProducts();
+      setStripeProducts(data);
+    } catch (e) {
+      console.error("Failed to load Stripe products", e);
+    }
+  };
+
   const handleChange = (key: string, value: string) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
     setSaved(false);
+  };
+
+  const handleTabToggle = (settingKey: string, tab: string) => {
+    const current: string[] = (() => {
+      try { return JSON.parse(settings[settingKey] || "[]"); } catch { return []; }
+    })();
+    const updated = current.includes(tab)
+      ? current.filter((t) => t !== tab)
+      : [...current, tab];
+    handleChange(settingKey, JSON.stringify(updated));
+  };
+
+  const getTabsFromSetting = (key: string): string[] => {
+    try { return JSON.parse(settings[key] || "[]"); } catch { return []; }
   };
 
   const handleSave = async () => {
@@ -1128,6 +1174,96 @@ function PlatformSettingsManager() {
     setSaving(false);
   };
 
+  // --- Product config form ---
+  const emptyConfig = {
+    stripe_product_id: "",
+    plan_type: "",
+    tabs: [] as string[],
+    max_devices: 1,
+    display_name: "",
+    description: "",
+    features: [] as string[],
+    price_monthly: null as number | null,
+    price_annual: null as number | null,
+    is_popular: false,
+    is_visible: true,
+    sort_order: 0,
+  };
+
+  const [configForm, setConfigForm] = useState(emptyConfig);
+  const [featuresText, setFeaturesText] = useState("");
+
+  const openNewConfig = () => {
+    setEditingConfig(null);
+    setConfigForm(emptyConfig);
+    setFeaturesText("");
+    setShowConfigForm(true);
+    loadStripeProducts();
+  };
+
+  const openEditConfig = (c: any) => {
+    setEditingConfig(c);
+    setConfigForm({
+      stripe_product_id: c.stripe_product_id,
+      plan_type: c.plan_type,
+      tabs: c.tabs || [],
+      max_devices: c.max_devices,
+      display_name: c.display_name || "",
+      description: c.description || "",
+      features: c.features || [],
+      price_monthly: c.price_monthly,
+      price_annual: c.price_annual,
+      is_popular: c.is_popular,
+      is_visible: c.is_visible,
+      sort_order: c.sort_order,
+    });
+    setFeaturesText((c.features || []).join("\n"));
+    setShowConfigForm(true);
+    loadStripeProducts();
+  };
+
+  const handleConfigTabToggle = (tab: string) => {
+    setConfigForm((prev) => ({
+      ...prev,
+      tabs: prev.tabs.includes(tab)
+        ? prev.tabs.filter((t) => t !== tab)
+        : [...prev.tabs, tab],
+    }));
+  };
+
+  const saveConfig = async () => {
+    setConfigSaving(true);
+    const data = {
+      ...configForm,
+      features: featuresText.split("\n").map((f) => f.trim()).filter(Boolean),
+    };
+    try {
+      if (editingConfig) {
+        await api.updateProductConfig(editingConfig.id, data);
+      } else {
+        await api.createProductConfig(data);
+      }
+      setShowConfigForm(false);
+      const refreshed = await api.getProductConfigs();
+      setConfigs(refreshed);
+    } catch (e: any) {
+      console.error("Failed to save product config", e);
+      alert(e.message || "Error saving config");
+    }
+    setConfigSaving(false);
+  };
+
+  const deleteConfig = async (id: number) => {
+    const ok = await confirm("Eliminar esta configuracion de producto?");
+    if (!ok) return;
+    try {
+      await api.deleteProductConfig(id);
+      setConfigs((prev) => prev.filter((c) => c.id !== id));
+    } catch (e) {
+      console.error("Failed to delete config", e);
+    }
+  };
+
   const trialEnabled = parseInt(settings.trial_days || "0") > 0;
 
   if (loading) {
@@ -1138,98 +1274,454 @@ function PlatformSettingsManager() {
     );
   }
 
+  const PLAN_TYPES = ["basic_monthly", "basic_annual", "pro_monthly", "pro_annual", "event"];
+
   return (
-    <div className="max-w-2xl mx-auto">
-      <h2 className="text-lg font-bold text-white mb-6">Configuracion de Plataforma</h2>
+    <div className="max-w-3xl mx-auto space-y-6">
+      <h2 className="text-lg font-bold text-white mb-2">Configuracion de Plataforma</h2>
 
-      {/* Trial Section */}
-      <div className="bg-surface rounded-xl border border-border p-5 mb-6">
-        <h3 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Prueba Gratuita (Trial)</h3>
-
-        <div className="space-y-4">
-          {/* Trial Days */}
-          <div>
-            <label className="block text-xs text-neutral-400 mb-1.5 uppercase tracking-wider">
-              Dias de prueba gratuita
-            </label>
-            <div className="flex items-center gap-3">
+      {/* Section: Registration Defaults */}
+      <div className="bg-surface rounded-xl border border-border">
+        <button
+          onClick={() => toggleSection("registration")}
+          className="w-full flex items-center justify-between p-5 text-left"
+        >
+          <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
+            Registro — Tabs por Defecto
+          </h3>
+          <span className="text-neutral-500 text-xs">{openSections.registration ? "\u25B2" : "\u25BC"}</span>
+        </button>
+        {openSections.registration && (
+          <div className="px-5 pb-5 space-y-4">
+            <div>
+              <label className="block text-xs text-neutral-400 mb-2 uppercase tracking-wider">
+                Tabs para nuevos usuarios (sin compra)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {STANDARD_TAB_OPTIONS.map(([key, label]) => {
+                  const active = getTabsFromSetting("default_tabs").includes(key);
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => handleTabToggle("default_tabs", key)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        active
+                          ? "bg-accent/20 border-accent/50 text-accent"
+                          : "bg-black border-border text-neutral-500 hover:border-neutral-600"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1.5 uppercase tracking-wider">
+                Max dispositivos (registro)
+              </label>
               <input
                 type="number"
-                min="0"
-                max="365"
-                value={settings.trial_days || "0"}
-                onChange={(e) => handleChange("trial_days", e.target.value)}
+                min="1"
+                max="50"
+                value={settings.default_max_devices || "2"}
+                onChange={(e) => handleChange("default_max_devices", e.target.value)}
                 className="w-24 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50 transition-colors"
               />
-              <span className="text-xs text-neutral-500">
-                {trialEnabled
-                  ? `Los nuevos usuarios tendran ${settings.trial_days} dias de acceso completo`
-                  : "Trial desactivado — los usuarios deben comprar via Stripe"}
-              </span>
-            </div>
-            <p className="text-[11px] text-neutral-600 mt-1">
-              Pon 0 para desactivar el trial. Los usuarios solo podran acceder comprando una suscripcion.
-            </p>
-          </div>
-
-          {/* Trial Banner Days */}
-          <div className={!trialEnabled ? "opacity-40 pointer-events-none" : ""}>
-            <label className="block text-xs text-neutral-400 mb-1.5 uppercase tracking-wider">
-              Mostrar banner de trial
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="number"
-                min="0"
-                max="365"
-                value={settings.trial_banner_days || "0"}
-                onChange={(e) => handleChange("trial_banner_days", e.target.value)}
-                className="w-24 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50 transition-colors"
-              />
-              <span className="text-xs text-neutral-500">
-                Mostrar banner en el dashboard cuando queden {settings.trial_banner_days || "0"} dias o menos
-              </span>
             </div>
           </div>
-
-          {/* Trial Email Days */}
-          <div className={!trialEnabled ? "opacity-40 pointer-events-none" : ""}>
-            <label className="block text-xs text-neutral-400 mb-1.5 uppercase tracking-wider">
-              Email de aviso de fin de trial
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="number"
-                min="0"
-                max="365"
-                value={settings.trial_email_days || "0"}
-                onChange={(e) => handleChange("trial_email_days", e.target.value)}
-                className="w-24 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50 transition-colors"
-              />
-              <span className="text-xs text-neutral-500">
-                Enviar email de aviso {settings.trial_email_days || "0"} dias antes de que expire
-              </span>
-            </div>
-            <p className="text-[11px] text-neutral-600 mt-1">
-              Pon 0 para no enviar emails de aviso.
-            </p>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Save */}
+      {/* Section: Trial */}
+      <div className="bg-surface rounded-xl border border-border">
+        <button
+          onClick={() => toggleSection("trial")}
+          className="w-full flex items-center justify-between p-5 text-left"
+        >
+          <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
+            Prueba Gratuita (Trial)
+          </h3>
+          <span className="text-neutral-500 text-xs">{openSections.trial ? "\u25B2" : "\u25BC"}</span>
+        </button>
+        {openSections.trial && (
+          <div className="px-5 pb-5 space-y-4">
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1.5 uppercase tracking-wider">
+                Dias de prueba gratuita
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min="0"
+                  max="365"
+                  value={settings.trial_days || "0"}
+                  onChange={(e) => handleChange("trial_days", e.target.value)}
+                  className="w-24 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50 transition-colors"
+                />
+                <span className="text-xs text-neutral-500">
+                  {trialEnabled
+                    ? `Los nuevos usuarios tendran ${settings.trial_days} dias de acceso completo`
+                    : "Trial desactivado"}
+                </span>
+              </div>
+            </div>
+
+            <div className={!trialEnabled ? "opacity-40 pointer-events-none" : ""}>
+              <label className="block text-xs text-neutral-400 mb-2 uppercase tracking-wider">
+                Tabs durante el trial
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {STANDARD_TAB_OPTIONS.map(([key, label]) => {
+                  const active = getTabsFromSetting("trial_tabs").includes(key);
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => handleTabToggle("trial_tabs", key)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        active
+                          ? "bg-accent/20 border-accent/50 text-accent"
+                          : "bg-black border-border text-neutral-500 hover:border-neutral-600"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className={!trialEnabled ? "opacity-40 pointer-events-none" : ""}>
+              <label className="block text-xs text-neutral-400 mb-1.5 uppercase tracking-wider">
+                Max dispositivos (trial)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="50"
+                value={settings.trial_max_devices || "2"}
+                onChange={(e) => handleChange("trial_max_devices", e.target.value)}
+                className="w-24 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50 transition-colors"
+              />
+            </div>
+
+            <div className={!trialEnabled ? "opacity-40 pointer-events-none" : ""}>
+              <label className="block text-xs text-neutral-400 mb-1.5 uppercase tracking-wider">
+                Mostrar banner de trial
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min="0"
+                  max="365"
+                  value={settings.trial_banner_days || "0"}
+                  onChange={(e) => handleChange("trial_banner_days", e.target.value)}
+                  className="w-24 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50 transition-colors"
+                />
+                <span className="text-xs text-neutral-500">dias antes de expirar</span>
+              </div>
+            </div>
+
+            <div className={!trialEnabled ? "opacity-40 pointer-events-none" : ""}>
+              <label className="block text-xs text-neutral-400 mb-1.5 uppercase tracking-wider">
+                Email de aviso
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min="0"
+                  max="365"
+                  value={settings.trial_email_days || "0"}
+                  onChange={(e) => handleChange("trial_email_days", e.target.value)}
+                  className="w-24 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50 transition-colors"
+                />
+                <span className="text-xs text-neutral-500">dias antes de expirar</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Save Settings */}
       <div className="flex items-center gap-3">
         <button
           onClick={handleSave}
           disabled={saving}
           className="bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm"
         >
-          {saving ? "Guardando..." : "Guardar cambios"}
+          {saving ? "Guardando..." : "Guardar configuracion"}
         </button>
         {saved && (
-          <span className="text-accent text-sm animate-fade-in">
-            Guardado correctamente
-          </span>
+          <span className="text-accent text-sm animate-fade-in">Guardado</span>
+        )}
+      </div>
+
+      {/* Section: Products / Plans */}
+      <div className="bg-surface rounded-xl border border-border">
+        <button
+          onClick={() => toggleSection("products")}
+          className="w-full flex items-center justify-between p-5 text-left"
+        >
+          <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
+            Productos / Planes (Stripe)
+          </h3>
+          <span className="text-neutral-500 text-xs">{openSections.products ? "\u25B2" : "\u25BC"}</span>
+        </button>
+        {openSections.products && (
+          <div className="px-5 pb-5">
+            {configs.length === 0 ? (
+              <p className="text-sm text-neutral-500 mb-4">
+                No hay productos configurados. Agrega uno para activar los planes dinamicos.
+              </p>
+            ) : (
+              <div className="overflow-x-auto mb-4">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-neutral-500 text-xs uppercase border-b border-border">
+                      <th className="text-left py-2 pr-4">Nombre</th>
+                      <th className="text-left py-2 pr-4">Tipo</th>
+                      <th className="text-left py-2 pr-4">Tabs</th>
+                      <th className="text-center py-2 pr-4">Disp.</th>
+                      <th className="text-center py-2 pr-4">Visible</th>
+                      <th className="text-right py-2">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {configs.map((c) => (
+                      <tr key={c.id} className="border-b border-border/50">
+                        <td className="py-2.5 pr-4 text-white font-medium">{c.display_name || c.plan_type}</td>
+                        <td className="py-2.5 pr-4 text-neutral-400">{c.plan_type}</td>
+                        <td className="py-2.5 pr-4">
+                          <div className="flex flex-wrap gap-1">
+                            {(c.tabs || []).slice(0, 4).map((t: string) => (
+                              <span key={t} className="bg-accent/10 text-accent text-[10px] px-1.5 py-0.5 rounded">
+                                {t}
+                              </span>
+                            ))}
+                            {(c.tabs || []).length > 4 && (
+                              <span className="text-neutral-500 text-[10px]">+{c.tabs.length - 4}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2.5 pr-4 text-center text-neutral-400">{c.max_devices}</td>
+                        <td className="py-2.5 pr-4 text-center">
+                          <span className={c.is_visible ? "text-accent" : "text-neutral-600"}>
+                            {c.is_visible ? "Si" : "No"}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-right space-x-2">
+                          <button onClick={() => openEditConfig(c)} className="text-accent hover:underline text-xs">
+                            Editar
+                          </button>
+                          <button onClick={() => deleteConfig(c.id)} className="text-red-400 hover:underline text-xs">
+                            Eliminar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <button
+              onClick={openNewConfig}
+              className="bg-accent/10 hover:bg-accent/20 text-accent border border-accent/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              + Agregar producto
+            </button>
+
+            {showConfigForm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+                <div className="bg-surface border border-border rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                  <h3 className="text-white font-bold mb-4">
+                    {editingConfig ? "Editar producto" : "Nuevo producto"}
+                  </h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs text-neutral-400 mb-1 uppercase">Producto Stripe</label>
+                      {stripeProducts.length > 0 ? (
+                        <select
+                          value={configForm.stripe_product_id}
+                          onChange={(e) => setConfigForm((p) => ({ ...p, stripe_product_id: e.target.value }))}
+                          className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
+                        >
+                          <option value="">Seleccionar...</option>
+                          {stripeProducts.map((sp) => (
+                            <option key={sp.id} value={sp.id}>
+                              {sp.name} ({sp.id})
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          value={configForm.stripe_product_id}
+                          onChange={(e) => setConfigForm((p) => ({ ...p, stripe_product_id: e.target.value }))}
+                          placeholder="prod_xxx"
+                          className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
+                        />
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-neutral-400 mb-1 uppercase">Tipo de plan</label>
+                      <select
+                        value={configForm.plan_type}
+                        onChange={(e) => setConfigForm((p) => ({ ...p, plan_type: e.target.value }))}
+                        className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
+                      >
+                        <option value="">Seleccionar...</option>
+                        {PLAN_TYPES.map((pt) => (
+                          <option key={pt} value={pt}>{pt}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-neutral-400 mb-2 uppercase">Tabs que otorga</label>
+                      <div className="flex flex-wrap gap-2">
+                        {STANDARD_TAB_OPTIONS.map(([key, label]) => {
+                          const active = configForm.tabs.includes(key);
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => handleConfigTabToggle(key)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                                active
+                                  ? "bg-accent/20 border-accent/50 text-accent"
+                                  : "bg-black border-border text-neutral-500 hover:border-neutral-600"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-neutral-400 mb-1 uppercase">Max dispositivos</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={configForm.max_devices}
+                        onChange={(e) => setConfigForm((p) => ({ ...p, max_devices: parseInt(e.target.value) || 1 }))}
+                        className="w-24 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-neutral-400 mb-1 uppercase">Nombre (pricing)</label>
+                      <input
+                        value={configForm.display_name}
+                        onChange={(e) => setConfigForm((p) => ({ ...p, display_name: e.target.value }))}
+                        placeholder="Plan Basico"
+                        className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-neutral-400 mb-1 uppercase">Descripcion</label>
+                      <input
+                        value={configForm.description}
+                        onChange={(e) => setConfigForm((p) => ({ ...p, description: e.target.value }))}
+                        placeholder="Para equipos pequenos"
+                        className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-neutral-400 mb-1 uppercase">
+                        Caracteristicas (una por linea)
+                      </label>
+                      <textarea
+                        value={featuresText}
+                        onChange={(e) => setFeaturesText(e.target.value)}
+                        rows={4}
+                        placeholder={"1 circuito incluido\nHasta 2 dispositivos\nSoporte basico"}
+                        className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white resize-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-neutral-400 mb-1 uppercase">Precio mensual</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={configForm.price_monthly ?? ""}
+                          onChange={(e) => setConfigForm((p) => ({ ...p, price_monthly: e.target.value ? parseFloat(e.target.value) : null }))}
+                          placeholder="49.00"
+                          className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-neutral-400 mb-1 uppercase">Precio anual</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={configForm.price_annual ?? ""}
+                          onChange={(e) => setConfigForm((p) => ({ ...p, price_annual: e.target.value ? parseFloat(e.target.value) : null }))}
+                          placeholder="490.00"
+                          className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-6">
+                      <label className="flex items-center gap-2 text-sm text-neutral-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={configForm.is_popular}
+                          onChange={(e) => setConfigForm((p) => ({ ...p, is_popular: e.target.checked }))}
+                          className="accent-accent"
+                        />
+                        Popular
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-neutral-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={configForm.is_visible}
+                          onChange={(e) => setConfigForm((p) => ({ ...p, is_visible: e.target.checked }))}
+                          className="accent-accent"
+                        />
+                        Visible en pricing
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-neutral-400 mb-1 uppercase">Orden</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={configForm.sort_order}
+                        onChange={(e) => setConfigForm((p) => ({ ...p, sort_order: parseInt(e.target.value) || 0 }))}
+                        className="w-24 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mt-6">
+                    <button
+                      onClick={saveConfig}
+                      disabled={configSaving || !configForm.stripe_product_id || !configForm.plan_type}
+                      className="bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold px-5 py-2 rounded-lg text-sm transition-colors"
+                    >
+                      {configSaving ? "Guardando..." : editingConfig ? "Actualizar" : "Crear"}
+                    </button>
+                    <button
+                      onClick={() => setShowConfigForm(false)}
+                      className="border border-border text-neutral-400 hover:text-white px-5 py-2 rounded-lg text-sm transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
