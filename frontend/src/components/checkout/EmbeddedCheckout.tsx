@@ -15,16 +15,18 @@ const stripePromise = loadStripe(
 export function EmbeddedCheckout({
   plan,
   circuitId,
+  eventDates,
   onCancel,
 }: {
   plan: string;
   circuitId: number;
+  eventDates?: string[];
   onCancel: () => void;
 }) {
   const fetchClientSecret = useCallback(async () => {
-    const data = await api.createCheckoutSession("", circuitId, plan);
+    const data = await api.createCheckoutSession("", circuitId, plan, eventDates);
     return data.client_secret;
-  }, [plan, circuitId]);
+  }, [plan, circuitId, eventDates]);
 
   return (
     <div className="min-h-screen bg-black flex flex-col items-center px-4 py-8">

@@ -32,6 +32,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<Tab>("race");
   const [pendingPlan, setPendingPlan] = useState<string | null>(null);
   const [checkoutCircuitId, setCheckoutCircuitId] = useState<number | null>(null);
+  const [eventDates, setEventDates] = useState<string[] | undefined>(undefined);
   const router = useRouter();
 
   useEffect(() => {
@@ -65,8 +66,9 @@ export default function DashboardPage() {
   }, [_hydrated, token]);
 
   // Handle circuit selection → show embedded checkout
-  const handleCircuitSelected = (circuitId: number) => {
+  const handleCircuitSelected = (circuitId: number, dates?: string[]) => {
     setCheckoutCircuitId(circuitId);
+    setEventDates(dates);
   };
 
   if (!_hydrated) {
@@ -105,7 +107,8 @@ export default function DashboardPage() {
       <EmbeddedCheckout
         plan={pendingPlan}
         circuitId={checkoutCircuitId}
-        onCancel={() => { setCheckoutCircuitId(null); setPendingPlan(null); }}
+        eventDates={eventDates}
+        onCancel={() => { setCheckoutCircuitId(null); setPendingPlan(null); setEventDates(undefined); }}
       />
     );
   }

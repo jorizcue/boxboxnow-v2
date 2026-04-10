@@ -73,15 +73,23 @@ def _calc_plan_valid_until(plan_type: str, from_date: datetime) -> datetime:
 async def _grant_circuit_access(
     db: AsyncSession, user_id: int, circuit_id: int, plan_type: str,
     period_end: datetime | None = None,
+    event_start: datetime | None = None,
+    event_end: datetime | None = None,
 ):
     """Grant or extend circuit access for a user based on plan type."""
     now = datetime.now(timezone.utc)
 
-    # If we have an explicit period_end from Stripe invoice, use it + 3 days grace
-    if period_end:
+    if event_start and event_end:
+        # Event with specific dates
+        valid_from = event_start
+        valid_until = event_end
+    elif period_end:
+        # Renewal from Stripe invoice: use period_end + 3 days grace
+        valid_from = now
         valid_until = period_end + timedelta(days=3)
     else:
         # Initial grant: exact calendar month/year from now
+        valid_from = now
         valid_until = _calc_plan_valid_until(plan_type, now)
 
     # Upsert: update existing or create new
@@ -102,13 +110,13 @@ async def _grant_circuit_access(
         ex_from = existing.valid_from
         if ex_from and ex_from.tzinfo is None:
             ex_from = ex_from.replace(tzinfo=timezone.utc)
-        if ex_from and ex_from > now:
-            existing.valid_from = now
+        if ex_from and ex_from > valid_from:
+            existing.valid_from = valid_from
     else:
         db.add(UserCircuitAccess(
             user_id=user_id,
             circuit_id=circuit_id,
-            valid_from=now,
+            valid_from=valid_from,
             valid_until=valid_until,
         ))
 
@@ -147,6 +155,7 @@ async def create_checkout_session(
     price_id = body.get("price_id")
     plan = body.get("plan")  # Alternative: accept plan name like "pro_monthly"
     circuit_id = body.get("circuit_id")
+    event_dates = body.get("event_dates")  # e.g. ["2026-04-15"] or ["2026-04-15", "2026-04-16"]
 
     # Resolve plan name to price_id if provided
     if not price_id and plan:
@@ -187,17 +196,40 @@ async def create_checkout_session(
     plan_type = _price_to_plan(price_id)
     is_one_time = plan_type == "event"
 
+    # Validate event_dates for event plans
+    if is_one_time and event_dates:
+        if not isinstance(event_dates, list) or len(event_dates) < 1 or len(event_dates) > 2:
+            raise HTTPException(400, "event_dates must be a list of 1 or 2 dates")
+        # Validate format and consecutiveness
+        from datetime import date as date_type
+        parsed = []
+        for d in event_dates:
+            try:
+                parsed.append(date_type.fromisoformat(d))
+            except (ValueError, TypeError):
+                raise HTTPException(400, f"Invalid date format: {d}")
+        parsed.sort()
+        if len(parsed) == 2 and (parsed[1] - parsed[0]).days != 1:
+            raise HTTPException(400, "Event dates must be consecutive")
+        today = date_type.today()
+        if parsed[0] < today:
+            raise HTTPException(400, "Event dates cannot be in the past")
+
+    metadata = {
+        "user_id": str(user.id),
+        "plan_type": plan_type or "unknown",
+        "circuit_id": str(circuit_id) if circuit_id else "",
+    }
+    if is_one_time and event_dates:
+        metadata["event_dates"] = ",".join(event_dates)
+
     session_params = {
         "customer": user.stripe_customer_id,
         "line_items": [{"price": price_id, "quantity": 1}],
         "mode": "payment" if is_one_time else "subscription",
         "success_url": f"{settings.frontend_url}/dashboard?checkout=success",
         "cancel_url": f"{settings.frontend_url}/dashboard?checkout=cancel",
-        "metadata": {
-            "user_id": str(user.id),
-            "plan_type": plan_type or "unknown",
-            "circuit_id": str(circuit_id) if circuit_id else "",
-        },
+        "metadata": metadata,
     }
 
     if not is_one_time:
@@ -340,18 +372,35 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
 
     elif session_data.get("mode") == "payment":
         # One-time payment (event)
+        # Parse event dates from metadata to determine access window
+        now = datetime.now(timezone.utc)
+        event_dates_str = meta.get("event_dates", "")
+        if event_dates_str:
+            from datetime import date as date_type
+            dates = sorted([date_type.fromisoformat(d) for d in event_dates_str.split(",")])
+            # Access starts at midnight of first day, ends at 23:59:59 of last day
+            event_start = datetime(dates[0].year, dates[0].month, dates[0].day, 0, 0, 0, tzinfo=timezone.utc)
+            event_end = datetime(dates[-1].year, dates[-1].month, dates[-1].day, 23, 59, 59, tzinfo=timezone.utc)
+        else:
+            # Fallback: 48h from now
+            event_start = now
+            event_end = now + timedelta(hours=48)
+
         sub = Subscription(
             user_id=user_id,
             plan_type=plan_type,
             status="active",
             circuit_id=circuit_id,
-            current_period_start=datetime.now(timezone.utc),
-            current_period_end=datetime.now(timezone.utc) + timedelta(hours=48),
+            current_period_start=event_start,
+            current_period_end=event_end,
         )
         db.add(sub)
 
         if circuit_id:
-            await _grant_circuit_access(db, user_id, circuit_id, plan_type)
+            await _grant_circuit_access(
+                db, user_id, circuit_id, plan_type,
+                event_start=event_start, event_end=event_end,
+            )
 
         # Extract price_id from checkout session line items
         stripe_price_id = None
