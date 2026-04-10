@@ -1,12 +1,15 @@
 "use client";
 
-import { useMemo, useRef, useEffect } from "react";
+import { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useSimNow } from "@/hooks/useSimNow";
 import { msToLapTime, tierHex } from "@/lib/formatters";
 import { useT } from "@/lib/i18n";
 import clsx from "clsx";
 import type { KartState } from "@/types/race";
+
+type BetaSortKey = "adjustedDistanceM" | "totalLaps" | "pitCount" | "pitBonusM" | "avgLapMs" | "tierScore" | "kartNumber";
+type BetaSortDir = "asc" | "desc";
 
 /**
  * Clasificacion Real Beta — improved distance-based classification.
@@ -38,6 +41,17 @@ export function RealClassificationBeta() {
   const t = useT();
   const { karts, config, countdownMs, durationMs } = useRaceStore();
   const { now, speed: replaySpeed } = useSimNow();
+  const [sortKey, setSortKey] = useState<BetaSortKey>("adjustedDistanceM");
+  const [sortDir, setSortDir] = useState<BetaSortDir>("desc");
+
+  const toggleSort = useCallback((key: BetaSortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "avgLapMs" ? "asc" : "desc");
+    }
+  }, [sortKey]);
 
   const circuitLengthM = config.circuitLengthM || 1100;
   const pitTimeS = config.pitTimeS || 0;
@@ -152,8 +166,21 @@ export function RealClassificationBeta() {
           interpolationMethod,
         };
       })
-      .sort((a, b) => b.adjustedDistanceM - a.adjustedDistanceM);
-  }, [karts, countdownMs, now, circuitLengthM, pitTimeS, replaySpeed]);
+      .sort((a, b) => {
+        let aVal: number, bVal: number;
+        switch (sortKey) {
+          case "adjustedDistanceM": aVal = a.adjustedDistanceM; bVal = b.adjustedDistanceM; break;
+          case "totalLaps": aVal = a.totalLaps; bVal = b.totalLaps; break;
+          case "pitCount": aVal = a.pitCount; bVal = b.pitCount; break;
+          case "pitBonusM": aVal = a.pitBonusM; bVal = b.pitBonusM; break;
+          case "avgLapMs": aVal = a.avgLapMs > 0 ? a.avgLapMs : Infinity; bVal = b.avgLapMs > 0 ? b.avgLapMs : Infinity; break;
+          case "tierScore": aVal = a.tierScore; bVal = b.tierScore; break;
+          case "kartNumber": aVal = a.kartNumber; bVal = b.kartNumber; break;
+          default: aVal = 0; bVal = 0;
+        }
+        return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+      });
+  }, [karts, countdownMs, now, circuitLengthM, pitTimeS, replaySpeed, sortKey, sortDir]);
 
   if (karts.length === 0 || adjusted.length === 0) {
     return (
@@ -189,17 +216,17 @@ export function RealClassificationBeta() {
             <tr>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-6 sm:w-8">#</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-8 sm:w-10 text-neutral-500" title="Posición según Apex (WebSocket)">Apex</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left w-8 sm:w-12">{t("race.kart")}</th>
+              <BetaSortTh align="left" colKey="kartNumber" current={sortKey} dir={sortDir} onSort={toggleSort} className="w-8 sm:w-12">{t("race.kart")}</BetaSortTh>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">{t("race.team")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">{t("race.driver")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">Vlts</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">{t("race.pit")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right" title="Distancia bonificada por tiempo en pits">Bonus</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">Dist. (m)</th>
+              <BetaSortTh align="center" colKey="totalLaps" current={sortKey} dir={sortDir} onSort={toggleSort}>Vlts</BetaSortTh>
+              <BetaSortTh align="center" colKey="pitCount" current={sortKey} dir={sortDir} onSort={toggleSort}>{t("race.pit")}</BetaSortTh>
+              <BetaSortTh align="right" colKey="pitBonusM" current={sortKey} dir={sortDir} onSort={toggleSort} title="Distancia bonificada por tiempo en pits">Bonus</BetaSortTh>
+              <BetaSortTh align="right" colKey="adjustedDistanceM" current={sortKey} dir={sortDir} onSort={toggleSort}>Dist. (m)</BetaSortTh>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("adjusted.gapSeconds")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("adjusted.intSeconds")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("race.avg20")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-8 sm:w-12">Tier</th>
+              <BetaSortTh align="right" colKey="avgLapMs" current={sortKey} dir={sortDir} onSort={toggleSort}>{t("race.avg20")}</BetaSortTh>
+              <BetaSortTh align="center" colKey="tierScore" current={sortKey} dir={sortDir} onSort={toggleSort} className="w-8 sm:w-12">Tier</BetaSortTh>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-16">Progreso</th>
             </tr>
           </thead>
@@ -356,6 +383,42 @@ export function RealClassificationBeta() {
         </div>
       </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sortable table header                                              */
+/* ------------------------------------------------------------------ */
+
+function BetaSortTh({ children, colKey, current, dir, onSort, align, title, className }: {
+  children: React.ReactNode;
+  colKey: BetaSortKey;
+  current: BetaSortKey;
+  dir: BetaSortDir;
+  onSort: (key: BetaSortKey) => void;
+  align: "left" | "center" | "right";
+  title?: string;
+  className?: string;
+}) {
+  const active = current === colKey;
+  return (
+    <th
+      className={clsx(
+        "px-1.5 sm:px-2 py-2 sm:py-2.5 cursor-pointer select-none hover:text-accent transition-colors",
+        `text-${align}`,
+        active && "text-accent",
+        className,
+      )}
+      onClick={() => onSort(colKey)}
+      title={title}
+    >
+      <span className="inline-flex items-center gap-0.5">
+        {children}
+        {active && (
+          <span className="text-[8px] leading-none">{dir === "asc" ? "▲" : "▼"}</span>
+        )}
+      </span>
+    </th>
   );
 }
 

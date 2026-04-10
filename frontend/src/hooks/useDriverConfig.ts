@@ -20,7 +20,8 @@ export type DriverCardId =
   | "boxScore"
   | "gpsLapDelta"
   | "gpsSpeed"
-  | "gpsGForce";
+  | "gpsGForce"
+  | "lapsToMaxStint";
 
 export const ALL_DRIVER_CARDS: { id: DriverCardId; label: string; requiresGps: boolean }[] = [
   { id: "raceTimer", label: "Tiempo de carrera", requiresGps: false },
@@ -37,6 +38,7 @@ export const ALL_DRIVER_CARDS: { id: DriverCardId; label: string; requiresGps: b
   { id: "gpsLapDelta", label: "Delta vuelta GPS", requiresGps: true },
   { id: "gpsSpeed", label: "Velocidad GPS", requiresGps: true },
   { id: "gpsGForce", label: "G-Force (números)", requiresGps: true },
+  { id: "lapsToMaxStint", label: "Vueltas hasta stint máximo", requiresGps: false },
 ];
 
 export const DEFAULT_CARD_ORDER: DriverCardId[] = ALL_DRIVER_CARDS.map((c) => c.id);
@@ -66,12 +68,12 @@ function loadConfig(): Partial<Pick<DriverConfig, "selectedCircuitId" | "selecte
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const data = JSON.parse(raw);
-      // Validate card order has all cards
+      // Validate card order has all cards — append any missing ones
       if (data.cardOrder) {
-        const hasAll = DEFAULT_CARD_ORDER.every((c) => data.cardOrder.includes(c));
-        if (!hasAll || data.cardOrder.length !== DEFAULT_CARD_ORDER.length) {
-          data.cardOrder = DEFAULT_CARD_ORDER;
-        }
+        const missing = DEFAULT_CARD_ORDER.filter((c) => !data.cardOrder.includes(c));
+        if (missing.length > 0) data.cardOrder = [...data.cardOrder, ...missing];
+        // Remove cards that no longer exist
+        data.cardOrder = data.cardOrder.filter((c: string) => DEFAULT_CARD_ORDER.includes(c as DriverCardId));
       }
       return data;
     }

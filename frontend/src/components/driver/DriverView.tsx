@@ -243,6 +243,8 @@ export function DriverView() {
 
   const circuitLengthM = config.circuitLengthM || 1100;
   const pitTimeS = config.pitTimeS || 0;
+  const durationMs = useRaceStore((s) => s.durationMs);
+  const raceFinished = useRaceStore((s) => s.raceFinished);
   // Kart number: user override from driver config, fallback to race session config
   const ourKart = driverCfg.selectedKartNumber ?? config.ourKartNumber;
 
@@ -408,6 +410,17 @@ export function DriverView() {
 
   // Avg lap 20 from kart data
   const avgLap20Ms = paceDisplay?.avgLapMs ?? 0;
+
+  // Laps to max stint
+  const lapsToMaxStint = useMemo(() => {
+    if (!ourKart || ourKart <= 0 || raceClock === 0 || raceFinished) return null;
+    const kart = karts.find((k) => k.kartNumber === ourKart);
+    if (!kart || kart.avgLapMs <= 0) return null;
+    const stintStart = kart.stintStartCountdownMs || durationMs || raceClock;
+    const stintSec = Math.max(0, stintStart - raceClock) / 1000;
+    const timeToMax = Math.max(0, config.maxStintMin * 60 - stintSec);
+    return timeToMax / (kart.avgLapMs / 1000);
+  }, [karts, ourKart, raceClock, durationMs, raceFinished, config.maxStintMin]);
 
   const cards: Record<DriverCardId, { label: string; content: React.ReactNode; accent: string }> = {
     raceTimer: {
@@ -657,6 +670,30 @@ export function DriverView() {
             <span>{t("driver.lateral")}: {(gps.sample?.gForceX ?? 0).toFixed(1)}</span>
             <span>{t("driver.braking")}: {(gps.sample?.gForceY ?? 0).toFixed(1)}</span>
           </div>
+        </div>
+      ),
+    },
+    lapsToMaxStint: {
+      label: t("metric.lapsToMaxStint"),
+      accent: lapsToMaxStint !== null && lapsToMaxStint <= 2
+        ? "from-red-500/25 to-red-500/5 border-red-400/50"
+        : lapsToMaxStint !== null && lapsToMaxStint <= 5
+          ? "from-orange-500/20 to-orange-500/5 border-orange-400/40"
+          : "from-teal-500/20 to-teal-500/5 border-teal-500/30",
+      content: (
+        <div className="flex flex-col items-center">
+          <span className={`text-4xl sm:text-5xl font-mono font-black leading-none ${
+            lapsToMaxStint !== null && lapsToMaxStint <= 2
+              ? "text-red-400 animate-pulse"
+              : lapsToMaxStint !== null && lapsToMaxStint <= 5
+                ? "text-orange-400"
+                : "text-white"
+          }`}>
+            {lapsToMaxStint !== null && lapsToMaxStint > 0 ? lapsToMaxStint.toFixed(1) : "0"}
+          </span>
+          <span className="text-[9px] sm:text-[10px] text-neutral-500 uppercase tracking-widest mt-0.5">
+            {t("metric.lapsToMaxStint").toLowerCase()}
+          </span>
         </div>
       ),
     },

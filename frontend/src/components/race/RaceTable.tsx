@@ -13,11 +13,26 @@ import clsx from "clsx";
 
 const COL_COUNT = 13; // number of <th> columns
 
+type SortKey = "avgLapMs" | "bestAvgMs" | "lastLapMs" | "bestLapMs" | "totalLaps" | "pitCount" | "tierScore" | "stint" | "kartNumber";
+type SortDir = "asc" | "desc";
+
 export function RaceTable() {
   const t = useT();
   const { karts, config } = useRaceStore();
   const raceClockMs = useRaceClock();
   const [expandedKart, setExpandedKart] = useState<number | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("avgLapMs");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const toggleSort = useCallback((key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      // Sensible defaults: higher is better for laps/tier, lower is better for times
+      setSortDir(key === "totalLaps" || key === "tierScore" || key === "pitCount" ? "desc" : "asc");
+    }
+  }, [sortKey]);
 
   const toggleExpand = useCallback(
     (kartNumber: number) => setExpandedKart((prev) => (prev === kartNumber ? null : kartNumber)),
@@ -28,13 +43,6 @@ export function RaceTable() {
   const prevLastLapRef = useRef<number>(0);
   const [lastLapDelta, setLastLapDelta] = useState<"faster" | "slower" | null>(null);
 
-  // Sort by avg lap time (fastest first), karts without avg go to the end
-  const sorted = [...karts].sort((a, b) => {
-    const aAvg = a.avgLapMs > 0 ? a.avgLapMs : Infinity;
-    const bAvg = b.avgLapMs > 0 ? b.avgLapMs : Infinity;
-    return aAvg - bAvg;
-  });
-
   // Helper: compute stint seconds from race clock
   const durationMs = useRaceStore((s) => s.durationMs);
   const raceFinished = useRaceStore((s) => s.raceFinished);
@@ -43,6 +51,24 @@ export function RaceTable() {
     const stintStart = kart.stintStartCountdownMs || durationMs || raceClockMs;
     return Math.max(0, stintStart - raceClockMs) / 1000;
   };
+
+  // Sort karts by selected column
+  const sorted = [...karts].sort((a, b) => {
+    let aVal: number, bVal: number;
+    switch (sortKey) {
+      case "avgLapMs": aVal = a.avgLapMs > 0 ? a.avgLapMs : Infinity; bVal = b.avgLapMs > 0 ? b.avgLapMs : Infinity; break;
+      case "bestAvgMs": aVal = a.bestAvgMs > 0 ? a.bestAvgMs : Infinity; bVal = b.bestAvgMs > 0 ? b.bestAvgMs : Infinity; break;
+      case "lastLapMs": aVal = a.lastLapMs > 0 ? a.lastLapMs : Infinity; bVal = b.lastLapMs > 0 ? b.lastLapMs : Infinity; break;
+      case "bestLapMs": aVal = a.bestLapMs > 0 ? a.bestLapMs : Infinity; bVal = b.bestLapMs > 0 ? b.bestLapMs : Infinity; break;
+      case "totalLaps": aVal = a.totalLaps; bVal = b.totalLaps; break;
+      case "pitCount": aVal = a.pitCount; bVal = b.pitCount; break;
+      case "tierScore": aVal = a.tierScore; bVal = b.tierScore; break;
+      case "stint": aVal = stintSecondsFor(a); bVal = stintSecondsFor(b); break;
+      case "kartNumber": aVal = a.kartNumber; bVal = b.kartNumber; break;
+      default: aVal = 0; bVal = 0;
+    }
+    return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+  });
 
   // Find our kart
   const ourKart = config.ourKartNumber > 0
@@ -214,17 +240,17 @@ export function RaceTable() {
           <thead className="bg-surface text-neutral-200 sticky top-0 z-10 text-[10px] sm:text-[11px] uppercase tracking-wider">
             <tr>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-6 sm:w-8">#</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left w-8 sm:w-12">{t("race.kart")}</th>
+              <SortTh align="left" colKey="kartNumber" current={sortKey} dir={sortDir} onSort={toggleSort} className="w-8 sm:w-12">{t("race.kart")}</SortTh>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">{t("race.team")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">{t("race.driver")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right" title={t("race.avg20Title")}>{t("race.avg20")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right" title={t("race.best3Title")}>{t("race.best3")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("race.last")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("race.best")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">{t("race.laps")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">{t("race.pit")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-8 sm:w-12">Tier</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">{t("race.stint")}</th>
+              <SortTh align="right" colKey="avgLapMs" current={sortKey} dir={sortDir} onSort={toggleSort} title={t("race.avg20Title")}>{t("race.avg20")}</SortTh>
+              <SortTh align="right" colKey="bestAvgMs" current={sortKey} dir={sortDir} onSort={toggleSort} title={t("race.best3Title")}>{t("race.best3")}</SortTh>
+              <SortTh align="right" colKey="lastLapMs" current={sortKey} dir={sortDir} onSort={toggleSort}>{t("race.last")}</SortTh>
+              <SortTh align="right" colKey="bestLapMs" current={sortKey} dir={sortDir} onSort={toggleSort}>{t("race.best")}</SortTh>
+              <SortTh align="center" colKey="totalLaps" current={sortKey} dir={sortDir} onSort={toggleSort}>{t("race.laps")}</SortTh>
+              <SortTh align="center" colKey="pitCount" current={sortKey} dir={sortDir} onSort={toggleSort}>{t("race.pit")}</SortTh>
+              <SortTh align="center" colKey="tierScore" current={sortKey} dir={sortDir} onSort={toggleSort} className="w-8 sm:w-12">Tier</SortTh>
+              <SortTh align="center" colKey="stint" current={sortKey} dir={sortDir} onSort={toggleSort}>{t("race.stint")}</SortTh>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-6 sm:w-8"></th>
             </tr>
           </thead>
@@ -366,6 +392,39 @@ function BoxCallButton() {
         {sent ? t("box.sent") : "BOX"}
       </span>
     </button>
+  );
+}
+
+/* ── Sortable table header ── */
+function SortTh({ children, colKey, current, dir, onSort, align, title, className }: {
+  children: React.ReactNode;
+  colKey: SortKey;
+  current: SortKey;
+  dir: SortDir;
+  onSort: (key: SortKey) => void;
+  align: "left" | "center" | "right";
+  title?: string;
+  className?: string;
+}) {
+  const active = current === colKey;
+  return (
+    <th
+      className={clsx(
+        "px-1.5 sm:px-2 py-2 sm:py-2.5 cursor-pointer select-none hover:text-accent transition-colors",
+        `text-${align}`,
+        active && "text-accent",
+        className,
+      )}
+      onClick={() => onSort(colKey)}
+      title={title}
+    >
+      <span className="inline-flex items-center gap-0.5">
+        {children}
+        {active && (
+          <span className="text-[8px] leading-none">{dir === "asc" ? "▲" : "▼"}</span>
+        )}
+      </span>
+    </th>
   );
 }
 

@@ -158,6 +158,7 @@ const CARD_ACCENTS: Record<DriverCardId, string> = {
   gpsLapDelta: "from-cyan-500/20 to-cyan-500/5 border-cyan-500/30",
   gpsSpeed: "from-sky-500/20 to-sky-500/5 border-sky-500/30",
   gpsGForce: "from-emerald-500/20 to-emerald-500/5 border-emerald-500/30",
+  lapsToMaxStint: "from-teal-500/20 to-teal-500/5 border-teal-500/30",
 };
 
 const CARD_SAMPLE_VALUES: Record<DriverCardId, string> = {
@@ -175,6 +176,7 @@ const CARD_SAMPLE_VALUES: Record<DriverCardId, string> = {
   gpsLapDelta: "+0.15s",
   gpsSpeed: "94 km/h",
   gpsGForce: "1.2G",
+  lapsToMaxStint: "5.2",
 };
 
 /* ------------------------------------------------------------------ */

@@ -23,6 +23,7 @@ import { DriverView } from "@/components/driver/DriverView";
 import { DriverConfigTab } from "@/components/driver/DriverConfigTab";
 import { MfaSetupRequired } from "@/components/auth/MfaSetupRequired";
 import { CircuitSelector } from "@/components/checkout/CircuitSelector";
+import { AccountPanel } from "@/components/account/AccountPanel";
 import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
 
 export default function DashboardPage() {
@@ -201,6 +202,7 @@ function Dashboard({
           {activeTab === "replay" && userTabs.includes("replay") && <ReplayTab />}
           {activeTab === "analytics" && userTabs.includes("analytics") && <KartAnalyticsTab />}
           {activeTab === "insights" && userTabs.includes("insights") && <GpsInsightsTab />}
+          {activeTab === "account" && <AccountPanel />}
           {activeTab === "admin-users" && user?.is_admin && userTabs.includes("admin-users") && <AdminUsersPanel />}
           {activeTab === "admin-circuits" && user?.is_admin && userTabs.includes("admin-circuits") && <AdminCircuitsPanel />}
           {activeTab === "admin-hub" && user?.is_admin && userTabs.includes("admin-hub") && <AdminHubPanel />}

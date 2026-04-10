@@ -285,6 +285,11 @@ export const api = {
       }),
     }),
   getSubscriptions: () => fetchApi<any[]>("/api/stripe/subscriptions"),
+  cancelSubscription: (subId: number) =>
+    fetchApi<{ ok: boolean }>(`/api/stripe/subscriptions/${subId}/cancel`, { method: "POST" }),
+  reactivateSubscription: (subId: number) =>
+    fetchApi<{ ok: boolean }>(`/api/stripe/subscriptions/${subId}/reactivate`, { method: "POST" }),
+  getInvoices: () => fetchApi<any[]>("/api/stripe/invoices"),
   getCustomerPortal: () =>
     fetchApi<{ url: string }>("/api/stripe/customer-portal", { method: "POST" }),
 

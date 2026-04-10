@@ -558,3 +558,79 @@ async def customer_portal(
     )
 
     return {"url": portal_session.url}
+
+
+@router.post("/subscriptions/{sub_id}/cancel")
+async def cancel_subscription(
+    sub_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancel subscription at end of billing period (don't renew)."""
+    s = get_stripe()
+    result = await db.execute(
+        select(Subscription).where(Subscription.id == sub_id, Subscription.user_id == user.id)
+    )
+    sub = result.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(404, "Subscription not found")
+    if sub.status not in ("active", "trialing"):
+        raise HTTPException(400, "Subscription is not active")
+    if not sub.stripe_subscription_id:
+        raise HTTPException(400, "No Stripe subscription linked")
+
+    s.Subscription.modify(sub.stripe_subscription_id, cancel_at_period_end=True)
+    sub.cancel_at_period_end = True
+    await db.commit()
+    return {"ok": True, "cancel_at_period_end": True}
+
+
+@router.post("/subscriptions/{sub_id}/reactivate")
+async def reactivate_subscription(
+    sub_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reactivate a subscription that was set to cancel at period end."""
+    s = get_stripe()
+    result = await db.execute(
+        select(Subscription).where(Subscription.id == sub_id, Subscription.user_id == user.id)
+    )
+    sub = result.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(404, "Subscription not found")
+    if not sub.cancel_at_period_end:
+        raise HTTPException(400, "Subscription is not set to cancel")
+    if not sub.stripe_subscription_id:
+        raise HTTPException(400, "No Stripe subscription linked")
+
+    s.Subscription.modify(sub.stripe_subscription_id, cancel_at_period_end=False)
+    sub.cancel_at_period_end = False
+    await db.commit()
+    return {"ok": True, "cancel_at_period_end": False}
+
+
+@router.get("/invoices")
+async def list_invoices(
+    user: User = Depends(get_current_user),
+):
+    """List user's Stripe invoices."""
+    s = get_stripe()
+    if not user.stripe_customer_id:
+        return []
+
+    invoices = s.Invoice.list(customer=user.stripe_customer_id, limit=50)
+    return [
+        {
+            "id": inv.id,
+            "number": inv.number,
+            "amount_paid": inv.amount_paid / 100,
+            "currency": inv.currency,
+            "status": inv.status,
+            "created": datetime.fromtimestamp(inv.created, tz=timezone.utc).isoformat(),
+            "invoice_pdf": inv.invoice_pdf,
+            "hosted_invoice_url": inv.hosted_invoice_url,
+        }
+        for inv in invoices.data
+        if inv.status == "paid"
+    ]
