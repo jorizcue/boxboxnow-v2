@@ -631,6 +631,100 @@ async def customer_portal(
     return {"url": portal_session.url}
 
 
+@router.get("/payment-methods")
+async def list_payment_methods(
+    user: User = Depends(get_current_user),
+):
+    """List user's saved payment methods."""
+    s = get_stripe()
+    if not user.stripe_customer_id:
+        return {"methods": [], "default_method": None}
+
+    methods = s.PaymentMethod.list(customer=user.stripe_customer_id, type="card")
+    # Get default payment method from customer
+    customer = s.Customer.retrieve(user.stripe_customer_id)
+    default_pm = None
+    if customer.invoice_settings and customer.invoice_settings.default_payment_method:
+        default_pm = customer.invoice_settings.default_payment_method
+
+    return {
+        "methods": [
+            {
+                "id": pm.id,
+                "brand": pm.card.brand if pm.card else "unknown",
+                "last4": pm.card.last4 if pm.card else "????",
+                "exp_month": pm.card.exp_month if pm.card else 0,
+                "exp_year": pm.card.exp_year if pm.card else 0,
+                "is_default": pm.id == default_pm,
+            }
+            for pm in methods.data
+        ],
+        "default_method": default_pm,
+    }
+
+
+@router.post("/setup-intent")
+async def create_setup_intent(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a SetupIntent for adding a new payment method."""
+    s = get_stripe()
+
+    # Ensure customer exists
+    if not user.stripe_customer_id:
+        customer = s.Customer.create(
+            email=user.email or f"{user.username}@boxboxnow.local",
+            name=user.username,
+            metadata={"user_id": str(user.id)},
+        )
+        user.stripe_customer_id = customer.id
+        await db.commit()
+
+    setup_intent = s.SetupIntent.create(
+        customer=user.stripe_customer_id,
+        payment_method_types=["card"],
+    )
+
+    return {"client_secret": setup_intent.client_secret}
+
+
+@router.post("/payment-methods/{pm_id}/default")
+async def set_default_payment_method(
+    pm_id: str,
+    user: User = Depends(get_current_user),
+):
+    """Set a payment method as the default for invoices."""
+    s = get_stripe()
+    if not user.stripe_customer_id:
+        raise HTTPException(400, "No Stripe customer found")
+
+    s.Customer.modify(
+        user.stripe_customer_id,
+        invoice_settings={"default_payment_method": pm_id},
+    )
+    return {"ok": True}
+
+
+@router.delete("/payment-methods/{pm_id}")
+async def delete_payment_method(
+    pm_id: str,
+    user: User = Depends(get_current_user),
+):
+    """Detach a payment method from the customer."""
+    s = get_stripe()
+    if not user.stripe_customer_id:
+        raise HTTPException(400, "No Stripe customer found")
+
+    # Verify it belongs to this customer
+    pm = s.PaymentMethod.retrieve(pm_id)
+    if pm.customer != user.stripe_customer_id:
+        raise HTTPException(403, "Payment method does not belong to this customer")
+
+    s.PaymentMethod.detach(pm_id)
+    return {"ok": True}
+
+
 @router.post("/subscriptions/{sub_id}/cancel")
 async def cancel_subscription(
     sub_id: int,

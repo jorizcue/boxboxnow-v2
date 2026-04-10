@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
+import { PaymentMethodsPanel } from "./PaymentMethodsPanel";
 
 interface Sub {
   id: number;
@@ -100,7 +101,7 @@ export function AccountPanel() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
-  const [tab, setTab] = useState<"subs" | "invoices">("subs");
+  const [tab, setTab] = useState<"subs" | "invoices" | "payment">("subs");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -171,15 +172,6 @@ export function AccountPanel() {
     }
   };
 
-  const handleOpenPortal = async () => {
-    try {
-      const data = await api.getCustomerPortal();
-      window.location.href = data.url;
-    } catch {
-      alert("Error al abrir el portal de pagos");
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -191,22 +183,11 @@ export function AccountPanel() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-white">Mi cuenta</h2>
-          <p className="text-sm text-neutral-400 mt-1">
-            {user?.username} {user?.email ? `· ${user.email}` : ""}
-          </p>
-        </div>
-        <button
-          onClick={handleOpenPortal}
-          className="shrink-0 flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl bg-white/[0.06] border border-border text-neutral-200 hover:text-white hover:bg-white/[0.1] hover:border-neutral-500 transition-all"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
-          </svg>
-          Gestionar métodos de pago
-        </button>
+      <div>
+        <h2 className="text-xl font-bold text-white">Mi cuenta</h2>
+        <p className="text-sm text-neutral-400 mt-1">
+          {user?.username} {user?.email ? `· ${user.email}` : ""}
+        </p>
       </div>
 
       {/* Tab switcher */}
@@ -230,6 +211,16 @@ export function AccountPanel() {
           }`}
         >
           Facturas ({invoices.length})
+        </button>
+        <button
+          onClick={() => setTab("payment")}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            tab === "payment"
+              ? "bg-surface text-white"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Métodos de pago
         </button>
       </div>
 
@@ -314,6 +305,9 @@ export function AccountPanel() {
           )}
         </div>
       )}
+
+      {/* Payment methods */}
+      {tab === "payment" && <PaymentMethodsPanel />}
 
       {/* Invoices */}
       {tab === "invoices" && (

@@ -297,6 +297,14 @@ export const api = {
   getInvoices: () => fetchApi<any[]>("/api/stripe/invoices"),
   getCustomerPortal: () =>
     fetchApi<{ url: string }>("/api/stripe/customer-portal", { method: "POST" }),
+  getPaymentMethods: () =>
+    fetchApi<{ methods: any[]; default_method: string | null }>("/api/stripe/payment-methods"),
+  createSetupIntent: () =>
+    fetchApi<{ client_secret: string }>("/api/stripe/setup-intent", { method: "POST" }),
+  setDefaultPaymentMethod: (pmId: string) =>
+    fetchApi<{ ok: boolean }>(`/api/stripe/payment-methods/${pmId}/default`, { method: "POST" }),
+  deletePaymentMethod: (pmId: string) =>
+    fetchApi<{ ok: boolean }>(`/api/stripe/payment-methods/${pmId}`, { method: "DELETE" }),
 
   // Platform settings (admin)
   getPlatformSettings: () =>
