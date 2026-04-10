@@ -1,5 +1,5 @@
 import logging
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from app.config import get_settings
@@ -17,6 +17,14 @@ engine = create_async_engine(
     connect_args={"check_same_thread": False},
 )
 
+
+# Enable foreign key enforcement on every connection (required for ON DELETE CASCADE in SQLite)
+@event.listens_for(engine.sync_engine, "connect")
+def _set_sqlite_fk_pragma(dbapi_conn, connection_record):
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -25,6 +33,8 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
         # Enable WAL mode for concurrent reads
         await conn.execute(text("PRAGMA journal_mode=WAL"))
+        # Enable foreign key enforcement (required for ON DELETE CASCADE)
+        await conn.execute(text("PRAGMA foreign_keys=ON"))
 
         # Migrations: add columns that may not exist yet
         try:
