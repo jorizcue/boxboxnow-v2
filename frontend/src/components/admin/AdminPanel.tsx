@@ -1254,7 +1254,7 @@ function PlatformSettingsManager() {
   };
 
   const deleteConfig = async (id: number) => {
-    const ok = await confirm("Eliminar esta configuracion de producto?");
+    const ok = await confirm({ message: "Eliminar esta configuracion de producto?" });
     if (!ok) return;
     try {
       await api.deleteProductConfig(id);
