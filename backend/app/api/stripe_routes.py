@@ -256,28 +256,35 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
             for trial_sub in trial_result.scalars().all():
                 trial_sub.status = "canceled"
 
+            # Retrieve subscription from Stripe for period dates and price_id
+            stripe_price_id = None
+            period_start = None
+            period_end = None
+            try:
+                sub_obj = s.Subscription.retrieve(sub_id, expand=["items.data"])
+                if sub_obj.current_period_start:
+                    period_start = datetime.fromtimestamp(sub_obj.current_period_start, tz=timezone.utc)
+                if sub_obj.current_period_end:
+                    period_end = datetime.fromtimestamp(sub_obj.current_period_end, tz=timezone.utc)
+                if sub_obj.items and sub_obj.items.data:
+                    stripe_price_id = sub_obj.items.data[0].price.id
+            except Exception as e:
+                logger.warning(f"Could not retrieve subscription details: {e}")
+
             sub = Subscription(
                 user_id=user_id,
                 stripe_subscription_id=sub_id,
                 plan_type=plan_type,
                 status="active",
                 circuit_id=circuit_id,
+                current_period_start=period_start,
+                current_period_end=period_end,
             )
             db.add(sub)
 
             # Grant circuit access for the selected circuit
             if circuit_id:
                 await _grant_circuit_access(db, user_id, circuit_id, plan_type)
-
-            # Update user plan capabilities — extract price_id from subscription
-            stripe_price_id = None
-            if sub_id:
-                try:
-                    sub_obj = s.Subscription.retrieve(sub_id, expand=["items.data"])
-                    if sub_obj.items and sub_obj.items.data:
-                        stripe_price_id = sub_obj.items.data[0].price.id
-                except Exception as e:
-                    logger.warning(f"Could not retrieve subscription price_id: {e}")
 
             await _apply_plan_to_user(user_id, plan_type, db, stripe_price_id=stripe_price_id)
             await db.commit()
@@ -353,12 +360,25 @@ async def _handle_invoice_paid(invoice_data: dict, db: AsyncSession):
     )
     sub = result.scalar_one_or_none()
     if sub:
-        period_start = invoice_data.get("period_start")
-        period_end = invoice_data.get("period_end")
-        if period_start:
-            sub.current_period_start = datetime.fromtimestamp(period_start, tz=timezone.utc)
-        if period_end:
-            sub.current_period_end = datetime.fromtimestamp(period_end, tz=timezone.utc)
+        # Get correct period dates from the Stripe subscription object (not the invoice,
+        # which has period_start == period_end for the initial invoice)
+        import stripe as s
+        try:
+            stripe_sub = s.Subscription.retrieve(sub_id)
+            if stripe_sub.current_period_start:
+                sub.current_period_start = datetime.fromtimestamp(stripe_sub.current_period_start, tz=timezone.utc)
+            if stripe_sub.current_period_end:
+                sub.current_period_end = datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc)
+        except Exception as e:
+            logger.warning(f"Could not retrieve subscription period from Stripe: {e}")
+            # Fallback to invoice dates
+            period_start = invoice_data.get("period_start")
+            period_end = invoice_data.get("period_end")
+            if period_start:
+                sub.current_period_start = datetime.fromtimestamp(period_start, tz=timezone.utc)
+            if period_end:
+                sub.current_period_end = datetime.fromtimestamp(period_end, tz=timezone.utc)
+
         sub.status = "active"
 
         # Extend circuit access with new period end

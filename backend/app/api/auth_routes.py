@@ -265,7 +265,11 @@ def _user_out(user: User) -> UserOut:
             if 'subscriptions' in state.dict:
                 now = datetime.now(timezone.utc)
                 for s in (user.subscriptions or []):
-                    if s.status in ("active", "trialing") and (s.current_period_end is None or s.current_period_end > now):
+                    # Normalize naive datetimes from SQLite to UTC-aware
+                    period_end = s.current_period_end
+                    if period_end and period_end.tzinfo is None:
+                        period_end = period_end.replace(tzinfo=timezone.utc)
+                    if s.status in ("active", "trialing") and (period_end is None or period_end > now):
                         has_sub = True
                         sub_plan = s.plan_type
                         if s.status == "trialing" and s.current_period_end:
