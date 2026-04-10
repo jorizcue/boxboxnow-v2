@@ -452,3 +452,68 @@ class GpsLapOut(BaseModel):
 
 class GpsLapBatchCreate(BaseModel):
     laps: list[GpsLapCreate]
+
+
+# --- Product Tab Config ---
+
+class ProductTabConfigOut(BaseModel):
+    """Response model for product tab config (admin)."""
+    id: int
+    stripe_product_id: str
+    plan_type: str
+    tabs: list[str] = []
+    max_devices: int = 1
+    display_name: str = ""
+    description: str | None = None
+    features: list[str] = []
+    price_monthly: float | None = None
+    price_annual: float | None = None
+    is_popular: bool = False
+    is_visible: bool = True
+    sort_order: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+class ProductTabConfigCreate(BaseModel):
+    """Request model for creating a product tab config."""
+    stripe_product_id: str
+    plan_type: str
+    tabs: list[str] = []
+    max_devices: int = 1
+    display_name: str = ""
+    description: str | None = None
+    features: list[str] = []
+    price_monthly: float | None = None
+    price_annual: float | None = None
+    is_popular: bool = False
+    is_visible: bool = True
+    sort_order: int = 0
+
+
+class ProductTabConfigUpdate(BaseModel):
+    """Request model for updating a product tab config."""
+    stripe_product_id: str | None = None
+    plan_type: str | None = None
+    tabs: list[str] | None = None
+    max_devices: int | None = None
+    display_name: str | None = None
+    description: str | None = None
+    features: list[str] | None = None
+    price_monthly: float | None = None
+    price_annual: float | None = None
+    is_popular: bool | None = None
+    is_visible: bool | None = None
+    sort_order: int | None = None
+
+
+class PlanPublicOut(BaseModel):
+    """Public response model for pricing page — no sensitive fields."""
+    plan_type: str
+    display_name: str
+    description: str | None = None
+    features: list[str] = []
+    price_monthly: float | None = None
+    price_annual: float | None = None
+    is_popular: bool = False
+    sort_order: int = 0
