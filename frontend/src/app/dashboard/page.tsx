@@ -27,6 +27,7 @@ import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
 export default function DashboardPage() {
   const { token, user, _hydrated } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("race");
+  const [checkingOut, setCheckingOut] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -35,7 +36,28 @@ export default function DashboardPage() {
     }
   }, [_hydrated, token, router]);
 
-  if (!_hydrated) {
+  // Auto-checkout: if user just registered/logged in with a pending plan, redirect to Stripe
+  useEffect(() => {
+    if (!_hydrated || !token || checkingOut) return;
+    const pendingPlan = localStorage.getItem("bbn_pending_plan");
+    if (!pendingPlan) return;
+
+    // Clear immediately to prevent loops
+    localStorage.removeItem("bbn_pending_plan");
+    setCheckingOut(true);
+
+    import("@/lib/api").then(({ api }) =>
+      api.createCheckoutSession("", undefined, pendingPlan)
+        .then((data) => {
+          window.location.href = data.checkout_url;
+        })
+        .catch(() => {
+          setCheckingOut(false);
+        })
+    );
+  }, [_hydrated, token, checkingOut]);
+
+  if (!_hydrated || checkingOut) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <span className="text-lg font-bold animate-pulse">

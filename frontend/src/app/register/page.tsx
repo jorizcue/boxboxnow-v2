@@ -7,6 +7,11 @@ import Link from "next/link";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+function getPlanFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("plan");
+}
+
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
@@ -18,6 +23,14 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const { token, _hydrated, setAuth } = useAuth();
   const router = useRouter();
+  const [pendingPlan] = useState(getPlanFromUrl);
+
+  // Store pending plan from query params
+  useEffect(() => {
+    if (pendingPlan) {
+      localStorage.setItem("bbn_pending_plan", pendingPlan);
+    }
+  }, [pendingPlan]);
 
   useEffect(() => {
     if (_hydrated && token) {
@@ -155,7 +168,7 @@ export default function RegisterPage() {
         <div className="bg-surface rounded-2xl p-5 sm:p-8 border border-border">
           {/* Google signup */}
           <a
-            href="/api/auth/google?mode=register"
+            href={`/api/auth/google?mode=register${pendingPlan ? `&plan=${pendingPlan}` : ""}`}
             className="w-full flex items-center justify-center gap-3 bg-white hover:bg-neutral-100 text-neutral-800 font-medium py-3 rounded-lg transition-colors"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">

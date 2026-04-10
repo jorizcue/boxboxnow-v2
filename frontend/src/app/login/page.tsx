@@ -39,6 +39,11 @@ export default function LoginPage() {
       const accessToken = params.get("token");
       const sessionTk = params.get("session_token");
       const userJson = params.get("user");
+      const plan = params.get("plan");
+      // Store pending plan from OAuth callback
+      if (plan) {
+        localStorage.setItem("bbn_pending_plan", plan);
+      }
       if (accessToken && sessionTk && userJson) {
         try {
           const userData = JSON.parse(userJson);

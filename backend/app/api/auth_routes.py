@@ -485,7 +485,7 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
 # --- Google OAuth ---
 
 @router.get("/google")
-async def google_login(request: Request):
+async def google_login(request: Request, plan: str | None = None):
     """Redirect to Google OAuth."""
     settings = get_settings()
     if not settings.google_client_id:
@@ -501,13 +501,16 @@ async def google_login(request: Request):
         "scope": "openid email profile",
         "access_type": "offline",
     }
+    # Pass plan selection through OAuth state parameter
+    if plan:
+        params["state"] = plan
     url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url)
 
 
 @router.get("/google/callback")
-async def google_callback(code: str, request: Request, db: AsyncSession = Depends(get_db)):
+async def google_callback(code: str, request: Request, state: str | None = None, db: AsyncSession = Depends(get_db)):
     """Handle Google OAuth callback."""
     import httpx
     settings = get_settings()
@@ -659,7 +662,7 @@ async def google_callback(code: str, request: Request, db: AsyncSession = Depend
     import json
     frontend_url = settings.frontend_url
     user_out = _user_out(user)
-    params = urlencode({
+    redirect_params = {
         "token": access_token,
         "session_token": session_token,
         "user": json.dumps({
@@ -673,7 +676,11 @@ async def google_callback(code: str, request: Request, db: AsyncSession = Depend
             "subscription_plan": user_out.subscription_plan,
             "trial_ends_at": user_out.trial_ends_at,
         }),
-    })
+    }
+    # Pass plan selection back to frontend if provided via OAuth state
+    if state:
+        redirect_params["plan"] = state
+    params = urlencode(redirect_params)
     return RedirectResponse(f"{frontend_url}/login?oauth=google&{params}")
 
 

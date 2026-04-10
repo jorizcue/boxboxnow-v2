@@ -5,6 +5,7 @@ import { useState } from "react";
 const plans = [
   {
     name: "Basico",
+    planKey: "basic",
     monthlyPrice: 49,
     annualPrice: 490,
     period: "/mes",
@@ -18,11 +19,11 @@ const plans = [
       "Hasta 2 dispositivos",
     ],
     cta: "Empezar ahora",
-    href: "/register",
     popular: false,
   },
   {
     name: "Pro",
+    planKey: "pro",
     monthlyPrice: 79,
     annualPrice: 790,
     period: "/mes",
@@ -37,11 +38,11 @@ const plans = [
       "Soporte prioritario",
     ],
     cta: "Empezar ahora",
-    href: "/register",
     popular: true,
   },
   {
     name: "Evento",
+    planKey: "event",
     monthlyPrice: 50,
     annualPrice: 50,
     period: "/evento",
@@ -55,7 +56,6 @@ const plans = [
       "Sin compromiso",
     ],
     cta: "Comprar evento",
-    href: "/register",
     popular: false,
   },
 ];
@@ -155,7 +155,7 @@ export function PricingToggle() {
               ))}
             </ul>
             <a
-              href={plan.href}
+              href={`/register?plan=${plan.planKey}${plan.isEvent ? "" : annual ? "_annual" : "_monthly"}`}
               className={`block w-full rounded-lg py-3 text-center text-sm font-semibold transition-colors ${
                 plan.popular
                   ? "bg-accent text-black hover:bg-accent-hover"

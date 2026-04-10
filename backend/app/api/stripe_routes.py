@@ -44,6 +44,18 @@ def _price_to_plan(price_id: str) -> str | None:
     return mapping.get(price_id)
 
 
+def _plan_to_price(plan: str) -> str | None:
+    settings = get_settings()
+    mapping = {
+        "basic_monthly": settings.stripe_basic_monthly_price_id,
+        "basic_annual": settings.stripe_basic_annual_price_id,
+        "pro_monthly": settings.stripe_pro_monthly_price_id,
+        "pro_annual": settings.stripe_pro_annual_price_id,
+        "event": settings.stripe_event_price_id,
+    }
+    return mapping.get(plan)
+
+
 @router.post("/create-checkout-session")
 async def create_checkout_session(
     request: Request,
@@ -52,10 +64,17 @@ async def create_checkout_session(
 ):
     body = await request.json()
     price_id = body.get("price_id")
+    plan = body.get("plan")  # Alternative: accept plan name like "pro_monthly"
     circuit_id = body.get("circuit_id")
 
+    # Resolve plan name to price_id if provided
+    if not price_id and plan:
+        price_id = _plan_to_price(plan)
+        if not price_id:
+            raise HTTPException(400, f"Unknown plan: {plan}")
+
     if not price_id:
-        raise HTTPException(400, "price_id required")
+        raise HTTPException(400, "price_id or plan required")
 
     settings = get_settings()
     s = get_stripe()
