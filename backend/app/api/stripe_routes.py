@@ -692,10 +692,11 @@ async def switch_plan(
         stripe_sub = s.Subscription.retrieve(sub.stripe_subscription_id, expand=["items"])
     except Exception as e:
         raise HTTPException(400, f"Could not retrieve Stripe subscription: {e}")
-    if not stripe_sub.get("items") or not stripe_sub["items"]["data"]:
+    items = stripe_sub.items.data if stripe_sub.items else []
+    if not items:
         raise HTTPException(400, "No subscription items found")
 
-    item_id = stripe_sub["items"]["data"][0]["id"]
+    item_id = items[0].id
 
     # Change price immediately without proration
     try:
