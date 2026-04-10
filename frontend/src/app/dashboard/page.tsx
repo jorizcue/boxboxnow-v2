@@ -25,7 +25,7 @@ import { MfaSetupRequired } from "@/components/auth/MfaSetupRequired";
 import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
 
 export default function DashboardPage() {
-  const { token, user, _hydrated } = useAuth();
+  const { token, user, _hydrated, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("race");
   const [checkingOut, setCheckingOut] = useState(false);
   const router = useRouter();
@@ -35,6 +35,20 @@ export default function DashboardPage() {
       router.push("/login");
     }
   }, [_hydrated, token, router]);
+
+  // Refresh user data after Stripe checkout success
+  useEffect(() => {
+    if (!_hydrated || !token) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "success") {
+      // Clean URL
+      window.history.replaceState({}, "", "/dashboard");
+      // Refresh user profile from backend (subscription is now active)
+      import("@/lib/api").then(({ api }) =>
+        api.getMe().then((freshUser) => updateUser(freshUser)).catch(() => {})
+      );
+    }
+  }, [_hydrated, token, updateUser]);
 
   // Auto-checkout: if user just registered/logged in with a pending plan, redirect to Stripe
   useEffect(() => {

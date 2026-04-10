@@ -185,12 +185,42 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
             db.add(sub)
 
             # Grant circuit access
-            if circuit_id:
+            # Subscription plans (basic/pro) grant access to ALL circuits
+            # Event plans are circuit-specific
+            if plan_type in ("basic_monthly", "basic_annual", "pro_monthly", "pro_annual"):
+                all_circuits = await db.execute(select(Circuit))
+                for circuit in all_circuits.scalars().all():
+                    # Check if access already exists
+                    existing = await db.execute(
+                        select(UserCircuitAccess).where(
+                            UserCircuitAccess.user_id == user_id,
+                            UserCircuitAccess.circuit_id == circuit.id,
+                        )
+                    )
+                    if existing.scalar_one_or_none():
+                        # Update existing access validity
+                        existing_access = (await db.execute(
+                            select(UserCircuitAccess).where(
+                                UserCircuitAccess.user_id == user_id,
+                                UserCircuitAccess.circuit_id == circuit.id,
+                            )
+                        )).scalar_one()
+                        existing_access.valid_from = datetime.now(timezone.utc)
+                        existing_access.valid_until = datetime.now(timezone.utc) + timedelta(days=365 * 10)
+                    else:
+                        db.add(UserCircuitAccess(
+                            user_id=user_id,
+                            circuit_id=circuit.id,
+                            valid_from=datetime.now(timezone.utc),
+                            valid_until=datetime.now(timezone.utc) + timedelta(days=365 * 10),
+                        ))
+            elif circuit_id:
+                # Event plan: specific circuit access
                 access = UserCircuitAccess(
                     user_id=user_id,
                     circuit_id=circuit_id,
                     valid_from=datetime.now(timezone.utc),
-                    valid_until=datetime.now(timezone.utc) + timedelta(days=365 * 10),  # Far future, managed by sub
+                    valid_until=datetime.now(timezone.utc) + timedelta(days=365 * 10),
                 )
                 db.add(access)
 

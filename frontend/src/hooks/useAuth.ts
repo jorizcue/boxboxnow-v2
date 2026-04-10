@@ -23,6 +23,7 @@ interface AuthStore {
   user: AuthUser | null;
   _hydrated: boolean;
   setAuth: (token: string, sessionToken: string, user: AuthUser) => void;
+  updateUser: (user: AuthUser) => void;
   logout: () => void;
   setHydrated: () => void;
 }
@@ -36,6 +37,8 @@ export const useAuth = create<AuthStore>()(
       _hydrated: false,
 
       setAuth: (token, sessionToken, user) => set({ token, sessionToken, user }),
+
+      updateUser: (user) => set({ user }),
 
       logout: () => set({ token: null, sessionToken: null, user: null }),
 
