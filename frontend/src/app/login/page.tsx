@@ -208,10 +208,10 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Brand header */}
         <div className="text-center mb-8 sm:mb-10">
-          <div className="inline-flex items-center gap-0 mb-2">
+          <Link href="/" className="inline-flex items-center gap-0 mb-2 hover:opacity-80 transition-opacity">
             <span className="text-4xl font-bold text-white">BB</span>
             <span className="text-4xl font-bold text-accent">N</span>
-          </div>
+          </Link>
           <h1 className="text-2xl font-bold tracking-wider text-white">
             BOXBOX<span className="text-accent">NOW</span>
           </h1>
