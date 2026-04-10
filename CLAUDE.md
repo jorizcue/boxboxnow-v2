@@ -141,15 +141,28 @@ ssh -i ~/.ssh/boxboxnow.pem ubuntu@3.252.140.252 \
 | Evento | 50€ (unico) | — | 3 | Todo (48h acceso) |
 | Trial | Gratis | — | 2 | Todo (configurable: 0-N dias) |
 
-## Flujo de checkout (Pricing → Registro → Stripe)
+## Flujo de checkout (Pricing → Registro → Circuito → Stripe)
 
 1. **PricingToggle**: Boton "Empezar ahora" → `/register?plan=pro_monthly`
 2. **Register/Login**: Guarda plan en `localStorage("bbn_pending_plan")`, lo pasa a Google OAuth via query param `?plan=`
 3. **Backend OAuth**: Recibe `plan` como query param → lo pasa a Google como `state` → lo devuelve en redirect al frontend
-4. **Dashboard**: Al montar, detecta `bbn_pending_plan` en localStorage → llama `POST /api/stripe/create-checkout-session` con `{ plan: "pro_monthly" }` → redirect a Stripe
-5. **Backend checkout**: Acepta tanto `price_id` como `plan` name — resuelve internamente via `_plan_to_price()`
-6. **Webhook post-pago**: `_handle_checkout_completed()` crea Subscription + otorga acceso a todos los circuitos (basic/pro) o circuito especifico (event)
-7. **Dashboard post-pago**: Detecta `?checkout=success` → llama `api.getMe()` → refresca user en Zustand (has_active_subscription, tab_access, etc.)
+4. **Dashboard**: Al montar, detecta `bbn_pending_plan` → muestra `CircuitSelector` para elegir circuito
+5. **CircuitSelector**: Lista circuitos via `GET /api/stripe/circuits` → usuario elige → `POST /api/stripe/create-checkout-session` con `{ plan, circuit_id }` → redirect a Stripe
+6. **Backend checkout**: Acepta tanto `price_id` como `plan` name — resuelve internamente via `_plan_to_price()`. `circuit_id` es **obligatorio**
+7. **Webhook post-pago**: `_handle_checkout_completed()` crea Subscription + `UserCircuitAccess` con fecha temporal segun plan
+8. **Webhook renovacion**: `_handle_invoice_paid()` extiende `UserCircuitAccess.valid_until` con cada pago (+ 3 dias de gracia)
+9. **Webhook cancelacion**: `_handle_subscription_deleted()` expira `UserCircuitAccess` inmediatamente
+10. **Dashboard post-pago**: Detecta `?checkout=success` → llama `api.getMe()` → refresca user en Zustand
+
+## Modelo de acceso a circuitos
+
+- **Todos los planes requieren seleccionar un circuito** (basic, pro, event)
+- **Acceso temporal**: `UserCircuitAccess.valid_from` / `valid_until` controlan las fechas
+- **Renovacion automatica**: Cada `invoice.paid` de Stripe extiende `valid_until` al nuevo `period_end + 3 dias gracia`
+- **Cancelacion**: `subscription.deleted` expira el acceso inmediatamente (`valid_until = now`)
+- **Duraciones por plan**: monthly ~33 dias, annual ~368 dias, event 48h (todas con 3 dias de gracia)
+- **Upsert**: Si ya existe acceso al circuito, se extiende (usa el mayor `valid_until`)
+- **Trial**: Otorga acceso a TODOS los circuitos durante el periodo trial (diferente de planes pagados)
 
 ## Convenciones de codigo
 
@@ -212,13 +225,15 @@ const [plan] = useState(getPlanFromUrl);
 **Solucion**: Leer `trial_days` de AppSetting. Si es 0, solo asignar tabs basicas, sin subscription ni circuit access.
 
 ### Subscripcion pagada sin acceso a circuitos
-**Problema**: Despues de pagar via Stripe, el usuario tenia subscription activa pero no podia acceder a ningun circuito (lista vacia).
+**Problema**: Despues de pagar via Stripe, el usuario tenia subscription activa pero no podia acceder a ningun circuito.
 **Causa dual**:
-1. El webhook de Stripe solo creaba `UserCircuitAccess` si recibia `circuit_id`, y el flujo de checkout desde pricing nunca lo pasaba.
+1. No habia seleccion de circuito en el flujo de compra — el checkout no pasaba `circuit_id`.
 2. El frontend cacheaba el user en Zustand con `has_active_subscription: false` y no lo refrescaba tras volver de Stripe.
 **Solucion**:
-1. En `_handle_checkout_completed()`, los planes basic/pro ahora otorgan acceso a TODOS los circuitos (como el trial). Solo el plan "event" requiere circuit_id especifico.
-2. En dashboard, detectar `?checkout=success` → llamar `api.getMe()` → `updateUser()` para refrescar el estado del usuario.
+1. Añadido paso de seleccion de circuito (`CircuitSelector`) antes del checkout. `circuit_id` ahora es obligatorio.
+2. Acceso temporal con duraciones por plan: `_grant_circuit_access()` centraliza la logica de upsert.
+3. Webhooks `invoice.paid` y `subscription.updated` extienden acceso, `subscription.deleted` lo revoca.
+4. Dashboard detecta `?checkout=success` → `api.getMe()` → `updateUser()`.
 
 ### Cache de usuario desactualizado tras acciones externas
 **Problema general**: Zustand persiste el user en localStorage. Cualquier cambio server-side (webhook, admin) no se refleja automaticamente.

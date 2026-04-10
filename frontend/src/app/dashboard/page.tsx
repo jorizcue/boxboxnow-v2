@@ -22,12 +22,14 @@ import { GpsInsightsTab } from "@/components/insights/GpsInsightsTab";
 import { DriverView } from "@/components/driver/DriverView";
 import { DriverConfigTab } from "@/components/driver/DriverConfigTab";
 import { MfaSetupRequired } from "@/components/auth/MfaSetupRequired";
+import { CircuitSelector } from "@/components/checkout/CircuitSelector";
 import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
 
 export default function DashboardPage() {
   const { token, user, _hydrated, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("race");
   const [checkingOut, setCheckingOut] = useState(false);
+  const [pendingPlan, setPendingPlan] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -50,26 +52,29 @@ export default function DashboardPage() {
     }
   }, [_hydrated, token, updateUser]);
 
-  // Auto-checkout: if user just registered/logged in with a pending plan, redirect to Stripe
+  // Detect pending plan from localStorage (set during pricing → register flow)
   useEffect(() => {
-    if (!_hydrated || !token || checkingOut) return;
-    const pendingPlan = localStorage.getItem("bbn_pending_plan");
+    if (!_hydrated || !token) return;
+    const plan = localStorage.getItem("bbn_pending_plan");
+    if (plan) {
+      localStorage.removeItem("bbn_pending_plan");
+      setPendingPlan(plan);
+    }
+  }, [_hydrated, token]);
+
+  // Handle circuit selection → Stripe checkout
+  const handleCircuitSelected = async (circuitId: number) => {
     if (!pendingPlan) return;
-
-    // Clear immediately to prevent loops
-    localStorage.removeItem("bbn_pending_plan");
     setCheckingOut(true);
-
-    import("@/lib/api").then(({ api }) =>
-      api.createCheckoutSession("", undefined, pendingPlan)
-        .then((data) => {
-          window.location.href = data.checkout_url;
-        })
-        .catch(() => {
-          setCheckingOut(false);
-        })
-    );
-  }, [_hydrated, token, checkingOut]);
+    try {
+      const { api } = await import("@/lib/api");
+      const data = await api.createCheckoutSession("", circuitId, pendingPlan);
+      window.location.href = data.checkout_url;
+    } catch {
+      setCheckingOut(false);
+      setPendingPlan(null);
+    }
+  };
 
   if (!_hydrated || checkingOut) {
     return (
@@ -99,6 +104,11 @@ export default function DashboardPage() {
         <MfaSetupRequired />
       </ConfirmProvider>
     );
+  }
+
+  // Circuit selection step: show when user has a pending plan from pricing flow
+  if (pendingPlan) {
+    return <CircuitSelector plan={pendingPlan} onSelect={handleCircuitSelected} onCancel={() => setPendingPlan(null)} />;
   }
 
   // Subscription gate: non-admin users without active subscription see upgrade page

@@ -56,6 +56,62 @@ def _plan_to_price(plan: str) -> str | None:
     return mapping.get(plan)
 
 
+# Duration per plan type for circuit access
+_PLAN_DURATION = {
+    "basic_monthly": timedelta(days=33),     # ~1 month + 3 days grace
+    "basic_annual": timedelta(days=368),     # ~1 year + 3 days grace
+    "pro_monthly": timedelta(days=33),
+    "pro_annual": timedelta(days=368),
+    "event": timedelta(hours=48),
+}
+
+
+async def _grant_circuit_access(
+    db: AsyncSession, user_id: int, circuit_id: int, plan_type: str,
+    period_end: datetime | None = None,
+):
+    """Grant or extend circuit access for a user based on plan type."""
+    now = datetime.now(timezone.utc)
+    duration = _PLAN_DURATION.get(plan_type, timedelta(days=33))
+
+    # If we have an explicit period_end from Stripe, use it + 3 days grace
+    if period_end:
+        valid_until = period_end + timedelta(days=3)
+    else:
+        valid_until = now + duration
+
+    # Upsert: update existing or create new
+    result = await db.execute(
+        select(UserCircuitAccess).where(
+            UserCircuitAccess.user_id == user_id,
+            UserCircuitAccess.circuit_id == circuit_id,
+        )
+    )
+    existing = result.scalar_one_or_none()
+    if existing:
+        # Extend: use the later of current valid_until or new valid_until
+        existing.valid_until = max(existing.valid_until, valid_until) if existing.valid_until else valid_until
+        if existing.valid_from > now:
+            existing.valid_from = now
+    else:
+        db.add(UserCircuitAccess(
+            user_id=user_id,
+            circuit_id=circuit_id,
+            valid_from=now,
+            valid_until=valid_until,
+        ))
+
+
+@router.get("/circuits")
+async def list_circuits_for_checkout(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all circuits available for subscription purchase."""
+    result = await db.execute(select(Circuit).order_by(Circuit.name))
+    return [{"id": c.id, "name": c.name} for c in result.scalars().all()]
+
+
 @router.post("/create-checkout-session")
 async def create_checkout_session(
     request: Request,
@@ -75,6 +131,9 @@ async def create_checkout_session(
 
     if not price_id:
         raise HTTPException(400, "price_id or plan required")
+
+    if not circuit_id:
+        raise HTTPException(400, "circuit_id required")
 
     settings = get_settings()
     s = get_stripe()
@@ -184,45 +243,9 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
             )
             db.add(sub)
 
-            # Grant circuit access
-            # Subscription plans (basic/pro) grant access to ALL circuits
-            # Event plans are circuit-specific
-            if plan_type in ("basic_monthly", "basic_annual", "pro_monthly", "pro_annual"):
-                all_circuits = await db.execute(select(Circuit))
-                for circuit in all_circuits.scalars().all():
-                    # Check if access already exists
-                    existing = await db.execute(
-                        select(UserCircuitAccess).where(
-                            UserCircuitAccess.user_id == user_id,
-                            UserCircuitAccess.circuit_id == circuit.id,
-                        )
-                    )
-                    if existing.scalar_one_or_none():
-                        # Update existing access validity
-                        existing_access = (await db.execute(
-                            select(UserCircuitAccess).where(
-                                UserCircuitAccess.user_id == user_id,
-                                UserCircuitAccess.circuit_id == circuit.id,
-                            )
-                        )).scalar_one()
-                        existing_access.valid_from = datetime.now(timezone.utc)
-                        existing_access.valid_until = datetime.now(timezone.utc) + timedelta(days=365 * 10)
-                    else:
-                        db.add(UserCircuitAccess(
-                            user_id=user_id,
-                            circuit_id=circuit.id,
-                            valid_from=datetime.now(timezone.utc),
-                            valid_until=datetime.now(timezone.utc) + timedelta(days=365 * 10),
-                        ))
-            elif circuit_id:
-                # Event plan: specific circuit access
-                access = UserCircuitAccess(
-                    user_id=user_id,
-                    circuit_id=circuit_id,
-                    valid_from=datetime.now(timezone.utc),
-                    valid_until=datetime.now(timezone.utc) + timedelta(days=365 * 10),
-                )
-                db.add(access)
+            # Grant circuit access for the selected circuit
+            if circuit_id:
+                await _grant_circuit_access(db, user_id, circuit_id, plan_type)
 
             # Update user plan capabilities
             await _apply_plan_to_user(user_id, plan_type, db)
@@ -252,19 +275,14 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
         db.add(sub)
 
         if circuit_id:
-            access = UserCircuitAccess(
-                user_id=user_id,
-                circuit_id=circuit_id,
-                valid_from=datetime.now(timezone.utc),
-                valid_until=datetime.now(timezone.utc) + timedelta(hours=48),
-            )
-            db.add(access)
+            await _grant_circuit_access(db, user_id, circuit_id, plan_type)
 
         await _apply_plan_to_user(user_id, plan_type, db)
         await db.commit()
 
 
 async def _handle_invoice_paid(invoice_data: dict, db: AsyncSession):
+    """Handle recurring invoice payment — extend subscription and circuit access."""
     sub_id = invoice_data.get("subscription")
     if not sub_id:
         return
@@ -282,22 +300,19 @@ async def _handle_invoice_paid(invoice_data: dict, db: AsyncSession):
             sub.current_period_end = datetime.fromtimestamp(period_end, tz=timezone.utc)
         sub.status = "active"
 
-        # Extend circuit access
+        # Extend circuit access with new period end
         if sub.circuit_id and sub.current_period_end:
-            result2 = await db.execute(
-                select(UserCircuitAccess).where(
-                    UserCircuitAccess.user_id == sub.user_id,
-                    UserCircuitAccess.circuit_id == sub.circuit_id,
-                )
+            await _grant_circuit_access(
+                db, sub.user_id, sub.circuit_id, sub.plan_type,
+                period_end=sub.current_period_end,
             )
-            access = result2.scalar_one_or_none()
-            if access:
-                access.valid_until = sub.current_period_end + timedelta(days=3)  # Grace period
 
         await db.commit()
+        logger.info(f"Invoice paid: user={sub.user_id} plan={sub.plan_type} circuit={sub.circuit_id} until={sub.current_period_end}")
 
 
 async def _handle_subscription_updated(sub_data: dict, db: AsyncSession):
+    """Handle subscription status changes — sync circuit access dates."""
     sub_id = sub_data.get("id")
     result = await db.execute(
         select(Subscription).where(Subscription.stripe_subscription_id == sub_id)
@@ -315,10 +330,19 @@ async def _handle_subscription_updated(sub_data: dict, db: AsyncSession):
         if current_period_start:
             sub.current_period_start = datetime.fromtimestamp(current_period_start, tz=timezone.utc)
 
+        # Sync circuit access if subscription is still active
+        if sub.circuit_id and sub.current_period_end and sub.status in ("active", "trialing"):
+            await _grant_circuit_access(
+                db, sub.user_id, sub.circuit_id, sub.plan_type,
+                period_end=sub.current_period_end,
+            )
+
         await db.commit()
+        logger.info(f"Subscription updated: sub={sub_id} status={sub.status} cancel_at_end={sub.cancel_at_period_end}")
 
 
 async def _handle_subscription_deleted(sub_data: dict, db: AsyncSession):
+    """Handle subscription cancellation — expire circuit access immediately."""
     sub_id = sub_data.get("id")
     result = await db.execute(
         select(Subscription).where(Subscription.stripe_subscription_id == sub_id)
@@ -326,7 +350,21 @@ async def _handle_subscription_deleted(sub_data: dict, db: AsyncSession):
     sub = result.scalar_one_or_none()
     if sub:
         sub.status = "canceled"
+
+        # Expire circuit access (set valid_until to now — immediate revocation)
+        if sub.circuit_id:
+            access_result = await db.execute(
+                select(UserCircuitAccess).where(
+                    UserCircuitAccess.user_id == sub.user_id,
+                    UserCircuitAccess.circuit_id == sub.circuit_id,
+                )
+            )
+            access = access_result.scalar_one_or_none()
+            if access:
+                access.valid_until = datetime.now(timezone.utc)
+
         await db.commit()
+        logger.info(f"Subscription deleted: sub={sub_id} user={sub.user_id} circuit={sub.circuit_id}")
 
 
 async def _apply_plan_to_user(user_id: int, plan_type: str, db: AsyncSession):

@@ -273,13 +273,15 @@ export const api = {
     }),
 
   // Stripe
-  createCheckoutSession: (priceId: string, circuitId?: number, plan?: string) =>
+  getCheckoutCircuits: () =>
+    fetchApi<{ id: number; name: string }[]>("/api/stripe/circuits"),
+  createCheckoutSession: (priceId: string, circuitId: number, plan?: string) =>
     fetchApi<{ checkout_url: string; session_id: string }>("/api/stripe/create-checkout-session", {
       method: "POST",
       body: JSON.stringify({
         ...(priceId ? { price_id: priceId } : {}),
         ...(plan ? { plan } : {}),
-        ...(circuitId ? { circuit_id: circuitId } : {}),
+        circuit_id: circuitId,
       }),
     }),
   getSubscriptions: () => fetchApi<any[]>("/api/stripe/subscriptions"),
