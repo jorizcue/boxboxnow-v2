@@ -365,7 +365,7 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
     # Send welcome email (fire and forget)
     from app.services.email_service import send_welcome_email
     import asyncio
-    asyncio.create_task(send_welcome_email(data.email, data.username))
+    asyncio.create_task(send_welcome_email(data.email, data.username, trial_days))
 
     access_token = create_token(user.id, user.username, user.is_admin, session_token)
     return LoginResponse(
@@ -639,7 +639,7 @@ async def google_callback(code: str, request: Request, state: str | None = None,
         if email:
             from app.services.email_service import send_welcome_email
             import asyncio as _asyncio
-            _asyncio.create_task(send_welcome_email(email, username))
+            _asyncio.create_task(send_welcome_email(email, username, trial_days))
 
     # Cleanup stale sessions
     await _cleanup_stale_sessions(db, user.id)

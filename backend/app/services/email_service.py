@@ -18,12 +18,47 @@ def _from_email() -> str:
     return settings.from_email or "BoxBoxNow <noreply@boxboxnow.com>"
 
 
-async def send_welcome_email(email: str, username: str):
-    """Send welcome email after registration."""
+async def send_welcome_email(email: str, username: str, trial_days: int = 0):
+    """Send welcome email after registration. Content adapts to trial vs direct purchase."""
     settings = get_settings()
     if not settings.resend_api_key:
         logger.warning("Resend API key not configured, skipping welcome email")
         return
+
+    if trial_days > 0:
+        body_html = f"""
+                <h2 style="color: #fff; font-size: 22px; margin-bottom: 10px;">Bienvenido, {username}!</h2>
+                <p style="color: #a3a3a3; font-size: 15px; line-height: 1.6;">
+                    Tu cuenta ha sido creada correctamente. Tienes <strong style="color: #9fe556;">{trial_days} dias de prueba gratuita</strong>
+                    con acceso completo a todas las funcionalidades.
+                </p>
+                <div style="background: #111; border: 1px solid #222; border-radius: 12px; padding: 20px; margin: 24px 0;">
+                    <p style="color: #9fe556; font-weight: 600; margin: 0 0 8px;">Tu prueba incluye:</p>
+                    <ul style="color: #a3a3a3; font-size: 14px; padding-left: 20px; margin: 0;">
+                        <li>Estrategia de carrera en tiempo real</li>
+                        <li>Analisis de tiempos y telemetria</li>
+                        <li>Gestion de pilotos y stints</li>
+                        <li>Replay de sesiones anteriores</li>
+                    </ul>
+                </div>
+        """
+    else:
+        body_html = f"""
+                <h2 style="color: #fff; font-size: 22px; margin-bottom: 10px;">Bienvenido, {username}!</h2>
+                <p style="color: #a3a3a3; font-size: 15px; line-height: 1.6;">
+                    Tu cuenta en <strong style="color: #9fe556;">BoxBoxNow</strong> ha sido creada correctamente.
+                    Completa tu suscripcion para acceder a todas las funcionalidades de la plataforma.
+                </p>
+                <div style="background: #111; border: 1px solid #222; border-radius: 12px; padding: 20px; margin: 24px 0;">
+                    <p style="color: #9fe556; font-weight: 600; margin: 0 0 8px;">Que puedes hacer con BoxBoxNow:</p>
+                    <ul style="color: #a3a3a3; font-size: 14px; padding-left: 20px; margin: 0;">
+                        <li>Estrategia de carrera en tiempo real</li>
+                        <li>Gestion de pit stops y cola FIFO</li>
+                        <li>Clasificacion ajustada por ritmo</li>
+                        <li>Analisis historico y telemetria GPS</li>
+                    </ul>
+                </div>
+        """
 
     r = _get_resend()
     try:
@@ -38,20 +73,7 @@ async def send_welcome_email(email: str, username: str):
                         <span style="color: #fff;">BOXBOX</span><span style="color: #9fe556;">NOW</span>
                     </h1>
                 </div>
-                <h2 style="color: #fff; font-size: 22px; margin-bottom: 10px;">Hola, {username}!</h2>
-                <p style="color: #a3a3a3; font-size: 15px; line-height: 1.6;">
-                    Tu cuenta ha sido creada correctamente. Tienes <strong style="color: #9fe556;">14 dias de prueba gratuita</strong>
-                    con acceso completo a todas las funcionalidades.
-                </p>
-                <div style="background: #111; border: 1px solid #222; border-radius: 12px; padding: 20px; margin: 24px 0;">
-                    <p style="color: #9fe556; font-weight: 600; margin: 0 0 8px;">Tu prueba incluye:</p>
-                    <ul style="color: #a3a3a3; font-size: 14px; padding-left: 20px; margin: 0;">
-                        <li>Estrategia de carrera en tiempo real</li>
-                        <li>Analisis de tiempos y telemetria</li>
-                        <li>Gestion de pilotos y stints</li>
-                        <li>Replay de sesiones anteriores</li>
-                    </ul>
-                </div>
+                {body_html}
                 <div style="text-align: center; margin: 30px 0;">
                     <a href="{settings.frontend_url}/dashboard" style="background: #9fe556; color: #000; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
                         Ir al Dashboard
@@ -63,7 +85,7 @@ async def send_welcome_email(email: str, username: str):
             </div>
             """,
         })
-        logger.info(f"Welcome email sent to {email}")
+        logger.info(f"Welcome email sent to {email} (trial_days={trial_days})")
     except Exception as e:
         logger.error(f"Failed to send welcome email to {email}: {e}")
 
@@ -108,18 +130,45 @@ async def send_trial_ending_email(email: str, username: str, days_remaining: int
         logger.error(f"Failed to send trial ending email to {email}: {e}")
 
 
-async def send_subscription_confirmation_email(email: str, username: str, plan_name: str):
-    """Send subscription purchase confirmation."""
+async def send_subscription_confirmation_email(
+    email: str, username: str, plan_name: str, circuit_name: str | None = None,
+):
+    """Send subscription/event purchase confirmation with circuit details."""
     settings = get_settings()
     if not settings.resend_api_key:
         return
+
+    circuit_html = ""
+    if circuit_name:
+        circuit_html = f"""
+                <div style="background: #111; border: 1px solid #222; border-radius: 12px; padding: 20px; margin: 24px 0;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="color: #a3a3a3; font-size: 13px; padding: 6px 0;">Plan</td>
+                            <td style="color: #fff; font-size: 14px; font-weight: 600; text-align: right; padding: 6px 0;">{plan_name}</td>
+                        </tr>
+                        <tr>
+                            <td style="color: #a3a3a3; font-size: 13px; padding: 6px 0;">Circuito</td>
+                            <td style="color: #9fe556; font-size: 14px; font-weight: 600; text-align: right; padding: 6px 0;">{circuit_name}</td>
+                        </tr>
+                    </table>
+                </div>
+        """
+
+    is_event = "evento" in plan_name.lower()
+    subject = f"Acceso Evento activado — {circuit_name}" if is_event else f"Suscripcion {plan_name} activada"
+    access_text = (
+        f"Tu acceso de evento a <strong style='color: #9fe556;'>{circuit_name}</strong> esta activo durante las proximas 48 horas."
+        if is_event
+        else f"Tu plan <strong style='color: #9fe556;'>{plan_name}</strong> ha sido activado correctamente."
+    )
 
     r = _get_resend()
     try:
         r.Emails.send({
             "from": _from_email(),
             "to": [email],
-            "subject": f"Suscripcion {plan_name} activada",
+            "subject": subject,
             "html": f"""
             <div style="font-family: 'Space Grotesk', -apple-system, sans-serif; max-width: 600px; margin: 0 auto; background: #000; color: #fff; padding: 40px 30px; border-radius: 16px;">
                 <div style="text-align: center; margin-bottom: 30px;">
@@ -129,9 +178,9 @@ async def send_subscription_confirmation_email(email: str, username: str, plan_n
                 </div>
                 <h2 style="color: #fff; font-size: 22px; margin-bottom: 10px;">Gracias, {username}!</h2>
                 <p style="color: #a3a3a3; font-size: 15px; line-height: 1.6;">
-                    Tu plan <strong style="color: #9fe556;">{plan_name}</strong> ha sido activado correctamente.
-                    Ya tienes acceso completo a todas las funcionalidades incluidas en tu plan.
+                    {access_text}
                 </p>
+                {circuit_html}
                 <div style="text-align: center; margin: 30px 0;">
                     <a href="{settings.frontend_url}/dashboard" style="background: #9fe556; color: #000; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
                         Ir al Dashboard
@@ -143,7 +192,7 @@ async def send_subscription_confirmation_email(email: str, username: str, plan_n
             </div>
             """,
         })
-        logger.info(f"Subscription confirmation email sent to {email}")
+        logger.info(f"Subscription confirmation email sent to {email} (plan={plan_name}, circuit={circuit_name})")
     except Exception as e:
         logger.error(f"Failed to send subscription confirmation to {email}: {e}")
 

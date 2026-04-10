@@ -251,16 +251,21 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
             await _apply_plan_to_user(user_id, plan_type, db)
             await db.commit()
 
-            # Send confirmation email
+            # Send confirmation email with circuit name
             user_result = await db.execute(select(User).where(User.id == user_id))
             _user = user_result.scalar_one_or_none()
+            circuit_name = None
+            if circuit_id:
+                circuit_result = await db.execute(select(Circuit).where(Circuit.id == circuit_id))
+                _circuit = circuit_result.scalar_one_or_none()
+                circuit_name = _circuit.name if _circuit else None
             if _user and _user.email:
                 from app.services.email_service import send_subscription_confirmation_email
                 import asyncio
                 plan_names = {"basic_monthly": "Basico Mensual", "basic_annual": "Basico Anual",
                               "pro_monthly": "Pro Mensual", "pro_annual": "Pro Anual", "event": "Evento"}
                 asyncio.create_task(send_subscription_confirmation_email(
-                    _user.email, _user.username, plan_names.get(plan_type, plan_type)))
+                    _user.email, _user.username, plan_names.get(plan_type, plan_type), circuit_name))
 
     elif session_data.get("mode") == "payment":
         # One-time payment (event)
@@ -279,6 +284,20 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
 
         await _apply_plan_to_user(user_id, plan_type, db)
         await db.commit()
+
+        # Send event confirmation email
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        _user = user_result.scalar_one_or_none()
+        circuit_name = None
+        if circuit_id:
+            circuit_result = await db.execute(select(Circuit).where(Circuit.id == circuit_id))
+            _circuit = circuit_result.scalar_one_or_none()
+            circuit_name = _circuit.name if _circuit else None
+        if _user and _user.email:
+            from app.services.email_service import send_subscription_confirmation_email
+            import asyncio
+            asyncio.create_task(send_subscription_confirmation_email(
+                _user.email, _user.username, "Evento", circuit_name))
 
 
 async def _handle_invoice_paid(invoice_data: dict, db: AsyncSession):
