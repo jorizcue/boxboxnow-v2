@@ -1099,7 +1099,8 @@ function PlatformSettingsManager() {
 
   // Product configs
   const [configs, setConfigs] = useState<any[]>([]);
-  const [stripeProducts, setStripeProducts] = useState<{ id: string; name: string; description: string | null }[]>([]);
+  const [stripeProducts, setStripeProducts] = useState<any[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [editingConfig, setEditingConfig] = useState<any | null>(null);
   const [showConfigForm, setShowConfigForm] = useState(false);
   const [configSaving, setConfigSaving] = useState(false);
@@ -1183,8 +1184,9 @@ function PlatformSettingsManager() {
     display_name: "",
     description: "",
     features: [] as string[],
-    price_monthly: null as number | null,
-    price_annual: null as number | null,
+    stripe_price_id: "",
+    price_amount: null as number | null,
+    billing_interval: "" as string,
     is_popular: false,
     is_visible: true,
     sort_order: 0,
@@ -1197,6 +1199,7 @@ function PlatformSettingsManager() {
     setEditingConfig(null);
     setConfigForm(emptyConfig);
     setFeaturesText("");
+    setSelectedProduct(null);
     setShowConfigForm(true);
     loadStripeProducts();
   };
@@ -1211,13 +1214,15 @@ function PlatformSettingsManager() {
       display_name: c.display_name || "",
       description: c.description || "",
       features: c.features || [],
-      price_monthly: c.price_monthly,
-      price_annual: c.price_annual,
+      stripe_price_id: c.stripe_price_id || "",
+      price_amount: c.price_amount ?? null,
+      billing_interval: c.billing_interval || "",
       is_popular: c.is_popular,
       is_visible: c.is_visible,
       sort_order: c.sort_order,
     });
     setFeaturesText((c.features || []).join("\n"));
+    setSelectedProduct(null);
     setShowConfigForm(true);
     loadStripeProducts();
   };
@@ -1480,7 +1485,9 @@ function PlatformSettingsManager() {
                     <tr className="text-neutral-500 text-xs uppercase border-b border-border">
                       <th className="text-left py-2 pr-4">Nombre</th>
                       <th className="text-left py-2 pr-4">Tipo</th>
-                      <th className="text-left py-2 pr-4">Tabs</th>
+                      <th className="text-left py-2 pr-4">Price ID</th>
+                      <th className="text-right py-2 pr-4">Precio</th>
+                      <th className="text-left py-2 pr-4">Intervalo</th>
                       <th className="text-center py-2 pr-4">Disp.</th>
                       <th className="text-center py-2 pr-4">Visible</th>
                       <th className="text-right py-2">Acciones</th>
@@ -1491,18 +1498,15 @@ function PlatformSettingsManager() {
                       <tr key={c.id} className="border-b border-border/50">
                         <td className="py-2.5 pr-4 text-white font-medium">{c.display_name || c.plan_type}</td>
                         <td className="py-2.5 pr-4 text-neutral-400">{c.plan_type}</td>
-                        <td className="py-2.5 pr-4">
-                          <div className="flex flex-wrap gap-1">
-                            {(c.tabs || []).slice(0, 4).map((t: string) => (
-                              <span key={t} className="bg-accent/10 text-accent text-[10px] px-1.5 py-0.5 rounded">
-                                {t}
-                              </span>
-                            ))}
-                            {(c.tabs || []).length > 4 && (
-                              <span className="text-neutral-500 text-[10px]">+{c.tabs.length - 4}</span>
-                            )}
-                          </div>
+                        <td className="py-2.5 pr-4 text-neutral-500 font-mono text-[11px]">
+                          {c.stripe_price_id
+                            ? `...${c.stripe_price_id.slice(-8)}`
+                            : <span className="text-neutral-700">—</span>}
                         </td>
+                        <td className="py-2.5 pr-4 text-right text-neutral-300">
+                          {c.price_amount != null ? `${c.price_amount.toFixed(2)}€` : <span className="text-neutral-700">—</span>}
+                        </td>
+                        <td className="py-2.5 pr-4 text-neutral-400">{c.billing_interval || <span className="text-neutral-700">—</span>}</td>
                         <td className="py-2.5 pr-4 text-center text-neutral-400">{c.max_devices}</td>
                         <td className="py-2.5 pr-4 text-center">
                           <span className={c.is_visible ? "text-accent" : "text-neutral-600"}>
@@ -1543,7 +1547,17 @@ function PlatformSettingsManager() {
                       {stripeProducts.length > 0 ? (
                         <select
                           value={configForm.stripe_product_id}
-                          onChange={(e) => setConfigForm((p) => ({ ...p, stripe_product_id: e.target.value }))}
+                          onChange={(e) => {
+                            const prod = stripeProducts.find((sp) => sp.id === e.target.value) || null;
+                            setSelectedProduct(prod);
+                            setConfigForm((p) => ({
+                              ...p,
+                              stripe_product_id: e.target.value,
+                              stripe_price_id: "",
+                              price_amount: null,
+                              billing_interval: "",
+                            }));
+                          }}
                           className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
                         >
                           <option value="">Seleccionar...</option>
@@ -1562,6 +1576,41 @@ function PlatformSettingsManager() {
                         />
                       )}
                     </div>
+
+                    {(selectedProduct || configForm.stripe_price_id) && (
+                      <div>
+                        <label className="block text-xs text-neutral-400 mb-1 uppercase">Precio</label>
+                        <select
+                          value={configForm.stripe_price_id}
+                          onChange={(e) => {
+                            const prices: any[] = selectedProduct?.prices || [];
+                            const price = prices.find((pr: any) => pr.id === e.target.value);
+                            setConfigForm((p) => ({
+                              ...p,
+                              stripe_price_id: e.target.value,
+                              price_amount: price ? price.unit_amount / 100 : p.price_amount,
+                              billing_interval: price
+                                ? price.recurring?.interval || "one_time"
+                                : p.billing_interval,
+                            }));
+                          }}
+                          className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
+                        >
+                          <option value="">Seleccionar precio...</option>
+                          {(selectedProduct?.prices || []).map((pr: any) => (
+                            <option key={pr.id} value={pr.id}>
+                              {(pr.unit_amount / 100).toFixed(2)} {pr.currency?.toUpperCase()} /{" "}
+                              {pr.recurring?.interval || "one_time"} ({pr.id})
+                            </option>
+                          ))}
+                        </select>
+                        {configForm.stripe_price_id && !selectedProduct && (
+                          <p className="text-[11px] text-neutral-500 mt-1">
+                            Price ID actual: {configForm.stripe_price_id}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     <div>
                       <label className="block text-xs text-neutral-400 mb-1 uppercase">Tipo de plan</label>
@@ -1647,24 +1696,22 @@ function PlatformSettingsManager() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs text-neutral-400 mb-1 uppercase">Precio mensual</label>
+                        <label className="block text-xs text-neutral-400 mb-1 uppercase">Precio (EUR)</label>
                         <input
                           type="number"
                           step="0.01"
-                          value={configForm.price_monthly ?? ""}
-                          onChange={(e) => setConfigForm((p) => ({ ...p, price_monthly: e.target.value ? parseFloat(e.target.value) : null }))}
+                          value={configForm.price_amount ?? ""}
+                          onChange={(e) => setConfigForm((p) => ({ ...p, price_amount: e.target.value ? parseFloat(e.target.value) : null }))}
                           placeholder="49.00"
                           className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-neutral-400 mb-1 uppercase">Precio anual</label>
+                        <label className="block text-xs text-neutral-400 mb-1 uppercase">Intervalo</label>
                         <input
-                          type="number"
-                          step="0.01"
-                          value={configForm.price_annual ?? ""}
-                          onChange={(e) => setConfigForm((p) => ({ ...p, price_annual: e.target.value ? parseFloat(e.target.value) : null }))}
-                          placeholder="490.00"
+                          value={configForm.billing_interval}
+                          onChange={(e) => setConfigForm((p) => ({ ...p, billing_interval: e.target.value }))}
+                          placeholder="month / year / one_time"
                           className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
                         />
                       </div>
@@ -1706,7 +1753,7 @@ function PlatformSettingsManager() {
                   <div className="flex gap-3 mt-6">
                     <button
                       onClick={saveConfig}
-                      disabled={configSaving || !configForm.stripe_product_id || !configForm.plan_type}
+                      disabled={configSaving || !configForm.stripe_product_id || !configForm.stripe_price_id || !configForm.plan_type}
                       className="bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold px-5 py-2 rounded-lg text-sm transition-colors"
                     >
                       {configSaving ? "Guardando..." : editingConfig ? "Actualizar" : "Crear"}
