@@ -14,6 +14,7 @@ interface Sub {
   current_period_start: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
+  pending_plan?: string | null;
   created_at: string | null;
   amount?: number;
   currency?: string;
@@ -154,7 +155,7 @@ export function AccountPanel() {
   const handleSwitchPlan = async (subId: number, newPlan: string, newLabel: string) => {
     const ok = await confirm({
       title: "Cambiar de plan",
-      message: `¿Cambiar a ${newLabel}? El cambio se aplicará de forma inmediata.`,
+      message: `¿Cambiar a ${newLabel}? El cambio se aplicará en la próxima renovación.`,
       confirmText: `Cambiar a ${newLabel.split(" ").pop()}`,
       cancelText: "Cancelar",
     });
@@ -268,9 +269,14 @@ export function AccountPanel() {
                           No se renovará. Acceso hasta {formatDate(sub.current_period_end)}.
                         </p>
                       )}
+                      {sub.pending_plan && (
+                        <p className="text-xs text-blue-400 mt-2">
+                          Cambio a {planLabel(sub.pending_plan)} programado para la próxima renovación.
+                        </p>
+                      )}
                     </div>
                     <div className="shrink-0 flex flex-col gap-1.5">
-                      {sub.status === "active" && !sub.cancel_at_period_end && sub.plan_type !== "trial" && (() => {
+                      {sub.status === "active" && !sub.cancel_at_period_end && !sub.pending_plan && sub.plan_type !== "trial" && (() => {
                         const alt = getAlternatePlan(sub.plan_type);
                         return alt ? (
                           <button

@@ -322,6 +322,7 @@ class Subscription(Base):
     current_period_start = Column(DateTime, nullable=True)
     current_period_end = Column(DateTime, nullable=True)
     cancel_at_period_end = Column(Boolean, default=False)
+    pending_plan = Column(String(50), nullable=True)  # Scheduled plan change (applied on next renewal)
     created_at = Column(DateTime, server_default=func.now())
 
     user = relationship("User", back_populates="subscriptions")

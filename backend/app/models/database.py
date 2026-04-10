@@ -261,6 +261,12 @@ async def init_db():
                 )
 
 
+        # Add pending_plan column to subscriptions
+        try:
+            await conn.execute(text("ALTER TABLE subscriptions ADD COLUMN pending_plan VARCHAR(50)"))
+        except Exception:
+            pass
+
 async def get_db():
     async with async_session() as session:
         yield session

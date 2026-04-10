@@ -209,9 +209,16 @@ async def create_checkout_session(
             }
         }
 
+    # Use embedded UI mode — returns client_secret for frontend Stripe.js
+    session_params["ui_mode"] = "embedded"
+    session_params["return_url"] = f"{settings.frontend_url}/dashboard?checkout=success&session_id={{CHECKOUT_SESSION_ID}}"
+    # Remove success/cancel URLs (not used in embedded mode)
+    session_params.pop("success_url", None)
+    session_params.pop("cancel_url", None)
+
     checkout_session = s.checkout.Session.create(**session_params)
 
-    return {"checkout_url": checkout_session.url, "session_id": checkout_session.id}
+    return {"client_secret": checkout_session.client_secret, "session_id": checkout_session.id}
 
 
 @router.post("/webhook")
@@ -386,16 +393,31 @@ async def _handle_invoice_paid(invoice_data: dict, db: AsyncSession):
     )
     sub = result.scalar_one_or_none()
     if sub:
-        # Calculate period from Stripe subscription start_date + plan interval
-        # (Stripe v15+ removed current_period_start/end from Subscription object)
         import stripe as s
         now = datetime.now(timezone.utc)
         try:
-            stripe_sub = s.Subscription.retrieve(sub_id)
-            if stripe_sub.get("start_date"):
-                sub.current_period_start = datetime.fromtimestamp(stripe_sub["start_date"], tz=timezone.utc)
+            stripe_sub = s.Subscription.retrieve(sub_id, expand=["items"])
+            if hasattr(stripe_sub, "start_date") and stripe_sub.start_date:
+                sub.current_period_start = datetime.fromtimestamp(stripe_sub.start_date, tz=timezone.utc)
             else:
                 sub.current_period_start = now
+
+            # Sync plan_type from Stripe's current price (handles deferred plan switches)
+            items = stripe_sub.items.data if stripe_sub.items else []
+            if items:
+                price_id = items[0].price.id if items[0].price else None
+                if price_id:
+                    new_plan = _price_to_plan(price_id)
+                    if new_plan and new_plan != sub.plan_type:
+                        logger.info(f"Plan changed on renewal: {sub.plan_type} → {new_plan} (user={sub.user_id})")
+                        sub.plan_type = new_plan
+                        sub.stripe_price_id = price_id
+                        # Apply new plan capabilities
+                        await _apply_plan_to_user(db, sub.user_id, new_plan)
+
+            # Clear pending plan since renewal applied it
+            sub.pending_plan = None
+
             sub.current_period_end = _calc_plan_valid_until(sub.plan_type, sub.current_period_start)
         except Exception as e:
             logger.warning(f"Could not retrieve subscription from Stripe: {e}")
@@ -581,6 +603,7 @@ async def list_subscriptions(
             "current_period_start": s_row.current_period_start.isoformat() if s_row.current_period_start else None,
             "current_period_end": s_row.current_period_end.isoformat() if s_row.current_period_end else None,
             "cancel_at_period_end": s_row.cancel_at_period_end,
+            "pending_plan": s_row.pending_plan,
             "created_at": s_row.created_at.isoformat() if s_row.created_at else None,
             **(stripe_prices.get(s_row.stripe_subscription_id, {})),
         }
@@ -698,7 +721,9 @@ async def switch_plan(
 
     item_id = items[0].id
 
-    # Change price immediately without proration
+    # Tell Stripe to use the new price on the next invoice (no proration, no immediate charge).
+    # We do NOT update the local plan_type yet — that happens when the renewal
+    # webhook (invoice.paid / customer.subscription.updated) fires.
     try:
         s.Subscription.modify(
             sub.stripe_subscription_id,
@@ -708,12 +733,11 @@ async def switch_plan(
     except Exception as e:
         raise HTTPException(400, f"Stripe error: {e}")
 
-    # Update local record
-    sub.plan_type = new_plan
-    sub.stripe_price_id = new_price_id
+    # Store pending plan so the UI can show it, but don't change plan_type yet
+    sub.pending_plan = new_plan
     await db.commit()
 
-    return {"ok": True, "new_plan": new_plan}
+    return {"ok": True, "new_plan": new_plan, "pending": True}
 
 
 @router.get("/invoices")

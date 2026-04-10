@@ -23,14 +23,15 @@ import { DriverView } from "@/components/driver/DriverView";
 import { DriverConfigTab } from "@/components/driver/DriverConfigTab";
 import { MfaSetupRequired } from "@/components/auth/MfaSetupRequired";
 import { CircuitSelector } from "@/components/checkout/CircuitSelector";
+import { EmbeddedCheckout } from "@/components/checkout/EmbeddedCheckout";
 import { AccountPanel } from "@/components/account/AccountPanel";
 import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
 
 export default function DashboardPage() {
   const { token, user, _hydrated, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("race");
-  const [checkingOut, setCheckingOut] = useState(false);
   const [pendingPlan, setPendingPlan] = useState<string | null>(null);
+  const [checkoutCircuitId, setCheckoutCircuitId] = useState<number | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -63,21 +64,12 @@ export default function DashboardPage() {
     }
   }, [_hydrated, token]);
 
-  // Handle circuit selection → Stripe checkout
-  const handleCircuitSelected = async (circuitId: number) => {
-    if (!pendingPlan) return;
-    setCheckingOut(true);
-    try {
-      const { api } = await import("@/lib/api");
-      const data = await api.createCheckoutSession("", circuitId, pendingPlan);
-      window.location.href = data.checkout_url;
-    } catch {
-      setCheckingOut(false);
-      setPendingPlan(null);
-    }
+  // Handle circuit selection → show embedded checkout
+  const handleCircuitSelected = (circuitId: number) => {
+    setCheckoutCircuitId(circuitId);
   };
 
-  if (!_hydrated || checkingOut) {
+  if (!_hydrated) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <span className="text-lg font-bold animate-pulse">
@@ -107,7 +99,16 @@ export default function DashboardPage() {
     );
   }
 
-  // Circuit selection step: show when user has a pending plan from pricing flow
+  // Checkout flow: circuit selection → embedded payment
+  if (pendingPlan && checkoutCircuitId) {
+    return (
+      <EmbeddedCheckout
+        plan={pendingPlan}
+        circuitId={checkoutCircuitId}
+        onCancel={() => { setCheckoutCircuitId(null); setPendingPlan(null); }}
+      />
+    );
+  }
   if (pendingPlan) {
     return <CircuitSelector plan={pendingPlan} onSelect={handleCircuitSelected} onCancel={() => setPendingPlan(null)} />;
   }

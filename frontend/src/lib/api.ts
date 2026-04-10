@@ -276,7 +276,7 @@ export const api = {
   getCheckoutCircuits: () =>
     fetchApi<{ id: number; name: string }[]>("/api/stripe/circuits"),
   createCheckoutSession: (priceId: string, circuitId: number, plan?: string) =>
-    fetchApi<{ checkout_url: string; session_id: string }>("/api/stripe/create-checkout-session", {
+    fetchApi<{ client_secret: string; session_id: string }>("/api/stripe/create-checkout-session", {
       method: "POST",
       body: JSON.stringify({
         ...(priceId ? { price_id: priceId } : {}),
