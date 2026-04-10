@@ -297,6 +297,31 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  // Product tab config (admin)
+  getProductConfigs: () =>
+    fetchApi<any[]>("/api/admin/product-config"),
+  createProductConfig: (data: any) =>
+    fetchApi<any>("/api/admin/product-config", { method: "POST", body: JSON.stringify(data) }),
+  updateProductConfig: (id: number, data: any) =>
+    fetchApi<any>(`/api/admin/product-config/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteProductConfig: (id: number) =>
+    fetchApi<any>(`/api/admin/product-config/${id}`, { method: "DELETE" }),
+  getStripeProducts: () =>
+    fetchApi<{ id: string; name: string; description: string | null }[]>("/api/admin/stripe-products"),
+
+  // Public plans (no auth)
+  getPlans: () =>
+    fetchRaw<{
+      plan_type: string;
+      display_name: string;
+      description: string | null;
+      features: string[];
+      price_monthly: number | null;
+      price_annual: number | null;
+      is_popular: boolean;
+      sort_order: number;
+    }[]>("/api/plans"),
+
   // Trial config (public)
   getTrialConfig: () =>
     fetchRaw<{ trial_enabled: boolean; trial_days: number; trial_banner_days: number }>("/api/auth/trial-config"),
