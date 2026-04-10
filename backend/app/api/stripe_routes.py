@@ -190,22 +190,29 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         event = s.Webhook.construct_event(payload, sig_header, settings.stripe_webhook_secret)
     except ValueError:
         raise HTTPException(400, "Invalid payload")
-    except s.error.SignatureVerificationError:
-        raise HTTPException(400, "Invalid signature")
+    except Exception as e:
+        if "SignatureVerification" in type(e).__name__:
+            raise HTTPException(400, "Invalid signature")
+        logger.error(f"Stripe webhook signature error: {e}")
+        raise HTTPException(400, "Webhook verification failed")
 
     event_type = event["type"]
     data = event["data"]["object"]
 
-    logger.info(f"Stripe webhook: {event_type}")
+    logger.info(f"Stripe webhook received: {event_type}")
 
-    if event_type == "checkout.session.completed":
-        await _handle_checkout_completed(data, db, s)
-    elif event_type == "invoice.paid":
-        await _handle_invoice_paid(data, db)
-    elif event_type == "customer.subscription.updated":
-        await _handle_subscription_updated(data, db)
-    elif event_type == "customer.subscription.deleted":
-        await _handle_subscription_deleted(data, db)
+    try:
+        if event_type == "checkout.session.completed":
+            await _handle_checkout_completed(data, db, s)
+        elif event_type == "invoice.paid":
+            await _handle_invoice_paid(data, db)
+        elif event_type == "customer.subscription.updated":
+            await _handle_subscription_updated(data, db)
+        elif event_type == "customer.subscription.deleted":
+            await _handle_subscription_deleted(data, db)
+    except Exception as e:
+        logger.error(f"Stripe webhook handler error ({event_type}): {e}", exc_info=True)
+        raise HTTPException(500, f"Webhook handler error: {e}")
 
     return {"received": True}
 
