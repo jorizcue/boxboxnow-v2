@@ -54,6 +54,38 @@ async def _get_platform_setting(db: AsyncSession, key: str) -> str:
     return setting.value if setting else PLATFORM_DEFAULTS.get(key, "0")
 
 
+async def _get_registration_config(db) -> dict:
+    """Read default and trial tab/device configuration from AppSettings."""
+    import json as _json
+
+    trial_days = int(await _get_platform_setting(db, "trial_days"))
+
+    if trial_days > 0:
+        tabs_json = await _get_platform_setting(db, "trial_tabs")
+        max_devices_str = await _get_platform_setting(db, "trial_max_devices")
+        try:
+            tabs = _json.loads(tabs_json) if tabs_json and tabs_json != "0" else []
+        except (ValueError, TypeError):
+            tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config", "replay", "analytics", "insights"]
+        try:
+            max_devices = int(max_devices_str) if max_devices_str and max_devices_str != "0" else 2
+        except (ValueError, TypeError):
+            max_devices = 2
+    else:
+        tabs_json = await _get_platform_setting(db, "default_tabs")
+        max_devices_str = await _get_platform_setting(db, "default_max_devices")
+        try:
+            tabs = _json.loads(tabs_json) if tabs_json and tabs_json != "0" else []
+        except (ValueError, TypeError):
+            tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config"]
+        try:
+            max_devices = int(max_devices_str) if max_devices_str and max_devices_str != "0" else 2
+        except (ValueError, TypeError):
+            max_devices = 2
+
+    return {"trial_days": trial_days, "tabs": tabs, "max_devices": max_devices}
+
+
 @router.get("/trial-config")
 async def get_trial_config(db: AsyncSession = Depends(get_db)):
     """Public endpoint: returns trial configuration for the frontend."""
@@ -309,15 +341,18 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
     db.add(user)
     await db.flush()
 
-    # Check trial configuration
-    trial_days = int(await _get_platform_setting(db, "trial_days"))
+    # Read registration config from AppSettings
+    reg_config = await _get_registration_config(db)
+    trial_days = reg_config["trial_days"]
+
+    # Set max_devices from config
+    user.max_devices = reg_config["max_devices"]
+
+    # Assign tabs from config
+    for tab in reg_config["tabs"]:
+        db.add(UserTabAccess(user_id=user.id, tab=tab))
 
     if trial_days > 0:
-        # Assign all tabs for trial users (full access during trial)
-        trial_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config", "replay", "analytics", "insights"]
-        for tab in trial_tabs:
-            db.add(UserTabAccess(user_id=user.id, tab=tab))
-
         # Create trial subscription with configurable duration
         trial_end = datetime.now(timezone.utc) + timedelta(days=trial_days)
         trial_sub = Subscription(
@@ -338,11 +373,6 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
                 valid_from=datetime.now(timezone.utc),
                 valid_until=trial_end,
             ))
-    else:
-        # No trial: assign basic tabs only
-        basic_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config"]
-        for tab in basic_tabs:
-            db.add(UserTabAccess(user_id=user.id, tab=tab))
 
     await db.commit()
 
@@ -592,16 +622,18 @@ async def google_callback(code: str, request: Request, state: str | None = None,
         db.add(user)
         await db.flush()
 
-        # Check trial configuration
-        trial_days = int(await _get_platform_setting(db, "trial_days"))
+        # Read registration config from AppSettings
+        reg_config = await _get_registration_config(db)
+        trial_days = reg_config["trial_days"]
+
+        # Set max_devices from config
+        user.max_devices = reg_config["max_devices"]
+
+        # Assign tabs from config
+        for tab in reg_config["tabs"]:
+            db.add(UserTabAccess(user_id=user.id, tab=tab))
 
         if trial_days > 0:
-            # Assign all tabs for trial users
-            trial_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config", "replay", "analytics", "insights"]
-            for tab in trial_tabs:
-                db.add(UserTabAccess(user_id=user.id, tab=tab))
-
-            # Create trial subscription with configurable duration
             trial_end = datetime.now(timezone.utc) + timedelta(days=trial_days)
             trial_sub = Subscription(
                 user_id=user.id,
@@ -612,7 +644,6 @@ async def google_callback(code: str, request: Request, state: str | None = None,
             )
             db.add(trial_sub)
 
-            # Grant circuit access to all circuits for trial period
             circuits_result = await db.execute(select(Circuit))
             for circuit in circuits_result.scalars().all():
                 db.add(UserCircuitAccess(
@@ -621,11 +652,6 @@ async def google_callback(code: str, request: Request, state: str | None = None,
                     valid_from=datetime.now(timezone.utc),
                     valid_until=trial_end,
                 ))
-        else:
-            # No trial: assign basic tabs only
-            basic_tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config"]
-            for tab in basic_tabs:
-                db.add(UserTabAccess(user_id=user.id, tab=tab))
 
         await db.commit()
 
