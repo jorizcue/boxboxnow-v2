@@ -271,6 +271,11 @@ export const api = {
     if (dateTo) params.set("date_to", dateTo);
     return fetchApi<any[]>(`/api/analytics/race-logs?${params}`);
   },
+  reprocessDay: (circuitId: number, date: string) =>
+    fetchApi<{ status: string; message: string; sessions: number; laps: number; deleted: number }>(
+      "/api/analytics/reprocess-day",
+      { method: "POST", body: JSON.stringify({ circuit_id: circuitId, date }) },
+    ),
 
   // Registration
   register: (email: string, username: string, password: string) =>

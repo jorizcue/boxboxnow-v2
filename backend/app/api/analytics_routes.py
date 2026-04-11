@@ -1,11 +1,14 @@
 """REST API routes for kart analytics."""
 
 import logging
+import os
+import re
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 from fastapi import APIRouter, Depends, Query, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func as sqlfunc
+from sqlalchemy import select, delete, and_, func as sqlfunc
 
 from app.models.database import get_db
 from app.models.schemas import User, RaceLog, KartLap, Circuit, UserCircuitAccess
@@ -308,3 +311,214 @@ async def list_race_logs(
         ).order_by(RaceLog.race_date.desc())
     )
     return result.scalars().all()
+
+
+# ---------------------------------------------------------------------------
+#  Reprocess day from recording
+# ---------------------------------------------------------------------------
+
+RECORDINGS_BASE = "data/recordings"
+
+
+def _safe_dir_name(name: str) -> str:
+    """Convert circuit name to safe directory name (must match DailyRecorder)."""
+    return re.sub(r'[^\w\-]', '_', name.strip())[:50]
+
+
+class ReprocessRequest(BaseModel):
+    circuit_id: int
+    date: str  # YYYY-MM-DD
+
+
+@router.post("/reprocess-day")
+async def reprocess_day(
+    body: ReprocessRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reprocess a day's recording to rebuild race_logs and kart_laps.
+
+    Admin only. Reads the circuit's daily recording file, parses all sessions,
+    and recreates the lap data in the database.
+    """
+    if not user.is_admin:
+        raise HTTPException(403, "Admin only")
+
+    # Validate date
+    try:
+        target_date = datetime.strptime(body.date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(400, "Invalid date format, use YYYY-MM-DD")
+
+    # Find circuit
+    circuit = (await db.execute(
+        select(Circuit).where(Circuit.id == body.circuit_id)
+    )).scalar_one_or_none()
+    if not circuit:
+        raise HTTPException(404, "Circuit not found")
+
+    # Find recording file
+    circuit_dir = _safe_dir_name(circuit.name)
+    log_path = os.path.join(RECORDINGS_BASE, circuit_dir, f"{body.date}.log")
+    gz_path = log_path + ".gz"
+    if os.path.exists(log_path):
+        filepath = log_path
+    elif os.path.exists(gz_path):
+        filepath = gz_path
+    else:
+        raise HTTPException(404, f"No recording found for {circuit.name} on {body.date}")
+
+    # Parse the recording file
+    from app.apex.replay import parse_log_file
+    from app.apex.parser import ApexMessageParser, EventType
+    from app.engine.state import RaceStateManager
+
+    logger.info(f"Reprocessing {circuit.name} for {body.date} from {filepath}")
+    blocks = parse_log_file(filepath)
+    if not blocks:
+        raise HTTPException(404, "Recording file is empty")
+
+    # Process all blocks through parser + state to extract laps
+    parser = ApexMessageParser()
+    state = RaceStateManager()
+
+    # Configure state with circuit defaults
+    state.circuit_length_m = circuit.length_m or 1100
+    state.laps_discard = circuit.laps_discard or 2
+    state.lap_differential = circuit.lap_differential or 3000
+
+    sessions: list[dict] = []  # [{session_name, timestamp, karts: {kart_number: KartState}}]
+    current_session_key = ""
+
+    def _build_key() -> str:
+        parts = [p for p in (state.category, state.track_name, state.session_title) if p]
+        return " | ".join(parts)
+
+    def _session_name() -> str:
+        parts = [p for p in (state.category, state.track_name, state.session_title) if p]
+        return " - ".join(parts) if parts else f"Auto {circuit.name}"
+
+    def _snapshot_session(timestamp: datetime):
+        """Save current state as a completed session."""
+        kart_laps = {}
+        for row_id, kart in state.karts.items():
+            if kart.all_laps:
+                kart_laps[kart.kart_number] = {
+                    "team_name": kart.team_name,
+                    "all_laps": list(kart.all_laps),
+                    "valid_laps": list(kart.valid_laps),
+                }
+        if kart_laps:
+            sessions.append({
+                "session_name": _session_name(),
+                "timestamp": timestamp,
+                "kart_laps": kart_laps,
+            })
+
+    last_timestamp = blocks[0][0] if blocks else None
+
+    for timestamp, message in blocks:
+        last_timestamp = timestamp
+        events = parser.parse(message)
+        if not events:
+            continue
+
+        has_init = any(e.type == EventType.INIT and e.value == "init" for e in events)
+        if has_init:
+            # Save current session before reset
+            _snapshot_session(timestamp)
+            state.reset()
+            current_session_key = ""
+
+        # Process events (without broadcasting)
+        for event in events:
+            state._apply_event(event)
+
+        # Detect session change (category/title changed)
+        new_key = _build_key()
+        if new_key and current_session_key and new_key != current_session_key:
+            _snapshot_session(timestamp)
+            # Partial reset: clear karts but keep metadata
+            old_category = state.category
+            old_track = state.track_name
+            old_title = state.session_title
+            state.karts.clear()
+            state.category = old_category
+            state.track_name = old_track
+            state.session_title = old_title
+        if new_key:
+            current_session_key = new_key
+
+    # Don't forget the last session
+    if last_timestamp:
+        _snapshot_session(last_timestamp)
+
+    if not sessions:
+        return {"status": "ok", "message": "No sessions found in recording", "sessions": 0, "laps": 0}
+
+    # Delete existing race_logs for this circuit+date (cascade deletes kart_laps)
+    day_start = datetime(target_date.year, target_date.month, target_date.day, tzinfo=timezone.utc)
+    day_end = day_start + timedelta(days=1)
+
+    deleted = await db.execute(
+        delete(RaceLog).where(
+            RaceLog.circuit_id == body.circuit_id,
+            RaceLog.race_date >= day_start,
+            RaceLog.race_date < day_end,
+        )
+    )
+    deleted_count = deleted.rowcount
+    logger.info(f"Deleted {deleted_count} existing race_logs for {circuit.name} on {body.date}")
+
+    # Insert new race_logs and kart_laps
+    total_laps = 0
+    total_sessions = 0
+
+    for session in sessions:
+        kart_laps = session["kart_laps"]
+        if not kart_laps:
+            continue
+
+        race_log = RaceLog(
+            circuit_id=body.circuit_id,
+            user_id=None,
+            race_date=session["timestamp"].replace(tzinfo=timezone.utc)
+                if session["timestamp"].tzinfo is None else session["timestamp"],
+            session_name=session["session_name"],
+            total_karts=len(kart_laps),
+        )
+        db.add(race_log)
+        await db.flush()  # get race_log.id
+
+        session_laps = 0
+        for kart_number, data in kart_laps.items():
+            valid_set = {(vl["totalLap"], vl["lapTime"]) for vl in data["valid_laps"]}
+            for lap in data["all_laps"]:
+                db.add(KartLap(
+                    race_log_id=race_log.id,
+                    kart_number=kart_number,
+                    team_name=data["team_name"],
+                    driver_name=lap.get("driverName", ""),
+                    lap_number=lap["totalLap"],
+                    lap_time_ms=lap["lapTime"],
+                    is_valid=(lap["totalLap"], lap["lapTime"]) in valid_set,
+                ))
+                session_laps += 1
+
+        total_laps += session_laps
+        total_sessions += 1
+        logger.info(f"  Session '{session['session_name']}': {len(kart_laps)} karts, {session_laps} laps")
+
+    await db.commit()
+
+    msg = (f"Reprocessed {circuit.name} {body.date}: "
+           f"{total_sessions} sessions, {total_laps} laps "
+           f"(replaced {deleted_count} old race_logs)")
+    logger.info(msg)
+    return {
+        "status": "ok",
+        "message": msg,
+        "sessions": total_sessions,
+        "laps": total_laps,
+        "deleted": deleted_count,
+    }

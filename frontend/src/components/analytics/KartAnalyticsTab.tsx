@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { api } from "@/lib/api";
 import { useT } from "@/lib/i18n";
+import { useAuth } from "@/hooks/useAuth";
 import { CalendarPicker } from "@/components/shared/CalendarPicker";
 
 interface CircuitRow {
@@ -63,6 +64,7 @@ function msToLapTime(ms: number): string {
 
 export function KartAnalyticsTab() {
   const t = useT();
+  const { user } = useAuth();
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 7);
@@ -85,6 +87,10 @@ export function KartAnalyticsTab() {
   const [driverModalKart, setDriverModalKart] = useState<number | null>(null);
   const [driverBreakdown, setDriverBreakdown] = useState<DriverBreakdown[]>([]);
   const [loadingDrivers, setLoadingDrivers] = useState(false);
+
+  // Reprocess day
+  const [reprocessing, setReprocessing] = useState(false);
+  const [reprocessResult, setReprocessResult] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -280,8 +286,51 @@ export function KartAnalyticsTab() {
                   <span className="text-accent font-semibold">{selected.validLaps.toLocaleString()}</span> {t("analytics.validLaps")}
                 </div>
               </div>
-              <button onClick={() => setSelectedCircuitId(null)} className="text-neutral-500 hover:text-white text-lg leading-none transition-colors">&times;</button>
+              <div className="flex items-center gap-2">
+                {user?.is_admin && (
+                  <button
+                    onClick={async () => {
+                      if (!selected || reprocessing) return;
+                      // Reprocess each day in the date range
+                      setReprocessing(true);
+                      setReprocessResult(null);
+                      try {
+                        const from = new Date(dateFrom);
+                        const to = new Date(dateTo);
+                        let totalSessions = 0, totalLaps = 0, days = 0;
+                        for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+                          const dateStr = d.toISOString().split("T")[0];
+                          try {
+                            const r = await api.reprocessDay(selected.circuit.id, dateStr);
+                            totalSessions += r.sessions;
+                            totalLaps += r.laps;
+                            if (r.sessions > 0) days++;
+                          } catch {
+                            // Day might not have a recording — skip
+                          }
+                        }
+                        setReprocessResult(`${days} días, ${totalSessions} sesiones, ${totalLaps} vueltas`);
+                        loadAll(); // reload data
+                      } catch (e: any) {
+                        setReprocessResult(`Error: ${e.message || "unknown"}`);
+                      }
+                      setReprocessing(false);
+                    }}
+                    disabled={reprocessing}
+                    className="text-[10px] px-2 py-1 rounded border border-orange-700/40 text-orange-400 hover:bg-orange-900/30 transition-colors disabled:opacity-50"
+                    title="Reprocesar grabaciones del rango de fechas seleccionado"
+                  >
+                    {reprocessing ? "⏳ Reprocesando..." : "🔄 Reprocesar"}
+                  </button>
+                )}
+                <button onClick={() => setSelectedCircuitId(null)} className="text-neutral-500 hover:text-white text-lg leading-none transition-colors">&times;</button>
+              </div>
             </div>
+            {reprocessResult && (
+              <div className="mb-3 px-3 py-2 rounded bg-green-900/20 border border-green-700/30 text-green-400 text-xs">
+                {reprocessResult}
+              </div>
+            )}
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
