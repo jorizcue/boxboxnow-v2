@@ -384,7 +384,7 @@ export function ReplayTab() {
             </div>
 
             {/* Buttons */}
-            <div className={`grid ${user?.is_admin ? "grid-cols-3" : "grid-cols-2"} gap-3`}>
+            <div className={`grid ${user?.is_admin ? "grid-cols-2" : "grid-cols-1"} gap-3`}>
               {/* Play button */}
               <button
                 onClick={() => {
@@ -401,29 +401,6 @@ export function ReplayTab() {
                   <path d="M8 5v14l11-7z" />
                 </svg>
                 <span className="text-sm font-semibold">{t("replay.play")}</span>
-              </button>
-
-              {/* Apex Timing view button */}
-              <button
-                onClick={() => {
-                  const sm = sessionModal;
-                  if (!selectedCircuitDir) return;
-                  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-                  const params = new URLSearchParams({
-                    filename: sm.dayFilename,
-                    circuit_dir: selectedCircuitDir,
-                    start_block: String(sm.raceStart.block),
-                    speed: "1",
-                  });
-                  window.open(`${apiBase}/api/apex-replay/viewer?${params}`, "_blank");
-                }}
-                disabled={!selectedCircuitDir}
-                className="flex flex-col items-center justify-center gap-2 py-6 rounded-xl bg-purple-900/30 hover:bg-purple-900/50 border border-purple-800/40 hover:border-purple-600/50 text-purple-400 transition-all disabled:opacity-40"
-              >
-                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                </svg>
-                <span className="text-sm font-semibold">Apex View</span>
               </button>
 
               {/* Download button — admin only */}
