@@ -226,6 +226,23 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
 
   const openDriverPopup = (e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // Detect iPhone/iPad — Safari and all iOS browsers lack Web Bluetooth
+    const ua = navigator.userAgent;
+    const isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+    if (isIOS) {
+      const bluefyUrl = "https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055";
+      const proceed = window.confirm(
+        t("driver.iosWarning") + "\n\n" + t("driver.iosDownload")
+      );
+      if (proceed) {
+        window.open(bluefyUrl, "_blank");
+        return;
+      }
+      // User dismissed — still open driver view (works without RaceBox)
+    }
+
     window.open(
       "/driver",
       "bbn-driver",
