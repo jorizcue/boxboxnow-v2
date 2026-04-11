@@ -374,7 +374,7 @@ const translations: Record<string, Record<Language, string>> = {
   "driver.open": { es: "Piloto", en: "Driver", it: "Pilota", de: "Fahrer" },
   "driver.iosWarning": { es: "Safari y los navegadores de iPhone/iPad no soportan Bluetooth Web (necesario para conectar RaceBox). Si quieres usar RaceBox, necesitas el navegador Bluefy.", en: "Safari and iPhone/iPad browsers don't support Web Bluetooth (required for RaceBox). To use RaceBox, you need the Bluefy browser.", it: "Safari e i browser iPhone/iPad non supportano il Bluetooth Web (necessario per RaceBox). Per usare RaceBox, serve il browser Bluefy.", de: "Safari und iPhone/iPad-Browser unterstützen kein Web Bluetooth (für RaceBox erforderlich). Für RaceBox wird der Bluefy-Browser benötigt." },
   "driver.iosDownload": { es: "¿Quieres ir a la App Store para descargar Bluefy? (Pulsa Cancelar para abrir la vista de piloto sin RaceBox)", en: "Go to App Store to download Bluefy? (Press Cancel to open driver view without RaceBox)", it: "Vuoi andare all'App Store per scaricare Bluefy? (Premi Annulla per aprire la vista pilota senza RaceBox)", de: "Zum App Store gehen, um Bluefy herunterzuladen? (Abbrechen drücken, um die Fahreransicht ohne RaceBox zu öffnen)" },
-  "driver.gpsLapDelta": { es: "Delta GPS", en: "GPS Delta", it: "Delta GPS", de: "GPS Delta" },
+  "driver.gpsLapDelta": { es: "Delta vuelta anterior GPS", en: "GPS Previous Lap Delta", it: "Delta giro precedente GPS", de: "GPS Vorrundenabweichung" },
   "driver.gpsSpeed": { es: "Velocidad GPS", en: "GPS Speed", it: "Velocita GPS", de: "GPS Tempo" },
   "driver.gpsGForce": { es: "Fuerza G", en: "G-Force", it: "Forza G", de: "G-Kraft" },
   "driver.gpsLap": { es: "Vuelta GPS", en: "GPS Lap", it: "Giro GPS", de: "GPS Runde" },
