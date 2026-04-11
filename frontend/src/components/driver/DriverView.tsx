@@ -5,6 +5,7 @@ import { useRaceStore } from "@/hooks/useRaceState";
 import { useSimNow } from "@/hooks/useSimNow";
 import { useRaceClock } from "@/hooks/useRaceClock";
 import { msToLapTime, tierHex, secondsToHMS } from "@/lib/formatters";
+import { stableSpeedMs } from "@/lib/classificationUtils";
 import { getDriverChannel } from "@/lib/driverChannel";
 import { useT } from "@/lib/i18n";
 import { useRaceBox, useRaceBoxStore } from "@/hooks/useRaceBox";
@@ -269,7 +270,7 @@ export function DriverView() {
     const mapped = karts
       .filter((k) => k.totalLaps > 0)
       .map((kart) => {
-        const speedMs = kart.avgLapMs > 0 ? circuitLengthM / (kart.avgLapMs / 1000) : 0;
+        const speedMs = stableSpeedMs(kart, circuitLengthM);
         const baseDistM = kart.totalLaps * circuitLengthM;
 
         let metersExtra = 0;

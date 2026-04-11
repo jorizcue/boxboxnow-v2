@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useSimNow } from "@/hooks/useSimNow";
 import { msToLapTime, tierHex } from "@/lib/formatters";
+import { stableSpeedMs, PositionHysteresis, applyHysteresis } from "@/lib/classificationUtils";
 import { useT } from "@/lib/i18n";
 import clsx from "clsx";
 
@@ -24,6 +25,7 @@ export function AdjustedClassification() {
   const t = useT();
   const { karts, config } = useRaceStore();
   const { now, speed } = useSimNow();
+  const hysteresisRef = useRef(new PositionHysteresis(3));
 
   const circuitLengthM = config.circuitLengthM || 1100;
   const pitTimeS = config.pitTimeS || 0;
@@ -34,11 +36,11 @@ export function AdjustedClassification() {
     // Only count completed pits (exclude karts currently in pit — their stop isn't done yet)
     const maxPits = Math.max(...karts.filter((k) => k.pitStatus !== "in_pit").map((k) => k.pitCount), 0);
 
-    return karts
+    const rawSorted = karts
       .filter((k) => k.totalLaps > 0)
       .map((kart) => {
-        // Average speed in m/s from avgLapMs and circuit length
-        const speedMs = kart.avgLapMs > 0 ? circuitLengthM / (kart.avgLapMs / 1000) : 0;
+        // Stable speed with outlier filtering
+        const speedMs = stableSpeedMs(kart, circuitLengthM);
 
         // Base distance: completed laps × circuit length
         const baseDistanceM = kart.totalLaps * circuitLengthM;
@@ -75,6 +77,8 @@ export function AdjustedClassification() {
         };
       })
       .sort((a, b) => b.adjustedDistanceM - a.adjustedDistanceM);
+
+    return applyHysteresis(rawSorted, hysteresisRef.current);
   }, [karts, now, circuitLengthM, pitTimeS]);
 
   if (karts.length === 0 || adjusted.length === 0) {

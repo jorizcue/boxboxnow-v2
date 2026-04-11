@@ -4,6 +4,7 @@ import { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useSimNow } from "@/hooks/useSimNow";
 import { msToLapTime, tierHex } from "@/lib/formatters";
+import { stableSpeedMs, PositionHysteresis, applyHysteresis } from "@/lib/classificationUtils";
 import { useT } from "@/lib/i18n";
 import clsx from "clsx";
 import type { KartState } from "@/types/race";
@@ -60,6 +61,7 @@ export function RealClassificationBeta() {
   // Track when each kart last changed totalLaps (browser timestamp in seconds)
   // This provides a fallback interpolation when countdown isn't ticking
   const lastLapTs = useRef<Map<number, { laps: number; ts: number }>>(new Map());
+  const hysteresisRef = useRef(new PositionHysteresis(3));
 
   useEffect(() => {
     for (const kart of karts) {
@@ -86,12 +88,10 @@ export function RealClassificationBeta() {
     // smooth transitions, uses real data.
     const racingKarts = karts.filter((k) => k.totalLaps > 0);
 
-    return racingKarts
+    const rawSorted = racingKarts
       .map((kart) => {
-        // Average speed (m/s) from avgLapMs
-        const speedMs = kart.avgLapMs > 0
-          ? circuitLengthM / (kart.avgLapMs / 1000)
-          : 0;
+        // Stable speed with outlier filtering
+        const speedMs = stableSpeedMs(kart, circuitLengthM);
 
         // Base distance from completed laps
         const baseDistanceM = kart.totalLaps * circuitLengthM;
@@ -166,7 +166,17 @@ export function RealClassificationBeta() {
           interpolationMethod,
         };
       })
-      .sort((a, b) => {
+      .sort((a, b) => b.adjustedDistanceM - a.adjustedDistanceM);
+
+    // Apply position hysteresis when sorted by default (adjustedDistanceM)
+    // This prevents rapid oscillations between karts with similar distances
+    const stabilised = sortKey === "adjustedDistanceM" && sortDir === "desc"
+      ? applyHysteresis(rawSorted, hysteresisRef.current)
+      : rawSorted;
+
+    // Apply user-selected sort (may differ from default distance sort)
+    if (sortKey !== "adjustedDistanceM" || sortDir !== "desc") {
+      return stabilised.sort((a, b) => {
         let aVal: number, bVal: number;
         switch (sortKey) {
           case "adjustedDistanceM": aVal = a.adjustedDistanceM; bVal = b.adjustedDistanceM; break;
@@ -180,6 +190,9 @@ export function RealClassificationBeta() {
         }
         return sortDir === "asc" ? aVal - bVal : bVal - aVal;
       });
+    }
+
+    return stabilised;
   }, [karts, countdownMs, now, circuitLengthM, pitTimeS, replaySpeed, sortKey, sortDir]);
 
   if (karts.length === 0 || adjusted.length === 0) {
