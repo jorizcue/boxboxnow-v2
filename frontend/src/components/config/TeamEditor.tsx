@@ -48,6 +48,7 @@ export function TeamEditor() {
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
+  const [autoLoad, setAutoLoad] = useState(true);
   const teamsUpdatedAt = useRaceStore((s) => s.teamsUpdatedAt);
   const initialLoadDone = useRef(false);
 
@@ -56,17 +57,34 @@ export function TeamEditor() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // Initial load
+  // Initial load + read auto_load_teams setting
   useEffect(() => {
-    loadTeams().then(() => { initialLoadDone.current = true; });
+    (async () => {
+      try {
+        const session = await api.getActiveSession();
+        if (session) {
+          setAutoLoad(session.auto_load_teams ?? true);
+        }
+      } catch {}
+      await loadTeams();
+      initialLoadDone.current = true;
+    })();
   }, []);
 
   // Reload when backend pushes teams_updated (race start driver auto-load)
+  // Only if auto-load is enabled
   useEffect(() => {
-    if (initialLoadDone.current && teamsUpdatedAt > 0) {
+    if (initialLoadDone.current && teamsUpdatedAt > 0 && autoLoad) {
       loadTeams();
     }
-  }, [teamsUpdatedAt]);
+  }, [teamsUpdatedAt, autoLoad]);
+
+  const toggleAutoLoad = async (value: boolean) => {
+    setAutoLoad(value);
+    try {
+      await api.updateSession({ auto_load_teams: value });
+    } catch {}
+  };
 
   const loadTeams = async () => {
     try {
@@ -263,7 +281,31 @@ export function TeamEditor() {
             {t("teams.dragHint")}
           </span>
         </h3>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          {/* Auto-load toggle */}
+          <label className="flex items-center gap-1.5 cursor-pointer group" title={t("teams.autoLoadHint")}>
+            <span className="text-[10px] text-neutral-500 group-hover:text-neutral-300 transition-colors uppercase tracking-wider hidden sm:inline">
+              {t("teams.autoLoad")}
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoLoad}
+              onClick={() => toggleAutoLoad(!autoLoad)}
+              className={`relative h-5 w-9 rounded-full transition-colors duration-200 ${
+                autoLoad ? "bg-accent" : "bg-border/60"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                  autoLoad ? "translate-x-4" : ""
+                }`}
+              />
+            </button>
+          </label>
+
+          <div className="w-px h-5 bg-border/40 hidden sm:block" />
+
           <button
             onClick={importFromLiveTiming}
             disabled={importing}

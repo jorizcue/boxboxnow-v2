@@ -271,6 +271,7 @@ class RaceSessionOut(BaseModel):
     box_karts: int
     our_kart_number: int
     refresh_interval_s: int
+    auto_load_teams: bool = True
     is_active: bool
     team_positions: list["TeamPositionOut"] = []
 
@@ -293,6 +294,7 @@ class RaceSessionCreate(BaseModel):
     box_karts: int = 30
     our_kart_number: int = 0
     refresh_interval_s: int = 30
+    auto_load_teams: bool = True
 
 
 class RaceSessionUpdate(BaseModel):
@@ -311,6 +313,7 @@ class RaceSessionUpdate(BaseModel):
     box_karts: int | None = None
     our_kart_number: int | None = None
     refresh_interval_s: int | None = None
+    auto_load_teams: bool | None = None
 
 
 # --- Team Positions + Drivers ---

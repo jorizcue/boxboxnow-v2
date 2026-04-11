@@ -379,6 +379,26 @@ class UserSession:
 
         await asyncio.sleep(1.0)
 
+        # Check if user has auto_load_teams enabled
+        try:
+            from app.models.database import async_session
+            from app.models.schemas import RaceSession
+            from sqlalchemy import select
+
+            async with async_session() as db:
+                result = await db.execute(
+                    select(RaceSession.auto_load_teams).where(
+                        RaceSession.user_id == self.user_id,
+                        RaceSession.is_active == True,
+                    )
+                )
+                auto_load = result.scalar_one_or_none()
+                if auto_load is False:
+                    logger.info(f"Auto-load teams disabled for user {self.user_id}, skipping")
+                    return
+        except Exception as e:
+            logger.warning(f"Could not check auto_load_teams setting: {e}")
+
         logger.info(f"Loading drivers from PHP API for {len(self.state.karts)} karts "
                      f"(user_id={self.user_id})")
 

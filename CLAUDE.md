@@ -160,7 +160,7 @@ ssh -i ~/.ssh/boxboxnow.pem ubuntu@3.252.140.252 \
 - **Acceso temporal**: `UserCircuitAccess.valid_from` / `valid_until` controlan las fechas
 - **Renovacion automatica**: Cada `invoice.paid` de Stripe extiende `valid_until` al nuevo `period_end + 3 dias gracia`
 - **Cancelacion**: `subscription.deleted` expira el acceso inmediatamente (`valid_until = now`)
-- **Duraciones por plan**: monthly ~33 dias, annual ~368 dias, event 48h (todas con 3 dias de gracia)
+- **Duraciones por plan**: monthly = `relativedelta(months=1)`, annual = `relativedelta(years=1)`, event = 48h. Siempre meses/anos calendario exactos (Apr 10 → May 10, Mar 31 → Apr 30). Grace period (+3 dias) solo se aplica sobre `period_end` de Stripe invoice
 - **Upsert**: Si ya existe acceso al circuito, se extiende (usa el mayor `valid_until`)
 - **Trial**: Otorga acceso a TODOS los circuitos durante el periodo trial (diferente de planes pagados)
 
@@ -234,6 +234,19 @@ const [plan] = useState(getPlanFromUrl);
 2. Acceso temporal con duraciones por plan: `_grant_circuit_access()` centraliza la logica de upsert.
 3. Webhooks `invoice.paid` y `subscription.updated` extienden acceso, `subscription.deleted` lo revoca.
 4. Dashboard detecta `?checkout=success` → `api.getMe()` → `updateUser()`.
+
+### Stripe webhook 500 — stripe-python v15 breaking changes (DOBLE)
+**Problema 1**: `stripe.error.SignatureVerificationError` ya no existe → `AttributeError` → 500.
+**Problema 2**: `StripeObject` ya no soporta `.get()` → los handlers fallaban con `AttributeError: get`.
+**Solucion**:
+1. `except Exception` con check de `type(e).__name__` para la firma.
+2. Parsear el payload como JSON plano (`json.loads(payload)`) despues de verificar firma con `construct_event`. Los handlers reciben dicts puros, no StripeObjects.
+**Leccion**: En stripe-python v15+, NUNCA usar el objeto devuelto por `construct_event` para acceder a datos. Solo usarlo para verificar firma. Parsear el JSON raw como dict.
+
+### Duracion de acceso con timedelta vs relativedelta
+**Problema**: `timedelta(days=33)` daba 33 dias fijos. Apr 10 → May 13 en vez de May 10.
+**Solucion**: Usar `dateutil.relativedelta(months=1)` para meses calendario exactos. Apr 10 → May 10, Mar 31 → Apr 30, etc.
+**Leccion**: Para duraciones de suscripcion, SIEMPRE usar relativedelta, nunca timedelta con dias fijos.
 
 ### Cache de usuario desactualizado tras acciones externas
 **Problema general**: Zustand persiste el user en localStorage. Cualquier cambio server-side (webhook, admin) no se refleja automaticamente.

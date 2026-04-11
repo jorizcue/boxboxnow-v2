@@ -267,6 +267,12 @@ async def init_db():
         except Exception:
             pass
 
+        # Add auto_load_teams column to race_sessions
+        try:
+            await conn.execute(text("ALTER TABLE race_sessions ADD COLUMN auto_load_teams BOOLEAN DEFAULT 1 NOT NULL"))
+        except Exception:
+            pass
+
 async def get_db():
     async with async_session() as session:
         yield session

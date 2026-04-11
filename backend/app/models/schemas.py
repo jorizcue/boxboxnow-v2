@@ -111,6 +111,9 @@ class RaceSession(Base):
     our_kart_number = Column(Integer, default=0)
     refresh_interval_s = Column(Integer, default=30)
 
+    # Team auto-load
+    auto_load_teams = Column(Boolean, default=True, nullable=False)
+
     # State
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())

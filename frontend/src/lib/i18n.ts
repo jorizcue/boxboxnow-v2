@@ -198,6 +198,8 @@ const translations: Record<string, Record<Language, string>> = {
   // === Team Editor ===
   "teams.title": { es: "Equipos y Pilotos", en: "Teams & Drivers", it: "Squadre e Piloti", de: "Teams & Fahrer" },
   "teams.dragHint": { es: "(arrastra para reordenar)", en: "(drag to reorder)", it: "(trascina per riordinare)", de: "(zum Sortieren ziehen)" },
+  "teams.autoLoad": { es: "Auto", en: "Auto", it: "Auto", de: "Auto" },
+  "teams.autoLoadHint": { es: "Cargar equipos automáticamente al iniciar carrera", en: "Auto-load teams on race start", it: "Caricamento automatico squadre all'avvio gara", de: "Teams automatisch beim Rennstart laden" },
   "teams.loadLive": { es: "Cargar Live", en: "Load Live", it: "Carica Live", de: "Live laden" },
   "teams.importing": { es: "Importando...", en: "Importing...", it: "Importazione...", de: "Importieren..." },
   "teams.addTeam": { es: "+ Equipo", en: "+ Team", it: "+ Squadra", de: "+ Team" },
