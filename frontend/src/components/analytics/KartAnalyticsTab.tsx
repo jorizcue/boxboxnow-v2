@@ -345,67 +345,6 @@ export function KartAnalyticsTab() {
               <p className="text-neutral-500 text-sm py-4 text-center">{t("analytics.noData")}</p>
             )}
           </div>
-
-          {/* Session filter — shown below circuit cards when a circuit is selected */}
-          {panelOpen && selected && selected.raceLogs.length > 0 && (
-            <div className="mt-4 pt-3 border-t border-border">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-[10px] text-neutral-200 uppercase tracking-wider">Sesiones</h4>
-                <div className="flex gap-1">
-                  <button
-                    onClick={selectAllSessions}
-                    className="text-[9px] text-accent hover:text-accent/80 transition-colors"
-                  >
-                    Todas
-                  </button>
-                  <span className="text-neutral-600 text-[9px]">|</span>
-                  <button
-                    onClick={clearAllSessions}
-                    className="text-[9px] text-neutral-400 hover:text-white transition-colors"
-                  >
-                    Ninguna
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-1 max-h-[300px] overflow-y-auto pr-1">
-                {selected.raceLogs.map((log) => (
-                  <label
-                    key={log.id}
-                    className={`flex items-start gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${
-                      selectedRaceLogIds.has(log.id)
-                        ? "bg-accent/10 border border-accent/30"
-                        : "bg-white/[0.03] hover:bg-white/[0.06] border border-transparent"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedRaceLogIds.has(log.id)}
-                      onChange={() => toggleRaceLog(log.id)}
-                      className="mt-0.5 w-3 h-3 rounded border-neutral-600 bg-transparent accent-accent flex-shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <div className={`text-[11px] truncate ${selectedRaceLogIds.has(log.id) ? "text-accent" : "text-neutral-300"}`}>
-                        {log.session_name || "Sin nombre"}
-                      </div>
-                      <div className="flex gap-2 text-[9px] text-neutral-500">
-                        <span>{new Date(log.race_date).toLocaleDateString()}</span>
-                        <span>{log.total_karts} karts</span>
-                      </div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-              {selectedRaceLogIds.size > 0 && (
-                <div className="mt-2 text-[9px] text-accent">
-                  {loadingFiltered ? (
-                    <span className="animate-pulse">Filtrando...</span>
-                  ) : (
-                    <span>{selectedRaceLogIds.size} sesion{selectedRaceLogIds.size !== 1 ? "es" : ""} seleccionada{selectedRaceLogIds.size !== 1 ? "s" : ""}</span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Right: kart detail panel */}
@@ -464,6 +403,54 @@ export function KartAnalyticsTab() {
             {reprocessResult && (
               <div className="mb-3 px-3 py-2 rounded bg-green-900/20 border border-green-700/30 text-green-400 text-xs">
                 {reprocessResult}
+              </div>
+            )}
+
+            {/* Session filter */}
+            {selected.raceLogs.length > 0 && (
+              <div className="mb-4 bg-white/[0.02] rounded-lg border border-border p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-[10px] text-neutral-200 uppercase tracking-wider">
+                    Filtrar por sesiones
+                    {selectedRaceLogIds.size > 0 && (
+                      <span className="ml-2 text-accent font-normal">
+                        ({selectedRaceLogIds.size} de {selected.raceLogs.length})
+                        {loadingFiltered && <span className="ml-1 animate-pulse">...</span>}
+                      </span>
+                    )}
+                  </h4>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={selectAllSessions}
+                      className="text-[10px] text-accent hover:text-accent/80 transition-colors"
+                    >
+                      Todas
+                    </button>
+                    <span className="text-neutral-600 text-[10px]">|</span>
+                    <button
+                      onClick={clearAllSessions}
+                      className="text-[10px] text-neutral-400 hover:text-white transition-colors"
+                    >
+                      Ninguna
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto">
+                  {selected.raceLogs.map((log) => (
+                    <button
+                      key={log.id}
+                      onClick={() => toggleRaceLog(log.id)}
+                      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] transition-colors border ${
+                        selectedRaceLogIds.has(log.id)
+                          ? "bg-accent/15 border-accent/40 text-accent"
+                          : "bg-white/[0.03] border-neutral-700/50 text-neutral-400 hover:border-accent/30 hover:text-neutral-300"
+                      }`}
+                    >
+                      <span className="truncate max-w-[200px]">{log.session_name || "Sin nombre"}</span>
+                      <span className="text-[8px] text-neutral-500">{log.total_karts}k</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
