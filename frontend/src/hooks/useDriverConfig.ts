@@ -39,7 +39,7 @@ export const ALL_DRIVER_CARDS: { id: DriverCardId; label: string; requiresGps: b
   { id: "best3", label: "Mejor 3 (3V)", requiresGps: false },
   { id: "avgFutureStint", label: "Media stint futuro", requiresGps: false },
   { id: "boxScore", label: "Puntuación Box", requiresGps: false },
-  { id: "gpsLapDelta", label: "Delta vuelta GPS", requiresGps: true },
+  { id: "gpsLapDelta", label: "Delta vuelta anterior GPS", requiresGps: true },
   { id: "gpsSpeed", label: "Velocidad GPS", requiresGps: true },
   { id: "gpsGForce", label: "G-Force (números)", requiresGps: true },
   { id: "lapsToMaxStint", label: "Vueltas hasta stint máximo", requiresGps: false },
