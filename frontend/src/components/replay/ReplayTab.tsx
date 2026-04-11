@@ -138,11 +138,13 @@ export function ReplayTab() {
   }, [replayActive]);
 
   const setReplayStartBlock = useRaceStore((s) => s.setReplayStartBlock);
+  const setReplayCircuitDir = useRaceStore((s) => s.setReplayCircuitDir);
 
   const startFromBlock = async (filename: string, circuitDir: string, block: number = 0) => {
     setActionLoading(true);
     try {
       setReplayStartBlock(block);
+      setReplayCircuitDir(circuitDir);
       await api.startReplay(filename, speed, block, null, circuitDir);
       requestWsReconnect();
       await syncStatus();
