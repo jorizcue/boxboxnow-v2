@@ -30,10 +30,33 @@ export function useDriverSpeech(data: SpeechData, enabled: boolean) {
   const lastSpokenLap = useRef<number>(0);
   const [supported, setSupported] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
+  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
 
-  // Check support on mount
+  // Check support on mount + pick best Spanish voice
   useEffect(() => {
-    setSupported(typeof window !== "undefined" && "speechSynthesis" in window);
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    setSupported(true);
+
+    const pickVoice = () => {
+      const voices = window.speechSynthesis.getVoices();
+      // Filter Spanish voices
+      const esVoices = voices.filter((v) => v.lang.startsWith("es"));
+      if (esVoices.length === 0) return;
+
+      // Prefer premium/enhanced voices (they sound more natural)
+      // On macOS: "Monica", "Paulina" (premium). On iOS: enhanced voices.
+      // On Chrome: "Google español" voices are decent.
+      const premium = esVoices.find(
+        (v) =>
+          /premium|enhanced|natural|google/i.test(v.name) ||
+          /monica|paulina|jorge/i.test(v.name)
+      );
+      voiceRef.current = premium || esVoices[0];
+    };
+
+    pickVoice();
+    // Voices load async in some browsers
+    window.speechSynthesis.onvoiceschanged = pickVoice;
   }, []);
 
   // iOS unlock: speak an empty utterance on first enable (needs user gesture context)
@@ -56,10 +79,10 @@ export function useDriverSpeech(data: SpeechData, enabled: boolean) {
 
     lastSpokenLap.current = data.lastLapMs;
 
-    // Build message parts
+    // Build message — natural phrasing with pauses
     const parts: string[] = [];
 
-    // 1. Last lap time
+    // 1. Last lap time — spell out for clarity
     const lapTimeStr = msToLapTime(data.lastLapMs);
     parts.push(lapTimeStr);
 
@@ -68,15 +91,15 @@ export function useDriverSpeech(data: SpeechData, enabled: boolean) {
       const deltaMs = data.lastLapMs - data.prevLapMs;
       const absDelta = Math.abs(deltaMs) / 1000;
       if (data.lapDelta === "faster") {
-        parts.push(`menos ${absDelta.toFixed(1)}`);
+        parts.push(`menos ${absDelta.toFixed(1)} decimas`);
       } else {
-        parts.push(`más ${absDelta.toFixed(1)}`);
+        parts.push(`mas ${absDelta.toFixed(1)} decimas`);
       }
     }
 
     // 3. Real position
     if (data.realPosition) {
-      parts.push(`posición ${data.realPosition}`);
+      parts.push(`posicion ${data.realPosition}`);
     }
 
     // 4. Box score
@@ -88,20 +111,24 @@ export function useDriverSpeech(data: SpeechData, enabled: boolean) {
     if (data.lapsToMaxStint !== null && data.lapsToMaxStint > 0) {
       const rounded = Math.round(data.lapsToMaxStint);
       if (rounded <= 10) {
-        parts.push(`${rounded} vueltas para stint`);
+        parts.push(`quedan ${rounded} vueltas`);
       }
     }
 
-    const message = parts.join(", ");
+    // Join with periods for natural pauses between segments
+    const message = parts.join(". ");
 
     // Cancel any pending speech
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(message);
     utterance.lang = "es-ES";
-    utterance.rate = 1.1; // Slightly faster for brevity
+    utterance.rate = 0.9;
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
+    if (voiceRef.current) {
+      utterance.voice = voiceRef.current;
+    }
 
     window.speechSynthesis.speak(utterance);
   }, [enabled, supported, data.lastLapMs, data.prevLapMs, data.lapDelta, data.realPosition, data.boxScore, data.lapsToMaxStint]);
