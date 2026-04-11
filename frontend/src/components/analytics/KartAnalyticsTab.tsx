@@ -40,12 +40,22 @@ interface DriverBreakdown {
   best_lap_ms: number;
 }
 
+interface RaceLogEntry {
+  id: number;
+  circuit_id: number;
+  race_date: string;
+  session_name: string;
+  duration_min: number;
+  total_karts: number;
+}
+
 interface CircuitSummary {
   circuit: CircuitRow;
   races: number;
   karts: number;
   validLaps: number;
   stats: KartStat[];
+  raceLogs: RaceLogEntry[];
 }
 
 type SortField = "best5_avg_ms" | "avg_lap_ms" | "best_lap_ms";
@@ -78,6 +88,11 @@ export function KartAnalyticsTab() {
   const [sortBy, setSortBy] = useState<SortField>("best5_avg_ms");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
+  // Session filter
+  const [selectedRaceLogIds, setSelectedRaceLogIds] = useState<Set<number>>(new Set());
+  const [loadingFiltered, setLoadingFiltered] = useState(false);
+  const [filteredStats, setFilteredStats] = useState<KartStat[] | null>(null);
+
   // Best laps modal
   const [modalKart, setModalKart] = useState<number | null>(null);
   const [bestLaps, setBestLaps] = useState<BestLap[]>([]);
@@ -109,9 +124,10 @@ export function KartAnalyticsTab() {
               karts: stats.length,
               validLaps: stats.reduce((a: number, s: KartStat) => a + s.valid_laps, 0),
               stats,
+              raceLogs: logs,
             } as CircuitSummary;
           } catch {
-            return { circuit, races: 0, karts: 0, validLaps: 0, stats: [] } as CircuitSummary;
+            return { circuit, races: 0, karts: 0, validLaps: 0, stats: [], raceLogs: [] } as CircuitSummary;
           }
         })
       );
@@ -123,6 +139,12 @@ export function KartAnalyticsTab() {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  // Reset session filter when circuit changes
+  useEffect(() => {
+    setSelectedRaceLogIds(new Set());
+    setFilteredStats(null);
+  }, [selectedCircuitId]);
 
   const toggleCircuit = (id: number) => {
     setSelectedCircuitId((prev) => (prev === id ? null : id));
@@ -137,19 +159,70 @@ export function KartAnalyticsTab() {
     }
   };
 
+  // Toggle a session in the filter
+  const toggleRaceLog = (id: number) => {
+    setSelectedRaceLogIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAllSessions = () => {
+    const selected = summaries.find((s) => s.circuit.id === selectedCircuitId);
+    if (selected) {
+      setSelectedRaceLogIds(new Set(selected.raceLogs.map((r) => r.id)));
+    }
+  };
+
+  const clearAllSessions = () => {
+    setSelectedRaceLogIds(new Set());
+    setFilteredStats(null);
+  };
+
+  // Fetch filtered stats when sessions are selected
+  const applySessionFilter = useCallback(async () => {
+    if (!selectedCircuitId || selectedRaceLogIds.size === 0) {
+      setFilteredStats(null);
+      return;
+    }
+    setLoadingFiltered(true);
+    try {
+      const ids = Array.from(selectedRaceLogIds);
+      const stats = await api.getKartStats(selectedCircuitId, dateFrom, dateTo, filterOutliers, ids);
+      setFilteredStats(stats);
+    } catch {
+      setFilteredStats(null);
+    }
+    setLoadingFiltered(false);
+  }, [selectedCircuitId, selectedRaceLogIds, dateFrom, dateTo, filterOutliers]);
+
+  // Auto-apply filter when selection changes
+  useEffect(() => {
+    if (selectedRaceLogIds.size > 0) {
+      applySessionFilter();
+    } else {
+      setFilteredStats(null);
+    }
+  }, [selectedRaceLogIds, applySessionFilter]);
+
   const selected = summaries.find((s) => s.circuit.id === selectedCircuitId);
-  const panelOpen = selected !== undefined && selected.stats.length > 0;
+  const panelOpen = selected !== undefined && (selected.stats.length > 0 || selected.raceLogs.length > 0);
+
+  // Use filtered stats if session filter is active, otherwise use full stats
+  const activeStats = filteredStats !== null ? filteredStats : (selected?.stats || []);
+  const activeValidLaps = activeStats.reduce((a, s) => a + s.valid_laps, 0);
 
   // Sorted stats
   const sortedStats = useMemo(() => {
-    if (!selected) return [];
-    const copy = [...selected.stats];
+    const copy = [...activeStats];
     copy.sort((a, b) => {
       const diff = a[sortBy] - b[sortBy];
       return sortDir === "asc" ? diff : -diff;
     });
     return copy;
-  }, [selected, sortBy, sortDir]);
+  }, [activeStats, sortBy, sortDir]);
 
   // Color scale for kart performance
   const bestBest5 = sortedStats.length > 0 ? Math.min(...sortedStats.map((s) => s.best5_avg_ms)) : 0;
@@ -166,13 +239,15 @@ export function KartAnalyticsTab() {
     return "text-red-400";
   };
 
+  const activeRaceLogIds = selectedRaceLogIds.size > 0 ? Array.from(selectedRaceLogIds) : undefined;
+
   const openBestLapsModal = async (kartNumber: number) => {
     if (!selectedCircuitId) return;
     setModalKart(kartNumber);
     setLoadingBestLaps(true);
     setBestLaps([]);
     try {
-      const laps = await api.getKartBestLaps(selectedCircuitId, kartNumber, dateFrom, dateTo, filterOutliers);
+      const laps = await api.getKartBestLaps(selectedCircuitId, kartNumber, dateFrom, dateTo, filterOutliers, activeRaceLogIds);
       setBestLaps(laps);
     } catch {}
     setLoadingBestLaps(false);
@@ -184,7 +259,7 @@ export function KartAnalyticsTab() {
     setLoadingDrivers(true);
     setDriverBreakdown([]);
     try {
-      const drivers = await api.getKartDrivers(selectedCircuitId, kartNumber, dateFrom, dateTo, filterOutliers);
+      const drivers = await api.getKartDrivers(selectedCircuitId, kartNumber, dateFrom, dateTo, filterOutliers, activeRaceLogIds);
       setDriverBreakdown(drivers);
     } catch {}
     setLoadingDrivers(false);
@@ -270,20 +345,81 @@ export function KartAnalyticsTab() {
               <p className="text-neutral-500 text-sm py-4 text-center">{t("analytics.noData")}</p>
             )}
           </div>
+
+          {/* Session filter — shown below circuit cards when a circuit is selected */}
+          {panelOpen && selected && selected.raceLogs.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-border">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-[10px] text-neutral-200 uppercase tracking-wider">Sesiones</h4>
+                <div className="flex gap-1">
+                  <button
+                    onClick={selectAllSessions}
+                    className="text-[9px] text-accent hover:text-accent/80 transition-colors"
+                  >
+                    Todas
+                  </button>
+                  <span className="text-neutral-600 text-[9px]">|</span>
+                  <button
+                    onClick={clearAllSessions}
+                    className="text-[9px] text-neutral-400 hover:text-white transition-colors"
+                  >
+                    Ninguna
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-1 max-h-[300px] overflow-y-auto pr-1">
+                {selected.raceLogs.map((log) => (
+                  <label
+                    key={log.id}
+                    className={`flex items-start gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${
+                      selectedRaceLogIds.has(log.id)
+                        ? "bg-accent/10 border border-accent/30"
+                        : "bg-white/[0.03] hover:bg-white/[0.06] border border-transparent"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedRaceLogIds.has(log.id)}
+                      onChange={() => toggleRaceLog(log.id)}
+                      className="mt-0.5 w-3 h-3 rounded border-neutral-600 bg-transparent accent-accent flex-shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <div className={`text-[11px] truncate ${selectedRaceLogIds.has(log.id) ? "text-accent" : "text-neutral-300"}`}>
+                        {log.session_name || "Sin nombre"}
+                      </div>
+                      <div className="flex gap-2 text-[9px] text-neutral-500">
+                        <span>{new Date(log.race_date).toLocaleDateString()}</span>
+                        <span>{log.total_karts} karts</span>
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {selectedRaceLogIds.size > 0 && (
+                <div className="mt-2 text-[9px] text-accent">
+                  {loadingFiltered ? (
+                    <span className="animate-pulse">Filtrando...</span>
+                  ) : (
+                    <span>{selectedRaceLogIds.size} sesion{selectedRaceLogIds.size !== 1 ? "es" : ""} seleccionada{selectedRaceLogIds.size !== 1 ? "s" : ""}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right: kart detail panel */}
-        {panelOpen && selected && (
+        {panelOpen && selected && activeStats.length > 0 && (
           <div className="flex-1 min-w-0 bg-white/[0.03] rounded-xl border border-border p-5 animate-in slide-in-from-right-4 duration-200">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h4 className="text-sm text-neutral-200 font-medium uppercase tracking-wider">{selected.circuit.name}</h4>
                 <div className="flex items-center gap-3 text-[10px] text-neutral-400 mt-1">
-                  <span className="text-accent font-semibold">{selected.races}</span> {t("analytics.racesFound")}
+                  <span className="text-accent font-semibold">{selectedRaceLogIds.size > 0 ? selectedRaceLogIds.size : selected.races}</span> {t("analytics.racesFound")}
                   <span className="text-neutral-600">|</span>
-                  <span className="text-accent font-semibold">{selected.stats.length}</span> {t("analytics.karts")}
+                  <span className="text-accent font-semibold">{activeStats.length}</span> {t("analytics.karts")}
                   <span className="text-neutral-600">|</span>
-                  <span className="text-accent font-semibold">{selected.validLaps.toLocaleString()}</span> {t("analytics.validLaps")}
+                  <span className="text-accent font-semibold">{activeValidLaps.toLocaleString()}</span> {t("analytics.validLaps")}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -291,7 +427,6 @@ export function KartAnalyticsTab() {
                   <button
                     onClick={async () => {
                       if (!selected || reprocessing) return;
-                      // Reprocess each day in the date range
                       setReprocessing(true);
                       setReprocessResult(null);
                       try {
@@ -309,8 +444,8 @@ export function KartAnalyticsTab() {
                             // Day might not have a recording — skip
                           }
                         }
-                        setReprocessResult(`${days} días, ${totalSessions} sesiones, ${totalLaps} vueltas`);
-                        loadAll(); // reload data
+                        setReprocessResult(`${days} dias, ${totalSessions} sesiones, ${totalLaps} vueltas`);
+                        loadAll();
                       } catch (e: any) {
                         setReprocessResult(`Error: ${e.message || "unknown"}`);
                       }
@@ -320,7 +455,7 @@ export function KartAnalyticsTab() {
                     className="text-[10px] px-2 py-1 rounded border border-orange-700/40 text-orange-400 hover:bg-orange-900/30 transition-colors disabled:opacity-50"
                     title="Reprocesar grabaciones del rango de fechas seleccionado"
                   >
-                    {reprocessing ? "⏳ Reprocesando..." : "🔄 Reprocesar"}
+                    {reprocessing ? "Reprocesando..." : "Reprocesar"}
                   </button>
                 )}
                 <button onClick={() => setSelectedCircuitId(null)} className="text-neutral-500 hover:text-white text-lg leading-none transition-colors">&times;</button>
@@ -408,7 +543,7 @@ export function KartAnalyticsTab() {
         )}
 
         {/* Empty state when circuit selected but no data */}
-        {selectedCircuitId && selected && selected.stats.length === 0 && (
+        {selectedCircuitId && selected && activeStats.length === 0 && selected.raceLogs.length === 0 && (
           <div className="flex-1 min-w-0 bg-white/[0.03] rounded-xl border border-border p-8 text-center animate-in fade-in duration-200">
             <div className="flex justify-end mb-2">
               <button onClick={() => setSelectedCircuitId(null)} className="text-neutral-500 hover:text-white text-lg leading-none transition-colors">&times;</button>

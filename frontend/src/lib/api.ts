@@ -244,25 +244,28 @@ export const api = {
 
   // Analytics
   getAnalyticsCircuits: () => fetchApi<any[]>("/api/analytics/circuits"),
-  getKartStats: (circuitId: number, dateFrom?: string, dateTo?: string, filterOutliers: boolean = true) => {
+  getKartStats: (circuitId: number, dateFrom?: string, dateTo?: string, filterOutliers: boolean = true, raceLogIds?: number[]) => {
     const params = new URLSearchParams({ circuit_id: String(circuitId) });
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     params.set("filter_outliers", String(filterOutliers));
+    if (raceLogIds && raceLogIds.length > 0) params.set("race_log_ids", raceLogIds.join(","));
     return fetchApi<any[]>(`/api/analytics/kart-stats?${params}`);
   },
-  getKartBestLaps: (circuitId: number, kartNumber: number, dateFrom?: string, dateTo?: string, filterOutliers: boolean = true) => {
+  getKartBestLaps: (circuitId: number, kartNumber: number, dateFrom?: string, dateTo?: string, filterOutliers: boolean = true, raceLogIds?: number[]) => {
     const params = new URLSearchParams({ circuit_id: String(circuitId), kart_number: String(kartNumber) });
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     params.set("filter_outliers", String(filterOutliers));
+    if (raceLogIds && raceLogIds.length > 0) params.set("race_log_ids", raceLogIds.join(","));
     return fetchApi<any[]>(`/api/analytics/kart-best-laps?${params}`);
   },
-  getKartDrivers: (circuitId: number, kartNumber: number, dateFrom?: string, dateTo?: string, filterOutliers: boolean = true) => {
+  getKartDrivers: (circuitId: number, kartNumber: number, dateFrom?: string, dateTo?: string, filterOutliers: boolean = true, raceLogIds?: number[]) => {
     const params = new URLSearchParams({ circuit_id: String(circuitId), kart_number: String(kartNumber) });
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     params.set("filter_outliers", String(filterOutliers));
+    if (raceLogIds && raceLogIds.length > 0) params.set("race_log_ids", raceLogIds.join(","));
     return fetchApi<any[]>(`/api/analytics/kart-drivers?${params}`);
   },
   getRaceLogs: (circuitId: number, dateFrom?: string, dateTo?: string) => {

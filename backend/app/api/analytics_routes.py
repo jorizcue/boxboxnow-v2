@@ -86,20 +86,26 @@ async def get_kart_stats(
     date_from: str | None = Query(None, description="ISO date YYYY-MM-DD"),
     date_to: str | None = Query(None, description="ISO date YYYY-MM-DD"),
     filter_outliers: bool = Query(True, description="Filter laps >10% from mean"),
+    race_log_ids: str | None = Query(None, description="Comma-separated race_log IDs to filter by"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get aggregated kart performance stats for a circuit within a date range."""
     await _check_circuit_access(user, circuit_id, db)
-    dt_from, dt_to = _parse_date_range(date_from, date_to)
-    race_log_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)
 
-    if not race_log_ids:
+    if race_log_ids:
+        rl_ids = [int(x) for x in race_log_ids.split(",") if x.strip()]
+    else:
+        dt_from, dt_to = _parse_date_range(date_from, date_to)
+        rl_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)
+    race_log_ids_list = rl_ids
+
+    if not race_log_ids_list:
         return []
 
     # Fetch all laps for those races
     result = await db.execute(
-        select(KartLap).where(KartLap.race_log_id.in_(race_log_ids))
+        select(KartLap).where(KartLap.race_log_id.in_(race_log_ids_list))
     )
     all_laps = result.scalars().all()
 
@@ -164,15 +170,20 @@ async def get_kart_best_laps(
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
     filter_outliers: bool = Query(True),
+    race_log_ids: str | None = Query(None, description="Comma-separated race_log IDs"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get the 5 best laps for a specific kart with race date, team, driver."""
     await _check_circuit_access(user, circuit_id, db)
-    dt_from, dt_to = _parse_date_range(date_from, date_to)
-    race_log_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)
 
-    if not race_log_ids:
+    if race_log_ids:
+        rl_ids = [int(x) for x in race_log_ids.split(",") if x.strip()]
+    else:
+        dt_from, dt_to = _parse_date_range(date_from, date_to)
+        rl_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)
+
+    if not rl_ids:
         return []
 
     # Fetch laps with race_log date
@@ -180,7 +191,7 @@ async def get_kart_best_laps(
         select(KartLap, RaceLog.race_date).join(
             RaceLog, KartLap.race_log_id == RaceLog.id
         ).where(
-            KartLap.race_log_id.in_(race_log_ids),
+            KartLap.race_log_id.in_(rl_ids),
             KartLap.kart_number == kart_number,
             KartLap.is_valid == True,
         )
@@ -224,20 +235,25 @@ async def get_kart_drivers(
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
     filter_outliers: bool = Query(True),
+    race_log_ids: str | None = Query(None, description="Comma-separated race_log IDs"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get per-driver breakdown for a specific kart: avg lap, best lap, laps count."""
     await _check_circuit_access(user, circuit_id, db)
-    dt_from, dt_to = _parse_date_range(date_from, date_to)
-    race_log_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)
 
-    if not race_log_ids:
+    if race_log_ids:
+        rl_ids = [int(x) for x in race_log_ids.split(",") if x.strip()]
+    else:
+        dt_from, dt_to = _parse_date_range(date_from, date_to)
+        rl_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)
+
+    if not rl_ids:
         return []
 
     result = await db.execute(
         select(KartLap).where(
-            KartLap.race_log_id.in_(race_log_ids),
+            KartLap.race_log_id.in_(rl_ids),
             KartLap.kart_number == kart_number,
             KartLap.is_valid == True,
         )
