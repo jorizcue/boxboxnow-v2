@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { GForceRadar } from "@/components/driver/GForceRadar";
 // Config panel moved to separate sidebar tab (driver-config)
 import { useGpsTelemetrySave } from "@/hooks/useGpsTelemetrySave";
+import { useDriverSpeech } from "@/hooks/useDriverSpeech";
 
 /* ------------------------------------------------------------------ */
 /*  Touch drag-and-drop hook                                           */
@@ -257,8 +258,8 @@ export function DriverView() {
   // Kart number: user override from driver config, fallback to race session config
   const ourKart = driverCfg.selectedKartNumber ?? config.ourKartNumber;
 
-  // Previous lap tracking for lastLap card
-  const { lastLapMs: lastLapVal, lapDelta } = usePrevLap(ourKart);
+  // Previous lap tracking for lastLap card + speech
+  const { prevLapMs, lastLapMs: lastLapVal, lapDelta } = usePrevLap(ourKart);
 
   /* ---------- Compute adjusted classification (countdown-based, same as Beta) ---------- */
   const { ourData } = useMemo(() => {
@@ -404,6 +405,21 @@ export function DriverView() {
     const timeToMax = Math.max(0, config.maxStintMin * 60 - stintSec);
     return timeToMax / (kart.avgLapMs / 1000);
   }, [karts, ourKart, raceClock, durationMs, raceFinished, config.maxStintMin]);
+
+  // Audio speech narration
+  const [speechEnabled, setSpeechEnabled] = useState(false);
+  const speech = useDriverSpeech(
+    {
+      lastLapMs: lastLapVal,
+      prevLapMs,
+      lapDelta,
+      realPosition: ourData?.realPosition ?? null,
+      totalKarts: ourData?.totalKarts ?? null,
+      boxScore: fifo?.score ?? 0,
+      lapsToMaxStint,
+    },
+    speechEnabled
+  );
 
   /* ---------- Waiting for data / no kart ---------- */
   const hasReceivedData = karts.length > 0 || config.ourKartNumber > 0;
@@ -832,6 +848,28 @@ export function DriverView() {
                 </button>
               )}
             </>
+          )}
+          {/* Audio speech toggle */}
+          {speech.supported && (
+            <button
+              onClick={() => {
+                const next = !speechEnabled;
+                setSpeechEnabled(next);
+                if (next && !speech.unlocked) speech.unlock();
+              }}
+              className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+                speechEnabled ? "bg-green-900/40 text-green-400 border border-green-700/40" : "text-neutral-500 hover:text-neutral-300"
+              }`}
+              title={speechEnabled ? "Audio activado" : "Audio desactivado"}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                {speechEnabled ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                )}
+              </svg>
+            </button>
           )}
           {/* Brightness control */}
           <button

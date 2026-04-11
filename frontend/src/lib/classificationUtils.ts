@@ -87,7 +87,7 @@ export class PositionHysteresis {
   stabilise(rawPositions: Map<number, number>): Map<number, number> {
     const result = new Map<number, number>();
 
-    for (const [kart, rawPos] of rawPositions) {
+    for (const [kart, rawPos] of Array.from(rawPositions.entries())) {
       const prev = this.state.get(kart);
 
       if (!prev) {
@@ -123,7 +123,7 @@ export class PositionHysteresis {
     }
 
     // Clean up karts that are no longer in the race
-    for (const kart of this.state.keys()) {
+    for (const kart of Array.from(this.state.keys())) {
       if (!rawPositions.has(kart)) {
         this.state.delete(kart);
       }

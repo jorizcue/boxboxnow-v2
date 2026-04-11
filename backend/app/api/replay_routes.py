@@ -29,6 +29,18 @@ LOGS_BASE_DIR = "data/logs"
 RECORDINGS_BASE_DIR = "data/recordings"
 
 
+def _safe_filename(filename: str) -> str:
+    """Sanitize filename to prevent path traversal attacks.
+
+    Strips directory components, rejects '..' sequences, and returns
+    only the base filename.
+    """
+    clean = Path(filename).name  # strips all directory components
+    if not clean or clean == "." or ".." in clean:
+        raise HTTPException(400, "Invalid filename")
+    return clean
+
+
 class ReplayStartRequest(BaseModel):
     filename: str
     speed: float = 1.0
@@ -57,7 +69,11 @@ def _resolve_logs_dir(user: User, owner_id: int | None = None,
     - default: user's own logs from data/logs/{user.id}/
     """
     if circuit_dir:
-        return os.path.join(RECORDINGS_BASE_DIR, circuit_dir)
+        # Sanitize: only allow simple directory names (no path traversal)
+        clean = Path(circuit_dir).name
+        if not clean or clean == "." or ".." in circuit_dir:
+            raise HTTPException(400, "Invalid circuit directory")
+        return os.path.join(RECORDINGS_BASE_DIR, clean)
     if owner_id is not None and user.is_admin:
         return os.path.join(LOGS_BASE_DIR, str(owner_id))
     return os.path.join(LOGS_BASE_DIR, str(user.id))
@@ -258,6 +274,7 @@ async def analyze_log(
     from app.apex.parser import ApexMessageParser
 
     logs_dir = _resolve_logs_dir(user, owner_id, circuit_dir)
+    filename = _safe_filename(filename)
 
     # Check file exists, fallback to .log.gz or legacy root dir
     filepath = os.path.join(logs_dir, filename)
@@ -310,6 +327,8 @@ async def start_replay(
         logs_dir = os.path.join(LOGS_BASE_DIR, str(data.owner_id))
     else:
         logs_dir = os.path.join(LOGS_BASE_DIR, str(user.id))
+
+    data.filename = _safe_filename(data.filename)
 
     # Check file exists (also check .log.gz fallback or root for legacy)
     filepath = os.path.join(logs_dir, data.filename)
@@ -501,6 +520,7 @@ async def download_session(
     from app.apex.parser import ApexMessageParser
 
     logs_dir = _resolve_logs_dir(user, owner_id, circuit_dir)
+    filename = _safe_filename(filename)
 
     # Check file exists with fallbacks
     filepath = os.path.join(logs_dir, filename)

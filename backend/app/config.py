@@ -1,5 +1,19 @@
+import secrets
+import logging
+
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+logger = logging.getLogger(__name__)
+
+
+def _generate_jwt_secret() -> str:
+    """Generate a random JWT secret and warn that it should be configured via .env."""
+    logger.warning(
+        "JWT_SECRET not set — using a random secret. "
+        "Sessions will NOT survive restarts. Set JWT_SECRET in .env for production."
+    )
+    return secrets.token_urlsafe(64)
 
 
 class Settings(BaseSettings):
@@ -15,10 +29,10 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     log_level: str = "info"
-    allowed_origins: str = "*"
+    allowed_origins: str = "https://boxboxnow.com,https://www.boxboxnow.com"
 
     # Auth
-    jwt_secret: str = "change-me-in-production"
+    jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 1440  # 24 hours
 
@@ -55,4 +69,7 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    s = Settings()
+    if not s.jwt_secret:
+        s.jwt_secret = _generate_jwt_secret()
+    return s
