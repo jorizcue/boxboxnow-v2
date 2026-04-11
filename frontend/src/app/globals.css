@@ -299,3 +299,28 @@ button {
   0%, 100% { transform: rotate(-0.5deg); }
   50% { transform: rotate(0.5deg); }
 }
+
+/* ==================== REDUCED MOTION ==================== */
+@media (prefers-reduced-motion: reduce) {
+  .speed-line,
+  .marquee-track,
+  .ticker-track,
+  .glow-pulse,
+  .animate-fade-in-up,
+  .reveal-up,
+  .reveal-scale,
+  .frozen-flake {
+    animation: none !important;
+  }
+  .animate-fade-in-up {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .reveal-up, .reveal-scale {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}

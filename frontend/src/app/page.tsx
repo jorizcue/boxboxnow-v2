@@ -9,36 +9,70 @@ const features = [
     desc: "Sigue cada kart en pista con actualizaciones al segundo. Posicion, vueltas, gaps e intervalos.",
     stat: "0.3s",
     statLabel: "latencia",
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+      </svg>
+    ),
+    large: true,
   },
   {
     title: "Gestion de boxes",
     desc: "Cola FIFO inteligente, prediccion de ventana de parada y analisis de tiempos de pit.",
     stat: "FIFO",
     statLabel: "cola inteligente",
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
+      </svg>
+    ),
+    large: true,
   },
   {
     title: "Clasificacion ajustada",
     desc: "Algoritmo propio que calcula posiciones reales considerando paradas y bonificaciones.",
     stat: "100%",
     statLabel: "precision",
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+      </svg>
+    ),
   },
   {
     title: "Vista de piloto",
     desc: "Interfaz optimizada para el piloto: siguiente stint, tiempos objetivo y estado del equipo.",
     stat: "1-TAP",
     statLabel: "acceso rapido",
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+      </svg>
+    ),
   },
   {
     title: "Analitica de karts",
     desc: "Historial de rendimiento por kart, rankings de velocidad y deteccion de outliers.",
     stat: "200+",
     statLabel: "metricas",
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
   },
   {
     title: "GPS Insights",
     desc: "Telemetria GPS con comparativa de vueltas, velocidad en curva y fuerzas G.",
     stat: "10Hz",
     statLabel: "frecuencia GPS",
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+      </svg>
+    ),
   },
 ];
 
@@ -48,7 +82,7 @@ const steps = [
     title: "Configura tu carrera",
     desc: "Selecciona circuito, duracion, equipos y parametros de stint.",
     icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
@@ -57,9 +91,9 @@ const steps = [
   {
     num: "02",
     title: "Datos en tiempo real",
-    desc: "Recibe los tiempos del cronometraje oficial del circuito de forma instantánea.",
+    desc: "Recibe los tiempos del cronometraje oficial del circuito de forma instantanea.",
     icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
       </svg>
     ),
@@ -69,7 +103,7 @@ const steps = [
     title: "Toma decisiones",
     desc: "Visualiza datos en vivo y optimiza tu estrategia de paradas.",
     icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
       </svg>
     ),
@@ -84,6 +118,33 @@ const circuits = [
   "Campillos Kart",
 ];
 
+const demoHighlights = [
+  {
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+      </svg>
+    ),
+    text: "Actualizacion cada 0.3s",
+  },
+  {
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+      </svg>
+    ),
+    text: "6 columnas de datos en vivo",
+  },
+  {
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+      </svg>
+    ),
+    text: "Deteccion automatica de pit stops",
+  },
+];
+
 export default function LandingPage() {
   return (
     <div className="noise-bg min-h-screen bg-black text-white overflow-clip">
@@ -91,17 +152,17 @@ export default function LandingPage() {
 
       {/* ===== HERO ===== */}
       <section className="relative flex min-h-screen items-center justify-center px-6 overflow-hidden">
-        {/* Speed lines background */}
+        {/* Speed lines background — reduced to 5 */}
         <div className="pointer-events-none absolute inset-0">
-          {Array.from({ length: 8 }).map((_, i) => (
+          {Array.from({ length: 5 }).map((_, i) => (
             <div
               key={i}
               className="speed-line absolute"
               style={{
-                top: `${12 + i * 11}%`,
-                width: `${200 + i * 80}px`,
-                animationDuration: `${4 + i * 1.3}s`,
-                animationDelay: `${i * 0.7}s`,
+                top: `${15 + i * 16}%`,
+                width: `${220 + i * 100}px`,
+                animationDuration: `${4.5 + i * 1.5}s`,
+                animationDelay: `${i * 0.9}s`,
               }}
             />
           ))}
@@ -115,21 +176,19 @@ export default function LandingPage() {
           <div className="animate-fade-in-up mb-3">
             <span className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/5 px-4 py-1.5 text-xs font-medium text-accent tracking-wide">
               <span className="led-dot" />
-              EN VIVO — Equipos compitiendo ahora
+              Usado por equipos en 5+ circuitos de Espana y Europa
             </span>
           </div>
 
           <h1 className="animate-fade-in-up text-3xl font-bold leading-[1.1] tracking-tight sm:text-5xl lg:text-6xl" style={{ animationDelay: "0.08s" }}>
-            Estrategia de karting
-          </h1>
-          <h1 className="animate-fade-in-up text-4xl font-black leading-[1.1] tracking-tight sm:text-7xl lg:text-[5.5rem]" style={{ animationDelay: "0.15s" }}>
-            <span className="bg-gradient-to-r from-accent via-accent-hover to-accent bg-clip-text text-transparent">
+            Estrategia de karting{" "}
+            <span className="block text-4xl font-black sm:text-7xl lg:text-[5.5rem] mt-1 bg-gradient-to-r from-accent via-accent-hover to-accent bg-clip-text text-transparent">
               en tiempo real
             </span>
           </h1>
 
           <p
-            className="animate-fade-in-up mx-auto mt-8 max-w-xl text-sm text-muted/50 sm:text-lg sm:max-w-2xl leading-relaxed"
+            className="animate-fade-in-up mx-auto mt-8 max-w-xl text-sm text-neutral-400 sm:text-lg sm:max-w-2xl leading-relaxed"
             style={{ animationDelay: "0.25s" }}
           >
             Monitoriza posiciones, optimiza paradas en boxes y toma decisiones
@@ -154,7 +213,7 @@ export default function LandingPage() {
             </a>
             <a
               href="#demo"
-              className="group rounded-xl border border-border/60 px-8 py-4 text-base font-medium text-muted/70 hover:border-accent/40 hover:text-white transition-all duration-300"
+              className="group rounded-xl border border-border/60 px-8 py-4 text-base font-medium text-neutral-400 hover:border-accent/40 hover:text-white transition-all duration-300"
             >
               Ver en accion
               <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">&rarr;</span>
@@ -171,9 +230,9 @@ export default function LandingPage() {
             {[...circuits, ...circuits].map((name, i) => (
               <span
                 key={`${name}-${i}`}
-                className="flex items-center gap-3 text-sm font-medium text-muted/25 whitespace-nowrap uppercase tracking-widest"
+                className="flex items-center gap-3 text-sm font-medium text-neutral-500 whitespace-nowrap uppercase tracking-widest"
               >
-                <span className="h-1 w-1 rounded-full bg-accent/40" />
+                <span className="h-1.5 w-1.5 rounded-full bg-accent/50" />
                 {name}
               </span>
             ))}
@@ -181,7 +240,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== FEATURES ===== */}
+      {/* ===== FEATURES — Bento Grid ===== */}
       <section id="funcionalidades" className="py-20 sm:py-28">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mx-auto max-w-2xl text-center mb-20">
@@ -196,29 +255,36 @@ export default function LandingPage() {
             </h2>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map((f, i) => (
+          {/* Bento layout: 2 large cards on top, 4 smaller below */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {features.map((f) => (
               <div
                 key={f.title}
-                className="group gradient-border p-6 transition-all duration-300 hover:-translate-y-1"
+                className={`group gradient-border p-6 transition-all duration-300 hover:-translate-y-1 ${
+                  f.large ? "lg:col-span-2" : ""
+                }`}
               >
-                {/* Stat */}
-                <div className="flex items-end justify-between mb-5">
-                  <div>
-                    <span className="stat-number text-3xl font-bold text-accent leading-none">
-                      {f.stat}
-                    </span>
-                    <p className="text-[10px] uppercase tracking-widest text-muted/30 mt-1">
-                      {f.statLabel}
-                    </p>
+                {/* Icon + Stat row */}
+                <div className="flex items-start justify-between mb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                      {f.icon}
+                    </div>
+                    <div>
+                      <span className="stat-number text-2xl font-bold text-accent leading-none">
+                        {f.stat}
+                      </span>
+                      <p className="text-[10px] uppercase tracking-widest text-neutral-500 mt-0.5">
+                        {f.statLabel}
+                      </p>
+                    </div>
                   </div>
-                  <div className="led-dot opacity-40 group-hover:opacity-100 transition-opacity" />
                 </div>
 
                 <h3 className="text-base font-semibold text-white mb-2">
                   {f.title}
                 </h3>
-                <p className="text-sm leading-relaxed text-muted/40">
+                <p className="text-sm leading-relaxed text-neutral-500">
                   {f.desc}
                 </p>
               </div>
@@ -243,23 +309,23 @@ export default function LandingPage() {
           </div>
 
           <div className="relative">
-            {/* Timeline line */}
-            <div className="hidden md:block absolute top-10 left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent/20 to-transparent" />
+            {/* Timeline connector — thicker gradient */}
+            <div className="hidden md:block absolute top-12 left-[15%] right-[15%] h-[2px] bg-gradient-to-r from-transparent via-accent/30 to-transparent" />
 
             <div className="grid gap-12 md:grid-cols-3 md:gap-8">
-              {steps.map((s, i) => (
+              {steps.map((s) => (
                 <div key={s.num} className="relative text-center group">
-                  {/* Step circle */}
-                  <div className="relative z-10 mx-auto flex h-20 w-20 items-center justify-center rounded-2xl border border-accent/20 bg-black/80 backdrop-blur text-accent transition-all duration-300 group-hover:border-accent/50 group-hover:shadow-[0_0_30px_rgba(159,229,86,0.1)]">
+                  {/* Step circle — larger */}
+                  <div className="relative z-10 mx-auto flex h-24 w-24 items-center justify-center rounded-2xl border border-accent/20 bg-black/80 backdrop-blur text-accent transition-all duration-300 group-hover:border-accent/50 group-hover:shadow-[0_0_40px_rgba(159,229,86,0.12)]">
                     {s.icon}
                   </div>
-                  <span className="stat-number absolute -top-2 -right-2 md:relative md:top-auto md:right-auto inline-block mt-3 text-[11px] font-bold text-accent/40 tracking-wider">
+                  <span className="stat-number inline-block mt-4 text-[11px] font-bold text-accent/50 tracking-wider">
                     {s.num}
                   </span>
                   <h3 className="mt-2 text-lg font-semibold text-white">
                     {s.title}
                   </h3>
-                  <p className="mt-2 text-sm text-muted/40 max-w-[280px] mx-auto">{s.desc}</p>
+                  <p className="mt-2 text-sm text-neutral-500 max-w-[280px] mx-auto">{s.desc}</p>
                 </div>
               ))}
             </div>
@@ -280,7 +346,7 @@ export default function LandingPage() {
                 accion
               </span>
             </h2>
-            <p className="mt-4 text-muted/40 max-w-lg mx-auto">
+            <p className="mt-4 text-neutral-500 max-w-lg mx-auto">
               Datos actualizandose en tiempo real, como en una carrera de verdad.
             </p>
           </div>
@@ -292,12 +358,22 @@ export default function LandingPage() {
               <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f56]" />
               <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]" />
               <span className="h-2.5 w-2.5 rounded-full bg-[#27c93f]" />
-              <span className="ml-4 font-mono text-[11px] text-muted/20">app.boxboxnow.com/race</span>
+              <span className="ml-4 font-mono text-[11px] text-neutral-600">app.boxboxnow.com/race</span>
             </div>
             {/* Content: animated mini race table */}
             <div className="bg-black/40 p-4 sm:p-8">
               <MiniRaceTable />
             </div>
+          </div>
+
+          {/* Demo highlights */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+            {demoHighlights.map((h) => (
+              <div key={h.text} className="flex items-center gap-3 rounded-xl bg-surface/50 border border-border/50 px-4 py-3">
+                <div className="text-accent/70">{h.icon}</div>
+                <span className="text-sm text-neutral-400">{h.text}</span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -317,7 +393,7 @@ export default function LandingPage() {
             <h2 className="text-3xl font-bold sm:text-4xl">
               Planes simples, sin sorpresas
             </h2>
-            <p className="mt-4 text-muted/40">
+            <p className="mt-4 text-neutral-500">
               Elige el plan que mejor se adapte a tu equipo. Sin permanencia.
             </p>
           </div>
@@ -341,7 +417,7 @@ export default function LandingPage() {
             </span>
             ?
           </h2>
-          <p className="mx-auto mt-6 max-w-lg text-lg text-muted/40">
+          <p className="mx-auto mt-6 max-w-lg text-lg text-neutral-500">
             Registrate gratis y prueba BoxBoxNow durante 14 dias.
           </p>
           <a
@@ -350,7 +426,7 @@ export default function LandingPage() {
           >
             Crear cuenta gratis
           </a>
-          <p className="mt-4 text-xs text-muted/25">Sin tarjeta de credito &middot; Cancela cuando quieras</p>
+          <p className="mt-4 text-xs text-neutral-600">Sin tarjeta de credito &middot; Cancela cuando quieras</p>
         </div>
       </section>
 
@@ -363,43 +439,46 @@ export default function LandingPage() {
               <a href="/" className="text-xl font-bold text-white tracking-tight">
                 BOXBOX<span className="text-accent">NOW</span>
               </a>
-              <p className="mt-3 text-sm text-muted/30 leading-relaxed">
+              <p className="mt-3 text-sm text-neutral-500 leading-relaxed">
                 Estrategia de karting en tiempo real para equipos de endurance.
+              </p>
+              <p className="mt-2 text-xs text-neutral-600">
+                Hecho en Espana
               </p>
             </div>
 
             {/* Links */}
             <div className="flex gap-16 text-sm">
               <div>
-                <h4 className="font-semibold text-muted/40 mb-3">Producto</h4>
+                <h4 className="font-semibold text-neutral-400 mb-3">Producto</h4>
                 <ul className="space-y-2">
-                  <li><a href="#funcionalidades" className="text-muted/30 hover:text-accent transition-colors">Funcionalidades</a></li>
-                  <li><a href="#precios" className="text-muted/30 hover:text-accent transition-colors">Precios</a></li>
-                  <li><a href="#demo" className="text-muted/30 hover:text-accent transition-colors">Demo</a></li>
+                  <li><a href="#funcionalidades" className="text-neutral-500 hover:text-accent transition-colors">Funcionalidades</a></li>
+                  <li><a href="#precios" className="text-neutral-500 hover:text-accent transition-colors">Precios</a></li>
+                  <li><a href="#demo" className="text-neutral-500 hover:text-accent transition-colors">Demo</a></li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-semibold text-muted/40 mb-3">Legal</h4>
+                <h4 className="font-semibold text-neutral-400 mb-3">Legal</h4>
                 <ul className="space-y-2">
-                  <li><a href="/terminos" className="text-muted/30 hover:text-accent transition-colors">Terminos</a></li>
-                  <li><a href="/privacidad" className="text-muted/30 hover:text-accent transition-colors">Privacidad</a></li>
-                  <li><a href="/cookies" className="text-muted/30 hover:text-accent transition-colors">Cookies</a></li>
+                  <li><a href="/terminos" className="text-neutral-500 hover:text-accent transition-colors">Terminos</a></li>
+                  <li><a href="/privacidad" className="text-neutral-500 hover:text-accent transition-colors">Privacidad</a></li>
+                  <li><a href="/cookies" className="text-neutral-500 hover:text-accent transition-colors">Cookies</a></li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-semibold text-muted/40 mb-3">Contacto</h4>
+                <h4 className="font-semibold text-neutral-400 mb-3">Contacto</h4>
                 <ul className="space-y-2">
-                  <li><a href="mailto:contacto@boxboxnow.com" className="text-muted/30 hover:text-accent transition-colors">contacto@boxboxnow.com</a></li>
+                  <li><a href="mailto:contacto@boxboxnow.com" className="text-neutral-500 hover:text-accent transition-colors">contacto@boxboxnow.com</a></li>
                 </ul>
               </div>
             </div>
           </div>
 
           <div className="mt-12 pt-6 border-t border-border/30 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <p className="text-xs text-muted/20">
+            <p className="text-xs text-neutral-600">
               &copy; 2026 BoxBoxNow. Todos los derechos reservados.
             </p>
-            <p className="font-mono text-[10px] text-muted/15 tracking-wider">
+            <p className="font-mono text-[10px] text-neutral-700 tracking-wider">
               BUILT FOR SPEED
             </p>
           </div>

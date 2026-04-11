@@ -171,10 +171,12 @@ export function PricingToggle() {
         {plans.map((plan) => (
           <div
             key={plan.base_type}
-            className={`relative rounded-2xl border bg-surface overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
+            className={`relative rounded-2xl border overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
               plan.is_popular
-                ? "border-accent/40 shadow-[0_0_50px_rgba(159,229,86,0.08)] md:scale-[1.03]"
-                : "border-border/50 hover:border-border"
+                ? "bg-accent/[0.03] border-accent/40 shadow-[0_0_60px_rgba(159,229,86,0.1)] md:scale-105"
+                : plan.is_event
+                  ? "bg-[#1a1708] border-gold/30 hover:border-gold/50"
+                  : "bg-surface border-border/50 hover:border-border"
             }`}
           >
             {/* Top gradient bar */}
@@ -219,7 +221,7 @@ export function PricingToggle() {
 
               <ul className="space-y-3 mb-8">
                 {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-3 text-sm text-muted/50">
+                  <li key={f} className="flex items-start gap-3 text-sm text-neutral-400">
                     <svg
                       className="mt-0.5 h-4 w-4 shrink-0 text-accent/70"
                       fill="none"
@@ -248,7 +250,7 @@ export function PricingToggle() {
                       : "bg-white/[0.06] border-2 border-accent/30 text-accent hover:border-accent/60 hover:bg-accent/10 hover:shadow-[0_0_20px_rgba(159,229,86,0.1)]"
                 }`}
               >
-                {plan.is_event ? "Comprar evento" : "Empezar ahora"}
+                {plan.is_event ? "Comprar evento" : plan.is_popular ? "Empezar ahora" : "Probar gratis"}
               </a>
             </div>
           </div>
