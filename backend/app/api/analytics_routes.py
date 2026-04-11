@@ -244,14 +244,16 @@ async def get_kart_drivers(
     if not all_laps:
         return []
 
-    # Group by driver_name
-    driver_data: dict[str, list[int]] = defaultdict(list)
+    # Group by (team_name, driver_name) combination
+    driver_data: dict[tuple[str, str], list[int]] = defaultdict(list)
     for lap in all_laps:
-        name = (lap.driver_name or "").strip() or "Desconocido"
-        driver_data[name].append(lap.lap_time_ms)
+        team = (lap.team_name or "").strip()
+        driver = (lap.driver_name or "").strip()
+        key = (team, driver)
+        driver_data[key].append(lap.lap_time_ms)
 
     drivers = []
-    for driver_name, times in sorted(driver_data.items()):
+    for (team_name, driver_name), times in sorted(driver_data.items()):
         if filter_outliers and len(times) > 3:
             raw_mean = sum(times) / len(times)
             threshold = raw_mean * 0.10
@@ -261,8 +263,13 @@ async def get_kart_drivers(
         else:
             filtered = times
 
+        # Build display label: "Team / Driver", or just one if the other is empty
+        label = " / ".join(part for part in [team_name, driver_name] if part) or "Desconocido"
+
         drivers.append({
+            "team_name": team_name,
             "driver_name": driver_name,
+            "display_name": label,
             "total_laps": len(times),
             "avg_lap_ms": round(sum(filtered) / len(filtered)),
             "best_lap_ms": min(filtered),

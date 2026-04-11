@@ -31,7 +31,9 @@ interface BestLap {
 }
 
 interface DriverBreakdown {
+  team_name: string;
   driver_name: string;
+  display_name: string;
   total_laps: number;
   avg_lap_ms: number;
   best_lap_ms: number;
@@ -441,7 +443,7 @@ export function KartAnalyticsTab() {
                 <thead className="text-[10px] text-neutral-400 uppercase tracking-wider">
                   <tr>
                     <th className="text-center px-2 py-1.5 w-8">#</th>
-                    <th className="text-left px-2 py-1.5">Piloto</th>
+                    <th className="text-left px-2 py-1.5">Equipo / Piloto</th>
                     <th className="text-right px-2 py-1.5">Tiempo medio</th>
                     <th className="text-right px-2 py-1.5">Mejor vuelta</th>
                     <th className="text-right px-2 py-1.5">Vueltas</th>
@@ -449,10 +451,10 @@ export function KartAnalyticsTab() {
                 </thead>
                 <tbody>
                   {driverBreakdown.map((d, idx) => (
-                    <tr key={d.driver_name} className="border-t border-border">
+                    <tr key={d.display_name} className="border-t border-border">
                       <td className="px-2 py-1.5 text-center text-neutral-500 text-xs">{idx + 1}</td>
-                      <td className="px-2 py-1.5 text-left text-white font-medium truncate max-w-[180px]">
-                        {d.driver_name}
+                      <td className="px-2 py-1.5 text-left text-white font-medium truncate max-w-[220px]">
+                        {d.display_name}
                       </td>
                       <td className="px-2 py-1.5 text-right font-mono font-semibold text-accent">
                         {msToLapTime(d.avg_lap_ms)}
