@@ -114,6 +114,7 @@ class CircuitConnection:
         self._lap_saved_per_kart: dict[int, int] = {}
         self._lap_save_lock = asyncio.Lock()
         self._lap_save_counter = 0  # batch saves every N lap events
+        self._lap_current_session_key: str = ""  # track category+session changes
 
     @property
     def connected(self) -> bool:
@@ -254,6 +255,17 @@ class CircuitConnection:
                     # New race: finalize previous race_log and reset state
                     await self._finalize_lap_race_log()
                 await self._lap_state.handle_events(events)
+
+                # Detect category/session change (e.g. "70 SILVER - Q1" → "70 GOLD - Q1")
+                # This creates a new race_log without needing a full init reset
+                new_key = self._build_session_key()
+                if new_key and self._lap_current_session_key and new_key != self._lap_current_session_key:
+                    logger.info(f"[{self.circuit_name}] Session changed: "
+                                f"'{self._lap_current_session_key}' → '{new_key}'")
+                    await self._finalize_lap_race_log(full_reset=False)
+                if new_key:
+                    self._lap_current_session_key = new_key
+
                 has_laps = any(e.type == EventType.LAP for e in events)
                 if has_laps:
                     self._lap_save_counter += 1
@@ -494,6 +506,15 @@ class CircuitConnection:
         except Exception as e:
             logger.error(f"[{self.circuit_name}] Failed to persist pit-out kart #{kart_number}: {e}")
 
+    def _build_session_key(self) -> str:
+        """Build a unique key from category + session_title + track_name."""
+        parts = [p for p in (
+            self._lap_state.category,
+            self._lap_state.track_name,
+            self._lap_state.session_title,
+        ) if p]
+        return " | ".join(parts)
+
     async def _save_circuit_laps(self):
         """Save newly arrived laps to DB (automatic, no user session needed)."""
         try:
@@ -504,9 +525,11 @@ class CircuitConnection:
             async with self._lap_save_lock:
                 async with async_session() as db:
                     if self._lap_race_log_id is None:
-                        # Use track_name + session_title to distinguish heats/races
-                        # within the same day at the same circuit
+                        # Use category + track_name + session_title to distinguish
+                        # heats/races within the same day at the same circuit
+                        # e.g. "70 SILVER - ADULTO (1100m) - Q1"
                         parts = [p for p in (
+                            self._lap_state.category,
                             self._lap_state.track_name,
                             self._lap_state.session_title,
                         ) if p]
@@ -575,8 +598,13 @@ class CircuitConnection:
         except Exception as e:
             logger.error(f"[{self.circuit_name}] Auto lap save failed: {e}")
 
-    async def _finalize_lap_race_log(self):
-        """Finalize current race_log and reset for next race."""
+    async def _finalize_lap_race_log(self, full_reset: bool = True):
+        """Finalize current race_log and reset for next race.
+
+        Args:
+            full_reset: If True, resets lap_state entirely (used on INIT).
+                        If False, only resets race_log tracking (used on session change).
+        """
         if self._lap_race_log_id is not None:
             try:
                 # Flush any remaining laps
@@ -601,8 +629,10 @@ class CircuitConnection:
         self._lap_race_log_id = None
         self._lap_saved_per_kart.clear()
         self._lap_save_counter = 0
-        # Reset lap state so next race starts fresh
-        self._lap_state.reset()
+        if full_reset:
+            # Reset lap state so next race starts fresh
+            self._lap_state.reset()
+            self._lap_current_session_key = ""
 
     async def _restore_from_db(self):
         """Restore live race state from DB on startup (if backend restarted mid-race)."""

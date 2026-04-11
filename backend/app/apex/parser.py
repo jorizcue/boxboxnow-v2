@@ -45,6 +45,7 @@ class EventType(Enum):
     RANKING = "ranking"
     FLAG = "flag"
     LIGHT = "light"              # light|lg|, light|lr|, light|lf|
+    CATEGORY = "category"            # title1||70 SILVER, title1||85 GOLD...
     SESSION_TITLE = "session_title"  # title2||...
     TRACK_INFO = "track_info"    # track||... (with circuit length)
     PRE_RACE_DURATION = "pre_race_duration"  # dyn1|text|HH:MM:SS
@@ -166,6 +167,12 @@ class ApexMessageParser:
         if line.startswith(("css|", "best|", "effects|", "comments|",
                             "title1|", "light|", "wth",
                             "track|", "com|", "title2|")):
+            # title1 handling (category) — must be before the skip block
+            if line.startswith("title1||"):
+                cat = line[8:].strip()
+                if cat:
+                    return [RaceEvent(type=EventType.CATEGORY, value=cat)]
+                return []
             # Light signals: lg=green, lr=red, lf=finish/chequered
             if line.startswith("light|"):
                 parts = line.split("|")

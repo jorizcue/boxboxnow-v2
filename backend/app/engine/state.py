@@ -163,6 +163,7 @@ class RaceStateManager:
         self.classification: list[dict] = []
 
         # Session metadata (auto-detected from Apex signals)
+        self.category: str = ""  # title1: "70 SILVER", "85 GOLD", etc.
         self.session_title: str = ""
         self.real_start_time: str = ""  # HH:MM from green flag com|| message
         self.race_current_lap: int = 0  # Current lap in lap-based races
@@ -197,6 +198,7 @@ class RaceStateManager:
         self.countdown_ms = 0
         self.track_name = ""
         self.start_time = 0.0
+        self.category = ""
         self.session_title = ""
         self.real_start_time = ""
         self._event_buffer.clear()
@@ -582,6 +584,11 @@ class RaceStateManager:
                 self._trigger_race_end()
                 return {"event": "raceEnd", "countdownMs": 0}
             return {"event": "light", "value": light}
+
+        elif event.type == EventType.CATEGORY:
+            self.category = event.value
+            logger.info(f"Category: {self.category}")
+            return {"event": "category", "value": event.value}
 
         elif event.type == EventType.SESSION_TITLE:
             self.session_title = event.value
