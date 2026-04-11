@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useSimNow } from "@/hooks/useSimNow";
 import { useRaceClock } from "@/hooks/useRaceClock";
-import { msToLapTime, tierHex } from "@/lib/formatters";
+import { msToLapTime, tierHex, secondsToHMS } from "@/lib/formatters";
 import { getDriverChannel } from "@/lib/driverChannel";
 import { useT } from "@/lib/i18n";
 import { useRaceBox, useRaceBoxStore } from "@/hooks/useRaceBox";
@@ -347,8 +347,28 @@ export function DriverView() {
     return {
       avgLapMs: kart.avgLapMs,
       lastLapMs: kart.lastLapMs,
+      bestAvgMs: kart.bestAvgMs,
     };
   }, [karts, ourKart]);
+
+  /* ---------- Average future stint ---------- */
+  const avgFutureStintData = useMemo(() => {
+    if (!ourKart || ourKart <= 0 || raceClock === 0 || raceFinished) return null;
+    const kart = karts.find((k) => k.kartNumber === ourKart);
+    if (!kart) return null;
+    const remainingPits = Math.max(0, config.minPits - kart.pitCount);
+    if (remainingPits <= 0) return null;
+    const totalRaceMin = config.durationMin;
+    const elapsedMs = durationMs > 0 ? Math.max(0, durationMs - raceClock) : 0;
+    const elapsedMin = elapsedMs / 1000 / 60;
+    const futureTimeInPitMin = remainingPits * config.pitTimeS / 60;
+    const availableRaceMin = totalRaceMin - elapsedMin - futureTimeInPitMin;
+    if (availableRaceMin <= 0) return null;
+    const avgMin = availableRaceMin / remainingPits;
+    const tooEarly = avgMin > config.maxStintMin;
+    const tooLate = avgMin <= config.minStintMin + 5;
+    return { avgMin, warn: tooEarly || tooLate };
+  }, [karts, ourKart, raceClock, durationMs, raceFinished, config.durationMin, config.minPits, config.pitTimeS, config.minStintMin, config.maxStintMin]);
 
   /* ---------- Desktop drag (HTML5 API) ---------- */
   const dragItem = useRef<number | null>(null);
@@ -534,6 +554,28 @@ export function DriverView() {
       content: (
         <span className="text-3xl sm:text-4xl font-mono font-black text-white leading-none">
           {avgLap20Ms > 0 ? msToLapTime(Math.round(avgLap20Ms)) : "--:--.---"}
+        </span>
+      ),
+    },
+    best3: {
+      label: "Mejor 3 (3V)",
+      accent: "from-amber-500/20 to-amber-500/5 border-amber-500/30",
+      content: (
+        <span className="text-3xl sm:text-4xl font-mono font-black text-white leading-none">
+          {(paceDisplay?.bestAvgMs ?? 0) > 0 ? msToLapTime(Math.round(paceDisplay!.bestAvgMs)) : "--:--.---"}
+        </span>
+      ),
+    },
+    avgFutureStint: {
+      label: "Media stint futuro",
+      accent: avgFutureStintData?.warn
+        ? "from-red-500/25 to-red-500/5 border-red-400/50"
+        : "from-teal-500/20 to-teal-500/5 border-teal-500/30",
+      content: (
+        <span className={`text-3xl sm:text-4xl font-mono font-black leading-none ${
+          avgFutureStintData?.warn ? "text-red-400" : "text-white"
+        }`}>
+          {avgFutureStintData ? secondsToHMS(Math.round(avgFutureStintData.avgMin * 60)) : "--:--"}
         </span>
       ),
     },

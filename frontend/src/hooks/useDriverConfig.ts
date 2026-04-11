@@ -17,6 +17,8 @@ export type DriverCardId =
   | "gapAhead"
   | "gapBehind"
   | "avgLap20"
+  | "best3"
+  | "avgFutureStint"
   | "boxScore"
   | "gpsLapDelta"
   | "gpsSpeed"
@@ -25,7 +27,7 @@ export type DriverCardId =
 
 export const ALL_DRIVER_CARDS: { id: DriverCardId; label: string; requiresGps: boolean }[] = [
   { id: "raceTimer", label: "Tiempo de carrera", requiresGps: false },
-  { id: "currentLapTime", label: "Vuelta actual (tiempo real)", requiresGps: false },
+  { id: "currentLapTime", label: "Vuelta actual (tiempo real)", requiresGps: true },
   { id: "lastLap", label: "Última vuelta", requiresGps: false },
   { id: "deltaBestLap", label: "Delta vs Best Lap (GPS)", requiresGps: true },
   { id: "gForceRadar", label: "G-Force (diana)", requiresGps: true },
@@ -34,6 +36,8 @@ export const ALL_DRIVER_CARDS: { id: DriverCardId; label: string; requiresGps: b
   { id: "gapAhead", label: "Gap kart delante", requiresGps: false },
   { id: "gapBehind", label: "Gap kart detrás", requiresGps: false },
   { id: "avgLap20", label: "Vuelta media (20v)", requiresGps: false },
+  { id: "best3", label: "Mejor 3 (3V)", requiresGps: false },
+  { id: "avgFutureStint", label: "Media stint futuro", requiresGps: false },
   { id: "boxScore", label: "Puntuación Box", requiresGps: false },
   { id: "gpsLapDelta", label: "Delta vuelta GPS", requiresGps: true },
   { id: "gpsSpeed", label: "Velocidad GPS", requiresGps: true },

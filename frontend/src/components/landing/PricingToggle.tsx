@@ -240,10 +240,12 @@ export function PricingToggle() {
 
               <a
                 href={planLink(plan)}
-                className={`block w-full rounded-xl py-3.5 text-center text-sm font-semibold transition-all duration-200 ${
+                className={`block w-full rounded-xl py-3.5 text-center text-sm font-bold uppercase tracking-wide transition-all duration-200 ${
                   plan.is_popular
-                    ? "bg-accent text-black hover:bg-accent-hover hover:shadow-[0_0_30px_rgba(159,229,86,0.2)]"
-                    : "border border-border/50 text-muted/70 hover:border-accent/40 hover:text-accent"
+                    ? "bg-accent text-black hover:bg-accent-hover shadow-[0_0_20px_rgba(159,229,86,0.15)] hover:shadow-[0_0_30px_rgba(159,229,86,0.3)]"
+                    : plan.is_event
+                      ? "bg-gradient-to-r from-gold/90 to-yellow-500/90 text-black border border-gold/50 hover:shadow-[0_0_20px_rgba(234,179,8,0.2)]"
+                      : "bg-white/[0.06] border-2 border-accent/30 text-accent hover:border-accent/60 hover:bg-accent/10 hover:shadow-[0_0_20px_rgba(159,229,86,0.1)]"
                 }`}
               >
                 {plan.is_event ? "Comprar evento" : "Empezar ahora"}
