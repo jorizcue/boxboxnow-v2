@@ -115,6 +115,21 @@ app.include_router(public_router)
 app.include_router(apex_replay_router)
 
 
+# Redirect Apex Timing JS image references (../commonv2/images/ resolves here)
+from fastapi.responses import FileResponse as _FileResponse, HTMLResponse as _HTMLResponse
+from pathlib import Path as _Path
+_APEX_IMAGES = _Path(__file__).parent.parent / "static" / "apex-timing" / "images"
+
+@app.get("/api/commonv2/images/{filename}")
+async def apex_commonv2_images(filename: str):
+    safe = _Path(filename).name
+    fp = _APEX_IMAGES / safe
+    if not fp.exists():
+        return _HTMLResponse("Not found", status_code=404)
+    mime = {".png": "image/png", ".jpg": "image/jpeg", ".gif": "image/gif"}.get(fp.suffix.lower(), "application/octet-stream")
+    return _FileResponse(fp, media_type=mime)
+
+
 @app.get("/health")
 async def health():
     registry = app.state.registry

@@ -80,6 +80,8 @@ async def apex_images(filename: str):
     return FileResponse(file_path, media_type=media_type)
 
 
+
+
 def _resolve_log_path(filename: str, circuit_dir: str | None = None) -> str | None:
     """Find the log file path."""
     if circuit_dir:
