@@ -1083,11 +1083,11 @@ export function DriverView() {
         </div>
       )}
 
-      {/* Cards grid — fills remaining height, no scroll for ≤3 rows */}
-      <div className="flex-1 p-1.5 sm:p-2 overflow-hidden min-h-0">
+      {/* Cards grid — fills remaining height, scroll only when needed */}
+      <div className="flex-1 p-1.5 sm:p-2 overflow-y-auto min-h-0">
         <div
-          className="grid grid-cols-3 gap-1.5 sm:gap-2 h-full min-h-0"
-          style={{ gridTemplateRows: `repeat(${numRows}, 1fr)` }}
+          className="grid grid-cols-3 gap-1.5 sm:gap-2 min-h-full"
+          style={{ gridTemplateRows: `repeat(${numRows}, minmax(0, 1fr))` }}
         >
           {visibleCardIds.map((cardId, index) => {
             const card = cards[cardId];
