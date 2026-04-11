@@ -37,6 +37,7 @@ export interface KartState {
   tierScore: number;
   avgLapMs: number;
   bestAvgMs: number;
+  bestStintLapMs: number;
   driverDifferentialMs: number;
   recentLaps: { lapTime: number; totalLap: number; driverName: string }[];
 }

@@ -350,6 +350,7 @@ export function DriverView() {
       avgLapMs: kart.avgLapMs,
       lastLapMs: kart.lastLapMs,
       bestAvgMs: kart.bestAvgMs,
+      bestStintLapMs: kart.bestStintLapMs ?? 0,
     };
   }, [karts, ourKart]);
 
@@ -623,6 +624,17 @@ export function DriverView() {
           </span>
           <span className="text-[9px] sm:text-[10px] text-neutral-600 uppercase tracking-widest">/ 100</span>
         </div>
+      ),
+    },
+    bestStintLap: {
+      label: t("driver.bestStintLap"),
+      accent: (paceDisplay?.bestStintLapMs ?? 0) > 0
+        ? "from-purple-500/20 to-purple-500/5 border-purple-500/30"
+        : "from-neutral-500/20 to-neutral-500/5 border-neutral-500/30",
+      content: (
+        <span className="text-3xl sm:text-4xl font-mono font-black text-white leading-none">
+          {(paceDisplay?.bestStintLapMs ?? 0) > 0 ? msToLapTime(paceDisplay!.bestStintLapMs) : "--:--.---"}
+        </span>
       ),
     },
     deltaBestLap: {

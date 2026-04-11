@@ -23,6 +23,7 @@ export type DriverCardId =
   | "gpsLapDelta"
   | "gpsSpeed"
   | "gpsGForce"
+  | "bestStintLap"
   | "lapsToMaxStint";
 
 export const ALL_DRIVER_CARDS: { id: DriverCardId; label: string; requiresGps: boolean }[] = [
@@ -39,6 +40,7 @@ export const ALL_DRIVER_CARDS: { id: DriverCardId; label: string; requiresGps: b
   { id: "best3", label: "Mejor 3 (3V)", requiresGps: false },
   { id: "avgFutureStint", label: "Media stint futuro", requiresGps: false },
   { id: "boxScore", label: "Puntuación Box", requiresGps: false },
+  { id: "bestStintLap", label: "Mejor vuelta stint", requiresGps: false },
   { id: "gpsLapDelta", label: "Delta vuelta anterior GPS", requiresGps: true },
   { id: "gpsSpeed", label: "Velocidad GPS", requiresGps: true },
   { id: "gpsGForce", label: "G-Force (números)", requiresGps: true },

@@ -96,6 +96,11 @@ class KartState:
         """Number of laps in current stint (all laps, not just valid)."""
         return sum(1 for lap in self.all_laps if lap.get("pitNumber") == self.pit_count)
 
+    def best_stint_lap_ms(self) -> int:
+        """Best valid lap time in the current stint (0 if no valid laps yet)."""
+        stint_laps = [lap["lapTime"] for lap in self.valid_laps if lap.get("pitNumber") == self.pit_count]
+        return min(stint_laps) if stint_laps else 0
+
     def driver_avg_lap_ms_map(self) -> dict:
         """Compute average lap time per driver from valid laps."""
         sums: dict[str, list[int]] = {}
@@ -135,6 +140,7 @@ class KartState:
             "driverDifferentialMs": self.driver_differential_ms,
             "avgLapMs": self.avg_lap_ms,
             "bestAvgMs": self.best_avg_ms,
+            "bestStintLapMs": self.best_stint_lap_ms(),
             "recentLaps": [
                 {"lapTime": l["lapTime"], "totalLap": l["totalLap"], "driverName": l.get("driverName", "")}
                 for l in self.valid_laps[-5:]

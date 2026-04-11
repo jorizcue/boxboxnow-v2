@@ -92,26 +92,37 @@ export function PricingToggle() {
   const [annual, setAnnual] = useState(false);
   const [plans, setPlans] = useState<GroupedPlan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [trialDays, setTrialDays] = useState(0);
 
   useEffect(() => {
-    api
-      .getPlans()
-      .then((data) => {
-        if (data && data.length > 0) {
-          setPlans(groupPlans(data));
-        } else {
-          setPlans(groupPlans(FALLBACK_PLANS));
-        }
-      })
-      .catch(() => {
+    Promise.all([
+      api.getPlans().catch(() => null),
+      api.getTrialConfig().catch(() => ({ trial_enabled: false, trial_days: 0 })),
+    ]).then(([plansData, trialConfig]) => {
+      if (plansData && plansData.length > 0) {
+        setPlans(groupPlans(plansData));
+      } else {
         setPlans(groupPlans(FALLBACK_PLANS));
-      })
-      .finally(() => setLoading(false));
+      }
+      setTrialDays(trialConfig.trial_days ?? 0);
+      setLoading(false);
+    });
   }, []);
 
   const planLink = (p: GroupedPlan) => {
     if (p.is_event) return `/register?plan=event`;
     return `/register?plan=${p.base_type}${annual ? "_annual" : "_monthly"}`;
+  };
+
+  const planButtonText = (p: GroupedPlan) => {
+    if (p.is_event) return "Comprar evento";
+    if (p.is_popular) return trialDays > 0 ? "Empezar ahora" : "Empezar ahora";
+    return trialDays > 0 ? `Probar gratis ${trialDays} dias` : "Suscribirse";
+  };
+
+  const planButtonHref = (p: GroupedPlan) => {
+    if (trialDays > 0 || p.is_event) return planLink(p);
+    return planLink(p);
   };
 
   if (loading) {
@@ -241,7 +252,7 @@ export function PricingToggle() {
               </ul>
 
               <a
-                href={planLink(plan)}
+                href={planButtonHref(plan)}
                 className={`block w-full rounded-xl py-3.5 text-center text-sm font-bold uppercase tracking-wide transition-all duration-200 ${
                   plan.is_popular
                     ? "bg-accent text-black hover:bg-accent-hover shadow-[0_0_20px_rgba(159,229,86,0.15)] hover:shadow-[0_0_30px_rgba(159,229,86,0.3)]"
@@ -250,7 +261,7 @@ export function PricingToggle() {
                       : "bg-white/[0.06] border-2 border-accent/30 text-accent hover:border-accent/60 hover:bg-accent/10 hover:shadow-[0_0_20px_rgba(159,229,86,0.1)]"
                 }`}
               >
-                {plan.is_event ? "Comprar evento" : plan.is_popular ? "Empezar ahora" : "Probar gratis"}
+                {planButtonText(plan)}
               </a>
             </div>
           </div>

@@ -2,6 +2,7 @@ import { Navbar } from "@/components/landing/Navbar";
 import { PricingToggle } from "@/components/landing/PricingToggle";
 import { LiveTicker } from "@/components/landing/LiveTicker";
 import { MiniRaceTable } from "@/components/landing/MiniRaceTable";
+import { TrialCTA, TrialSubtitle } from "@/components/landing/TrialCTA";
 
 const features = [
   {
@@ -205,12 +206,10 @@ export default function LandingPage() {
             className="animate-fade-in-up mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
             style={{ animationDelay: "0.45s" }}
           >
-            <a
-              href="/register"
+            <TrialCTA
               className="glow-pulse rounded-xl bg-accent px-10 py-4 text-base font-bold text-black hover:bg-accent-hover transition-all duration-300 hover:scale-[1.03]"
-            >
-              Empieza gratis — 14 dias
-            </a>
+              variant="hero"
+            />
             <a
               href="#demo"
               className="group rounded-xl border border-border/60 px-8 py-4 text-base font-medium text-neutral-400 hover:border-accent/40 hover:text-white transition-all duration-300"
@@ -418,15 +417,12 @@ export default function LandingPage() {
             ?
           </h2>
           <p className="mx-auto mt-6 max-w-lg text-lg text-neutral-500">
-            Registrate gratis y prueba BoxBoxNow durante 14 dias.
+            Descubre como BoxBoxNow puede transformar tu estrategia de carrera.
           </p>
-          <a
-            href="/register"
+          <TrialCTA
             className="glow-pulse mt-10 inline-block rounded-xl bg-accent px-12 py-4 text-base font-bold text-black hover:bg-accent-hover transition-all duration-300 hover:scale-[1.03]"
-          >
-            Crear cuenta gratis
-          </a>
-          <p className="mt-4 text-xs text-neutral-600">Sin tarjeta de credito &middot; Cancela cuando quieras</p>
+            variant="bottom"
+          />
         </div>
       </section>
 
