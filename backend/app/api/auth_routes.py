@@ -17,6 +17,7 @@ User can list and kill their own sessions (like Netflix device management).
 Admin can set max_devices per user.
 """
 
+import re
 import time
 import secrets
 import bcrypt
@@ -286,6 +287,7 @@ def _user_out(user: User) -> UserOut:
         max_devices=user.max_devices,
         mfa_enabled=user.mfa_enabled or False,
         mfa_required=user.mfa_required or False,
+        has_password=getattr(user, 'has_custom_password', True),
         tab_access=tabs,
         has_active_subscription=has_sub,
         subscription_plan=sub_plan,
@@ -414,10 +416,16 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
 @router.post("/login", response_model=LoginResponse)
 async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     login_limiter.check(request.client.host if request.client else "unknown")
-    # Validate credentials
-    result = await db.execute(
-        select(User).where(User.username == data.username).options(selectinload(User.tab_access), selectinload(User.subscriptions))
-    )
+    # Validate credentials — accept username OR email
+    identifier = data.username.strip()
+    if "@" in identifier:
+        result = await db.execute(
+            select(User).where(User.email == identifier.lower()).options(selectinload(User.tab_access), selectinload(User.subscriptions))
+        )
+    else:
+        result = await db.execute(
+            select(User).where(User.username == identifier).options(selectinload(User.tab_access), selectinload(User.subscriptions))
+        )
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(data.password, user.password_hash):
@@ -620,6 +628,7 @@ async def google_callback(code: str, request: Request, state: str | None = None,
             email=email,
             google_id=google_id,
             password_hash=hash_password(random_pass),
+            has_custom_password=False,
             is_admin=False,
             max_devices=2,
         )
@@ -962,6 +971,28 @@ async def reset_password(request: Request, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     return {"ok": True, "message": "Contrasena actualizada correctamente"}
+
+
+@router.post("/set-password")
+async def set_password(request: Request, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Set or change password for logged-in user (especially for Google-only accounts)."""
+    body = await request.json()
+    new_password = body.get("password", "")
+
+    if not new_password or len(new_password) < 8:
+        raise HTTPException(400, "La contrasena debe tener al menos 8 caracteres")
+
+    if not re.search(r"[A-Z]", new_password):
+        raise HTTPException(400, "La contrasena debe tener al menos una mayuscula")
+
+    if not re.search(r"[0-9]", new_password):
+        raise HTTPException(400, "La contrasena debe tener al menos un numero")
+
+    user.password_hash = hash_password(new_password)
+    user.has_custom_password = True
+    await db.commit()
+
+    return {"ok": True, "message": "Contrasena establecida correctamente"}
 
 
 # --- Kill session without being logged in (from the 409 screen) ---

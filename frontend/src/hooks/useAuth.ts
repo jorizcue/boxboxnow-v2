@@ -11,6 +11,7 @@ interface AuthUser {
   max_devices: number;
   mfa_enabled: boolean;
   mfa_required: boolean;
+  has_password: boolean;
   tab_access: string[];
   has_active_subscription?: boolean;
   subscription_plan?: string | null;

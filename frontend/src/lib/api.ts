@@ -372,6 +372,12 @@ export const api = {
       body: JSON.stringify({ token, password }),
     }),
 
+  setPassword: (password: string) =>
+    fetchApi<{ ok: boolean; message: string }>("/api/auth/set-password", {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    }),
+
   // GPS Telemetry
   saveGpsLaps: (laps: any[]) =>
     fetchApi("/api/gps/laps", { method: "POST", body: JSON.stringify({ laps }) }),

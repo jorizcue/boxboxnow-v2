@@ -31,6 +31,13 @@ export default function LoginPage() {
   const { token, _hydrated, setAuth } = useAuth();
   const router = useRouter();
 
+  // Detect WebView/embedded browsers (Bluefy, WebBLE, etc.) where Google OAuth is blocked
+  const isWebView = typeof navigator !== "undefined" && (
+    /Bluefy|WebBLE/i.test(navigator.userAgent) ||
+    (/(iPhone|iPod|iPad)/.test(navigator.userAgent) && !/Safari/i.test(navigator.userAgent)) ||
+    /wv|WebView/i.test(navigator.userAgent)
+  );
+
   // Handle Google OAuth callback
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -226,14 +233,14 @@ export default function LoginPage() {
               <>
                 <div>
                   <label className="block text-[11px] text-neutral-200 mb-1.5 uppercase tracking-wider">
-                    Usuario
+                    Usuario o email
                   </label>
                   <input
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700 focus:outline-none focus:border-accent/50 transition-colors"
-                    placeholder="usuario"
+                    placeholder="usuario o email"
                     autoFocus
                     autoComplete="username"
                   />
@@ -301,7 +308,7 @@ export default function LoginPage() {
             )}
           </form>
 
-          {!mfaRequired && (
+          {!mfaRequired && !isWebView && (
             <>
               {/* Divider */}
               <div className="flex items-center gap-3 my-5">
@@ -324,6 +331,11 @@ export default function LoginPage() {
                 Iniciar sesion con Google
               </a>
             </>
+          )}
+          {!mfaRequired && isWebView && (
+            <p className="mt-4 text-xs text-center text-amber-400/80 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+              Google login no disponible en este navegador. Usa tu email y contrasena.
+            </p>
           )}
         </div>
 

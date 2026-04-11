@@ -17,6 +17,7 @@ class User(Base):
     mfa_required = Column(Boolean, default=False)  # Admin forces user to enable MFA
     email = Column(String(255), unique=True, nullable=True, index=True)
     google_id = Column(String(255), unique=True, nullable=True, index=True)
+    has_custom_password = Column(Boolean, default=True, nullable=False)  # False for Google-only users
     stripe_customer_id = Column(String(255), unique=True, nullable=True, index=True)
     password_reset_token = Column(String(255), nullable=True)
     password_reset_expires = Column(DateTime, nullable=True)

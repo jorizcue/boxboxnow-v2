@@ -273,6 +273,16 @@ async def init_db():
         except Exception:
             pass
 
+        # Add has_custom_password column to users (False for Google-only signups)
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN has_custom_password BOOLEAN DEFAULT 1 NOT NULL"))
+            # Mark existing Google-only users as not having a custom password
+            await conn.execute(text(
+                "UPDATE users SET has_custom_password = 0 WHERE google_id IS NOT NULL AND google_id != ''"
+            ))
+        except Exception:
+            pass
+
 async def get_db():
     async with async_session() as session:
         yield session

@@ -26,6 +26,7 @@ class UserOut(BaseModel):
     mfa_enabled: bool = False
     mfa_required: bool = False
     tab_access: list[str] = []
+    has_password: bool = True
     has_active_subscription: bool = False
     subscription_plan: str | None = None
     trial_ends_at: str | None = None  # ISO string if on trial
