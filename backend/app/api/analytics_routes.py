@@ -428,11 +428,18 @@ async def reprocess_day(
             # Save current session before reset
             _snapshot_session(timestamp)
             state.reset()
+            # Re-apply circuit config (reset clears everything)
+            state.circuit_length_m = circuit.length_m or 1100
+            state.laps_discard = circuit.laps_discard or 2
+            state.lap_differential = circuit.lap_differential or 3000
             current_session_key = ""
 
         # Process events (without broadcasting)
         for event in events:
-            state._apply_event(event)
+            try:
+                state._apply_event(event)
+            except Exception:
+                pass  # Skip malformed events (empty countdown, etc.)
 
         # Detect session change (category/title changed)
         new_key = _build_key()
