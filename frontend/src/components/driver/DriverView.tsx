@@ -220,6 +220,7 @@ export function DriverView() {
   const [calibrationSkipped, setCalibrationSkipped] = useState(false);
   const [brightness, setBrightness] = useState(100);
   const [showBrightness, setShowBrightness] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const { dragging, registerRect, onTouchStart, onTouchMove, onTouchEnd } =
     useTouchDrag(driverCfg.cardOrder, driverCfg.setCardOrder);
@@ -778,10 +779,25 @@ export function DriverView() {
     },
   };
 
+  // Count visible cards to calculate grid rows
+  const visibleCardIds = driverCfg.cardOrder.filter((id) => {
+    if (!driverCfg.visibleCards[id]) return false;
+    const gpsCards: DriverCardId[] = ["gpsLapDelta", "gpsSpeed", "gpsGForce", "deltaBestLap", "gForceRadar"];
+    if (!editMode && !gpsConnected && gpsCards.includes(id)) return false;
+    return true;
+  });
+  const numRows = Math.ceil(visibleCardIds.length / 3);
+
   return (
     <div
-      className="min-h-screen bg-black flex flex-col select-none"
-      style={brightness !== 100 ? { filter: `brightness(${brightness / 100}) contrast(${1 + (brightness - 100) / 200})` } : undefined}
+      className="h-[100dvh] bg-black flex flex-col select-none"
+      style={{
+        ...(brightness !== 100 ? { filter: `brightness(${brightness / 100}) contrast(${1 + (brightness - 100) / 200})` } : {}),
+        paddingLeft: "env(safe-area-inset-left)",
+        paddingRight: "env(safe-area-inset-right)",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
     >
       {/* BOX alert overlay */}
       {boxAlert.active && (
@@ -796,140 +812,204 @@ export function DriverView() {
         </div>
       )}
 
-      {/* Minimal header */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/20 shrink-0">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-white tracking-wider">
-            BB<span className="text-accent">N</span>
-          </span>
-          <div className={`w-2 h-2 rounded-full ${connected ? "bg-accent" : "bg-red-500 animate-pulse"}`} />
-        </div>
-        <span className="text-sm font-bold text-white tracking-wide">
-          {t("driver.title")} — K{ourKart}
-        </span>
-        <div className="flex items-center gap-2">
-          {/* GPS connect buttons */}
-          {gpsConnected ? (
-            <button
-              onClick={() => setShowGpsSetup(!showGpsSetup)}
-              className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-cyan-900/40 text-cyan-400 border border-cyan-700/40 transition-colors"
-              title={gpsSource === "racebox" ? "RaceBox GPS" : "Phone GPS"}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                {gpsSource === "racebox" ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                )}
-              </svg>
-              {gpsSource === "racebox" && gps.sample && (
-                <span className="font-mono">{gps.sample.numSatellites}{t("driver.gpsSat")}</span>
-              )}
-              {gpsSource === "phone" && (
-                <span className="font-mono">GPS</span>
-              )}
-            </button>
-          ) : (raceBox.status === "connecting" || phoneGps.status === "connecting") ? (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-900/30 text-blue-400 animate-pulse">
-              GPS...
-            </span>
-          ) : (
-            <>
-              {raceBox.supported && (
-                <button
-                  onClick={() => raceBox.connect()}
-                  className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded text-neutral-500 hover:text-cyan-400 border border-transparent hover:border-cyan-700/30 transition-colors"
-                  title="RaceBox BLE"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546" />
-                  </svg>
-                  <span>BLE</span>
-                </button>
-              )}
-              {phoneGps.supported && (
-                <button
-                  onClick={() => phoneGps.connect()}
-                  className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded text-neutral-500 hover:text-cyan-400 border border-transparent hover:border-cyan-700/30 transition-colors"
-                  title="Phone GPS"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                  </svg>
-                  <span>GPS</span>
-                </button>
-              )}
-            </>
-          )}
-          {/* Audio speech toggle */}
-          {speech.supported && (
-            <button
-              onClick={() => {
-                const next = !speechEnabled;
-                setSpeechEnabled(next);
-                if (next && !speech.unlocked) speech.unlock();
-              }}
-              className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
-                speechEnabled ? "bg-green-900/40 text-green-400 border border-green-700/40" : "text-neutral-500 hover:text-neutral-300"
-              }`}
-              title={speechEnabled ? "Audio activado" : "Audio desactivado"}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                {speechEnabled ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
-                )}
-              </svg>
-            </button>
-          )}
-          {/* Brightness control */}
-          <button
-            onClick={() => setShowBrightness(!showBrightness)}
-            className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
-              brightness > 100 ? "bg-yellow-900/40 text-yellow-400 border border-yellow-700/40" : "text-neutral-500 hover:text-neutral-300"
-            }`}
-            title="Brillo"
+      {/* Hamburger menu drawer (overlay) */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-40 flex" onClick={() => setMenuOpen(false)}>
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/60" />
+          {/* Drawer panel */}
+          <div
+            className="relative z-10 w-64 max-w-[75vw] bg-surface border-r border-border h-full flex flex-col overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+            style={{ paddingLeft: "env(safe-area-inset-left)" }}
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
-            </svg>
-          </button>
-          <button
-            onClick={() => setEditMode(!editMode)}
-            className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded transition-colors ${
-              editMode ? "bg-accent/20 text-accent" : "text-neutral-500 hover:text-neutral-300"
-            }`}
-          >
-            {editMode ? "✓" : "⇄"}
-          </button>
-        </div>
-      </div>
+            {/* Drawer header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+              <span className="text-sm font-bold text-white tracking-wider">
+                BB<span className="text-accent">N</span>
+              </span>
+              <button onClick={() => setMenuOpen(false)} className="text-neutral-400 hover:text-white p-1">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
-      {/* Brightness slider */}
-      {showBrightness && (
-        <div className="flex items-center gap-3 px-3 py-2 bg-surface border-b border-border/20">
-          <span className="text-[10px] text-neutral-400 uppercase tracking-wider shrink-0">Brillo</span>
-          <input
-            type="range"
-            min={100}
-            max={250}
-            step={10}
-            value={brightness}
-            onChange={(e) => setBrightness(Number(e.target.value))}
-            className="flex-1 h-1.5 accent-yellow-400"
-          />
-          <span className="text-[10px] text-neutral-400 font-mono w-8 text-right">{brightness}%</span>
-          {brightness !== 100 && (
-            <button
-              onClick={() => setBrightness(100)}
-              className="text-[10px] text-neutral-500 hover:text-white"
-            >
-              Reset
-            </button>
-          )}
+            {/* Menu items */}
+            <div className="flex-1 px-3 py-3 space-y-2">
+              {/* GPS */}
+              <div className="space-y-1">
+                <p className="text-[10px] text-neutral-500 uppercase tracking-wider px-1 mb-1">GPS</p>
+                {gpsConnected ? (
+                  <button
+                    onClick={() => { setShowGpsSetup(!showGpsSetup); setMenuOpen(false); }}
+                    className="w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-cyan-900/30 text-cyan-400 border border-cyan-700/30"
+                  >
+                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      {gpsSource === "racebox" ? (
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546" />
+                      ) : (
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                      )}
+                    </svg>
+                    {gpsSource === "racebox" ? "RaceBox" : "Phone GPS"}
+                    {gpsSource === "racebox" && gps.sample && (
+                      <span className="ml-auto font-mono text-[10px]">{gps.sample.numSatellites} sat</span>
+                    )}
+                  </button>
+                ) : (raceBox.status === "connecting" || phoneGps.status === "connecting") ? (
+                  <div className="text-xs px-3 py-2 rounded-lg bg-blue-900/20 text-blue-400 animate-pulse">
+                    Conectando GPS...
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {raceBox.supported && (
+                      <button
+                        onClick={() => { raceBox.connect(); setMenuOpen(false); }}
+                        className="w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg text-neutral-400 hover:text-cyan-400 hover:bg-cyan-900/20 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546" />
+                        </svg>
+                        Conectar RaceBox BLE
+                      </button>
+                    )}
+                    {phoneGps.supported && (
+                      <button
+                        onClick={() => { phoneGps.connect(); setMenuOpen(false); }}
+                        className="w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg text-neutral-400 hover:text-cyan-400 hover:bg-cyan-900/20 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                        </svg>
+                        Usar GPS del telefono
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Audio */}
+              {speech.supported && (
+                <div className="space-y-1">
+                  <p className="text-[10px] text-neutral-500 uppercase tracking-wider px-1 mb-1">Audio</p>
+                  <button
+                    onClick={() => {
+                      const next = !speechEnabled;
+                      setSpeechEnabled(next);
+                      if (next && !speech.unlocked) speech.unlock();
+                    }}
+                    className={`w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg transition-colors ${
+                      speechEnabled ? "bg-green-900/30 text-green-400 border border-green-700/30" : "text-neutral-400 hover:text-green-400 hover:bg-green-900/20"
+                    }`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      {speechEnabled ? (
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                      ) : (
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                      )}
+                    </svg>
+                    {speechEnabled ? "Audio activado" : "Audio desactivado"}
+                  </button>
+                </div>
+              )}
+
+              {/* Brightness */}
+              <div className="space-y-1">
+                <p className="text-[10px] text-neutral-500 uppercase tracking-wider px-1 mb-1">Brillo</p>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/50">
+                  <svg className="w-4 h-4 text-yellow-400 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+                  </svg>
+                  <input
+                    type="range"
+                    min={100}
+                    max={250}
+                    step={10}
+                    value={brightness}
+                    onChange={(e) => setBrightness(Number(e.target.value))}
+                    className="flex-1 h-1.5 accent-yellow-400"
+                  />
+                  <span className="text-[10px] text-neutral-400 font-mono w-10 text-right">{brightness}%</span>
+                </div>
+                {brightness !== 100 && (
+                  <button
+                    onClick={() => setBrightness(100)}
+                    className="w-full text-[10px] text-neutral-500 hover:text-white px-3 py-1 text-left"
+                  >
+                    Resetear brillo
+                  </button>
+                )}
+              </div>
+
+              {/* Edit cards */}
+              <div className="space-y-1">
+                <p className="text-[10px] text-neutral-500 uppercase tracking-wider px-1 mb-1">Tarjetas</p>
+                <button
+                  onClick={() => { setEditMode(!editMode); setMenuOpen(false); }}
+                  className={`w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg transition-colors ${
+                    editMode ? "bg-accent/20 text-accent border border-accent/30" : "text-neutral-400 hover:text-accent hover:bg-accent/10"
+                  }`}
+                >
+                  <span className="text-base">{editMode ? "✓" : "⇄"}</span>
+                  {editMode ? "Terminar edicion" : "Reordenar tarjetas"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
+
+      {/* Compact header */}
+      <div className="flex items-center justify-between px-3 py-1 border-b border-border/20 shrink-0">
+        {/* Hamburger button */}
+        <button
+          onClick={() => setMenuOpen(true)}
+          className="flex items-center gap-1.5 text-neutral-400 hover:text-white transition-colors p-0.5"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+          <div className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-accent" : "bg-red-500 animate-pulse"}`} />
+        </button>
+        {/* Title */}
+        <span className="text-xs font-bold text-white tracking-wide">
+          K{ourKart}
+        </span>
+        {/* Quick status icons (compact, no text) */}
+        <div className="flex items-center gap-1.5">
+          {gpsConnected && (
+            <span className="text-cyan-400">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303" />
+              </svg>
+            </span>
+          )}
+          {speechEnabled && (
+            <span className="text-green-400">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+              </svg>
+            </span>
+          )}
+          {brightness > 100 && (
+            <span className="text-yellow-400">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+              </svg>
+            </span>
+          )}
+          {editMode && (
+            <button
+              onClick={() => setEditMode(false)}
+              className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded"
+            >
+              ✓
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* GPS setup panel (finish line) */}
       {showGpsSetup && gpsConnected && (
@@ -1003,19 +1083,13 @@ export function DriverView() {
         </div>
       )}
 
-      {/* Cards grid */}
-      <div className="flex-1 p-2 sm:p-3 overflow-auto">
-        <div className="grid grid-cols-3 auto-rows-fr gap-2 sm:gap-3 h-full min-h-0">
-          {driverCfg.cardOrder
-            .filter((id) => {
-              // Hide cards disabled in driver config
-              if (!driverCfg.visibleCards[id]) return false;
-              // Hide GPS cards when GPS not connected (unless in edit mode)
-              const gpsCards: DriverCardId[] = ["gpsLapDelta", "gpsSpeed", "gpsGForce", "deltaBestLap", "gForceRadar"];
-              if (!editMode && !gpsConnected && gpsCards.includes(id)) return false;
-              return true;
-            })
-            .map((cardId, index) => {
+      {/* Cards grid — fills remaining height, no scroll for ≤3 rows */}
+      <div className="flex-1 p-1.5 sm:p-2 overflow-hidden min-h-0">
+        <div
+          className="grid grid-cols-3 gap-1.5 sm:gap-2 h-full min-h-0"
+          style={{ gridTemplateRows: `repeat(${numRows}, 1fr)` }}
+        >
+          {visibleCardIds.map((cardId, index) => {
             const card = cards[cardId];
             if (!card) return null;
             const isDragging = dragging === index;
