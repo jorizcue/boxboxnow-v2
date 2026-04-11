@@ -214,6 +214,65 @@ async def get_kart_best_laps(
     ]
 
 
+@router.get("/kart-drivers")
+async def get_kart_drivers(
+    circuit_id: int,
+    kart_number: int,
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    filter_outliers: bool = Query(True),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get per-driver breakdown for a specific kart: avg lap, best lap, laps count."""
+    await _check_circuit_access(user, circuit_id, db)
+    dt_from, dt_to = _parse_date_range(date_from, date_to)
+    race_log_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)
+
+    if not race_log_ids:
+        return []
+
+    result = await db.execute(
+        select(KartLap).where(
+            KartLap.race_log_id.in_(race_log_ids),
+            KartLap.kart_number == kart_number,
+            KartLap.is_valid == True,
+        )
+    )
+    all_laps = result.scalars().all()
+
+    if not all_laps:
+        return []
+
+    # Group by driver_name
+    driver_data: dict[str, list[int]] = defaultdict(list)
+    for lap in all_laps:
+        name = (lap.driver_name or "").strip() or "Desconocido"
+        driver_data[name].append(lap.lap_time_ms)
+
+    drivers = []
+    for driver_name, times in sorted(driver_data.items()):
+        if filter_outliers and len(times) > 3:
+            raw_mean = sum(times) / len(times)
+            threshold = raw_mean * 0.10
+            filtered = [t for t in times if abs(t - raw_mean) <= threshold]
+            if not filtered:
+                filtered = times
+        else:
+            filtered = times
+
+        drivers.append({
+            "driver_name": driver_name,
+            "total_laps": len(filtered),
+            "avg_lap_ms": round(sum(filtered) / len(filtered)),
+            "best_lap_ms": min(filtered),
+        })
+
+    # Sort by avg_lap_ms (fastest first)
+    drivers.sort(key=lambda d: d["avg_lap_ms"])
+    return drivers
+
+
 @router.get("/race-logs", response_model=list[RaceLogOut])
 async def list_race_logs(
     circuit_id: int,

@@ -30,6 +30,13 @@ interface BestLap {
   recorded_at: string;
 }
 
+interface DriverBreakdown {
+  driver_name: string;
+  total_laps: number;
+  avg_lap_ms: number;
+  best_lap_ms: number;
+}
+
 interface CircuitSummary {
   circuit: CircuitRow;
   races: number;
@@ -71,6 +78,11 @@ export function KartAnalyticsTab() {
   const [modalKart, setModalKart] = useState<number | null>(null);
   const [bestLaps, setBestLaps] = useState<BestLap[]>([]);
   const [loadingBestLaps, setLoadingBestLaps] = useState(false);
+
+  // Driver breakdown modal
+  const [driverModalKart, setDriverModalKart] = useState<number | null>(null);
+  const [driverBreakdown, setDriverBreakdown] = useState<DriverBreakdown[]>([]);
+  const [loadingDrivers, setLoadingDrivers] = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -156,6 +168,18 @@ export function KartAnalyticsTab() {
       setBestLaps(laps);
     } catch {}
     setLoadingBestLaps(false);
+  };
+
+  const openDriverModal = async (kartNumber: number) => {
+    if (!selectedCircuitId) return;
+    setDriverModalKart(kartNumber);
+    setLoadingDrivers(true);
+    setDriverBreakdown([]);
+    try {
+      const drivers = await api.getKartDrivers(selectedCircuitId, kartNumber, dateFrom, dateTo, filterOutliers);
+      setDriverBreakdown(drivers);
+    } catch {}
+    setLoadingDrivers(false);
   };
 
   const SortIcon = ({ field }: { field: SortField }) => {
@@ -288,7 +312,12 @@ export function KartAnalyticsTab() {
                 </thead>
                 <tbody>
                   {sortedStats.map((s, idx) => (
-                    <tr key={s.kart_number} className="border-t border-border hover:bg-black/30 transition-colors">
+                    <tr
+                      key={s.kart_number}
+                      className="border-t border-border hover:bg-black/30 transition-colors cursor-pointer"
+                      onDoubleClick={() => openDriverModal(s.kart_number)}
+                      title="Doble click para ver desglose de pilotos"
+                    >
                       <td className="px-2 py-1.5 text-center text-neutral-500 text-xs">{idx + 1}</td>
                       <td className="px-2 py-1.5 text-center font-bold text-white text-base">{s.kart_number}</td>
                       <td
@@ -382,6 +411,57 @@ export function KartAnalyticsTab() {
                           : lap.race_date
                             ? new Date(lap.race_date).toLocaleDateString()
                             : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Driver Breakdown Modal */}
+      {driverModalKart !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setDriverModalKart(null)}>
+          <div className="bg-[#1a1a2e] border border-border rounded-xl shadow-xl p-6 w-[520px] max-w-[90vw] animate-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
+                Desglose pilotos — Kart {driverModalKart}
+              </h3>
+              <button onClick={() => setDriverModalKart(null)} className="text-neutral-500 hover:text-white text-lg leading-none transition-colors">&times;</button>
+            </div>
+
+            {loadingDrivers ? (
+              <p className="text-neutral-500 text-xs animate-pulse py-4 text-center">{t("analytics.loading")}</p>
+            ) : driverBreakdown.length === 0 ? (
+              <p className="text-neutral-500 text-xs py-4 text-center">{t("analytics.noData")}</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="text-[10px] text-neutral-400 uppercase tracking-wider">
+                  <tr>
+                    <th className="text-center px-2 py-1.5 w-8">#</th>
+                    <th className="text-left px-2 py-1.5">Piloto</th>
+                    <th className="text-right px-2 py-1.5">Tiempo medio</th>
+                    <th className="text-right px-2 py-1.5">Mejor vuelta</th>
+                    <th className="text-right px-2 py-1.5">Vueltas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {driverBreakdown.map((d, idx) => (
+                    <tr key={d.driver_name} className="border-t border-border">
+                      <td className="px-2 py-1.5 text-center text-neutral-500 text-xs">{idx + 1}</td>
+                      <td className="px-2 py-1.5 text-left text-white font-medium truncate max-w-[180px]">
+                        {d.driver_name}
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-mono font-semibold text-accent">
+                        {msToLapTime(d.avg_lap_ms)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-mono text-purple-400">
+                        {msToLapTime(d.best_lap_ms)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right text-neutral-400">
+                        {d.total_laps}
                       </td>
                     </tr>
                   ))}
