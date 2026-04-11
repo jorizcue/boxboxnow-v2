@@ -263,7 +263,7 @@ async def get_kart_drivers(
 
         drivers.append({
             "driver_name": driver_name,
-            "total_laps": len(filtered),
+            "total_laps": len(times),
             "avg_lap_ms": round(sum(filtered) / len(filtered)),
             "best_lap_ms": min(filtered),
         })
