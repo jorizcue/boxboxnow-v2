@@ -56,6 +56,24 @@
                 // Override configHost so the original JS doesn't try to connect elsewhere
                 var configHost = window.location.hostname;
             })();
+
+            // Listen for speed/control commands from parent (BBN dashboard)
+            window.addEventListener('message', function(event) {
+                if (!event.data || typeof event.data !== 'object') return;
+                if (event.data.type === 'bbn_replay_speed' && window._bbn_ws) {
+                    try {
+                        window._bbn_ws.send('speed:' + event.data.speed);
+                    } catch(e) {}
+                } else if (event.data.type === 'bbn_replay_pause' && window._bbn_ws) {
+                    try {
+                        window._bbn_ws.send('pause');
+                    } catch(e) {}
+                } else if (event.data.type === 'bbn_replay_stop' && window._bbn_ws) {
+                    try {
+                        window._bbn_ws.send('stop');
+                    } catch(e) {}
+                }
+            });
         </script>
 
 
