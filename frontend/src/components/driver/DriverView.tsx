@@ -7,6 +7,7 @@ import { useRaceClock } from "@/hooks/useRaceClock";
 import { msToLapTime, tierHex, secondsToHMS } from "@/lib/formatters";
 import { stableSpeedMs } from "@/lib/classificationUtils";
 import { getDriverChannel } from "@/lib/driverChannel";
+import { api } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { useRaceBox, useRaceBoxStore } from "@/hooks/useRaceBox";
 import { usePhoneGps } from "@/hooks/usePhoneGps";
@@ -244,6 +245,14 @@ export function DriverView() {
   const [brightness, setBrightness] = useState(100);
   const [showBrightness, setShowBrightness] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [presets, setPresets] = useState<{ id: number; name: string; visible_cards: Record<string, boolean>; card_order: string[] }[]>([]);
+
+  // Load presets when menu opens
+  useEffect(() => {
+    if (menuOpen && presets.length === 0) {
+      api.getPresets().then(setPresets).catch(() => {});
+    }
+  }, [menuOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { dragging, registerRect, onTouchStart, onTouchMove, onTouchEnd } =
     useTouchDrag(driverCfg.cardOrder, driverCfg.setCardOrder);
@@ -1055,6 +1064,35 @@ export function DriverView() {
                   </button>
                 )}
               </div>
+
+              {/* Presets */}
+              {presets.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[10px] text-neutral-500 uppercase tracking-wider px-1 mb-1">Plantilla</p>
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const preset = presets.find((p) => p.id === Number(e.target.value));
+                      if (!preset) return;
+                      const allIds = ALL_DRIVER_CARDS.map((c) => c.id);
+                      const defaultVis = Object.fromEntries(allIds.map((c) => [c, true]));
+                      const visibleCards = { ...defaultVis, ...preset.visible_cards } as Record<DriverCardId, boolean>;
+                      const cardOrder = preset.card_order.length
+                        ? (preset.card_order.filter((c) => allIds.includes(c as DriverCardId)) as DriverCardId[])
+                            .concat(allIds.filter((c) => !preset.card_order.includes(c)))
+                        : DEFAULT_CARD_ORDER;
+                      driverCfg.applyPreset(visibleCards, cardOrder);
+                      setMenuOpen(false);
+                    }}
+                    className="w-full bg-black border border-border rounded-lg px-2 py-2 text-xs text-white"
+                  >
+                    <option value="">Aplicar plantilla...</option>
+                    {presets.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Edit cards */}
               <div className="space-y-1">
