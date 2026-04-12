@@ -793,19 +793,27 @@ export function DriverView() {
     },
     lapsToMaxStint: {
       label: t("metric.lapsToMaxStint"),
-      accent: lapsToMaxStint !== null && lapsToMaxStint <= 2
-        ? "from-red-500/25 to-red-500/5 border-red-400/50"
-        : lapsToMaxStint !== null && lapsToMaxStint <= 5
-          ? "from-orange-500/20 to-orange-500/5 border-orange-400/40"
-          : "from-teal-500/20 to-teal-500/5 border-teal-500/30",
+      accent: pitWindowOpen === false
+        ? "from-red-500/30 to-red-500/10 border-red-500/60"
+        : lapsToMaxStint !== null && lapsToMaxStint <= 2
+          ? "from-red-500/25 to-red-500/5 border-red-400/50"
+          : lapsToMaxStint !== null && lapsToMaxStint <= 5
+            ? "from-orange-500/20 to-orange-500/5 border-orange-400/40"
+            : pitWindowOpen === true
+              ? "from-green-500/20 to-green-500/5 border-green-500/40"
+              : "from-teal-500/20 to-teal-500/5 border-teal-500/30",
       content: (
         <div className="flex flex-col items-center">
           <span className={`text-4xl sm:text-5xl font-mono font-black leading-none ${
-            lapsToMaxStint !== null && lapsToMaxStint <= 2
-              ? "text-red-400 animate-pulse"
-              : lapsToMaxStint !== null && lapsToMaxStint <= 5
-                ? "text-orange-400"
-                : "text-white"
+            pitWindowOpen === false
+              ? "text-red-400"
+              : lapsToMaxStint !== null && lapsToMaxStint <= 2
+                ? "text-red-400 animate-pulse"
+                : lapsToMaxStint !== null && lapsToMaxStint <= 5
+                  ? "text-orange-400"
+                  : pitWindowOpen === true
+                    ? "text-green-400"
+                    : "text-white"
           }`}>
             {lapsToMaxStint !== null && lapsToMaxStint > 0 ? lapsToMaxStint.toFixed(1) : "0"}
           </span>
