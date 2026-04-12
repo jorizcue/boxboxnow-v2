@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 
 from app.models.database import get_db
-from app.models.schemas import GpsTelemetryLap, User
+from app.models.schemas import GpsTelemetryLap, RaceSession, User
 from app.models.pydantic_models import GpsLapCreate, GpsLapOut, GpsLapBatchCreate
 from app.api.auth_routes import get_current_user
 
@@ -20,12 +20,26 @@ async def save_laps(
     db: AsyncSession = Depends(get_db),
 ):
     """Save one or more GPS laps (typically called when session ends or periodically)."""
+    # Auto-resolve race_session_id from user's active session if not provided
+    active_session_id = None
+    try:
+        result = await db.execute(
+            select(RaceSession.id)
+            .where(RaceSession.user_id == user.id, RaceSession.is_active == True)
+            .limit(1)
+        )
+        row_rs = result.scalar_one_or_none()
+        if row_rs:
+            active_session_id = row_rs
+    except Exception:
+        pass  # Non-critical — save telemetry even without session link
+
     results = []
     for lap in data.laps:
         row = GpsTelemetryLap(
             user_id=user.id,
             circuit_id=lap.circuit_id,
-            race_session_id=lap.race_session_id,
+            race_session_id=lap.race_session_id or active_session_id,
             lap_number=lap.lap_number,
             duration_ms=lap.duration_ms,
             total_distance_m=lap.total_distance_m,

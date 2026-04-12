@@ -22,7 +22,12 @@ interface LapRecord {
   durationMs: number;
   distances: number[];      // cumulative meters at each sample index
   timestamps: number[];     // performance.now() at each sample index
+  positions: { lat: number; lon: number }[];  // GPS positions per sample
+  speeds: number[];         // speed in km/h per sample
+  gforceLat: number[];      // lateral g-force per sample
+  gforceLon: number[];      // longitudinal g-force per sample
   totalDistanceM: number;
+  maxSpeedKmh: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -40,6 +45,10 @@ interface RaceBoxState {
   currentLapStartTime: number;
   currentLapDistances: number[];
   currentLapTimestamps: number[];
+  currentLapPositions: { lat: number; lon: number }[];
+  currentLapSpeeds: number[];
+  currentLapGforceLat: number[];
+  currentLapGforceLon: number[];
   prevSample: RaceBoxSample | null;
   samplesSinceCrossing: number;
 
@@ -121,6 +130,10 @@ export const useRaceBoxStore = create<RaceBoxState>((set, get) => ({
   currentLapStartTime: 0,
   currentLapDistances: [],
   currentLapTimestamps: [],
+  currentLapPositions: [],
+  currentLapSpeeds: [],
+  currentLapGforceLat: [],
+  currentLapGforceLon: [],
   prevSample: null,
   samplesSinceCrossing: 0,
 
@@ -194,6 +207,7 @@ export const useRaceBoxStore = create<RaceBoxState>((set, get) => ({
     const prev = state.prevSample;
     let {
       currentLapDistances, currentLapTimestamps, currentLapStartTime,
+      currentLapPositions, currentLapSpeeds, currentLapGforceLat, currentLapGforceLon,
       currentLapNumber, samplesSinceCrossing, previousLap, bestLap,
       laps, lastLapMs, bestLapMs, maxSpeedKmh,
     } = state;
@@ -216,6 +230,10 @@ export const useRaceBoxStore = create<RaceBoxState>((set, get) => ({
 
     const newDistances = [...currentLapDistances, currentDist];
     const newTimestamps = [...currentLapTimestamps, s.timestamp];
+    const newPositions = [...currentLapPositions, { lat: s.lat, lon: s.lon }];
+    const newSpeeds = [...currentLapSpeeds, s.speedKmh];
+    const newGforceLat = [...currentLapGforceLat, s.gForceX];
+    const newGforceLon = [...currentLapGforceLon, s.gForceY];
 
     // Finish line crossing check
     let crossed = false;
@@ -239,7 +257,12 @@ export const useRaceBoxStore = create<RaceBoxState>((set, get) => ({
           durationMs: lapDuration,
           distances: newDistances,
           timestamps: newTimestamps,
+          positions: newPositions,
+          speeds: newSpeeds,
+          gforceLat: newGforceLat,
+          gforceLon: newGforceLon,
           totalDistanceM: currentDist,
+          maxSpeedKmh: maxSpeedKmh,
         };
         previousLap = lap;
         lastLapMs = lapDuration;
@@ -265,6 +288,10 @@ export const useRaceBoxStore = create<RaceBoxState>((set, get) => ({
         currentLapStartTime: s.timestamp,
         currentLapDistances: [0],
         currentLapTimestamps: [s.timestamp],
+        currentLapPositions: [{ lat: s.lat, lon: s.lon }],
+        currentLapSpeeds: [s.speedKmh],
+        currentLapGforceLat: [s.gForceX],
+        currentLapGforceLon: [s.gForceY],
         samplesSinceCrossing,
         previousLap,
         bestLap,
@@ -294,6 +321,10 @@ export const useRaceBoxStore = create<RaceBoxState>((set, get) => ({
       prevSample: s,
       currentLapDistances: newDistances,
       currentLapTimestamps: newTimestamps,
+      currentLapPositions: newPositions,
+      currentLapSpeeds: newSpeeds,
+      currentLapGforceLat: newGforceLat,
+      currentLapGforceLon: newGforceLon,
       samplesSinceCrossing,
       deltaMs,
       deltaBestMs,
@@ -310,6 +341,10 @@ export const useRaceBoxStore = create<RaceBoxState>((set, get) => ({
       currentLapStartTime: 0,
       currentLapDistances: [],
       currentLapTimestamps: [],
+      currentLapPositions: [],
+      currentLapSpeeds: [],
+      currentLapGforceLat: [],
+      currentLapGforceLon: [],
       prevSample: null,
       samplesSinceCrossing: 0,
       previousLap: null,
