@@ -392,6 +392,7 @@ const translations: Record<string, Record<Language, string>> = {
   "driver.connecting": { es: "Conectando...", en: "Connecting...", it: "Connessione...", de: "Verbindung..." },
   "driver.boxAlert": { es: "BOX BOX BOX", en: "BOX BOX BOX", it: "BOX BOX BOX", de: "BOX BOX BOX" },
   "driver.tapDismiss": { es: "Toca para cerrar", en: "Tap to dismiss", it: "Tocca per chiudere", de: "Tippen zum Schliessen" },
+  "driver.pitWindow": { es: "Ventana Pit", en: "Pit Window", it: "Finestra Pit", de: "Pit Fenster" },
 
   // BOX call button
   "box.callBox": { es: "Llamar a BOX", en: "Call BOX", it: "Chiama BOX", de: "BOX rufen" },

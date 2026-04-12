@@ -24,7 +24,8 @@ export type DriverCardId =
   | "gpsSpeed"
   | "gpsGForce"
   | "bestStintLap"
-  | "lapsToMaxStint";
+  | "lapsToMaxStint"
+  | "pitWindow";
 
 export const ALL_DRIVER_CARDS: { id: DriverCardId; label: string; requiresGps: boolean }[] = [
   { id: "raceTimer", label: "Tiempo de carrera", requiresGps: false },
@@ -45,6 +46,7 @@ export const ALL_DRIVER_CARDS: { id: DriverCardId; label: string; requiresGps: b
   { id: "gpsSpeed", label: "Velocidad GPS", requiresGps: true },
   { id: "gpsGForce", label: "G-Force (números)", requiresGps: true },
   { id: "lapsToMaxStint", label: "Vueltas hasta stint máximo", requiresGps: false },
+  { id: "pitWindow", label: "Ventana de pit (open/closed)", requiresGps: false },
 ];
 
 export const DEFAULT_CARD_ORDER: DriverCardId[] = ALL_DRIVER_CARDS.map((c) => c.id);

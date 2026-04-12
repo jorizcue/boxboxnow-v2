@@ -169,6 +169,7 @@ const CARD_ACCENTS: Record<DriverCardId, string> = {
   gpsSpeed: "from-sky-500/20 to-sky-500/5 border-sky-500/30",
   gpsGForce: "from-emerald-500/20 to-emerald-500/5 border-emerald-500/30",
   lapsToMaxStint: "from-teal-500/20 to-teal-500/5 border-teal-500/30",
+  pitWindow: "from-green-500/25 to-green-500/5 border-green-400/50",
 };
 
 const CARD_SAMPLE_VALUES: Record<DriverCardId, string> = {
@@ -190,6 +191,7 @@ const CARD_SAMPLE_VALUES: Record<DriverCardId, string> = {
   gpsSpeed: "94 km/h",
   gpsGForce: "1.2G",
   lapsToMaxStint: "5.2",
+  pitWindow: "OPEN",
 };
 
 /* ------------------------------------------------------------------ */

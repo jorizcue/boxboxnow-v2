@@ -397,16 +397,54 @@ export function DriverView() {
     dragOverItem.current = null;
   }, [driverCfg.cardOrder]);
 
-  // Laps to max stint (must be before early returns to satisfy Rules of Hooks)
-  const lapsToMaxStint = useMemo(() => {
-    if (!ourKart || ourKart <= 0 || raceClock === 0 || raceFinished) return null;
+  // Real max stint calculation & laps to max stint
+  const { lapsToMaxStint, realMaxStintMin } = useMemo(() => {
+    if (!ourKart || ourKart <= 0 || raceClock === 0 || raceFinished)
+      return { lapsToMaxStint: null, realMaxStintMin: null };
     const kart = karts.find((k) => k.kartNumber === ourKart);
-    if (!kart || kart.avgLapMs <= 0) return null;
+    if (!kart || kart.avgLapMs <= 0)
+      return { lapsToMaxStint: null, realMaxStintMin: null };
+
+    // Current stint elapsed time (seconds)
     const stintStart = kart.stintStartCountdownMs || durationMs || raceClock;
     const stintSec = Math.max(0, stintStart - raceClock) / 1000;
-    const timeToMax = Math.max(0, config.maxStintMin * 60 - stintSec);
-    return timeToMax / (kart.avgLapMs / 1000);
-  }, [karts, ourKart, raceClock, durationMs, raceFinished, config.maxStintMin]);
+
+    // Time remaining from last pit-out (or race start) until end of race
+    const timeRemainingFromStintStartMin = stintStart / 1000 / 60;
+
+    // Pending pits
+    const pendingPits = Math.max(0, config.minPits - kart.pitCount);
+
+    // Real max stint = min(maxStintMin, timeRemaining - (pitTime + minStint) * pendingPits)
+    const reservePerPitMin = (config.pitTimeS / 60) + config.minStintMin;
+    const availableMin = timeRemainingFromStintStartMin - (reservePerPitMin * pendingPits);
+    const realMax = pendingPits > 0
+      ? Math.min(config.maxStintMin, Math.max(0, availableMin))
+      : config.maxStintMin;
+
+    const timeToMaxSec = Math.max(0, realMax * 60 - stintSec);
+    const laps = timeToMaxSec / (kart.avgLapMs / 1000);
+
+    return { lapsToMaxStint: laps, realMaxStintMin: realMax };
+  }, [karts, ourKart, raceClock, durationMs, raceFinished, config.maxStintMin, config.minPits, config.pitTimeS, config.minStintMin]);
+
+  // Pit window open/closed
+  const pitWindowOpen = useMemo(() => {
+    if (!ourKart || ourKart <= 0 || raceClock === 0 || raceFinished) return null;
+    const kart = karts.find((k) => k.kartNumber === ourKart);
+    if (!kart) return null;
+
+    // Time elapsed in current stint (seconds)
+    const stintStart = kart.stintStartCountdownMs || durationMs || raceClock;
+    const stintSec = Math.max(0, stintStart - raceClock) / 1000;
+    const stintMin = stintSec / 60;
+
+    // Pit closed if stint < minStintMin
+    if (stintMin < config.minStintMin) return false;
+
+    // Pit open if stint >= minStintMin
+    return true;
+  }, [karts, ourKart, raceClock, durationMs, raceFinished, config.minStintMin]);
 
   // Audio speech narration
   const [speechEnabled, setSpeechEnabled] = useState(false);
@@ -771,9 +809,49 @@ export function DriverView() {
           }`}>
             {lapsToMaxStint !== null && lapsToMaxStint > 0 ? lapsToMaxStint.toFixed(1) : "0"}
           </span>
+          {realMaxStintMin !== null && realMaxStintMin < config.maxStintMin && (
+            <span className="text-[8px] sm:text-[9px] text-orange-400 font-mono mt-0.5">
+              max {Math.floor(realMaxStintMin)}:{String(Math.round((realMaxStintMin % 1) * 60)).padStart(2, "0")}
+            </span>
+          )}
           <span className="text-[9px] sm:text-[10px] text-neutral-500 uppercase tracking-widest mt-0.5">
             {t("metric.lapsToMaxStint").toLowerCase()}
           </span>
+        </div>
+      ),
+    },
+    pitWindow: {
+      label: t("driver.pitWindow"),
+      accent: pitWindowOpen === true
+        ? "from-green-500/25 to-green-500/5 border-green-400/50"
+        : pitWindowOpen === false
+          ? "from-red-500/25 to-red-500/5 border-red-400/50"
+          : "from-neutral-500/20 to-neutral-500/5 border-neutral-500/30",
+      content: (
+        <div className="flex flex-col items-center">
+          <span className={`text-3xl sm:text-4xl font-black leading-none uppercase tracking-wider ${
+            pitWindowOpen === true
+              ? "text-green-400"
+              : pitWindowOpen === false
+                ? "text-red-400 animate-pulse"
+                : "text-neutral-500"
+          }`}>
+            {pitWindowOpen === true ? "OPEN" : pitWindowOpen === false ? "CLOSED" : "--"}
+          </span>
+          {pitWindowOpen === false && (() => {
+            const kart = karts.find((k) => k.kartNumber === ourKart);
+            if (!kart) return null;
+            const stintStart = kart.stintStartCountdownMs || durationMs || raceClock;
+            const stintSec = Math.max(0, stintStart - raceClock) / 1000;
+            const remainSec = Math.max(0, config.minStintMin * 60 - stintSec);
+            const m = Math.floor(remainSec / 60);
+            const s = Math.floor(remainSec % 60);
+            return (
+              <span className="text-[10px] sm:text-xs text-red-400/70 font-mono mt-1">
+                {m}:{String(s).padStart(2, "0")}
+              </span>
+            );
+          })()}
         </div>
       ),
     },
