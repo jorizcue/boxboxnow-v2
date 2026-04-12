@@ -47,7 +47,7 @@ def _is_valid_apex_message(message: str) -> bool:
     """
     # Reject messages starting with HTTP methods (bot/scanner garbage)
     first_line = message.split("\n", 1)[0].strip()
-    if first_line.startswith(("CONNECT ", "GET http", "POST ", "PUT ", "DELETE ", "HEAD ", "OPTIONS ")):
+    if first_line.startswith(("CONNECT ", "GET ", "POST ", "PUT ", "DELETE ", "HEAD ", "OPTIONS ", "HTTP/")):
         return False
     # Reject messages with non-printable characters (binary/TLS data)
     # Allow common whitespace: \n \r \t and printable ASCII + extended latin
