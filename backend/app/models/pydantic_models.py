@@ -317,6 +317,17 @@ class RaceSessionUpdate(BaseModel):
     auto_load_teams: bool | None = None
 
 
+# --- User Preferences (driver view config) ---
+
+class UserPreferencesOut(BaseModel):
+    visible_cards: dict[str, bool] = {}
+    card_order: list[str] = []
+
+class UserPreferencesUpdate(BaseModel):
+    visible_cards: dict[str, bool] | None = None
+    card_order: list[str] | None = None
+
+
 # --- Team Positions + Drivers ---
 
 class TeamDriverOut(BaseModel):

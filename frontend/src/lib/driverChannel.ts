@@ -22,3 +22,12 @@ export function sendBoxCall() {
   const ch = getDriverChannel();
   ch?.postMessage({ type: "boxCall" });
 }
+
+/** Broadcast driver config changes to other windows (driver view, live). */
+export function broadcastDriverConfig(config: {
+  visibleCards: Record<string, boolean>;
+  cardOrder: string[];
+}) {
+  const ch = getDriverChannel();
+  ch?.postMessage({ type: "configSync", config });
+}

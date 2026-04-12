@@ -209,10 +209,33 @@ export function DriverView() {
   const driverCfg = useDriverConfig();
   const { user } = useAuth();
 
-  // Hydrate driver config for current user (per-user localStorage)
+  // Hydrate driver config for current user
   useEffect(() => {
     driverCfg.hydrateForUser(user?.id ?? null);
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Listen for config changes from dashboard via BroadcastChannel
+  useEffect(() => {
+    const ch = getDriverChannel();
+    if (!ch) return;
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === "configSync" && event.data.config) {
+        const { visibleCards, cardOrder } = event.data.config;
+        // Apply directly to store (bypass setters to avoid re-broadcast + re-save)
+        const allCards = ALL_DRIVER_CARDS.map((c) => c.id);
+        const defaultVis = Object.fromEntries(allCards.map((c) => [c, true]));
+        useDriverConfig.setState({
+          visibleCards: { ...defaultVis, ...visibleCards },
+          cardOrder: cardOrder?.length
+            ? cardOrder.filter((c: string) => allCards.includes(c as any))
+                .concat(allCards.filter((c) => !cardOrder.includes(c)))
+            : allCards,
+        });
+      }
+    };
+    ch.addEventListener("message", handler);
+    return () => ch.removeEventListener("message", handler);
+  }, []);
 
   const [editMode, setEditMode] = useState(false);
   const [showGpsSetup, setShowGpsSetup] = useState(false);

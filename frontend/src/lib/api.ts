@@ -147,6 +147,11 @@ export const api = {
 
   getLiveTimingUrl: () => fetchApi<{ url: string | null }>("/api/config/live-timing-url"),
 
+  // Driver view preferences (user-scoped, persisted in DB)
+  getPreferences: () => fetchApi<{ visible_cards: Record<string, boolean>; card_order: string[] }>("/api/config/preferences"),
+  updatePreferences: (data: { visible_cards?: Record<string, boolean>; card_order?: string[] }) =>
+    fetchApi<any>("/api/config/preferences", { method: "PATCH", body: JSON.stringify(data) }),
+
   // Race
   getSnapshot: () => fetchApi<any>("/api/race/snapshot"),
   getConnectionStatus: () => fetchApi<{

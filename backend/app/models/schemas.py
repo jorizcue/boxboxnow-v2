@@ -29,6 +29,7 @@ class User(Base):
     device_sessions = relationship("DeviceSession", back_populates="user", cascade="all, delete-orphan")
     gps_laps = relationship("GpsTelemetryLap", backref="user", cascade="all, delete-orphan")
     subscriptions = relationship("Subscription", back_populates="user", cascade="all, delete-orphan")
+    preferences = relationship("UserPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 
 class Circuit(Base):
@@ -76,6 +77,19 @@ class UserTabAccess(Base):
     tab = Column(String(50), nullable=False)  # "replay" | "analytics"
 
     user = relationship("User", back_populates="tab_access")
+
+
+class UserPreferences(Base):
+    """Per-user preferences (driver view config, etc.)."""
+    __tablename__ = "user_preferences"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    visible_cards = Column(Text, nullable=False, default="{}")    # JSON: Record<DriverCardId, boolean>
+    card_order = Column(Text, nullable=False, default="[]")       # JSON: DriverCardId[]
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="preferences")
 
 
 class RaceSession(Base):

@@ -1,5 +1,6 @@
 """REST API routes for user-scoped race configuration."""
 
+import json
 import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -8,11 +9,12 @@ from sqlalchemy import select, delete, and_
 from sqlalchemy.orm import selectinload
 
 from app.models.database import get_db
-from app.models.schemas import User, Circuit, UserCircuitAccess, RaceSession, TeamPosition, TeamDriver
+from app.models.schemas import User, Circuit, UserCircuitAccess, RaceSession, TeamPosition, TeamDriver, UserPreferences
 from app.models.pydantic_models import (
     CircuitOut,
     RaceSessionOut, RaceSessionCreate, RaceSessionUpdate,
     TeamPositionOut, TeamPositionCreate, TeamDriverOut,
+    UserPreferencesOut, UserPreferencesUpdate,
 )
 from app.api.auth_routes import get_current_user
 
@@ -353,3 +355,51 @@ async def _verify_circuit_access(user: User, circuit_id: int, db: AsyncSession):
     )
     if not result.scalar_one_or_none():
         raise HTTPException(403, "No access to this circuit")
+
+
+# --- User Preferences (driver view config) ---
+
+@router.get("/preferences", response_model=UserPreferencesOut)
+async def get_preferences(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Get driver view preferences for the current user."""
+    result = await db.execute(
+        select(UserPreferences).where(UserPreferences.user_id == user.id)
+    )
+    prefs = result.scalar_one_or_none()
+    if not prefs:
+        return UserPreferencesOut()
+    return UserPreferencesOut(
+        visible_cards=json.loads(prefs.visible_cards) if prefs.visible_cards else {},
+        card_order=json.loads(prefs.card_order) if prefs.card_order else [],
+    )
+
+
+@router.patch("/preferences", response_model=UserPreferencesOut)
+async def update_preferences(
+    data: UserPreferencesUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create or update driver view preferences for the current user."""
+    result = await db.execute(
+        select(UserPreferences).where(UserPreferences.user_id == user.id)
+    )
+    prefs = result.scalar_one_or_none()
+
+    if not prefs:
+        prefs = UserPreferences(user_id=user.id)
+        db.add(prefs)
+
+    update_data = data.model_dump(exclude_unset=True)
+    if "visible_cards" in update_data:
+        prefs.visible_cards = json.dumps(update_data["visible_cards"])
+    if "card_order" in update_data:
+        prefs.card_order = json.dumps(update_data["card_order"])
+
+    await db.commit()
+    await db.refresh(prefs)
+
+    return UserPreferencesOut(
+        visible_cards=json.loads(prefs.visible_cards) if prefs.visible_cards else {},
+        card_order=json.loads(prefs.card_order) if prefs.card_order else [],
+    )
