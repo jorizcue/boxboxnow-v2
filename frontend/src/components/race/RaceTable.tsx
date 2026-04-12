@@ -88,15 +88,30 @@ export function RaceTable() {
 
   const ourStintSec = ourKart ? stintSecondsFor(ourKart) : 0;
   const ourStintMin = ourStintSec / 60;
-  const timeToMaxStint = Math.max(0, config.maxStintMin * 60 - ourStintSec);
+
+  // Real max stint: min(maxStintConfig, timeFromPitOut - reserve for pending pits)
+  const realMaxStintSec = (() => {
+    if (!ourKart) return config.maxStintMin * 60;
+    const stintStart = ourKart.stintStartCountdownMs || durationMs || raceClockMs;
+    const timeRemainingFromStintStartSec = stintStart / 1000;
+    const pendingPits = Math.max(0, config.minPits - ourKart.pitCount);
+    if (pendingPits <= 0) return config.maxStintMin * 60;
+    const reservePerPitSec = config.pitTimeS + config.minStintMin * 60;
+    const availableSec = timeRemainingFromStintStartSec - (reservePerPitSec * pendingPits);
+    return Math.min(config.maxStintMin * 60, Math.max(0, availableSec));
+  })();
+
+  const timeToMaxStint = Math.max(0, realMaxStintSec - ourStintSec);
   const lapsToMaxStint = ourKart && ourKart.avgLapMs > 0
     ? timeToMaxStint / (ourKart.avgLapMs / 1000)
     : 0;
 
+  const realMaxStintMin = realMaxStintSec / 60;
+
   const kartsNearPit = sorted.filter((k) => {
     const stintSec = stintSecondsFor(k);
     const stintMin = stintSec / 60;
-    return stintMin >= config.maxStintMin - 5 && k.pitStatus !== "in_pit";
+    return stintMin >= realMaxStintMin - 5 && k.pitStatus !== "in_pit";
   }).length;
 
   // Our kart position in the avg-sorted table (1-based)
@@ -105,13 +120,13 @@ export function RaceTable() {
     : 0;
 
   // Stint color logic:
-  // Red if < minStintMin (can't pit yet) or >= maxStintMin (overdue)
-  // Orange if within 5min of maxStintMin
+  // Red if < minStintMin (can't pit yet) or >= realMaxStint (overdue)
+  // Orange if within 5min of realMaxStint
   // Green otherwise (safe window)
   const stintColor = (() => {
     if (ourStintMin < config.minStintMin) return "text-red-400";
-    if (ourStintMin >= config.maxStintMin) return "text-red-400 animate-pulse";
-    if (ourStintMin >= config.maxStintMin - 5) return "text-orange-400";
+    if (ourStintMin >= realMaxStintMin) return "text-red-400 animate-pulse";
+    if (ourStintMin >= realMaxStintMin - 5) return "text-orange-400";
     return "text-green-400";
   })();
 
