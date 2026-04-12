@@ -42,6 +42,7 @@ export function useRaceWebSocket(options?: WsOptions) {
   const wsReconnectTrigger = useRaceStore((s) => s.wsReconnectTrigger);
 
   // Listen for snapshot requests from driver window — send current store state
+  // Also listen for "reconnect" message (sent when dashboard switches session)
   useEffect(() => {
     const ch = getDriverChannel();
     if (!ch) return;
@@ -63,10 +64,24 @@ export function useRaceWebSocket(options?: WsOptions) {
           },
         });
       }
+      // Driver window receives this and reconnects its own WS
+      if (event.data?.type === "reconnect" && viewParam === "driver") {
+        useRaceStore.getState().requestWsReconnect();
+      }
     };
     ch.addEventListener("message", handler);
     return () => ch.removeEventListener("message", handler);
-  }, []);
+  }, [viewParam]);
+
+  // Notify driver window to reconnect when dashboard switches session
+  const prevTrigger = useRef(wsReconnectTrigger);
+  useEffect(() => {
+    if (!viewParam && wsReconnectTrigger !== prevTrigger.current) {
+      prevTrigger.current = wsReconnectTrigger;
+      const ch = getDriverChannel();
+      ch?.postMessage({ type: "reconnect" });
+    }
+  }, [wsReconnectTrigger, viewParam]);
 
   // Main WS connection effect
   useEffect(() => {
