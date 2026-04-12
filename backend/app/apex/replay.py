@@ -387,7 +387,15 @@ class ReplayEngine:
             if prev_time and i > actual_start:
                 delta = (timestamp - prev_time).total_seconds()
                 if delta > 0:
-                    await asyncio.sleep(delta / self._speed)
+                    # Cap large gaps (idle periods between sessions) to 10s
+                    capped_delta = min(delta, 10.0)
+                    remaining = capped_delta / self._speed
+                    while remaining > 0 and self._active:
+                        while self._paused and self._active:
+                            await asyncio.sleep(0.1)
+                        chunk = min(remaining, 0.5)
+                        await asyncio.sleep(chunk)
+                        remaining -= chunk
 
             prev_time = timestamp
             self._current_block = i + 1

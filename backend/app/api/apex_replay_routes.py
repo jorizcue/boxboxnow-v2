@@ -194,8 +194,11 @@ async def apex_replay_ws(
             if prev_time and i > actual_start:
                 delta = (timestamp - prev_time).total_seconds()
                 if delta > 0:
-                    # Split long delays into small chunks to stay responsive
-                    remaining = delta / current_speed
+                    # Cap large gaps (idle periods between sessions) to 2s real-time
+                    MAX_GAP_SECONDS = 10.0
+                    capped_delta = min(delta, MAX_GAP_SECONDS)
+                    # Split delays into small chunks to stay responsive
+                    remaining = capped_delta / current_speed
                     while remaining > 0 and active:
                         while paused and active:
                             await asyncio.sleep(0.1)
