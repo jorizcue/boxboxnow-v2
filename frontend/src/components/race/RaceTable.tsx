@@ -130,10 +130,31 @@ export function RaceTable() {
     return "text-green-400";
   })();
 
+  // Pit window: open when stint >= minStintMin
+  const pitWindowOpen = ourKart && raceClockMs > 0 && !raceFinished
+    ? ourStintMin >= config.minStintMin
+    : null;
+
   const timeToMaxColor = (() => {
     if (timeToMaxStint <= 0) return "text-red-400 animate-pulse";
     if (timeToMaxStint / 60 <= 5) return "text-orange-400";
     return "text-neutral-200";
+  })();
+
+  const lapsToMaxColor = (() => {
+    if (pitWindowOpen === false) return "text-red-400";
+    if (lapsToMaxStint <= 2) return "text-red-400 animate-pulse";
+    if (lapsToMaxStint <= 5) return "text-orange-400";
+    if (pitWindowOpen === true) return "text-green-400";
+    return "text-neutral-200";
+  })();
+
+  const lapsToMaxBorder = (() => {
+    if (pitWindowOpen === false) return "border-red-500/60";
+    if (lapsToMaxStint <= 2) return "border-red-400/50";
+    if (lapsToMaxStint <= 5) return "border-orange-400/40";
+    if (pitWindowOpen === true) return "border-green-500/40";
+    return "border-border";
   })();
 
   if (sorted.length === 0) {
@@ -224,11 +245,11 @@ export function RaceTable() {
           </div>
 
           {/* Laps to max stint */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
+          <div className={`bg-surface rounded-xl border ${lapsToMaxBorder} p-2 sm:p-3 flex flex-col items-center justify-between`}>
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.lapsToMaxStint")}
             </span>
-            <span className="text-lg sm:text-xl font-mono font-black leading-none text-neutral-200">
+            <span className={`text-lg sm:text-xl font-mono font-black leading-none ${lapsToMaxColor}`}>
               {lapsToMaxStint > 0 ? lapsToMaxStint.toFixed(1) : "0"}
             </span>
           </div>
