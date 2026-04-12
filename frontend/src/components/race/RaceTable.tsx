@@ -218,8 +218,7 @@ export function RaceTable() {
             </span>
             {realMaxStintMin < config.maxStintMin && (
               <span className="text-[7px] text-orange-400 font-mono">
-                max real {Math.floor(realMaxStintMin)}:{String(Math.round((realMaxStintMin % 1) * 60)).padStart(2, "0")}
-                {" "}p{Math.max(0, config.minPits - (ourKart?.pitCount ?? 0))}
+                max {Math.floor(realMaxStintMin)}:{String(Math.round((realMaxStintMin % 1) * 60)).padStart(2, "0")}
               </span>
             )}
           </div>
