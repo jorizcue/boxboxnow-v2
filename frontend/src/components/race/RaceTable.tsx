@@ -216,6 +216,12 @@ export function RaceTable() {
             <span className={clsx("text-lg sm:text-xl font-mono font-black leading-none", timeToMaxColor)}>
               {secondsToHMS(timeToMaxStint)}
             </span>
+            {realMaxStintMin < config.maxStintMin && (
+              <span className="text-[7px] text-orange-400 font-mono">
+                max real {Math.floor(realMaxStintMin)}:{String(Math.round((realMaxStintMin % 1) * 60)).padStart(2, "0")}
+                {" "}p{Math.max(0, config.minPits - (ourKart?.pitCount ?? 0))}
+              </span>
+            )}
           </div>
 
           {/* Laps to max stint */}
