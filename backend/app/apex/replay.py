@@ -38,9 +38,53 @@ def try_parse_timestamp(line: str) -> datetime | None:
         return None
 
 
+def _is_valid_apex_message(message: str) -> bool:
+    """Check if a message looks like valid Apex Timing data.
+
+    Rejects:
+    - HTTP proxy/scanner requests (CONNECT, GET http, etc.)
+    - Messages containing non-printable binary bytes (TLS handshakes, etc.)
+    """
+    # Reject messages starting with HTTP methods (bot/scanner garbage)
+    first_line = message.split("\n", 1)[0].strip()
+    if first_line.startswith(("CONNECT ", "GET http", "POST ", "PUT ", "DELETE ", "HEAD ", "OPTIONS ")):
+        return False
+    # Reject messages with non-printable characters (binary/TLS data)
+    # Allow common whitespace: \n \r \t and printable ASCII + extended latin
+    for ch in message:
+        code = ord(ch)
+        if code < 32 and ch not in "\n\r\t":
+            return False
+        if 128 <= code < 160:  # C1 control characters
+            return False
+    return True
+
+
+def _sanitize_apex_line(line: str) -> str | None:
+    """Remove trailing binary garbage from an Apex message line.
+
+    Some log entries have valid Apex data followed by TLS/binary bytes
+    injected by port scanners. Strip everything after the last valid
+    pipe-delimited segment.
+    """
+    # Find the last valid pipe-delimited token boundary
+    # Apex messages use format: key|action|value
+    # If we detect non-printable bytes, truncate there
+    for i, ch in enumerate(line):
+        code = ord(ch)
+        if code < 32 and ch not in "\n\r\t":
+            line = line[:i].rstrip()
+            break
+        if 128 <= code < 160:
+            line = line[:i].rstrip()
+            break
+    return line if line.strip() else None
+
+
 def parse_log_file(filepath: str) -> list[tuple[datetime, str]]:
     """Parse a log file into (timestamp, message_block) tuples.
-    Supports both .log and .log.gz files."""
+    Supports both .log and .log.gz files.
+    Filters out garbage from bots/scanners that connected to the WebSocket."""
     blocks = []
     current_timestamp = None
     current_lines: list[str] = []
@@ -74,7 +118,21 @@ def parse_log_file(filepath: str) -> list[tuple[datetime, str]]:
         if message.strip():
             blocks.append((current_timestamp, message))
 
-    return blocks
+    # Filter out garbage messages and sanitize binary-contaminated ones
+    clean_blocks = []
+    for ts, message in blocks:
+        if not _is_valid_apex_message(message):
+            continue
+        # Sanitize individual lines (strip trailing binary)
+        sanitized_lines = []
+        for line in message.split("\n"):
+            clean = _sanitize_apex_line(line)
+            if clean:
+                sanitized_lines.append(clean)
+        if sanitized_lines:
+            clean_blocks.append((ts, "\n".join(sanitized_lines)))
+
+    return clean_blocks
 
 
 class ReplayEngine:
