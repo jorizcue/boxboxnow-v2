@@ -95,9 +95,8 @@ export function RaceTable() {
     const stintStart = ourKart.stintStartCountdownMs || durationMs || raceClockMs;
     const timeRemainingFromStintStartSec = stintStart / 1000;
     const pendingPits = Math.max(0, config.minPits - ourKart.pitCount);
-    if (pendingPits <= 0) return config.maxStintMin * 60;
-    const reservePerPitSec = config.pitTimeS + config.minStintMin * 60;
-    const availableSec = timeRemainingFromStintStartSec - (reservePerPitSec * pendingPits);
+    const reservePerPitSec = pendingPits > 0 ? (config.pitTimeS + config.minStintMin * 60) * pendingPits : 0;
+    const availableSec = timeRemainingFromStintStartSec - reservePerPitSec;
     return Math.min(config.maxStintMin * 60, Math.max(0, availableSec));
   })();
 

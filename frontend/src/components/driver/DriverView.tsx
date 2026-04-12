@@ -415,12 +415,10 @@ export function DriverView() {
     // Pending pits
     const pendingPits = Math.max(0, config.minPits - kart.pitCount);
 
-    // Real max stint = min(maxStintMin, timeRemaining - (pitTime + minStint) * pendingPits)
-    const reservePerPitMin = (config.pitTimeS / 60) + config.minStintMin;
-    const availableMin = timeRemainingFromStintStartMin - (reservePerPitMin * pendingPits);
-    const realMax = pendingPits > 0
-      ? Math.min(config.maxStintMin, Math.max(0, availableMin))
-      : config.maxStintMin;
+    // Real max stint = min(maxStintMin, timeRemaining - reserve for pending pits)
+    const reserveMin = pendingPits > 0 ? ((config.pitTimeS / 60) + config.minStintMin) * pendingPits : 0;
+    const availableMin = timeRemainingFromStintStartMin - reserveMin;
+    const realMax = Math.min(config.maxStintMin, Math.max(0, availableMin));
 
     const timeToMaxSec = Math.max(0, realMax * 60 - stintSec);
     const laps = timeToMaxSec / (kart.avgLapMs / 1000);
