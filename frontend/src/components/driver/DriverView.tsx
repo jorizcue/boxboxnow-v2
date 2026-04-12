@@ -426,7 +426,7 @@ export function DriverView() {
     return { lapsToMaxStint: laps, realMaxStintMin: realMax };
   }, [karts, ourKart, raceClock, durationMs, raceFinished, config.maxStintMin, config.minPits, config.pitTimeS, config.minStintMin]);
 
-  // Pit window open/closed
+  // Pit window open/closed (uses real min stint)
   const pitWindowOpen = useMemo(() => {
     if (!ourKart || ourKart <= 0 || raceClock === 0 || raceFinished) return null;
     const kart = karts.find((k) => k.kartNumber === ourKart);
@@ -437,12 +437,18 @@ export function DriverView() {
     const stintSec = Math.max(0, stintStart - raceClock) / 1000;
     const stintMin = stintSec / 60;
 
-    // Pit closed if stint < minStintMin
-    if (stintMin < config.minStintMin) return false;
+    // Real min stint: max(minStintConfig, timeFromStintStartToEnd - (pitTime + maxStint) × pendingPits)
+    const pendingPits = Math.max(0, config.minPits - kart.pitCount);
+    const timeFromStintStartToEndMin = stintStart / 1000 / 60;
+    const reservePerPitMin = pendingPits > 0 ? (config.pitTimeS / 60 + config.maxStintMin) * pendingPits : 0;
+    const realMinStintMin = Math.max(config.minStintMin, timeFromStintStartToEndMin - reservePerPitMin);
 
-    // Pit open if stint >= minStintMin
+    // Pit closed if stint < realMinStintMin
+    if (stintMin < realMinStintMin) return false;
+
+    // Pit open
     return true;
-  }, [karts, ourKart, raceClock, durationMs, raceFinished, config.minStintMin]);
+  }, [karts, ourKart, raceClock, durationMs, raceFinished, config.minStintMin, config.minPits, config.pitTimeS, config.maxStintMin]);
 
   // Audio speech narration
   const [speechEnabled, setSpeechEnabled] = useState(false);

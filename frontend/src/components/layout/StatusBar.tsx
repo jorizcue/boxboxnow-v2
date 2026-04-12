@@ -31,6 +31,9 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
   const pitClosedStartMin = useRaceStore((s) => s.config.pitClosedStartMin);
   const pitClosedEndMin = useRaceStore((s) => s.config.pitClosedEndMin);
   const minStintMin = useRaceStore((s) => s.config.minStintMin);
+  const maxStintMin = useRaceStore((s) => s.config.maxStintMin);
+  const pitTimeS = useRaceStore((s) => s.config.pitTimeS);
+  const minPitsConfig = useRaceStore((s) => s.config.minPits);
   const ourKartNumber = useRaceStore((s) => s.config.ourKartNumber);
   const karts = useRaceStore((s) => s.karts);
   const replayActive = useRaceStore((s) => s.replayActive);
@@ -114,10 +117,15 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
     // Regulation window: first/last N minutes
     if (pitClosedStartMin > 0 && elapsedMin < pitClosedStartMin) return true;
     if (pitClosedEndMin > 0 && remainingMin < pitClosedEndMin) return true;
-    // Min stint lockout: after our kart's pit out, closed until minStintMin elapsed
+    // Min stint lockout: after our kart's pit out, closed until realMinStint elapsed
     if (minStintMin > 0 && ourKart && ourKart.pitStatus === "racing" && ourKart.stintStartCountdownMs > 0) {
       const stintElapsedMin = (ourKart.stintStartCountdownMs - raceClockMs) / 60000;
-      if (stintElapsedMin >= 0 && stintElapsedMin < minStintMin) return true;
+      // Real min stint: max(minStintConfig, timeFromStintStartToEnd - (pitTime + maxStint) × pendingPits)
+      const pendingPits = Math.max(0, minPitsConfig - ourKart.pitCount);
+      const timeFromStintStartToEndMin = ourKart.stintStartCountdownMs / 1000 / 60;
+      const reservePerPitMin = pendingPits > 0 ? (pitTimeS / 60 + maxStintMin) * pendingPits : 0;
+      const realMinStintMin = Math.max(minStintMin, timeFromStintStartToEndMin - reservePerPitMin);
+      if (stintElapsedMin >= 0 && stintElapsedMin < realMinStintMin) return true;
     }
     return false;
   })();

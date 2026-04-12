@@ -59,7 +59,7 @@ export function RaceTable() {
       case "avgLapMs": aVal = a.avgLapMs > 0 ? a.avgLapMs : Infinity; bVal = b.avgLapMs > 0 ? b.avgLapMs : Infinity; break;
       case "bestAvgMs": aVal = a.bestAvgMs > 0 ? a.bestAvgMs : Infinity; bVal = b.bestAvgMs > 0 ? b.bestAvgMs : Infinity; break;
       case "lastLapMs": aVal = a.lastLapMs > 0 ? a.lastLapMs : Infinity; bVal = b.lastLapMs > 0 ? b.lastLapMs : Infinity; break;
-      case "bestLapMs": aVal = a.bestLapMs > 0 ? a.bestLapMs : Infinity; bVal = b.bestLapMs > 0 ? b.bestLapMs : Infinity; break;
+      case "bestLapMs": aVal = a.bestStintLapMs > 0 ? a.bestStintLapMs : Infinity; bVal = b.bestStintLapMs > 0 ? b.bestStintLapMs : Infinity; break;
       case "totalLaps": aVal = a.totalLaps; bVal = b.totalLaps; break;
       case "pitCount": aVal = a.pitCount; bVal = b.pitCount; break;
       case "tierScore": aVal = a.tierScore; bVal = b.tierScore; break;
@@ -129,9 +129,17 @@ export function RaceTable() {
     return "text-green-400";
   })();
 
-  // Pit window: open when stint >= minStintMin
+  // Pit window: open when stint >= realMinStint
+  const realMinStintMin = (() => {
+    if (!ourKart) return config.minStintMin;
+    const stintStart = ourKart.stintStartCountdownMs || durationMs || raceClockMs;
+    const pendingPits = Math.max(0, config.minPits - ourKart.pitCount);
+    const timeFromStintStartToEndMin = stintStart / 1000 / 60;
+    const reservePerPitMin = pendingPits > 0 ? (config.pitTimeS / 60 + config.maxStintMin) * pendingPits : 0;
+    return Math.max(config.minStintMin, timeFromStintStartToEndMin - reservePerPitMin);
+  })();
   const pitWindowOpen = ourKart && raceClockMs > 0 && !raceFinished
-    ? ourStintMin >= config.minStintMin
+    ? ourStintMin >= realMinStintMin
     : null;
 
   const timeToMaxColor = (() => {
@@ -340,7 +348,7 @@ export function RaceTable() {
                       {msToLapTime(kart.lastLapMs)}
                     </td>
                     <td className="px-2 py-1.5 text-right font-mono text-accent">
-                      {msToLapTime(kart.bestLapMs)}
+                      {kart.bestStintLapMs > 0 ? msToLapTime(kart.bestStintLapMs) : "-"}
                     </td>
                     <td className="px-2 py-1.5 text-center text-neutral-300">{kart.totalLaps}</td>
                     <td className="px-2 py-1.5 text-center">
@@ -369,7 +377,7 @@ export function RaceTable() {
                       >
                         {secondsToStint(stintSec)}
                       </span>
-                      <span className="text-xs text-neutral-700 ml-0.5">
+                      <span className="text-xs text-neutral-400 ml-0.5">
                         ({kart.stintLapsCount}v)
                       </span>
                     </td>

@@ -196,7 +196,12 @@ function Dashboard({
         <main className="flex-1 overflow-auto p-2 sm:p-3">
           {activeTab === "race" && userTabs.includes("race") && <RaceTable />}
           {activeTab === "pit" && userTabs.includes("pit") && <FifoQueue />}
-          {activeTab === "live" && userTabs.includes("live") && <LiveTiming />}
+          {/* LiveTiming stays mounted (hidden) so iframe replay doesn't restart on tab switch */}
+          {userTabs.includes("live") && (
+            <div className={activeTab === "live" ? "" : "hidden"}>
+              <LiveTiming />
+            </div>
+          )}
           {activeTab === "classification" && <ClassificationTable />}
           {activeTab === "adjusted" && userTabs.includes("adjusted") && <AdjustedClassification />}
           {activeTab === "adjusted-beta" && userTabs.includes("adjusted-beta") && <RealClassificationBeta />}
