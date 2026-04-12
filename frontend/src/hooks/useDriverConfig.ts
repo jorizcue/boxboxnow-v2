@@ -65,6 +65,8 @@ interface DriverConfig {
   setKartNumber: (kart: number | null) => void;
   setCardVisible: (card: DriverCardId, visible: boolean) => void;
   setCardOrder: (order: DriverCardId[]) => void;
+  /** Apply a preset (batch update visibleCards + cardOrder) */
+  applyPreset: (visibleCards: Record<DriverCardId, boolean>, cardOrder: DriverCardId[]) => void;
   /** Re-hydrate from localStorage + API for a specific user */
   hydrateForUser: (userId: number | null) => void;
 }
@@ -184,6 +186,15 @@ export const useDriverConfig = create<DriverConfig>((set, get) => ({
     _pendingUpdate.card_order = order;
     scheduleSave();
     broadcastDriverConfig({ visibleCards: get().visibleCards, cardOrder: order });
+  },
+
+  applyPreset: (visibleCards, cardOrder) => {
+    set({ visibleCards, cardOrder });
+    saveLocalConfig(_currentUserId, get());
+    _pendingUpdate.visible_cards = visibleCards;
+    _pendingUpdate.card_order = cardOrder;
+    scheduleSave();
+    broadcastDriverConfig({ visibleCards, cardOrder });
   },
 
   hydrateForUser: (userId) => {

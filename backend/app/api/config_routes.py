@@ -9,12 +9,13 @@ from sqlalchemy import select, delete, and_
 from sqlalchemy.orm import selectinload
 
 from app.models.database import get_db
-from app.models.schemas import User, Circuit, UserCircuitAccess, RaceSession, TeamPosition, TeamDriver, UserPreferences
+from app.models.schemas import User, Circuit, UserCircuitAccess, RaceSession, TeamPosition, TeamDriver, UserPreferences, DriverConfigPreset
 from app.models.pydantic_models import (
     CircuitOut,
     RaceSessionOut, RaceSessionCreate, RaceSessionUpdate,
     TeamPositionOut, TeamPositionCreate, TeamDriverOut,
     UserPreferencesOut, UserPreferencesUpdate,
+    PresetCreate, PresetOut, PresetUpdate,
 )
 from app.api.auth_routes import get_current_user
 
@@ -403,3 +404,127 @@ async def update_preferences(
         visible_cards=json.loads(prefs.visible_cards) if prefs.visible_cards else {},
         card_order=json.loads(prefs.card_order) if prefs.card_order else [],
     )
+
+
+# --- Driver Config Presets ---
+
+MAX_PRESETS_PER_USER = 10
+
+
+def _preset_to_out(p: DriverConfigPreset) -> PresetOut:
+    return PresetOut(
+        id=p.id,
+        name=p.name,
+        visible_cards=json.loads(p.visible_cards) if p.visible_cards else {},
+        card_order=json.loads(p.card_order) if p.card_order else [],
+    )
+
+
+@router.get("/presets", response_model=list[PresetOut])
+async def list_presets(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(DriverConfigPreset)
+        .where(DriverConfigPreset.user_id == user.id)
+        .order_by(DriverConfigPreset.created_at)
+    )
+    return [_preset_to_out(p) for p in result.scalars().all()]
+
+
+@router.post("/presets", response_model=PresetOut, status_code=201)
+async def create_preset(
+    data: PresetCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    name = data.name.strip()
+    if not name or len(name) > 50:
+        raise HTTPException(400, "El nombre debe tener entre 1 y 50 caracteres")
+
+    # Check limit
+    count_result = await db.execute(
+        select(DriverConfigPreset.id).where(DriverConfigPreset.user_id == user.id)
+    )
+    if len(count_result.all()) >= MAX_PRESETS_PER_USER:
+        raise HTTPException(400, f"Máximo {MAX_PRESETS_PER_USER} plantillas permitidas")
+
+    # Check duplicate name
+    dup = await db.execute(
+        select(DriverConfigPreset).where(
+            DriverConfigPreset.user_id == user.id,
+            DriverConfigPreset.name == name,
+        )
+    )
+    if dup.scalar_one_or_none():
+        raise HTTPException(409, "Ya existe una plantilla con ese nombre")
+
+    preset = DriverConfigPreset(
+        user_id=user.id,
+        name=name,
+        visible_cards=json.dumps(data.visible_cards),
+        card_order=json.dumps(data.card_order),
+    )
+    db.add(preset)
+    await db.commit()
+    await db.refresh(preset)
+    return _preset_to_out(preset)
+
+
+@router.patch("/presets/{preset_id}", response_model=PresetOut)
+async def update_preset(
+    preset_id: int,
+    data: PresetUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(DriverConfigPreset).where(
+            DriverConfigPreset.id == preset_id,
+            DriverConfigPreset.user_id == user.id,
+        )
+    )
+    preset = result.scalar_one_or_none()
+    if not preset:
+        raise HTTPException(404, "Plantilla no encontrada")
+
+    update = data.model_dump(exclude_unset=True)
+    if "name" in update:
+        name = update["name"].strip()
+        if not name or len(name) > 50:
+            raise HTTPException(400, "El nombre debe tener entre 1 y 50 caracteres")
+        dup = await db.execute(
+            select(DriverConfigPreset).where(
+                DriverConfigPreset.user_id == user.id,
+                DriverConfigPreset.name == name,
+                DriverConfigPreset.id != preset_id,
+            )
+        )
+        if dup.scalar_one_or_none():
+            raise HTTPException(409, "Ya existe una plantilla con ese nombre")
+        preset.name = name
+    if "visible_cards" in update:
+        preset.visible_cards = json.dumps(update["visible_cards"])
+    if "card_order" in update:
+        preset.card_order = json.dumps(update["card_order"])
+
+    await db.commit()
+    await db.refresh(preset)
+    return _preset_to_out(preset)
+
+
+@router.delete("/presets/{preset_id}", status_code=204)
+async def delete_preset(
+    preset_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(DriverConfigPreset).where(
+            DriverConfigPreset.id == preset_id,
+            DriverConfigPreset.user_id == user.id,
+        )
+    )
+    preset = result.scalar_one_or_none()
+    if not preset:
+        raise HTTPException(404, "Plantilla no encontrada")
+    await db.delete(preset)
+    await db.commit()

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import { useDriverConfig, ALL_DRIVER_CARDS, type DriverCardId } from "@/hooks/useDriverConfig";
+import { useDriverConfig, ALL_DRIVER_CARDS, DEFAULT_CARD_ORDER, type DriverCardId } from "@/hooks/useDriverConfig";
 
 interface Circuit {
   id: number;
@@ -13,17 +13,39 @@ interface Circuit {
   finish_lon2: number | null;
 }
 
+interface Preset {
+  id: number;
+  name: string;
+  visible_cards: Record<string, boolean>;
+  card_order: string[];
+}
+
 export function DriverConfigPanel({ onClose }: { onClose: () => void }) {
   const config = useDriverConfig();
   const [circuits, setCircuits] = useState<Circuit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [presets, setPresets] = useState<Preset[]>([]);
 
   useEffect(() => {
     api.getMyCircuits()
       .then((data: Circuit[]) => setCircuits(data))
       .catch(() => {})
       .finally(() => setLoading(false));
+    api.getPresets().then(setPresets).catch(() => {});
   }, []);
+
+  const handleApplyPreset = (presetId: string) => {
+    const preset = presets.find((p) => p.id === Number(presetId));
+    if (!preset) return;
+    const allIds = ALL_DRIVER_CARDS.map((c) => c.id);
+    const defaultVis = Object.fromEntries(allIds.map((c) => [c, true]));
+    const visibleCards = { ...defaultVis, ...preset.visible_cards } as Record<DriverCardId, boolean>;
+    const cardOrder = preset.card_order.length
+      ? (preset.card_order.filter((c) => allIds.includes(c as DriverCardId)) as DriverCardId[])
+          .concat(allIds.filter((c) => !preset.card_order.includes(c)))
+      : DEFAULT_CARD_ORDER;
+    config.applyPreset(visibleCards, cardOrder);
+  };
 
   return (
     <div className="bg-neutral-900/98 border-b border-border/40 px-3 py-3 space-y-3 text-xs max-h-[70vh] overflow-y-auto">
@@ -35,6 +57,23 @@ export function DriverConfigPanel({ onClose }: { onClose: () => void }) {
           </svg>
         </button>
       </div>
+
+      {/* Preset quick selector */}
+      {presets.length > 0 && (
+        <div className="space-y-1">
+          <label className="text-[10px] text-neutral-400 uppercase tracking-wider">Plantilla</label>
+          <select
+            value=""
+            onChange={(e) => { if (e.target.value) handleApplyPreset(e.target.value); }}
+            className="w-full bg-black border border-border rounded-md px-2 py-1.5 text-xs text-white"
+          >
+            <option value="">Aplicar plantilla...</option>
+            {presets.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Circuit selector */}
       <div className="space-y-1">

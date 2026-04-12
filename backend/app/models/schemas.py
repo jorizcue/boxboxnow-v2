@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Text
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.models.database import Base
@@ -30,6 +30,7 @@ class User(Base):
     gps_laps = relationship("GpsTelemetryLap", backref="user", cascade="all, delete-orphan")
     subscriptions = relationship("Subscription", back_populates="user", cascade="all, delete-orphan")
     preferences = relationship("UserPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    config_presets = relationship("DriverConfigPreset", back_populates="user", cascade="all, delete-orphan")
 
 
 class Circuit(Base):
@@ -90,6 +91,23 @@ class UserPreferences(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", back_populates="preferences")
+
+
+class DriverConfigPreset(Base):
+    """Named preset for driver view card configuration (max 10 per user)."""
+    __tablename__ = "driver_config_presets"
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_user_preset_name"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(50), nullable=False)
+    visible_cards = Column(Text, nullable=False, default="{}")
+    card_order = Column(Text, nullable=False, default="[]")
+    created_at = Column(DateTime, server_default=func.now())
+
+    user = relationship("User", back_populates="config_presets")
 
 
 class RaceSession(Base):

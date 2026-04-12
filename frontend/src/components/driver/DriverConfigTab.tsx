@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "@/lib/api";
-import { useDriverConfig, ALL_DRIVER_CARDS, type DriverCardId } from "@/hooks/useDriverConfig";
+import { useDriverConfig, ALL_DRIVER_CARDS, DEFAULT_CARD_ORDER, type DriverCardId } from "@/hooks/useDriverConfig";
 import { useAuth } from "@/hooks/useAuth";
 
 interface Circuit {
@@ -14,6 +14,13 @@ interface Circuit {
   finish_lon2: number | null;
 }
 
+interface Preset {
+  id: number;
+  name: string;
+  visible_cards: Record<string, boolean>;
+  card_order: string[];
+}
+
 /**
  * Full-page driver configuration tab.
  * Shows circuit selector, kart number, and card visibility/order management.
@@ -23,6 +30,14 @@ export function DriverConfigTab() {
   const { user } = useAuth();
   const [circuits, setCircuits] = useState<Circuit[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Preset state
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [showSaveInput, setShowSaveInput] = useState(false);
+  const [presetName, setPresetName] = useState("");
+  const [presetSaving, setPresetSaving] = useState(false);
+  const [presetError, setPresetError] = useState<string | null>(null);
+  const saveInputRef = useRef<HTMLInputElement>(null);
 
   // Hydrate driver config for current user
   useEffect(() => {
@@ -36,14 +51,149 @@ export function DriverConfigTab() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Load presets
+  useEffect(() => {
+    api.getPresets().then(setPresets).catch(() => {});
+  }, []);
+
+  // Focus input when save form opens
+  useEffect(() => {
+    if (showSaveInput) saveInputRef.current?.focus();
+  }, [showSaveInput]);
+
+  const handleSavePreset = async () => {
+    const name = presetName.trim();
+    if (!name) return;
+    setPresetSaving(true);
+    setPresetError(null);
+    try {
+      const created = await api.createPreset({
+        name,
+        visible_cards: config.visibleCards,
+        card_order: config.cardOrder,
+      });
+      setPresets((prev) => [...prev, created]);
+      setPresetName("");
+      setShowSaveInput(false);
+    } catch (e: any) {
+      const msg = e?.message || "Error al guardar";
+      setPresetError(msg.includes("409") ? "Ya existe una plantilla con ese nombre" : msg.includes("400") ? "Máximo 10 plantillas" : msg);
+    } finally {
+      setPresetSaving(false);
+    }
+  };
+
+  const handleApplyPreset = (preset: Preset) => {
+    const allIds = ALL_DRIVER_CARDS.map((c) => c.id);
+    const defaultVis = Object.fromEntries(allIds.map((c) => [c, true]));
+    const visibleCards = { ...defaultVis, ...preset.visible_cards } as Record<DriverCardId, boolean>;
+    const cardOrder = preset.card_order.length
+      ? (preset.card_order.filter((c) => allIds.includes(c as DriverCardId)) as DriverCardId[])
+          .concat(allIds.filter((c) => !preset.card_order.includes(c)))
+      : DEFAULT_CARD_ORDER;
+    config.applyPreset(visibleCards, cardOrder);
+  };
+
+  const handleDeletePreset = async (id: number) => {
+    try {
+      await api.deletePreset(id);
+      setPresets((prev) => prev.filter((p) => p.id !== id));
+    } catch {}
+  };
+
   const gpsCards = ALL_DRIVER_CARDS.filter((c) => c.requiresGps);
   const standardCards = ALL_DRIVER_CARDS.filter((c) => !c.requiresGps);
+  const canSaveMore = presets.length < 10;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
         <h2 className="text-lg font-bold text-white">Configuracion Vista Piloto</h2>
         <p className="text-xs text-neutral-500 mt-1">Personaliza la vista del piloto: circuito GPS, numero de kart y tarjetas visibles.</p>
+      </div>
+
+      {/* Presets */}
+      <div className="bg-surface border border-border rounded-xl p-4 space-y-3">
+        <h3 className="text-xs font-bold text-accent uppercase tracking-wider">Plantillas</h3>
+        <p className="text-[11px] text-neutral-500">Guarda la configuracion actual como plantilla para reutilizarla mas tarde.</p>
+
+        {presets.length > 0 && (
+          <div className="space-y-1.5">
+            {presets.map((preset) => (
+              <div
+                key={preset.id}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/40 border border-border hover:border-neutral-600 group transition-colors"
+              >
+                <button
+                  onClick={() => handleApplyPreset(preset)}
+                  className="flex-1 text-left text-sm text-neutral-200 hover:text-white transition-colors"
+                >
+                  {preset.name}
+                </button>
+                <span className="text-[10px] text-neutral-600">
+                  {Object.values(preset.visible_cards).filter(Boolean).length} tarjetas
+                </span>
+                <button
+                  onClick={() => handleDeletePreset(preset.id)}
+                  className="text-neutral-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-0.5"
+                  title="Eliminar plantilla"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {presets.length === 0 && !showSaveInput && (
+          <p className="text-[11px] text-neutral-600 italic">No tienes plantillas guardadas.</p>
+        )}
+
+        {showSaveInput ? (
+          <div className="flex items-center gap-2">
+            <input
+              ref={saveInputRef}
+              type="text"
+              value={presetName}
+              onChange={(e) => { setPresetName(e.target.value); setPresetError(null); }}
+              onKeyDown={(e) => e.key === "Enter" && handleSavePreset()}
+              placeholder="Nombre de la plantilla"
+              maxLength={50}
+              className="flex-1 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:border-accent focus:outline-none"
+            />
+            <button
+              onClick={handleSavePreset}
+              disabled={!presetName.trim() || presetSaving}
+              className="px-3 py-2 rounded-lg bg-accent text-black text-xs font-bold hover:bg-accent/90 disabled:opacity-40 transition-colors"
+            >
+              {presetSaving ? "..." : "Guardar"}
+            </button>
+            <button
+              onClick={() => { setShowSaveInput(false); setPresetName(""); setPresetError(null); }}
+              className="px-2 py-2 text-neutral-500 hover:text-white text-xs"
+            >
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowSaveInput(true)}
+            disabled={!canSaveMore}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-neutral-700 hover:border-accent text-xs text-neutral-400 hover:text-accent disabled:opacity-40 disabled:hover:border-neutral-700 disabled:hover:text-neutral-400 transition-colors"
+            title={canSaveMore ? "Guardar configuracion actual como plantilla" : "Máximo 10 plantillas"}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Guardar como plantilla
+          </button>
+        )}
+
+        {presetError && (
+          <p className="text-[11px] text-red-400">{presetError}</p>
+        )}
       </div>
 
       {/* Circuit selector */}

@@ -328,6 +328,27 @@ class UserPreferencesUpdate(BaseModel):
     card_order: list[str] | None = None
 
 
+# --- Driver Config Presets ---
+
+class PresetCreate(BaseModel):
+    name: str
+    visible_cards: dict[str, bool]
+    card_order: list[str]
+
+class PresetOut(BaseModel):
+    id: int
+    name: str
+    visible_cards: dict[str, bool]
+    card_order: list[str]
+
+    model_config = {"from_attributes": True}
+
+class PresetUpdate(BaseModel):
+    name: str | None = None
+    visible_cards: dict[str, bool] | None = None
+    card_order: list[str] | None = None
+
+
 # --- Team Positions + Drivers ---
 
 class TeamDriverOut(BaseModel):
