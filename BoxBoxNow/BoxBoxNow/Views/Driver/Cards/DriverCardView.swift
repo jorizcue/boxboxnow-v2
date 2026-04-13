@@ -63,6 +63,8 @@ struct DriverCardView: View {
                         .stroke(cardBorderColor.opacity(0.4), lineWidth: 1)
                 )
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityDescription)
     }
 
     // MARK: - Dynamic label (some cards show extra info)
@@ -482,6 +484,77 @@ struct DriverCardView: View {
                         .foregroundColor(.red.opacity(0.7))
                 }
             }
+        }
+    }
+
+    // MARK: - Accessibility description
+    private var accessibilityDescription: String {
+        switch card {
+        case .raceTimer:
+            return "Tiempo de carrera: \(Formatters.msToRaceTime(raceClock))"
+        case .currentLapTime:
+            return "Vuelta actual"
+        case .lastLap:
+            let t = kart?.lastLapMs.flatMap { $0 > 0 ? Formatters.msToLapTime($0) : nil } ?? "sin datos"
+            let delta = lapDelta == "faster" ? ", mas rapida" : lapDelta == "slower" ? ", mas lenta" : ""
+            return "Ultima vuelta: \(t)\(delta)"
+        case .deltaBestLap:
+            if let d = lapTracker?.deltaBestMs {
+                return "Delta vs mejor: \(String(format: "%@%.2f segundos", d < 0 ? "" : "+", d / 1000))"
+            }
+            return "Delta vs mejor: sin datos"
+        case .gForceRadar:
+            return "Radar de fuerza G"
+        case .position:
+            if let rp = racePosition { return "Posicion: P\(rp.pos) de \(rp.total)" }
+            return "Posicion: sin datos"
+        case .realPos:
+            if let od = ourData { return "Posicion real: P\(od.realPosition) de \(od.totalKarts)" }
+            return "Posicion real: sin datos"
+        case .gapAhead:
+            if let od = ourData, od.aheadKart != nil {
+                return "Diferencia adelante: \(String(format: "%.1f", od.aheadSeconds)) segundos"
+            }
+            return "Diferencia adelante: primero"
+        case .gapBehind:
+            if let od = ourData, od.behindKart != nil {
+                return "Diferencia detras: \(String(format: "%.1f", od.behindSeconds)) segundos"
+            }
+            return "Diferencia detras: ultimo"
+        case .avgLap20:
+            let t = kart?.avgLap20Ms.flatMap { $0 > 0 ? Formatters.msToLapTime($0) : nil } ?? "sin datos"
+            return "Media 20 vueltas: \(t)"
+        case .best3:
+            let t = kart?.best3Ms.flatMap { $0 > 0 ? Formatters.msToLapTime($0) : nil } ?? "sin datos"
+            return "Mejor 3 vueltas: \(t)"
+        case .avgFutureStint:
+            if let data = avgFutureStint {
+                return "Media stint futuro: \(Formatters.secondsToHMS(Int(data.avgMin * 60)))"
+            }
+            return "Media stint futuro: sin datos"
+        case .boxScore:
+            return "Box score: \(boxScore > 0 ? String(format: "%.2f", boxScore) : "0")"
+        case .bestStintLap:
+            let t = kart?.bestStintLapMs.flatMap { $0 > 0 ? Formatters.msToLapTime($0) : nil } ?? "sin datos"
+            return "Mejor vuelta del stint: \(t)"
+        case .gpsLapDelta:
+            if let d = lapTracker?.deltaPrevMs {
+                return "Delta vuelta anterior: \(String(format: "%@%.2f segundos", d < 0 ? "" : "+", d / 1000))"
+            }
+            return "Delta vuelta anterior: sin datos"
+        case .gpsSpeed:
+            return "Velocidad: \(Formatters.speedString(gps?.speedKmh ?? 0)) km/h"
+        case .gpsGForce:
+            return "Fuerza G: \(String(format: "%.1f", abs(gps?.gForceX ?? 0))) G"
+        case .lapsToMaxStint:
+            if let laps = stintCalc.lapsToMax {
+                return "Vueltas hasta max stint: \(String(format: "%.1f", laps))"
+            }
+            return "Vueltas hasta max stint: sin datos"
+        case .pitWindow:
+            if pitWindowOpen == true { return "Ventana de pit: abierta" }
+            if pitWindowOpen == false { return "Ventana de pit: cerrada" }
+            return "Ventana de pit: sin datos"
         }
     }
 

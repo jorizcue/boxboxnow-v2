@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CardVisibilityView: View {
     @EnvironmentObject var driverVM: DriverViewModel
+    @EnvironmentObject var toast: ToastManager
 
     private var standardCards: [DriverCard] {
         DriverCard.allCases.filter { !$0.requiresGPS }
@@ -42,10 +43,18 @@ struct CardVisibilityView: View {
         .navigationTitle("Tarjetas visibles")
         .onDisappear {
             driverVM.saveConfig()
-            Task { try? await APIClient.shared.updatePreferences(
-                visibleCards: driverVM.visibleCards,
-                cardOrder: driverVM.cardOrder
-            ) }
+            Task {
+                do {
+                    try await APIClient.shared.updatePreferences(
+                        visibleCards: driverVM.visibleCards,
+                        cardOrder: driverVM.cardOrder
+                    )
+                } catch {
+                    await MainActor.run {
+                        toast.warning("Guardado local OK, pero no se pudo sincronizar con el servidor")
+                    }
+                }
+            }
         }
     }
 

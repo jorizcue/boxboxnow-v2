@@ -7,6 +7,7 @@ final class AppState: ObservableObject {
     let driverVM = DriverViewModel()
     let configVM = ConfigViewModel()
     let gpsVM = GPSViewModel()
+    let toast = ToastManager()
 
     private var cancellables = Set<AnyCancellable>()
 

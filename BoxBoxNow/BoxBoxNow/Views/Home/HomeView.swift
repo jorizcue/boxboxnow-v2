@@ -73,6 +73,8 @@ struct HomeView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Salir") { authVM.logout() }
                         .foregroundColor(.red)
+                        .frame(minHeight: 44)
+                        .accessibilityLabel("Cerrar sesion")
                 }
             }
         }
@@ -108,5 +110,6 @@ struct HomeCard: View {
         .padding(20)
         .background(Color(.systemGray6))
         .cornerRadius(16)
+        .accessibilityElement(children: .combine)
     }
 }

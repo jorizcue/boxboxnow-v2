@@ -9,6 +9,7 @@ struct DriverView: View {
     @State private var showMenu = false
     @State private var lapDelta: String? = nil // "faster" | "slower"
     @State private var prevLapMs: Double = 0
+    @State private var previousBrightness: CGFloat = 0.5
 
     var body: some View {
         // TimelineView ticks every second, giving us a smooth clock
@@ -23,11 +24,15 @@ struct DriverView: View {
                 let cards = driverVM.orderedVisibleCards
                 let numRows = (cards.count + numCols - 1) / numCols
                 let spacing: CGFloat = 6
-                let padding: CGFloat = 6
+                // Use safe area insets so cards don't clip behind rounded corners
+                let safeTop = max(6, geo.safeAreaInsets.top)
+                let safeBottom = max(6, geo.safeAreaInsets.bottom)
+                let safeLeading = max(6, geo.safeAreaInsets.leading)
+                let safeTrailing = max(6, geo.safeAreaInsets.trailing)
 
                 // Calculate card height to fill the screen
                 let totalVerticalSpacing = spacing * CGFloat(max(0, numRows - 1))
-                let availableHeight = geo.size.height - padding * 2 - totalVerticalSpacing
+                let availableHeight = geo.size.height - safeTop - safeBottom - totalVerticalSpacing
                 let cardHeight = numRows > 0 ? max(60, availableHeight / CGFloat(numRows)) : 90
 
                 let columns = Array(repeating: GridItem(.flexible(), spacing: spacing),
@@ -63,7 +68,10 @@ struct DriverView: View {
                                         )
                                     }
                                 }
-                                .padding(padding)
+                                .padding(.top, safeTop)
+                                .padding(.bottom, safeBottom)
+                                .padding(.leading, safeLeading)
+                                .padding(.trailing, safeTrailing)
                             } else {
                                 ScrollView {
                                     LazyVGrid(columns: columns, spacing: spacing) {
@@ -81,7 +89,10 @@ struct DriverView: View {
                                             )
                                         }
                                     }
-                                    .padding(padding)
+                                    .padding(.top, safeTop)
+                                    .padding(.bottom, safeBottom)
+                                    .padding(.leading, safeLeading)
+                                    .padding(.trailing, safeTrailing)
                                 }
                             }
                         }
@@ -113,6 +124,30 @@ struct DriverView: View {
                         .allowsHitTesting(false)
                     }
 
+                    // ── Connection lost banner ──
+                    if !raceVM.isConnected && !raceVM.karts.isEmpty {
+                        VStack {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .tint(.white)
+                                    .scaleEffect(0.8)
+                                Text("Reconectando...")
+                                    .font(.caption.bold())
+                                    .foregroundColor(.white)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.red.opacity(0.85))
+                            .cornerRadius(20)
+                            .padding(.top, safeTop + 4)
+                            Spacer()
+                        }
+                        .allowsHitTesting(false)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .animation(.easeInOut(duration: 0.3), value: raceVM.isConnected)
+                        .accessibilityLabel("Conexion perdida, reconectando")
+                    }
+
                     // ── BOX CALL overlay (full-screen red flash) ──
                     if raceVM.boxCallActive {
                         BoxCallOverlay {
@@ -141,9 +176,16 @@ struct DriverView: View {
         }
         .onAppear {
             raceVM.connect()
+            // Max brightness + keep screen on for driver view
+            previousBrightness = UIScreen.main.brightness
+            UIScreen.main.brightness = 1.0
+            UIApplication.shared.isIdleTimerDisabled = true
         }
         .onDisappear {
             raceVM.disconnect()
+            // Restore previous brightness + allow screen sleep
+            UIScreen.main.brightness = previousBrightness
+            UIApplication.shared.isIdleTimerDisabled = false
         }
         .onChange(of: myKart?.lastLapMs) {
             detectLapDelta()

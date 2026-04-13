@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct CardOrderPreviewView: View {
     @EnvironmentObject var driverVM: DriverViewModel
+    @EnvironmentObject var toast: ToastManager
     @State private var draggingCard: DriverCard?
 
     var body: some View {
@@ -63,10 +64,18 @@ struct CardOrderPreviewView: View {
         .navigationTitle("Orden y vista previa")
         .onDisappear {
             driverVM.saveConfig()
-            Task { try? await APIClient.shared.updatePreferences(
-                visibleCards: driverVM.visibleCards,
-                cardOrder: driverVM.cardOrder
-            ) }
+            Task {
+                do {
+                    try await APIClient.shared.updatePreferences(
+                        visibleCards: driverVM.visibleCards,
+                        cardOrder: driverVM.cardOrder
+                    )
+                } catch {
+                    await MainActor.run {
+                        toast.warning("Guardado local OK, pero no se pudo sincronizar con el servidor")
+                    }
+                }
+            }
         }
     }
 }
@@ -105,6 +114,9 @@ struct CardPreviewCell: View {
         .opacity(isDragging ? 0.4 : 1.0)
         .scaleEffect(isDragging ? 0.95 : 1.0)
         .animation(.easeInOut(duration: 0.15), value: isDragging)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(card.displayName): \(card.sampleValue)")
+        .accessibilityHint("Arrastra para reordenar")
     }
 }
 

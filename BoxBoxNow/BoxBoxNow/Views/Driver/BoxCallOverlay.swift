@@ -26,9 +26,13 @@ struct BoxCallOverlay: View {
 
                 Text("Toca para cerrar")
                     .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.white.opacity(0.7))
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Alerta: ir a boxes")
+        .accessibilityAddTraits(.isModal)
+        .accessibilityAction { onDismiss() }
         .onAppear { flash = true }
         .onTapGesture { onDismiss() }
         .transition(.opacity)

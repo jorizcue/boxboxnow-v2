@@ -7,9 +7,12 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var user: User?
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var isGoogleLoading = false
     @Published var showMfa = false
     @Published var mfaCode = ""
     @Published var tempToken: String?
+    @Published var showBiometricPrompt = false  // offer to enable after first login
+    @Published var biometricPending = false     // waiting for Face ID on app launch
 
     // Keep a strong reference so the session isn't deallocated mid-flow
     private var authSession: ASWebAuthenticationSession?
@@ -56,6 +59,7 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
             guard let self = self else { return }
             DispatchQueue.main.async {
                 self.authSession = nil // release
+                self.isGoogleLoading = false
 
                 if let error = error as? ASWebAuthenticationSessionError,
                    error.code == .canceledLogin {
@@ -117,27 +121,71 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
     }
 
+    /// Normal logout: keeps token + biometric so user can re-enter with Face ID
     func logout() {
-        KeychainHelper.deleteToken()
         isAuthenticated = false
         user = nil
         showMfa = false
         tempToken = nil
+        biometricPending = false
+        // Token stays in Keychain for biometric re-login
+    }
+
+    /// Full sign-out: wipes everything including biometric preference
+    func fullSignOut() {
+        KeychainHelper.deleteToken()
+        BiometricService.disable()
+        logout()
     }
 
     private func checkExistingSession() {
         guard let token = KeychainHelper.loadToken() else { return }
-        if let payload = KeychainHelper.decodeJWTPayload(token),
-           let exp = payload["exp"] as? TimeInterval,
-           exp > Date().timeIntervalSince1970 {
-            isAuthenticated = true
-            if let userData = try? JSONSerialization.data(withJSONObject: payload),
-               let user = try? JSONDecoder().decode(User.self, from: userData) {
-                self.user = user
-            }
-        } else {
+        guard let payload = KeychainHelper.decodeJWTPayload(token),
+              let exp = payload["exp"] as? TimeInterval,
+              exp > Date().timeIntervalSince1970 else {
             KeychainHelper.deleteToken()
+            BiometricService.disable()
+            return
         }
+
+        // Decode user from token payload
+        let decodedUser: User? = {
+            guard let data = try? JSONSerialization.data(withJSONObject: payload) else { return nil }
+            return try? JSONDecoder().decode(User.self, from: data)
+        }()
+
+        if BiometricService.isEnabled && BiometricService.isAvailable {
+            // Require biometric before granting access
+            biometricPending = true
+            user = decodedUser
+            Task { await authenticateWithBiometric() }
+        } else {
+            // No biometric — auto-login as before
+            isAuthenticated = true
+            user = decodedUser
+        }
+    }
+
+    /// Attempt biometric auth; on success grant access, on failure show login form
+    func authenticateWithBiometric() async {
+        let success = await BiometricService.authenticate()
+        await MainActor.run {
+            biometricPending = false
+            if success {
+                isAuthenticated = true
+            }
+            // If failed, user stays on login screen with token still in keychain
+        }
+    }
+
+    /// Called after a successful login to offer enabling biometric
+    func enableBiometric() {
+        BiometricService.isEnabled = true
+        showBiometricPrompt = false
+    }
+
+    func skipBiometric() {
+        showBiometricPrompt = false
     }
 
     private func handleAuthResponse(_ resp: AuthResponse) {
@@ -145,6 +193,11 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
             KeychainHelper.saveToken(token)
             user = resp.user
             isAuthenticated = true
+
+            // Offer biometric setup if available and not already enabled
+            if BiometricService.isAvailable && !BiometricService.isEnabled {
+                showBiometricPrompt = true
+            }
         }
     }
 }
