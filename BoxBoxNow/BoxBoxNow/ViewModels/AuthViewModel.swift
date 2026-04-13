@@ -2,7 +2,7 @@ import SwiftUI
 import Combine
 import AuthenticationServices
 
-final class AuthViewModel: ObservableObject {
+final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentationContextProviding {
     @Published var isAuthenticated = false
     @Published var user: User?
     @Published var isLoading = false
@@ -11,7 +11,23 @@ final class AuthViewModel: ObservableObject {
     @Published var mfaCode = ""
     @Published var tempToken: String?
 
-    init() { checkExistingSession() }
+    // Keep a strong reference so the session isn't deallocated mid-flow
+    private var authSession: ASWebAuthenticationSession?
+
+    override init() {
+        super.init()
+        checkExistingSession()
+    }
+
+    // MARK: - ASWebAuthenticationPresentationContextProviding
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        // Return the key window as anchor
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = scene.windows.first else {
+            return ASPresentationAnchor()
+        }
+        return window
+    }
 
     func login(email: String, password: String) {
         isLoading = true; errorMessage = nil
@@ -30,29 +46,60 @@ final class AuthViewModel: ObservableObject {
     }
 
     func loginWithGoogle() {
-        guard let url = URL(string: "\(Constants.apiBaseURL)/auth/google/ios") else { return }
-        let scheme = "boxboxnow"
-        let session = ASWebAuthenticationSession(url: url, callbackURLScheme: scheme) { [weak self] callbackURL, error in
+        guard let url = URL(string: "\(Constants.apiBaseURL)/auth/google/ios") else {
+            errorMessage = "URL de Google login inválida"
+            return
+        }
+        errorMessage = nil
+
+        let session = ASWebAuthenticationSession(url: url, callbackURLScheme: "boxboxnow") { [weak self] callbackURL, error in
             guard let self = self else { return }
-            if let error = error {
-                DispatchQueue.main.async { self.errorMessage = error.localizedDescription }
-                return
-            }
-            guard let url = callbackURL,
-                  let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-                  let token = components.queryItems?.first(where: { $0.name == "token" })?.value else { return }
             DispatchQueue.main.async {
+                self.authSession = nil // release
+
+                if let error = error as? ASWebAuthenticationSessionError,
+                   error.code == .canceledLogin {
+                    // User cancelled — don't show error
+                    return
+                }
+                if let error = error {
+                    self.errorMessage = error.localizedDescription
+                    return
+                }
+                guard let url = callbackURL,
+                      let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+                    self.errorMessage = "Respuesta inválida de Google"
+                    return
+                }
+
+                // Check for error from backend
+                if let errParam = components.queryItems?.first(where: { $0.name == "error" })?.value {
+                    if errParam == "no_account" {
+                        self.errorMessage = "No existe una cuenta con ese email de Google"
+                    } else {
+                        self.errorMessage = "Error: \(errParam)"
+                    }
+                    return
+                }
+
+                guard let token = components.queryItems?.first(where: { $0.name == "token" })?.value else {
+                    self.errorMessage = "No se recibió token de autenticación"
+                    return
+                }
+
                 KeychainHelper.saveToken(token)
                 self.isAuthenticated = true
-                // Decode user from token
                 if let payload = KeychainHelper.decodeJWTPayload(token),
                    let userData = try? JSONSerialization.data(withJSONObject: payload),
                    let user = try? JSONDecoder().decode(User.self, from: userData) {
                     self.user = user
                 }
+                print("[Auth] Google login OK")
             }
         }
+        session.presentationContextProvider = self
         session.prefersEphemeralWebBrowserSession = false
+        self.authSession = session // keep strong reference
         session.start()
     }
 
