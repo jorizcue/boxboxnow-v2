@@ -209,6 +209,16 @@ async def race_websocket(
                         current_state = new_state
                     snapshot = current_state.get_snapshot()
                     await websocket.send_text(json.dumps(snapshot))
+
+                elif msg.get("type") == "box_call":
+                    # Broadcast box call to all other connections of the same user
+                    relay_msg = json.dumps({"type": "box_call"})
+                    others = _ws_connections.get(user_id, set()) - {websocket}
+                    for ws in list(others):
+                        try:
+                            await ws.send_text(relay_msg)
+                        except Exception:
+                            pass
             except json.JSONDecodeError:
                 pass
 

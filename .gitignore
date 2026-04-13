@@ -21,6 +21,12 @@ out/
 .idea/
 *.swp
 
+# Xcode
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+DerivedData/
+
 # OS
 .DS_Store
 Thumbs.db

@@ -1,0 +1,455 @@
+import Foundation
+import Combine
+
+final class RaceViewModel: ObservableObject {
+    @Published var karts: [KartState] = []
+    @Published var isConnected = false
+    @Published var raceTimerMs: Double = 0
+    @Published var raceStatus = ""
+    @Published var sessionName = ""
+    @Published var raceStarted = false
+    @Published var raceFinished = false
+    @Published var countdownMs: Double = 0
+    @Published var durationMs: Double = 0
+    @Published var boxScore: Double = 0
+    @Published var replayActive = false
+    @Published var boxCallActive = false
+    @Published var boxCallDate = Date()
+
+    // Race config (updated live from WS snapshot config)
+    @Published var ourKartNumber: Int = 0
+    @Published var circuitLengthM: Double = 1100
+    @Published var pitTimeS: Double = 0
+    @Published var durationMin: Double = 0
+    @Published var minPits: Int = 0
+    @Published var maxStintMin: Double = 0
+    @Published var minStintMin: Double = 0
+    @Published var minDriverTimeMin: Double = 0
+
+    private let wsClient = WebSocketClient()
+    private var cancellables = Set<AnyCancellable>()
+
+    // Clock reference point: the server value and wall-clock time it was received.
+    // The View uses TimelineView to interpolate smoothly between server updates.
+    @Published var serverCountdownMs: Double = 0
+    @Published var serverCountdownDate: Date = Date()
+
+    init() {
+        wsClient.$isConnected
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$isConnected)
+
+        wsClient.onMessage = { [weak self] text in
+            self?.handleMessage(text)
+        }
+    }
+
+    func connect() {
+        guard let token = KeychainHelper.loadToken() else {
+            print("[RaceVM] No token for WS connection")
+            return
+        }
+        let urlStr = "\(Constants.wsBaseURL)/race?token=\(token)&view=driver"
+        print("[RaceVM] Connecting to: \(urlStr)")
+        wsClient.connectToURL(urlStr)
+    }
+
+    func disconnect() { wsClient.disconnect() }
+
+    // MARK: - Clock interpolation (matching web useRaceClock)
+    // Server sends countdown every ~30s. View interpolates with TimelineView.
+
+    private func recalibrateServerClock(_ serverMs: Double) {
+        serverCountdownMs = serverMs
+        serverCountdownDate = Date()
+        countdownMs = serverMs
+        raceTimerMs = serverMs
+    }
+
+    /// Call from TimelineView to get smooth interpolated clock value
+    func interpolatedClockMs(at now: Date) -> Double {
+        guard serverCountdownMs > 0, !raceFinished else { return 0 }
+        let wallElapsedMs = now.timeIntervalSince(serverCountdownDate) * 1000
+        return max(0, serverCountdownMs - wallElapsedMs)
+    }
+
+    // MARK: - Calculations matching web DriverView.tsx
+
+    /// Stable speed (m/s) — web: stableSpeedMs() in classificationUtils.ts
+    func stableSpeedMs(_ kart: KartState) -> Double {
+        guard let avg = kart.avgLapMs, avg > 0 else { return 0 }
+        if let last = kart.lastLapMs, last > 0 {
+            let ratio = last / avg
+            if ratio >= 0.85 && ratio <= 1.15 {
+                let blended = avg * 0.7 + last * 0.3
+                return circuitLengthM / (blended / 1000)
+            }
+        }
+        return circuitLengthM / (avg / 1000)
+    }
+
+    /// Adjusted classification — web: useMemo ourData in DriverView.tsx lines 298-365
+    struct OurData {
+        let realPosition: Int
+        let totalKarts: Int
+        let aheadKart: KartState?
+        let behindKart: KartState?
+        let aheadSeconds: Double
+        let behindSeconds: Double
+    }
+
+    func computeOurData(ourKartNumber: Int, clockMs: Double = 0) -> OurData? {
+        guard ourKartNumber > 0, !karts.isEmpty else { return nil }
+        let clock = clockMs > 0 ? clockMs : raceTimerMs
+
+        struct MappedKart {
+            let kart: KartState
+            let speedMs: Double
+            let adjDist: Double
+        }
+
+        let mapped = karts
+            .filter { $0.totalLaps > 0 }
+            .map { kart -> MappedKart in
+                let speedMs = stableSpeedMs(kart)
+                let baseDistM = Double(kart.totalLaps) * circuitLengthM
+
+                var metersExtra = 0.0
+                if kart.pitStatus == "racing" && speedMs > 0 {
+                    if let stintStartCD = kart.stintStartCountdownMs, stintStartCD > 0, clock != 0 {
+                        let stintTimeMs = stintStartCD - clock
+                        let sinceCrossMs = stintTimeMs - (kart.stintElapsedMs ?? 0)
+                        if sinceCrossMs > 0 {
+                            metersExtra = (sinceCrossMs / 1000) * speedMs
+                        }
+                    }
+                    metersExtra = min(metersExtra, circuitLengthM * 0.95)
+                }
+
+                let totalDist = baseDistM + metersExtra
+                let missing = Double(max(0, minPits - kart.pitCount))
+                let penalty = missing * speedMs * pitTimeS
+                let adjDist = totalDist - penalty
+
+                return MappedKart(kart: kart, speedMs: speedMs, adjDist: adjDist)
+            }
+            .sorted { $0.adjDist > $1.adjDist }
+
+        guard let ourIdx = mapped.firstIndex(where: { $0.kart.kartNumber == ourKartNumber }) else { return nil }
+
+        let our = mapped[ourIdx]
+        let ahead = ourIdx > 0 ? mapped[ourIdx - 1] : nil
+        let behind = ourIdx < mapped.count - 1 ? mapped[ourIdx + 1] : nil
+
+        let aheadDistDiff = ahead != nil ? ahead!.adjDist - our.adjDist : 0
+        let aheadTimeDiff = our.speedMs > 0 ? aheadDistDiff / our.speedMs : 0
+
+        let behindDistDiff = behind != nil ? our.adjDist - behind!.adjDist : 0
+        let behindTimeDiff = behind != nil && behind!.speedMs > 0 ? behindDistDiff / behind!.speedMs : 0
+
+        return OurData(
+            realPosition: ourIdx + 1,
+            totalKarts: mapped.count,
+            aheadKart: ahead?.kart,
+            behindKart: behind?.kart,
+            aheadSeconds: aheadTimeDiff,
+            behindSeconds: behindTimeDiff
+        )
+    }
+
+    /// Race position by pace — web: lines 368-375
+    func racePosition(ourKartNumber: Int) -> (pos: Int, total: Int)? {
+        guard ourKartNumber > 0, !karts.isEmpty else { return nil }
+        let sorted = karts
+            .filter { ($0.avgLapMs ?? 0) > 0 }
+            .sorted { ($0.avgLapMs ?? .infinity) < ($1.avgLapMs ?? .infinity) }
+        guard let idx = sorted.firstIndex(where: { $0.kartNumber == ourKartNumber }) else { return nil }
+        return (pos: idx + 1, total: sorted.count)
+    }
+
+    /// Laps to max stint — web: lines 433-459
+    struct StintCalc {
+        let lapsToMax: Double?
+        let realMaxStintMin: Double?
+    }
+
+    func computeStintCalc(ourKartNumber: Int, clockMs: Double = 0) -> StintCalc {
+        let clock = clockMs > 0 ? clockMs : raceTimerMs
+        guard ourKartNumber > 0, clock > 0, !raceFinished else {
+            return StintCalc(lapsToMax: nil, realMaxStintMin: nil)
+        }
+        guard let kart = karts.first(where: { $0.kartNumber == ourKartNumber }),
+              let avgLap = kart.avgLapMs, avgLap > 0 else {
+            return StintCalc(lapsToMax: nil, realMaxStintMin: nil)
+        }
+
+        let raceClock = clock
+        let stintStart = kart.stintStartCountdownMs ?? (durationMs > 0 ? durationMs : raceClock)
+        let stintSec = max(0, stintStart - raceClock) / 1000
+
+        let timeRemainingFromStintStartMin = stintStart / 1000 / 60
+        let pendingPits = max(0, minPits - kart.pitCount)
+        let reserveMin = pendingPits > 0 ? ((pitTimeS / 60) + minStintMin) * Double(pendingPits) : 0
+        let availableMin = timeRemainingFromStintStartMin - reserveMin
+        let realMax = min(maxStintMin, max(0, availableMin))
+
+        let timeToMaxSec = max(0, realMax * 60 - stintSec)
+        let laps = timeToMaxSec / (avgLap / 1000)
+
+        return StintCalc(lapsToMax: laps, realMaxStintMin: realMax)
+    }
+
+    /// Pit window open/closed — web: lines 462-483
+    func computePitWindowOpen(ourKartNumber: Int, clockMs: Double = 0) -> Bool? {
+        let clock = clockMs > 0 ? clockMs : raceTimerMs
+        guard ourKartNumber > 0, clock > 0, !raceFinished else { return nil }
+        guard let kart = karts.first(where: { $0.kartNumber == ourKartNumber }) else { return nil }
+
+        let raceClock = clock
+        let stintStart = kart.stintStartCountdownMs ?? (durationMs > 0 ? durationMs : raceClock)
+        let stintSec = max(0, stintStart - raceClock) / 1000
+        let stintMin = stintSec / 60
+
+        let pendingPits = max(0, minPits - kart.pitCount)
+        let timeFromStintStartToEndMin = stintStart / 1000 / 60
+        let reservePerPitMin = pendingPits > 0 ? (pitTimeS / 60 + maxStintMin) * Double(pendingPits) : 0
+        let realMinStintMin = max(minStintMin, timeFromStintStartToEndMin - reservePerPitMin)
+
+        if stintMin < realMinStintMin { return false }
+        return true
+    }
+
+    /// Average future stint — web: lines 391-407
+    struct AvgFutureStint {
+        let avgMin: Double
+        let warn: Bool
+    }
+
+    func computeAvgFutureStint(ourKartNumber: Int, clockMs: Double = 0) -> AvgFutureStint? {
+        let clock = clockMs > 0 ? clockMs : raceTimerMs
+        guard ourKartNumber > 0, clock > 0, !raceFinished else { return nil }
+        guard let kart = karts.first(where: { $0.kartNumber == ourKartNumber }) else { return nil }
+        let remainingPits = max(0, minPits - kart.pitCount)
+        guard remainingPits > 0 else { return nil }
+        let totalRaceMin = durationMin
+        let elapsedMs = durationMs > 0 ? max(0, durationMs - clock) : 0
+        let elapsedMin = elapsedMs / 1000 / 60
+        let futureTimeInPitMin = Double(remainingPits) * pitTimeS / 60
+        let availableRaceMin = totalRaceMin - elapsedMin - futureTimeInPitMin
+        guard availableRaceMin > 0 else { return nil }
+        let avgMin = availableRaceMin / Double(remainingPits)
+        let tooEarly = avgMin > maxStintMin
+        let tooLate = avgMin <= minStintMin + 5
+        return AvgFutureStint(avgMin: avgMin, warn: tooEarly || tooLate)
+    }
+
+    /// Lap delta flash — web: useLapDelta hook
+    struct LapDeltaInfo {
+        let delta: String? // "faster" or "slower"
+        let deltaMs: Double
+    }
+
+    // MARK: - WebSocket message handling
+
+    private func handleMessage(_ text: String) {
+        guard let data = text.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            print("[RaceVM] Failed to parse JSON")
+            return
+        }
+
+        let type = json["type"] as? String ?? ""
+
+        switch type {
+        case "snapshot", "analytics":
+            if let snapshotData = json["data"] as? [String: Any] {
+                if let kartsArray = snapshotData["karts"] as? [[String: Any]] {
+                    parseKarts(kartsArray)
+                }
+                if let started = snapshotData["raceStarted"] as? Bool { raceStarted = started; if started { print("[RaceVM] Race started") } }
+                if let finished = snapshotData["raceFinished"] as? Bool { raceFinished = finished }
+                if let durMs = asDouble(snapshotData["durationMs"]) {
+                    durationMs = durMs
+                    if raceTimerMs == 0 { recalibrateServerClock(durMs) }
+                }
+                if let trackName = snapshotData["trackName"] as? String { sessionName = trackName }
+                if let countdown = asDouble(snapshotData["countdownMs"]) {
+                    recalibrateServerClock(countdown)
+                }
+
+                // Extract race config from snapshot (backend sends camelCase)
+                if let cfg = snapshotData["config"] as? [String: Any] {
+                    ourKartNumber = asInt(cfg["ourKartNumber"]) ?? ourKartNumber
+                    circuitLengthM = asDouble(cfg["circuitLengthM"]) ?? circuitLengthM
+                    pitTimeS = asDouble(cfg["pitTimeS"]) ?? pitTimeS
+                    durationMin = asDouble(cfg["durationMin"]) ?? durationMin
+                    minPits = asInt(cfg["minPits"]) ?? minPits
+                    maxStintMin = asDouble(cfg["maxStintMin"]) ?? maxStintMin
+                    minStintMin = asDouble(cfg["minStintMin"]) ?? minStintMin
+                    minDriverTimeMin = asDouble(cfg["minDriverTimeMin"]) ?? minDriverTimeMin
+                    print("[RaceVM] Config from WS: kart=\(ourKartNumber), circuitLength=\(circuitLengthM), minPits=\(minPits)")
+                }
+
+                // Box score from fifo
+                parseFifoScore(snapshotData)
+            }
+
+        case "update":
+            if let events = json["events"] as? [[String: Any]] {
+                for event in events {
+                    applyUpdateEvent(event)
+                }
+            }
+            // Update countdown/race clock from update messages
+            if let countdown = asDouble(json["countdownMs"]) {
+                recalibrateServerClock(countdown)
+            }
+
+        case "fifo_update":
+            if let msgData = json["data"] as? [String: Any] {
+                parseFifoScore(msgData)
+            }
+
+        case "replay_status":
+            if let rsData = json["data"] as? [String: Any] {
+                let active = rsData["active"] as? Bool ?? false
+                let wasActive = replayActive
+                replayActive = active
+
+                // When replay just started or stopped, ask server to re-resolve
+                // our state (switch between live ↔ replay). Server will respond
+                // with a fresh snapshot from the correct state.
+                if active != wasActive {
+                    print("[RaceVM] Replay \(active ? "started" : "stopped") — requesting snapshot")
+                    wsClient.send("{\"type\":\"requestSnapshot\"}")
+                }
+            }
+
+        case "box_call":
+            // Pit call from web dashboard — notify the driver view
+            print("[RaceVM] BOX CALL received")
+            boxCallActive = true
+            boxCallDate = Date()
+
+        default:
+            break
+        }
+    }
+
+    private func parseKarts(_ data: [[String: Any]]) {
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: data)
+            let decoder = JSONDecoder()
+            let decoded = try decoder.decode([KartState].self, from: jsonData)
+            karts = decoded.sorted { $0.position < $1.position }
+            print("[RaceVM] Parsed \(karts.count) karts")
+        } catch {
+            print("[RaceVM] Failed to decode karts: \(error)")
+        }
+    }
+
+    private func parseFifoScore(_ data: [String: Any]) {
+        if let fifo = data["fifo"] as? [String: Any] {
+            if let score = fifo["score"] as? Double {
+                boxScore = score
+            } else if let score = fifo["score"] as? Int {
+                boxScore = Double(score)
+            }
+        }
+    }
+
+    private func applyUpdateEvent(_ event: [String: Any]) {
+        let eventType = event["event"] as? String ?? ""
+
+        // Global events (not kart-specific)
+        switch eventType {
+        case "countdown":
+            if let ms = asDouble(event["ms"]) {
+                recalibrateServerClock(ms)
+            }
+            return
+        case "raceEnd":
+            raceFinished = true
+            raceTimerMs = 0
+            countdownMs = 0
+            return
+        case "track":
+            if let name = event["name"] as? String { sessionName = name }
+            if let len = asDouble(event["circuitLengthM"]) { circuitLengthM = len }
+            return
+        default:
+            break
+        }
+
+        // Kart-specific events: find kart by kartNumber or rowId
+        let idx: Int?
+        if let kartNumber = asInt(event["kartNumber"]) {
+            idx = karts.firstIndex(where: { $0.kartNumber == kartNumber })
+        } else if let rowId = event["rowId"] as? String {
+            idx = karts.firstIndex(where: { $0.rowId == rowId })
+        } else {
+            return
+        }
+        guard let kartIdx = idx else { return }
+
+        switch eventType {
+        case "lap":
+            if let lapMs = asDouble(event["lapTimeMs"]) {
+                karts[kartIdx].lastLapMs = lapMs
+                if karts[kartIdx].bestLapMs == nil || lapMs < (karts[kartIdx].bestLapMs ?? .infinity) {
+                    karts[kartIdx].bestLapMs = lapMs
+                }
+            }
+            if let total = asInt(event["totalLaps"]) {
+                karts[kartIdx].totalLaps = total
+            } else {
+                karts[kartIdx].totalLaps += 1
+            }
+        case "bestLap":
+            if let lapMs = asDouble(event["lapTimeMs"]) {
+                karts[kartIdx].bestLapMs = lapMs
+            }
+        case "position":
+            if let pos = asInt(event["position"]) { karts[kartIdx].position = pos }
+        case "gap":
+            if let val = event["value"] as? String { karts[kartIdx].gap = val }
+        case "interval":
+            if let val = event["value"] as? String { karts[kartIdx].interval = val }
+        case "totalLaps":
+            if let val = asInt(event["value"]) { karts[kartIdx].totalLaps = val }
+        case "pitCount":
+            if let val = asInt(event["value"]) { karts[kartIdx].pitCount = val }
+        case "pitIn":
+            karts[kartIdx].pitStatus = "in_pit"
+            if let pc = asInt(event["pitCount"]) { karts[kartIdx].pitCount = pc }
+        case "pitOut":
+            karts[kartIdx].pitStatus = "racing"
+            if let pc = asInt(event["pitCount"]) { karts[kartIdx].pitCount = pc }
+            if let cd = asDouble(event["stintStartCountdownMs"]) {
+                karts[kartIdx].stintStartCountdownMs = cd
+            }
+            karts[kartIdx].stintElapsedMs = 0
+        case "driver":
+            if let name = event["driverName"] as? String { karts[kartIdx].driverName = name }
+        case "team":
+            if let name = event["teamName"] as? String { karts[kartIdx].teamName = name }
+        case "pitTime":
+            break // display-only, not needed for calculations
+        default:
+            break
+        }
+    }
+
+    // MARK: - JSON helpers (backend may send Int or Double)
+    private func asDouble(_ value: Any?) -> Double? {
+        if let d = value as? Double { return d }
+        if let i = value as? Int { return Double(i) }
+        return nil
+    }
+
+    private func asInt(_ value: Any?) -> Int? {
+        if let i = value as? Int { return i }
+        if let d = value as? Double { return Int(d) }
+        return nil
+    }
+}

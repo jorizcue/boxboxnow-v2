@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRaceStore } from "./useRaceState";
 import { useAuth } from "./useAuth";
+import { setDriverWsRef } from "@/lib/driverChannel";
 import type { WsMessage } from "@/types/race";
 
 const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/race";
@@ -135,6 +136,9 @@ export function useRaceWebSocket(options?: WsOptions) {
             setReplayStatus(rs.active, rs.paused, undefined, rs.progress, rs.currentTime, rs.speed, rs.totalBlocks);
           } else if (msg.type === "teams_updated") {
             notifyTeamsUpdated();
+          } else if (msg.type === "box_call") {
+            // Relay box call from WS to BroadcastChannel (for driver view in same browser)
+            ch?.postMessage({ type: "boxCall" });
           }
         } catch {
           // ignore parse errors
@@ -163,6 +167,15 @@ export function useRaceWebSocket(options?: WsOptions) {
     };
     // wsReconnectTrigger in deps => entire effect re-runs (close old WS, open new)
   }, [token, wsReconnectTrigger, setConnected, applySnapshot, applyUpdates, applyFifoUpdate, applyAnalytics, setReplayStatus, notifyTeamsUpdated]);
+
+  // Expose WS ref so sendBoxCall can relay through server (for iOS app)
+  useEffect(() => {
+    if (!viewParam) {
+      // Only from the main dashboard (not driver view), register the WS
+      setDriverWsRef(wsRef);
+      return () => setDriverWsRef(null);
+    }
+  }, [viewParam]);
 
   return wsRef;
 }
