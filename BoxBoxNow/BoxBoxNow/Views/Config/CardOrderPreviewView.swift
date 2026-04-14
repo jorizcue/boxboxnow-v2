@@ -4,13 +4,24 @@ import UniformTypeIdentifiers
 struct CardOrderPreviewView: View {
     @EnvironmentObject var driverVM: DriverViewModel
     @EnvironmentObject var toast: ToastManager
+    @EnvironmentObject var auth: AuthViewModel
     @State private var draggingCard: DriverCard?
+
+    /// Mirrors DriverView.canShowBoxCards — users without the
+    /// `app-config-box` tab permission must never see BOX-group cards, not
+    /// even in the "Orden y vista previa" preview.
+    private var canShowBoxCards: Bool {
+        if auth.user?.isAdmin == true { return true }
+        return auth.user?.tabAccess?.contains("app-config-box") == true
+    }
 
     var body: some View {
         GeometryReader { geo in
             let isLandscape = geo.size.width > geo.size.height
             let numCols = isLandscape ? 3 : 2
-            let cards = driverVM.orderedVisibleCards
+            let cards = driverVM.orderedVisibleCards.filter { card in
+                canShowBoxCards || card.group != .box
+            }
             let numRows = (cards.count + numCols - 1) / numCols
             let spacing: CGFloat = 8
             let padding: CGFloat = 12
@@ -34,7 +45,8 @@ struct CardOrderPreviewView: View {
                                 .onDrop(of: [.text], delegate: CardDropDelegate(
                                     card: card,
                                     draggingCard: $draggingCard,
-                                    driverVM: driverVM
+                                    driverVM: driverVM,
+                                    canShowBoxCards: canShowBoxCards
                                 ))
                         }
                     }
@@ -51,7 +63,8 @@ struct CardOrderPreviewView: View {
                                     .onDrop(of: [.text], delegate: CardDropDelegate(
                                         card: card,
                                         draggingCard: $draggingCard,
-                                        driverVM: driverVM
+                                        driverVM: driverVM,
+                                        canShowBoxCards: canShowBoxCards
                                     ))
                             }
                         }
@@ -124,6 +137,7 @@ struct CardDropDelegate: DropDelegate {
     let card: DriverCard
     @Binding var draggingCard: DriverCard?
     let driverVM: DriverViewModel
+    let canShowBoxCards: Bool
 
     func performDrop(info: DropInfo) -> Bool {
         draggingCard = nil
@@ -132,7 +146,9 @@ struct CardDropDelegate: DropDelegate {
 
     func dropEntered(info: DropInfo) {
         guard let dragging = draggingCard, dragging != card else { return }
-        let visibleCards = driverVM.orderedVisibleCards
+        let visibleCards = driverVM.orderedVisibleCards.filter { c in
+            canShowBoxCards || c.group != .box
+        }
         guard let fromIdx = visibleCards.firstIndex(of: dragging),
               let toIdx = visibleCards.firstIndex(of: card) else { return }
 
