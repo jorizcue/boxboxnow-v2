@@ -417,7 +417,36 @@ def _preset_to_out(p: DriverConfigPreset) -> PresetOut:
         name=p.name,
         visible_cards=json.loads(p.visible_cards) if p.visible_cards else {},
         card_order=json.loads(p.card_order) if p.card_order else [],
+        is_default=bool(getattr(p, "is_default", False)),
     )
+
+
+async def _clear_default_presets(db: AsyncSession, user_id: int, except_id: int | None = None):
+    """Unset is_default on all of a user's presets except optionally one."""
+    from sqlalchemy import update as sql_update
+    stmt = sql_update(DriverConfigPreset).where(
+        DriverConfigPreset.user_id == user_id,
+        DriverConfigPreset.is_default == True,
+    ).values(is_default=False)
+    if except_id is not None:
+        stmt = stmt.where(DriverConfigPreset.id != except_id)
+    await db.execute(stmt)
+
+
+async def _notify_default_preset_changed(user_id: int, preset_id: int | None):
+    """Push a WS event so every connected client (especially iOS DriverView)
+    can reload and auto-apply the new default preset live."""
+    try:
+        from app.ws.server import broadcast_to_user
+        await broadcast_to_user(user_id, {
+            "type": "preset_default_changed",
+            "preset_id": preset_id,
+        })
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(
+            f"preset_default_changed broadcast failed (user={user_id}): {e}"
+        )
 
 
 @router.get("/presets", response_model=list[PresetOut])
@@ -457,15 +486,24 @@ async def create_preset(
     if dup.scalar_one_or_none():
         raise HTTPException(409, "Ya existe una plantilla con ese nombre")
 
+    want_default = bool(data.is_default)
+    if want_default:
+        await _clear_default_presets(db, user.id)
+
     preset = DriverConfigPreset(
         user_id=user.id,
         name=name,
         visible_cards=json.dumps(data.visible_cards),
         card_order=json.dumps(data.card_order),
+        is_default=want_default,
     )
     db.add(preset)
     await db.commit()
     await db.refresh(preset)
+
+    if want_default:
+        await _notify_default_preset_changed(user.id, preset.id)
+
     return _preset_to_out(preset)
 
 
@@ -506,8 +544,28 @@ async def update_preset(
     if "card_order" in update:
         preset.card_order = json.dumps(update["card_order"])
 
+    default_toggled = False
+    new_default_id: int | None = None
+    if "is_default" in update:
+        want = bool(update["is_default"])
+        if want:
+            # Only one default per user — clear others then set this one.
+            await _clear_default_presets(db, user.id, except_id=preset.id)
+            preset.is_default = True
+            default_toggled = True
+            new_default_id = preset.id
+        else:
+            if preset.is_default:
+                default_toggled = True
+                new_default_id = None
+            preset.is_default = False
+
     await db.commit()
     await db.refresh(preset)
+
+    if default_toggled:
+        await _notify_default_preset_changed(user.id, new_default_id)
+
     return _preset_to_out(preset)
 
 
@@ -526,5 +584,8 @@ async def delete_preset(
     preset = result.scalar_one_or_none()
     if not preset:
         raise HTTPException(404, "Plantilla no encontrada")
+    was_default = bool(getattr(preset, "is_default", False))
     await db.delete(preset)
     await db.commit()
+    if was_default:
+        await _notify_default_preset_changed(user.id, None)

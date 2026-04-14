@@ -297,6 +297,95 @@ async def init_db():
         except Exception:
             pass
 
+        # Drop UNIQUE constraint on product_tab_config.plan_type so the same
+        # label can be reused across multiple products. stripe_price_id remains
+        # unique (one row per price). SQLite can't DROP CONSTRAINT — detect the
+        # unique index on plan_type and rebuild the table without it.
+        try:
+            idx_result = await conn.execute(text("PRAGMA index_list('product_tab_config')"))
+            indexes = idx_result.fetchall()
+            has_unique_plan_type = False
+            for idx in indexes:
+                if idx[2] == 1:  # unique index
+                    info = await conn.execute(text(f"PRAGMA index_info('{idx[1]}')"))
+                    cols = [row[2] for row in info.fetchall()]
+                    if cols == ["plan_type"]:
+                        has_unique_plan_type = True
+                        break
+            if has_unique_plan_type:
+                logger.info("Migrating product_tab_config: removing UNIQUE on plan_type")
+                await conn.execute(text("""
+                    CREATE TABLE product_tab_config_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        stripe_product_id VARCHAR(255) NOT NULL,
+                        stripe_price_id VARCHAR(255) NOT NULL UNIQUE,
+                        plan_type VARCHAR(50) NOT NULL,
+                        tabs TEXT NOT NULL DEFAULT '[]',
+                        max_devices INTEGER NOT NULL DEFAULT 1,
+                        concurrency_web INTEGER,
+                        concurrency_mobile INTEGER,
+                        per_circuit BOOLEAN NOT NULL DEFAULT 1,
+                        display_name VARCHAR(100) NOT NULL DEFAULT '',
+                        description TEXT,
+                        features TEXT DEFAULT '[]',
+                        price_amount FLOAT,
+                        billing_interval VARCHAR(20),
+                        is_popular BOOLEAN NOT NULL DEFAULT 0,
+                        is_visible BOOLEAN NOT NULL DEFAULT 1,
+                        sort_order INTEGER NOT NULL DEFAULT 0
+                    )
+                """))
+                await conn.execute(text("""
+                    INSERT INTO product_tab_config_new
+                        (id, stripe_product_id, stripe_price_id, plan_type, tabs, max_devices,
+                         concurrency_web, concurrency_mobile, per_circuit,
+                         display_name, description, features, price_amount, billing_interval,
+                         is_popular, is_visible, sort_order)
+                    SELECT id, stripe_product_id, stripe_price_id, plan_type, tabs, max_devices,
+                           concurrency_web, concurrency_mobile, COALESCE(per_circuit, 1),
+                           display_name, description, features, price_amount, billing_interval,
+                           is_popular, is_visible, sort_order
+                    FROM product_tab_config
+                """))
+                await conn.execute(text("DROP TABLE product_tab_config"))
+                await conn.execute(text("ALTER TABLE product_tab_config_new RENAME TO product_tab_config"))
+                await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_product_tab_config_stripe_product_id ON product_tab_config (stripe_product_id)"))
+                await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_product_tab_config_stripe_price_id ON product_tab_config (stripe_price_id)"))
+                logger.info("product_tab_config UNIQUE plan_type drop complete")
+        except Exception as e:
+            logger.warning(f"product_tab_config plan_type unique drop: {e}")
+
+        # Backfill stripe_price_id on subscriptions rows that were created before
+        # we started persisting it on Subscription. Populate from ProductTabConfig
+        # via plan_type where possible. Needed so downstream lookups (concurrency
+        # limits, invoice renewals) can resolve the config without falling back
+        # to plan_type matching.
+        try:
+            await conn.execute(text("ALTER TABLE subscriptions ADD COLUMN stripe_price_id VARCHAR(255)"))
+        except Exception:
+            pass
+        try:
+            await conn.execute(text("""
+                UPDATE subscriptions
+                SET stripe_price_id = (
+                    SELECT p.stripe_price_id FROM product_tab_config p
+                    WHERE p.plan_type = subscriptions.plan_type
+                    LIMIT 1
+                )
+                WHERE stripe_price_id IS NULL AND plan_type IS NOT NULL
+            """))
+        except Exception as e:
+            logger.warning(f"subscription stripe_price_id backfill: {e}")
+
+        # Add is_default to driver_config_presets so a single preset can be
+        # marked as the "default" that auto-applies when the driver view loads.
+        try:
+            await conn.execute(text(
+                "ALTER TABLE driver_config_presets ADD COLUMN is_default BOOLEAN DEFAULT 0 NOT NULL"
+            ))
+        except Exception:
+            pass
+
 async def get_db():
     async with async_session() as session:
         yield session

@@ -153,11 +153,11 @@ export const api = {
     fetchApi<any>("/api/config/preferences", { method: "PATCH", body: JSON.stringify(data) }),
 
   // Driver config presets
-  getPresets: () => fetchApi<{ id: number; name: string; visible_cards: Record<string, boolean>; card_order: string[] }[]>("/api/config/presets"),
-  createPreset: (data: { name: string; visible_cards: Record<string, boolean>; card_order: string[] }) =>
-    fetchApi<{ id: number; name: string; visible_cards: Record<string, boolean>; card_order: string[] }>("/api/config/presets", { method: "POST", body: JSON.stringify(data) }),
-  updatePreset: (id: number, data: { name?: string; visible_cards?: Record<string, boolean>; card_order?: string[] }) =>
-    fetchApi<{ id: number; name: string; visible_cards: Record<string, boolean>; card_order: string[] }>(`/api/config/presets/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  getPresets: () => fetchApi<{ id: number; name: string; visible_cards: Record<string, boolean>; card_order: string[]; is_default: boolean }[]>("/api/config/presets"),
+  createPreset: (data: { name: string; visible_cards: Record<string, boolean>; card_order: string[]; is_default?: boolean }) =>
+    fetchApi<{ id: number; name: string; visible_cards: Record<string, boolean>; card_order: string[]; is_default: boolean }>("/api/config/presets", { method: "POST", body: JSON.stringify(data) }),
+  updatePreset: (id: number, data: { name?: string; visible_cards?: Record<string, boolean>; card_order?: string[]; is_default?: boolean }) =>
+    fetchApi<{ id: number; name: string; visible_cards: Record<string, boolean>; card_order: string[]; is_default: boolean }>(`/api/config/presets/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deletePreset: (id: number) =>
     fetchApi<void>(`/api/config/presets/${id}`, { method: "DELETE" }),
 

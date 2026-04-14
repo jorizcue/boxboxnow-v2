@@ -37,25 +37,45 @@ struct PresetsView: View {
                     .listRowBackground(Color.clear)
                 } else {
                     ForEach(driverVM.presets) { preset in
-                        Button(action: {
-                            driverVM.applyPreset(preset)
-                            toast.success("Plantilla \"\(preset.name)\" aplicada")
-                        }) {
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(preset.name).foregroundColor(.white)
-                                    Text("\(preset.visibleCards.filter { $0.value }.count) tarjetas")
-                                        .font(.caption).foregroundColor(.gray)
-                                }
-                                Spacer()
-                                if driverVM.selectedPresetId == preset.id {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.accentColor)
-                                }
+                        HStack(spacing: 12) {
+                            // Star toggle — mark as default (auto-applies on DriverView.onAppear)
+                            Button(action: { toggleDefault(preset) }) {
+                                Image(systemName: preset.isDefault ? "star.fill" : "star")
+                                    .font(.system(size: 17))
+                                    .foregroundColor(preset.isDefault ? .accentColor : Color(.systemGray2))
+                                    .frame(width: 32, height: 32)
+                                    .contentShape(Rectangle())
                             }
-                            .frame(minHeight: 44)
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(preset.isDefault ? "Quitar como predefinida" : "Marcar como predefinida")
+
+                            Button(action: {
+                                driverVM.applyPreset(preset)
+                                toast.success("Plantilla \"\(preset.name)\" aplicada")
+                            }) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack(spacing: 6) {
+                                            Text(preset.name).foregroundColor(.white)
+                                            if preset.isDefault {
+                                                Text("PREDEFINIDA")
+                                                    .font(.system(size: 9, weight: .bold))
+                                                    .foregroundColor(.accentColor)
+                                            }
+                                        }
+                                        Text("\(preset.visibleCards.filter { $0.value }.count) tarjetas")
+                                            .font(.caption).foregroundColor(.gray)
+                                    }
+                                    Spacer()
+                                    if driverVM.selectedPresetId == preset.id {
+                                        Image(systemName: "checkmark")
+                                            .foregroundColor(.accentColor)
+                                    }
+                                }
+                                .frame(minHeight: 44)
+                            }
+                            .accessibilityLabel("Plantilla \(preset.name), \(preset.visibleCards.filter { $0.value }.count) tarjetas\(driverVM.selectedPresetId == preset.id ? ", seleccionada" : "")\(preset.isDefault ? ", predefinida" : "")")
                         }
-                        .accessibilityLabel("Plantilla \(preset.name), \(preset.visibleCards.filter { $0.value }.count) tarjetas\(driverVM.selectedPresetId == preset.id ? ", seleccionada" : "")")
                     }
                     .onDelete(perform: confirmDelete)
                 }
@@ -126,6 +146,24 @@ struct PresetsView: View {
     private func confirmDelete(at offsets: IndexSet) {
         guard let idx = offsets.first else { return }
         presetToDelete = driverVM.presets[idx]
+    }
+
+    private func toggleDefault(_ preset: DriverConfigPreset) {
+        let want = !preset.isDefault
+        Task {
+            do {
+                try await driverVM.setPresetDefault(preset, isDefault: want)
+                await MainActor.run {
+                    toast.success(want
+                        ? "\"\(preset.name)\" marcada como predefinida"
+                        : "Predefinida eliminada")
+                }
+            } catch {
+                await MainActor.run {
+                    toast.error("Error: \(error.localizedDescription)")
+                }
+            }
+        }
     }
 
     private func deletePreset(_ preset: DriverConfigPreset) {

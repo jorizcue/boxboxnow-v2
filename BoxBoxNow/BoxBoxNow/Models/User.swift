@@ -29,11 +29,30 @@ struct DriverConfigPreset: Codable, Identifiable {
     let name: String
     let visibleCards: [String: Bool]
     let cardOrder: [String]
+    let isDefault: Bool
 
     enum CodingKeys: String, CodingKey {
         case id, name
         case visibleCards = "visible_cards"
         case cardOrder = "card_order"
+        case isDefault = "is_default"
+    }
+
+    init(id: Int, name: String, visibleCards: [String: Bool], cardOrder: [String], isDefault: Bool = false) {
+        self.id = id
+        self.name = name
+        self.visibleCards = visibleCards
+        self.cardOrder = cardOrder
+        self.isDefault = isDefault
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(Int.self, forKey: .id)
+        self.name = try c.decode(String.self, forKey: .name)
+        self.visibleCards = try c.decode([String: Bool].self, forKey: .visibleCards)
+        self.cardOrder = try c.decode([String].self, forKey: .cardOrder)
+        self.isDefault = (try? c.decode(Bool.self, forKey: .isDefault)) ?? false
     }
 }
 

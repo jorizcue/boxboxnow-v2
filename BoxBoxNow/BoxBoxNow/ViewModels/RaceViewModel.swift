@@ -1,6 +1,13 @@
 import Foundation
 import Combine
 
+extension Notification.Name {
+    /// Fired when the race WebSocket delivers a `preset_default_changed`
+    /// event. DriverViewModel listens for this and re-applies the new
+    /// default preset live while the pilot is on track.
+    static let presetDefaultChanged = Notification.Name("presetDefaultChanged")
+}
+
 final class RaceViewModel: ObservableObject {
     @Published var karts: [KartState] = []
     @Published var isConnected = false
@@ -336,6 +343,17 @@ final class RaceViewModel: ObservableObject {
             print("[RaceVM] BOX CALL received")
             boxCallActive = true
             boxCallDate = Date()
+
+        case "preset_default_changed":
+            // Web marked a different preset as the default. Re-post as a
+            // NotificationCenter event so DriverViewModel can reload + apply.
+            print("[RaceVM] preset_default_changed")
+            let presetId = json["preset_id"] as? Int
+            NotificationCenter.default.post(
+                name: .presetDefaultChanged,
+                object: nil,
+                userInfo: presetId.map { ["preset_id": $0] } ?? [:]
+            )
 
         default:
             break

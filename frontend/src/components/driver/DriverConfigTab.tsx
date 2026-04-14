@@ -19,6 +19,7 @@ interface Preset {
   name: string;
   visible_cards: Record<string, boolean>;
   card_order: string[];
+  is_default: boolean;
 }
 
 /**
@@ -103,6 +104,22 @@ export function DriverConfigTab() {
     } catch {}
   };
 
+  // Toggle default preset. Only one preset can be default at a time; the
+  // backend enforces that rule, so after the update we just refresh the list
+  // (the sidebar/driver view on mobile will live-sync via WebSocket).
+  const handleToggleDefault = async (preset: Preset) => {
+    try {
+      const want = !preset.is_default;
+      await api.updatePreset(preset.id, { is_default: want });
+      setPresets((prev) =>
+        prev.map((p) => ({
+          ...p,
+          is_default: p.id === preset.id ? want : want ? false : p.is_default,
+        }))
+      );
+    } catch {}
+  };
+
   const visibleGroups = DRIVER_CARD_GROUPS.filter((g) => g.id !== "box" || canBox);
   const canSaveMore = presets.length < 10;
 
@@ -123,13 +140,25 @@ export function DriverConfigTab() {
             {presets.map((preset) => (
               <div
                 key={preset.id}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/40 border border-border hover:border-neutral-600 group transition-colors"
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-black/40 border group transition-colors ${preset.is_default ? "border-accent/60" : "border-border hover:border-neutral-600"}`}
               >
+                <button
+                  onClick={() => handleToggleDefault(preset)}
+                  className={`p-0.5 transition-colors ${preset.is_default ? "text-accent" : "text-neutral-600 hover:text-accent/80"}`}
+                  title={preset.is_default ? "Plantilla predefinida (click para desmarcar)" : "Marcar como predefinida"}
+                >
+                  <svg className="w-4 h-4" fill={preset.is_default ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                </button>
                 <button
                   onClick={() => handleApplyPreset(preset)}
                   className="flex-1 text-left text-sm text-neutral-200 hover:text-white transition-colors"
                 >
                   {preset.name}
+                  {preset.is_default && (
+                    <span className="ml-2 text-[9px] uppercase tracking-wider text-accent">Predefinida</span>
+                  )}
                 </button>
                 <span className="text-[10px] text-neutral-600">
                   {Object.values(preset.visible_cards).filter(Boolean).length} tarjetas

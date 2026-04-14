@@ -1291,8 +1291,6 @@ function PlatformSettingsManager() {
     );
   }
 
-  const PLAN_TYPES = ["basic_monthly", "basic_annual", "pro_monthly", "pro_annual", "event"];
-
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <h2 className="text-lg font-bold text-white mb-2">Configuracion de Plataforma</h2>
@@ -1632,16 +1630,16 @@ function PlatformSettingsManager() {
 
                     <div>
                       <label className="block text-xs text-neutral-400 mb-1 uppercase">Tipo de plan</label>
-                      <select
+                      <input
+                        type="text"
                         value={configForm.plan_type}
                         onChange={(e) => setConfigForm((p) => ({ ...p, plan_type: e.target.value }))}
-                        className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
-                      >
-                        <option value="">Seleccionar...</option>
-                        {PLAN_TYPES.map((pt) => (
-                          <option key={pt} value={pt}>{pt}</option>
-                        ))}
-                      </select>
+                        placeholder="ej: pro_monthly"
+                        className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-neutral-600"
+                      />
+                      <p className="text-[11px] text-neutral-500 mt-1">
+                        Etiqueta interna. Puede repetirse entre productos.
+                      </p>
                     </div>
 
                     <div>

@@ -28,7 +28,7 @@ final class OrientationManager {
             guard let scene = UIApplication.shared.connectedScenes
                 .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
             else { return }
-            let prefs = UIWindowSceneGeometryPreferencesIOS(interfaceOrientations: newMask)
+            let prefs = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: newMask)
             scene.requestGeometryUpdate(prefs) { _ in }
             scene.windows
                 .first(where: { $0.isKeyWindow })?

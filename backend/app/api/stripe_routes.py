@@ -22,61 +22,62 @@ def get_stripe():
     return stripe
 
 
-# Plan config mapping
-PLAN_CONFIG = {
-    "basic_monthly": {"max_devices": 2, "tabs": ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config"]},
-    "basic_annual": {"max_devices": 2, "tabs": ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config"]},
-    "pro_monthly": {"max_devices": 5, "tabs": ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config", "replay", "analytics", "insights"]},
-    "pro_annual": {"max_devices": 5, "tabs": ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config", "replay", "analytics", "insights"]},
-    "event": {"max_devices": 3, "tabs": ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config", "replay", "analytics", "insights"]},
-}
+# ProductTabConfig is the single source of truth for plan capabilities,
+# billing interval and per-circuit behaviour. The legacy PLAN_CONFIG dict
+# and env-var price mappings have been removed — everything is looked up
+# against the DB via stripe_price_id.
 
 
-def _price_to_plan(price_id: str) -> str | None:
-    settings = get_settings()
-    mapping = {
-        settings.stripe_basic_monthly_price_id: "basic_monthly",
-        settings.stripe_basic_annual_price_id: "basic_annual",
-        settings.stripe_pro_monthly_price_id: "pro_monthly",
-        settings.stripe_pro_annual_price_id: "pro_annual",
-        settings.stripe_event_price_id: "event",
-    }
-    return mapping.get(price_id)
+async def _get_config_by_price(db: AsyncSession, price_id: str | None) -> ProductTabConfig | None:
+    """Resolve a ProductTabConfig row from a Stripe price id."""
+    if not price_id:
+        return None
+    result = await db.execute(
+        select(ProductTabConfig).where(ProductTabConfig.stripe_price_id == price_id)
+    )
+    return result.scalar_one_or_none()
 
 
-def _plan_to_price(plan: str) -> str | None:
-    settings = get_settings()
-    mapping = {
-        "basic_monthly": settings.stripe_basic_monthly_price_id,
-        "basic_annual": settings.stripe_basic_annual_price_id,
-        "pro_monthly": settings.stripe_pro_monthly_price_id,
-        "pro_annual": settings.stripe_pro_annual_price_id,
-        "event": settings.stripe_event_price_id,
-    }
-    return mapping.get(plan)
+async def _get_config_by_plan_type(db: AsyncSession, plan_type: str | None) -> ProductTabConfig | None:
+    """Resolve a ProductTabConfig row from a plan_type label.
+
+    plan_type is no longer unique, so this returns the first matching row
+    (sorted by id) for legacy callers that only know the label.
+    """
+    if not plan_type:
+        return None
+    result = await db.execute(
+        select(ProductTabConfig)
+        .where(ProductTabConfig.plan_type == plan_type)
+        .order_by(ProductTabConfig.id)
+    )
+    return result.scalars().first()
 
 
-def _calc_plan_valid_until(plan_type: str, from_date: datetime) -> datetime:
-    """Calculate valid_until using exact calendar month/year arithmetic."""
+def _calc_valid_until(config: ProductTabConfig | None, from_date: datetime) -> datetime:
+    """Calculate valid_until from the config's billing_interval.
+
+    Falls back to a 1-month window when no config/interval is available,
+    matching the legacy default used to be applied for subscriptions.
+    """
     from dateutil.relativedelta import relativedelta
 
-    if plan_type in ("basic_monthly", "pro_monthly"):
-        return from_date + relativedelta(months=1)
-    elif plan_type in ("basic_annual", "pro_annual"):
+    interval = (config.billing_interval if config and config.billing_interval else "month").lower()
+    if interval == "year":
         return from_date + relativedelta(years=1)
-    elif plan_type == "event":
+    if interval in ("one_time", "event"):
         return from_date + timedelta(hours=48)
-    else:
-        return from_date + relativedelta(months=1)
+    return from_date + relativedelta(months=1)
 
 
 async def _grant_circuit_access(
-    db: AsyncSession, user_id: int, circuit_id: int, plan_type: str,
+    db: AsyncSession, user_id: int, circuit_id: int,
+    config: ProductTabConfig | None = None,
     period_end: datetime | None = None,
     event_start: datetime | None = None,
     event_end: datetime | None = None,
 ):
-    """Grant or extend circuit access for a user based on plan type."""
+    """Grant or extend circuit access for a user based on a ProductTabConfig row."""
     now = datetime.now(timezone.utc)
 
     if event_start and event_end:
@@ -88,9 +89,9 @@ async def _grant_circuit_access(
         valid_from = now
         valid_until = period_end + timedelta(days=3)
     else:
-        # Initial grant: exact calendar month/year from now
+        # Initial grant: derive window from config billing_interval
         valid_from = now
-        valid_until = _calc_plan_valid_until(plan_type, now)
+        valid_until = _calc_valid_until(config, now)
 
     # Upsert: update existing or create new
     result = await db.execute(
@@ -121,21 +122,16 @@ async def _grant_circuit_access(
         ))
 
 
-async def _plan_is_per_circuit(db: AsyncSession, plan_type: str) -> bool:
-    """Return the per_circuit flag for a plan (defaults to True if unknown)."""
-    if not plan_type:
+def _config_is_per_circuit(config: ProductTabConfig | None) -> bool:
+    """Return the per_circuit flag for a config row (defaults to True if unknown)."""
+    if not config:
         return True
-    res = await db.execute(
-        select(ProductTabConfig.per_circuit).where(ProductTabConfig.plan_type == plan_type)
-    )
-    row = res.first()
-    if not row:
-        return True
-    return bool(row[0]) if row[0] is not None else True
+    return bool(config.per_circuit) if config.per_circuit is not None else True
 
 
 async def _grant_all_circuits_access(
-    db: AsyncSession, user_id: int, plan_type: str,
+    db: AsyncSession, user_id: int,
+    config: ProductTabConfig | None = None,
     period_end: datetime | None = None,
     event_start: datetime | None = None,
     event_end: datetime | None = None,
@@ -145,7 +141,8 @@ async def _grant_all_circuits_access(
     circuit_ids = [row[0] for row in result.all()]
     for cid in circuit_ids:
         await _grant_circuit_access(
-            db, user_id, cid, plan_type,
+            db, user_id, cid,
+            config=config,
             period_end=period_end,
             event_start=event_start,
             event_end=event_end,
@@ -184,22 +181,28 @@ async def create_checkout_session(
 ):
     body = await request.json()
     price_id = body.get("price_id")
-    plan = body.get("plan")  # Alternative: accept plan name like "pro_monthly"
+    plan = body.get("plan")  # Legacy: accept plan label like "pro_monthly" (resolved via DB)
     circuit_id = body.get("circuit_id")
     event_dates = body.get("event_dates")  # e.g. ["2026-04-15"] or ["2026-04-15", "2026-04-16"]
 
-    # Resolve plan name to price_id if provided
+    # Legacy plan-label path — find the first matching row with that label
     if not price_id and plan:
-        price_id = _plan_to_price(plan)
-        if not price_id:
+        legacy_config = await _get_config_by_plan_type(db, plan)
+        if not legacy_config:
             raise HTTPException(400, f"Unknown plan: {plan}")
+        price_id = legacy_config.stripe_price_id
 
     if not price_id:
         raise HTTPException(400, "price_id or plan required")
 
-    # Resolve plan_type from price_id to check per_circuit flag
-    resolved_plan = _price_to_plan(price_id)
-    needs_circuit = await _plan_is_per_circuit(db, resolved_plan) if resolved_plan else True
+    # Resolve everything we need from the ProductTabConfig row
+    config = await _get_config_by_price(db, price_id)
+    if not config:
+        raise HTTPException(400, f"No product config found for price {price_id}")
+
+    plan_type = config.plan_type
+    needs_circuit = _config_is_per_circuit(config)
+    is_one_time = (config.billing_interval or "").lower() in ("one_time", "event")
 
     if needs_circuit and not circuit_id:
         raise HTTPException(400, "circuit_id required")
@@ -218,11 +221,11 @@ async def create_checkout_session(
         if existing.scalar_one_or_none():
             raise HTTPException(400, "Ya tienes una suscripcion activa para este circuito")
     else:
-        # For global plans, prevent duplicate plan_type active subscriptions
+        # For global plans, prevent duplicate active subscription at the same price
         existing = await db.execute(
             select(Subscription).where(
                 Subscription.user_id == user.id,
-                Subscription.plan_type == resolved_plan,
+                Subscription.stripe_price_id == price_id,
                 Subscription.circuit_id.is_(None),
                 Subscription.status.in_(("active", "trialing")),
             )
@@ -242,9 +245,6 @@ async def create_checkout_session(
         )
         user.stripe_customer_id = customer.id
         await db.commit()
-
-    plan_type = _price_to_plan(price_id)
-    is_one_time = plan_type == "event"
 
     # Validate event_dates for event plans
     if is_one_time and event_dates:
@@ -268,6 +268,7 @@ async def create_checkout_session(
     metadata = {
         "user_id": str(user.id),
         "plan_type": plan_type or "unknown",
+        "stripe_price_id": price_id,
         "circuit_id": str(circuit_id) if circuit_id else "",
     }
     if is_one_time and event_dates:
@@ -287,6 +288,7 @@ async def create_checkout_session(
             "metadata": {
                 "user_id": str(user.id),
                 "plan_type": plan_type or "unknown",
+                "stripe_price_id": price_id,
                 "circuit_id": str(circuit_id) if circuit_id else "",
             }
         }
@@ -349,8 +351,9 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
 async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
     metadata = session_data.get("metadata", {})
     user_id = int(metadata.get("user_id", 0))
-    plan_type = metadata.get("plan_type", "")
     circuit_id = int(metadata.get("circuit_id")) if metadata.get("circuit_id") else None
+    # Prefer the explicit stripe_price_id stamped into metadata at checkout.
+    stripe_price_id = metadata.get("stripe_price_id") or None
 
     if not user_id:
         return
@@ -370,25 +373,25 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
             for trial_sub in trial_result.scalars().all():
                 trial_sub.status = "canceled"
 
-            # Retrieve subscription from Stripe for price_id and calculate period
-            stripe_price_id = None
+            # Retrieve subscription from Stripe to pin down price_id + start date
             period_start = datetime.now(timezone.utc)
-            period_end = None
             try:
                 sub_obj = s.Subscription.retrieve(sub_id, expand=["items.data"])
                 if sub_obj.get("start_date"):
                     period_start = datetime.fromtimestamp(sub_obj["start_date"], tz=timezone.utc)
-                # Calculate period_end from plan interval (Stripe v15+ removed current_period_end)
-                period_end = _calc_plan_valid_until(plan_type, period_start)
-                if sub_obj.items and sub_obj.items.data:
+                if not stripe_price_id and sub_obj.items and sub_obj.items.data:
                     stripe_price_id = sub_obj.items.data[0].price.id
             except Exception as e:
                 logger.warning(f"Could not retrieve subscription details: {e}")
-                period_end = _calc_plan_valid_until(plan_type, period_start)
+
+            config = await _get_config_by_price(db, stripe_price_id)
+            plan_type = config.plan_type if config else metadata.get("plan_type", "")
+            period_end = _calc_valid_until(config, period_start)
 
             sub = Subscription(
                 user_id=user_id,
                 stripe_subscription_id=sub_id,
+                stripe_price_id=stripe_price_id,
                 plan_type=plan_type,
                 status="active",
                 circuit_id=circuit_id,
@@ -400,13 +403,14 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
             # Grant circuit access: either the selected circuit, or all circuits
             # when the plan is sold cross-circuit (per_circuit=false).
             if circuit_id:
-                await _grant_circuit_access(db, user_id, circuit_id, plan_type)
-            elif not await _plan_is_per_circuit(db, plan_type):
+                await _grant_circuit_access(db, user_id, circuit_id, config=config)
+            elif not _config_is_per_circuit(config):
                 await _grant_all_circuits_access(
-                    db, user_id, plan_type, period_end=period_end
+                    db, user_id, config=config, period_end=period_end
                 )
 
-            await _apply_plan_to_user(user_id, plan_type, db, stripe_price_id=stripe_price_id)
+            if config:
+                await _apply_config_to_user(user_id, config, db)
             await db.commit()
 
             # Send confirmation email with circuit name
@@ -420,10 +424,9 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
             if _user and _user.email:
                 from app.services.email_service import send_subscription_confirmation_email
                 import asyncio
-                plan_names = {"basic_monthly": "Basico Mensual", "basic_annual": "Basico Anual",
-                              "pro_monthly": "Pro Mensual", "pro_annual": "Pro Anual", "event": "Evento"}
+                display_label = config.display_name if config and config.display_name else plan_type
                 asyncio.create_task(send_subscription_confirmation_email(
-                    _user.email, _user.username, plan_names.get(plan_type, plan_type), circuit_name))
+                    _user.email, _user.username, display_label, circuit_name))
 
     elif session_data.get("mode") == "payment":
         # One-time payment (event)
@@ -441,8 +444,23 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
             event_start = now
             event_end = now + timedelta(hours=48)
 
+        # Extract price_id from checkout session line items if not in metadata
+        if not stripe_price_id:
+            checkout_id = session_data.get("id")
+            if checkout_id:
+                try:
+                    line_items = s.checkout.Session.list_line_items(checkout_id)
+                    if line_items.data:
+                        stripe_price_id = line_items.data[0].price.id
+                except Exception as e:
+                    logger.warning(f"Could not retrieve checkout price_id: {e}")
+
+        config = await _get_config_by_price(db, stripe_price_id)
+        plan_type = config.plan_type if config else metadata.get("plan_type", "")
+
         sub = Subscription(
             user_id=user_id,
+            stripe_price_id=stripe_price_id,
             plan_type=plan_type,
             status="active",
             circuit_id=circuit_id,
@@ -453,27 +471,17 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
 
         if circuit_id:
             await _grant_circuit_access(
-                db, user_id, circuit_id, plan_type,
+                db, user_id, circuit_id, config=config,
                 event_start=event_start, event_end=event_end,
             )
-        elif not await _plan_is_per_circuit(db, plan_type):
+        elif not _config_is_per_circuit(config):
             await _grant_all_circuits_access(
-                db, user_id, plan_type,
+                db, user_id, config=config,
                 event_start=event_start, event_end=event_end,
             )
 
-        # Extract price_id from checkout session line items
-        stripe_price_id = None
-        checkout_id = session_data.get("id")
-        if checkout_id:
-            try:
-                line_items = s.checkout.Session.list_line_items(checkout_id)
-                if line_items.data:
-                    stripe_price_id = line_items.data[0].price.id
-            except Exception as e:
-                logger.warning(f"Could not retrieve checkout price_id: {e}")
-
-        await _apply_plan_to_user(user_id, plan_type, db, stripe_price_id=stripe_price_id)
+        if config:
+            await _apply_config_to_user(user_id, config, db)
         await db.commit()
 
         # Send event confirmation email
@@ -487,8 +495,9 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
         if _user and _user.email:
             from app.services.email_service import send_subscription_confirmation_email
             import asyncio
+            display_label = config.display_name if config and config.display_name else (plan_type or "Evento")
             asyncio.create_task(send_subscription_confirmation_email(
-                _user.email, _user.username, "Evento", circuit_name))
+                _user.email, _user.username, display_label, circuit_name))
 
 
 async def _handle_invoice_paid(invoice_data: dict, db: AsyncSession):
@@ -501,54 +510,71 @@ async def _handle_invoice_paid(invoice_data: dict, db: AsyncSession):
         select(Subscription).where(Subscription.stripe_subscription_id == sub_id)
     )
     sub = result.scalar_one_or_none()
-    if sub:
-        import stripe as s
-        now = datetime.now(timezone.utc)
-        try:
-            stripe_sub = s.Subscription.retrieve(sub_id, expand=["items"])
-            if hasattr(stripe_sub, "start_date") and stripe_sub.start_date:
-                sub.current_period_start = datetime.fromtimestamp(stripe_sub.start_date, tz=timezone.utc)
-            else:
-                sub.current_period_start = now
+    if not sub:
+        return
 
-            # Sync plan_type from Stripe's current price (handles deferred plan switches)
-            items = stripe_sub.items.data if stripe_sub.items else []
-            if items:
-                price_id = items[0].price.id if items[0].price else None
-                if price_id:
-                    new_plan = _price_to_plan(price_id)
-                    if new_plan and new_plan != sub.plan_type:
-                        logger.info(f"Plan changed on renewal: {sub.plan_type} → {new_plan} (user={sub.user_id})")
-                        sub.plan_type = new_plan
-                        sub.stripe_price_id = price_id
-                        # Apply new plan capabilities
-                        await _apply_plan_to_user(db, sub.user_id, new_plan)
+    import stripe as s
+    now = datetime.now(timezone.utc)
 
-            # Clear pending plan since renewal applied it
-            sub.pending_plan = None
+    # Resolve current config — starts from whatever price is on the subscription row
+    config = await _get_config_by_price(db, sub.stripe_price_id)
 
-            sub.current_period_end = _calc_plan_valid_until(sub.plan_type, sub.current_period_start)
-        except Exception as e:
-            logger.warning(f"Could not retrieve subscription from Stripe: {e}")
+    try:
+        stripe_sub = s.Subscription.retrieve(sub_id, expand=["items"])
+        if hasattr(stripe_sub, "start_date") and stripe_sub.start_date:
+            sub.current_period_start = datetime.fromtimestamp(stripe_sub.start_date, tz=timezone.utc)
+        else:
             sub.current_period_start = now
-            sub.current_period_end = _calc_plan_valid_until(sub.plan_type, now)
 
-        sub.status = "active"
+        # Sync config from Stripe's current price (handles deferred plan switches)
+        items = stripe_sub.items.data if stripe_sub.items else []
+        if items:
+            price_id = items[0].price.id if items[0].price else None
+            if price_id and price_id != sub.stripe_price_id:
+                new_config = await _get_config_by_price(db, price_id)
+                if new_config:
+                    old_label = sub.plan_type
+                    logger.info(
+                        f"Plan changed on renewal: {old_label} → {new_config.plan_type} "
+                        f"(user={sub.user_id} price={price_id})"
+                    )
+                    sub.stripe_price_id = price_id
+                    sub.plan_type = new_config.plan_type
+                    config = new_config
+                    await _apply_config_to_user(sub.user_id, new_config, db)
+                else:
+                    logger.warning(
+                        f"Renewal price {price_id} has no ProductTabConfig row; keeping existing plan"
+                    )
 
-        # Extend circuit access with new period end
-        if sub.circuit_id and sub.current_period_end:
-            await _grant_circuit_access(
-                db, sub.user_id, sub.circuit_id, sub.plan_type,
-                period_end=sub.current_period_end,
-            )
-        elif sub.current_period_end and not await _plan_is_per_circuit(db, sub.plan_type):
-            await _grant_all_circuits_access(
-                db, sub.user_id, sub.plan_type,
-                period_end=sub.current_period_end,
-            )
+        # Clear pending plan since renewal applied it
+        sub.pending_plan = None
 
-        await db.commit()
-        logger.info(f"Invoice paid: user={sub.user_id} plan={sub.plan_type} circuit={sub.circuit_id} until={sub.current_period_end}")
+        sub.current_period_end = _calc_valid_until(config, sub.current_period_start)
+    except Exception as e:
+        logger.warning(f"Could not retrieve subscription from Stripe: {e}")
+        sub.current_period_start = now
+        sub.current_period_end = _calc_valid_until(config, now)
+
+    sub.status = "active"
+
+    # Extend circuit access with new period end
+    if sub.circuit_id and sub.current_period_end:
+        await _grant_circuit_access(
+            db, sub.user_id, sub.circuit_id, config=config,
+            period_end=sub.current_period_end,
+        )
+    elif sub.current_period_end and not _config_is_per_circuit(config):
+        await _grant_all_circuits_access(
+            db, sub.user_id, config=config,
+            period_end=sub.current_period_end,
+        )
+
+    await db.commit()
+    logger.info(
+        f"Invoice paid: user={sub.user_id} plan={sub.plan_type} "
+        f"circuit={sub.circuit_id} until={sub.current_period_end}"
+    )
 
 
 async def _handle_subscription_updated(sub_data: dict, db: AsyncSession):
@@ -570,16 +596,18 @@ async def _handle_subscription_updated(sub_data: dict, db: AsyncSession):
         if current_period_start:
             sub.current_period_start = datetime.fromtimestamp(current_period_start, tz=timezone.utc)
 
+        config = await _get_config_by_price(db, sub.stripe_price_id)
+
         # Sync circuit access if subscription is still active
         if sub.current_period_end and sub.status in ("active", "trialing"):
             if sub.circuit_id:
                 await _grant_circuit_access(
-                    db, sub.user_id, sub.circuit_id, sub.plan_type,
+                    db, sub.user_id, sub.circuit_id, config=config,
                     period_end=sub.current_period_end,
                 )
-            elif not await _plan_is_per_circuit(db, sub.plan_type):
+            elif not _config_is_per_circuit(config):
                 await _grant_all_circuits_access(
-                    db, sub.user_id, sub.plan_type,
+                    db, sub.user_id, config=config,
                     period_end=sub.current_period_end,
                 )
 
@@ -613,50 +641,26 @@ async def _handle_subscription_deleted(sub_data: dict, db: AsyncSession):
         logger.info(f"Subscription deleted: sub={sub_id} user={sub.user_id} circuit={sub.circuit_id}")
 
 
-async def _apply_plan_to_user(user_id: int, plan_type: str, db: AsyncSession, stripe_price_id: str | None = None):
-    """Apply plan capabilities to user (max_devices, tab access).
+async def _apply_config_to_user(user_id: int, config: ProductTabConfig, db: AsyncSession):
+    """Apply a ProductTabConfig row to a user: tab access + max_devices.
 
-    Looks up product_tab_config by stripe_price_id first.
-    Falls back to plan_type lookup, then hardcoded PLAN_CONFIG.
+    This is the single entry point for turning a paid plan into user
+    capabilities. ProductTabConfig is the source of truth — no fallback
+    to hardcoded defaults.
     """
     import json as _json
-    from app.models.schemas import UserTabAccess, ProductTabConfig
+    from app.models.schemas import UserTabAccess
 
-    tabs: list[str] = []
-    max_devices: int = 1
+    if not config:
+        logger.warning(f"_apply_config_to_user called with no config (user_id={user_id})")
+        return
 
-    # Try DB config first (by stripe_price_id)
-    if stripe_price_id:
-        result = await db.execute(
-            select(ProductTabConfig).where(ProductTabConfig.stripe_price_id == stripe_price_id)
-        )
-        config_row = result.scalar_one_or_none()
-        if config_row:
-            tabs = _json.loads(config_row.tabs) if config_row.tabs else []
-            max_devices = config_row.max_devices
-        else:
-            logger.warning(f"No product_tab_config for stripe_price_id={stripe_price_id}, trying plan_type")
-
-    # Try DB config by plan_type
-    if not tabs and plan_type:
-        result = await db.execute(
-            select(ProductTabConfig).where(ProductTabConfig.plan_type == plan_type)
-        )
-        config_row = result.scalar_one_or_none()
-        if config_row:
-            tabs = _json.loads(config_row.tabs) if config_row.tabs else []
-            max_devices = config_row.max_devices
-        else:
-            logger.warning(f"No product_tab_config for plan_type={plan_type}, falling back to PLAN_CONFIG")
-
-    # Fallback to hardcoded PLAN_CONFIG if DB didn't match
-    if not tabs:
-        config = PLAN_CONFIG.get(plan_type)
-        if not config:
-            logger.warning(f"No config found for plan_type={plan_type}")
-            return
-        tabs = config["tabs"]
-        max_devices = config["max_devices"]
+    try:
+        tabs = _json.loads(config.tabs) if config.tabs else []
+    except Exception:
+        logger.warning(f"Invalid tabs JSON on product_tab_config id={config.id}")
+        tabs = []
+    max_devices = config.max_devices or 1
 
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -665,7 +669,7 @@ async def _apply_plan_to_user(user_id: int, plan_type: str, db: AsyncSession, st
 
     user.max_devices = max(user.max_devices, max_devices)
 
-    # Add tabs (don't remove existing)
+    # Add tabs (don't remove existing — users accumulate access across plans)
     for tab in tabs:
         existing = await db.execute(
             select(UserTabAccess).where(
@@ -918,13 +922,24 @@ async def switch_plan(
 ):
     """Switch subscription plan (e.g. monthly↔annual). Applies at next renewal."""
     body = await request.json()
-    new_plan = body.get("plan")  # e.g. "basic_annual", "pro_monthly"
-    if not new_plan:
-        raise HTTPException(400, "plan required")
+    new_price_id = body.get("price_id")
+    new_plan = body.get("plan")  # Legacy label path (e.g. "pro_monthly")
 
-    new_price_id = _plan_to_price(new_plan)
-    if not new_price_id:
-        raise HTTPException(400, f"Unknown plan: {new_plan}")
+    # Resolve the target ProductTabConfig — price_id wins, fall back to label.
+    target_config: ProductTabConfig | None = None
+    if new_price_id:
+        target_config = await _get_config_by_price(db, new_price_id)
+        if not target_config:
+            raise HTTPException(400, f"No product config found for price {new_price_id}")
+    elif new_plan:
+        target_config = await _get_config_by_plan_type(db, new_plan)
+        if not target_config:
+            raise HTTPException(400, f"Unknown plan: {new_plan}")
+        new_price_id = target_config.stripe_price_id
+    else:
+        raise HTTPException(400, "price_id or plan required")
+
+    new_plan = target_config.plan_type
 
     s = get_stripe()
     result = await db.execute(

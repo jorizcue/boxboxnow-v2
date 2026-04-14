@@ -224,6 +224,11 @@ struct DriverView: View {
             UIApplication.shared.isIdleTimerDisabled = true
             // Apply orientation lock chosen by the user
             OrientationManager.shared.apply(driverVM.orientationLock)
+            // Fetch presets and auto-apply the default one if the user
+            // marked one as "predefinida" (from web or from the iOS
+            // presets screen). This runs every time the driver view is
+            // opened so the pilot always lands on the expected layout.
+            Task { await driverVM.applyDefaultPresetIfAny() }
             // Staggered card entrance
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 cardsAppeared = true

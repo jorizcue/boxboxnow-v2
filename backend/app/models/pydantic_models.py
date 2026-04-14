@@ -334,12 +334,14 @@ class PresetCreate(BaseModel):
     name: str
     visible_cards: dict[str, bool]
     card_order: list[str]
+    is_default: bool | None = None
 
 class PresetOut(BaseModel):
     id: int
     name: str
     visible_cards: dict[str, bool]
     card_order: list[str]
+    is_default: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -347,6 +349,7 @@ class PresetUpdate(BaseModel):
     name: str | None = None
     visible_cards: dict[str, bool] | None = None
     card_order: list[str] | None = None
+    is_default: bool | None = None
 
 
 # --- Team Positions + Drivers ---

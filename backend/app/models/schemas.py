@@ -105,6 +105,9 @@ class DriverConfigPreset(Base):
     name = Column(String(50), nullable=False)
     visible_cards = Column(Text, nullable=False, default="{}")
     card_order = Column(Text, nullable=False, default="[]")
+    # Only one preset per user should have is_default=True. Enforced in application
+    # code (config_routes.py) since SQLite lacks partial unique indexes in a portable way.
+    is_default = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
     user = relationship("User", back_populates="config_presets")
@@ -286,8 +289,8 @@ class ProductTabConfig(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     stripe_product_id = Column(String(255), nullable=False, index=True)  # NOT unique — shared across prices
-    stripe_price_id = Column(String(255), unique=True, nullable=False, index=True)  # Unique per price
-    plan_type = Column(String(50), nullable=False, unique=True)  # basic_monthly, basic_annual, etc. — unique
+    stripe_price_id = Column(String(255), unique=True, nullable=False, index=True)  # Unique per price (source of truth)
+    plan_type = Column(String(50), nullable=False)  # Label: may repeat across rows (e.g. two products both tagged "basic_monthly")
     tabs = Column(Text, nullable=False, default="[]")  # JSON array of tab slugs
     max_devices = Column(Integer, nullable=False, default=1)  # DEPRECATED: kept for backward compat, fallback when web/mobile not set
     concurrency_web = Column(Integer, nullable=True)  # Max concurrent browser sessions (NULL = use max_devices)

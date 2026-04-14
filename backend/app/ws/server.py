@@ -43,6 +43,24 @@ def get_user_circuit_map() -> dict[int, int]:
     return dict(_user_circuits)
 
 
+async def broadcast_to_user(user_id: int, message: dict):
+    """Send a JSON message to every active WebSocket for a given user.
+
+    Used for cross-device sync (e.g. web sets a new default driver preset →
+    iOS driver view picks it up live). Failures on individual sockets are
+    swallowed — the disconnect handler will clean them up.
+    """
+    ws_set = _ws_connections.get(user_id)
+    if not ws_set:
+        return
+    payload = json.dumps(message)
+    for ws in list(ws_set):
+        try:
+            await ws.send_text(payload)
+        except Exception as e:
+            logger.warning(f"broadcast_to_user failed (user={user_id}): {e}")
+
+
 async def close_ws_for_session(session_token: str):
     """Close all WebSocket connections for a killed session."""
     ws_set = _ws_by_session.get(session_token)
@@ -156,24 +174,38 @@ async def race_websocket(
         fallback_max = (u_val[0] if u_val else 1) or 1
         is_admin_user = bool(u_val[1]) if u_val else False
 
-        # Resolve per-kind limits from the user's active subscription product config.
+        # Resolve per-kind limits from the user's active subscription product
+        # config. Join Subscription.stripe_price_id -> ProductTabConfig to get
+        # the exact row (plan_type is no longer unique). Fall back to matching
+        # by plan_type for subscriptions that predate the price_id backfill.
         kind_limit: int | None = None
         if not is_admin_user:
             sub_row = await db.execute(
-                select(Subscription.plan_type).where(
+                select(Subscription.stripe_price_id, Subscription.plan_type).where(
                     Subscription.user_id == user_id,
                     Subscription.status.in_(("active", "trialing")),
                 )
             )
-            plan_types = [r[0] for r in sub_row.all() if r[0]]
-            for pt in plan_types:
-                cfg_row = await db.execute(
-                    select(
-                        ProductTabConfig.concurrency_web,
-                        ProductTabConfig.concurrency_mobile,
-                    ).where(ProductTabConfig.plan_type == pt)
-                )
-                cfg = cfg_row.first()
+            for price_id, plan_type in sub_row.all():
+                cfg = None
+                if price_id:
+                    cfg_row = await db.execute(
+                        select(
+                            ProductTabConfig.concurrency_web,
+                            ProductTabConfig.concurrency_mobile,
+                        ).where(ProductTabConfig.stripe_price_id == price_id)
+                    )
+                    cfg = cfg_row.first()
+                if not cfg and plan_type:
+                    cfg_row = await db.execute(
+                        select(
+                            ProductTabConfig.concurrency_web,
+                            ProductTabConfig.concurrency_mobile,
+                        ).where(ProductTabConfig.plan_type == plan_type)
+                        .order_by(ProductTabConfig.id)
+                        .limit(1)
+                    )
+                    cfg = cfg_row.first()
                 if not cfg:
                     continue
                 cw, cm = cfg

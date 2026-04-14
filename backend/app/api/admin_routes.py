@@ -532,7 +532,8 @@ async def create_product_config(request: Request, admin: User = Depends(require_
     import json as _json
     body = await request.json()
 
-    # Check unique stripe_price_id
+    # stripe_price_id is the canonical unique identifier for a row —
+    # plan_type is just a label and can be reused across products.
     price_id = body.get("stripe_price_id", "")
     if price_id:
         existing = await db.execute(
@@ -541,14 +542,7 @@ async def create_product_config(request: Request, admin: User = Depends(require_
         if existing.scalar_one_or_none():
             raise HTTPException(409, "Ya existe una configuracion para este precio de Stripe")
 
-    # Check unique plan_type
     plan_type = body.get("plan_type", "")
-    if plan_type:
-        existing = await db.execute(
-            select(ProductTabConfig).where(ProductTabConfig.plan_type == plan_type)
-        )
-        if existing.scalar_one_or_none():
-            raise HTTPException(409, f"Ya existe una configuracion para el tipo de plan '{plan_type}'")
 
     config = ProductTabConfig(
         stripe_product_id=body.get("stripe_product_id", ""),
@@ -584,6 +578,22 @@ async def update_product_config(config_id: int, request: Request, admin: User = 
         raise HTTPException(404, "Product config not found")
 
     body = await request.json()
+
+    # Defensive 409: if stripe_price_id is being changed, make sure the
+    # target value isn't already claimed by another row. SQLite would raise
+    # a cryptic IntegrityError otherwise.
+    new_price_id = body.get("stripe_price_id")
+    if new_price_id and new_price_id != config.stripe_price_id:
+        dup = await db.execute(
+            select(ProductTabConfig.id).where(
+                ProductTabConfig.stripe_price_id == new_price_id,
+                ProductTabConfig.id != config_id,
+            )
+        )
+        if dup.scalar_one_or_none():
+            raise HTTPException(
+                409, "Ya existe otra configuracion con ese precio de Stripe"
+            )
 
     for field in ("stripe_product_id", "stripe_price_id", "plan_type", "display_name", "description", "billing_interval"):
         if field in body:

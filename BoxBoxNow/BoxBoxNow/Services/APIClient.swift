@@ -31,16 +31,18 @@ final class APIClient {
         return try await get("/config/presets")
     }
 
-    func createPreset(name: String, visibleCards: [String: Bool], cardOrder: [String]) async throws -> DriverConfigPreset {
-        let body: [String: Any] = ["name": name, "visible_cards": visibleCards, "card_order": cardOrder]
+    func createPreset(name: String, visibleCards: [String: Bool], cardOrder: [String], isDefault: Bool = false) async throws -> DriverConfigPreset {
+        var body: [String: Any] = ["name": name, "visible_cards": visibleCards, "card_order": cardOrder]
+        if isDefault { body["is_default"] = true }
         return try await post("/config/presets", body: body)
     }
 
-    func updatePreset(id: Int, name: String?, visibleCards: [String: Bool]?, cardOrder: [String]?) async throws -> DriverConfigPreset {
+    func updatePreset(id: Int, name: String? = nil, visibleCards: [String: Bool]? = nil, cardOrder: [String]? = nil, isDefault: Bool? = nil) async throws -> DriverConfigPreset {
         var body = [String: Any]()
         if let n = name { body["name"] = n }
         if let vc = visibleCards { body["visible_cards"] = vc }
         if let co = cardOrder { body["card_order"] = co }
+        if let isDefault { body["is_default"] = isDefault }
         return try await patch("/config/presets/\(id)", body: body)
     }
 

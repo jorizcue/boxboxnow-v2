@@ -72,6 +72,18 @@ final class DriverViewModel: ObservableObject {
 
         // Load persisted finish line for GPS lap tracking
         lapTracker.loadFinishLine()
+
+        // Listen for live default-preset changes coming from the web
+        // via the race WebSocket. RaceViewModel re-posts them as
+        // `.presetDefaultChanged` notifications.
+        NotificationCenter.default.addObserver(
+            forName: .presetDefaultChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { await self.applyDefaultPresetIfAny() }
+        }
     }
 
     func saveConfig() {
@@ -83,11 +95,23 @@ final class DriverViewModel: ObservableObject {
         defaults.set(orientationLock.rawValue, forKey: Constants.Keys.orientation)
     }
 
-    func loadPresets() async {
+    func loadPresets(autoApplyDefault: Bool = false) async {
         do {
             let result = try await APIClient.shared.fetchPresets()
-            await MainActor.run { self.presets = result }
+            await MainActor.run {
+                self.presets = result
+                if autoApplyDefault, let def = result.first(where: { $0.isDefault }) {
+                    self.applyPreset(def)
+                }
+            }
         } catch { /* silently fail */ }
+    }
+
+    /// Fetch presets and, if a default exists, immediately apply it.
+    /// Called by DriverView.onAppear so the pilot always lands on the
+    /// layout their coach marked as "predefinida".
+    func applyDefaultPresetIfAny() async {
+        await loadPresets(autoApplyDefault: true)
     }
 
     func applyPreset(_ preset: DriverConfigPreset) {
@@ -97,10 +121,42 @@ final class DriverViewModel: ObservableObject {
         saveConfig()
     }
 
-    func saveAsPreset(name: String) async throws {
+    func saveAsPreset(name: String, isDefault: Bool = false) async throws {
         let preset = try await APIClient.shared.createPreset(
-            name: name, visibleCards: visibleCards, cardOrder: cardOrder)
-        await MainActor.run { self.presets.append(preset) }
+            name: name, visibleCards: visibleCards, cardOrder: cardOrder, isDefault: isDefault)
+        await MainActor.run {
+            if isDefault {
+                // Server already unset any previous default; mirror that locally.
+                self.presets = self.presets.map { p in
+                    DriverConfigPreset(
+                        id: p.id, name: p.name,
+                        visibleCards: p.visibleCards, cardOrder: p.cardOrder,
+                        isDefault: false
+                    )
+                }
+            }
+            self.presets.append(preset)
+        }
+    }
+
+    func setPresetDefault(_ preset: DriverConfigPreset, isDefault: Bool) async throws {
+        let updated = try await APIClient.shared.updatePreset(
+            id: preset.id, isDefault: isDefault
+        )
+        await MainActor.run {
+            self.presets = self.presets.map { p in
+                if p.id == updated.id { return updated }
+                // Enforce single-default client-side too
+                if isDefault {
+                    return DriverConfigPreset(
+                        id: p.id, name: p.name,
+                        visibleCards: p.visibleCards, cardOrder: p.cardOrder,
+                        isDefault: false
+                    )
+                }
+                return p
+            }
+        }
     }
 
     func deletePreset(_ preset: DriverConfigPreset) async throws {
