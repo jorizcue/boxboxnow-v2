@@ -52,8 +52,22 @@ final class APIClient {
 
     // MARK: - Session
 
-    func getActiveSession() async throws -> RaceSession {
-        return try await get("/config/session")
+    /// Fetch active session. Returns nil if user has no active session yet.
+    /// Backend returns `null` (200) in that case; naive decoding of a required
+    /// `RaceSession` would throw, so we explicitly handle the null body.
+    func getActiveSession() async throws -> RaceSession? {
+        let req = try buildRequest("/config/session", method: "GET")
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else { throw APIError.requestFailed }
+        if http.statusCode == 401 { KeychainHelper.deleteToken(); throw APIError.unauthorized }
+        guard (200...299).contains(http.statusCode) else { throw APIError.requestFailed }
+
+        // Empty body or literal "null" → no active session yet.
+        if data.isEmpty { return nil }
+        let trimmed = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed == "null" || trimmed == "" { return nil }
+
+        return try JSONDecoder().decode(RaceSession.self, from: data)
     }
 
     func updateSession(_ session: RaceSession) async throws -> RaceSession {
@@ -62,6 +76,33 @@ final class APIClient {
         let data = try encoder.encode(session)
         let body = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
         return try await patch("/config/session", body: body)
+    }
+
+    /// Create a new active session. Required when the user has no session yet
+    /// — PATCH /config/session would 404. Accepts a minimal circuit_id plus
+    /// the full RaceSession values we want to persist.
+    func createSession(_ session: RaceSession) async throws -> RaceSession {
+        guard let circuitId = session.circuitId else {
+            throw APIError.requestFailed
+        }
+        let body: [String: Any] = [
+            "circuit_id": circuitId,
+            "name": session.name ?? "",
+            "duration_min": session.durationMin,
+            "min_stint_min": session.minStintMin,
+            "max_stint_min": session.maxStintMin,
+            "min_pits": session.minPits,
+            "pit_time_s": session.pitTimeS,
+            "min_driver_time_min": session.minDriverTimeMin,
+            "rain": session.rain,
+            "pit_closed_start_min": session.pitClosedStartMin,
+            "pit_closed_end_min": session.pitClosedEndMin,
+            "box_lines": session.boxLines,
+            "box_karts": session.boxKarts,
+            "our_kart_number": session.ourKartNumber,
+            "refresh_interval_s": session.refreshIntervalS,
+        ]
+        return try await post("/config/session", body: body)
     }
 
     /// PATCH session with an arbitrary dict (for fields not in RaceSession model, e.g. auto_load_teams)

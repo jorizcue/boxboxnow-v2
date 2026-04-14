@@ -5,6 +5,7 @@ struct DriverView: View {
     @EnvironmentObject var raceVM: RaceViewModel
     @EnvironmentObject var configVM: ConfigViewModel
     @EnvironmentObject var gpsVM: GPSViewModel
+    @EnvironmentObject var auth: AuthViewModel
     @Environment(\.dismiss) private var dismiss
     @StateObject private var speech = DriverSpeechService()
     @State private var showMenu = false
@@ -12,6 +13,16 @@ struct DriverView: View {
     @State private var prevLapMs: Double = 0
     @State private var previousBrightness: CGFloat = 0.5
     @State private var cardsAppeared = false
+
+    /// Whether the current user has permission to view BOX-group cards.
+    /// Admins always can. Otherwise the `app-config-box` tab must be granted.
+    /// When false, we drop every card whose group is `.box` from the driver
+    /// view regardless of what visibleCards / presets have saved, so a pilot
+    /// without box permissions never sees pit-related data.
+    private var canShowBoxCards: Bool {
+        if auth.user?.isAdmin == true { return true }
+        return auth.user?.tabAccess?.contains("app-config-box") == true
+    }
 
     var body: some View {
         // TimelineView ticks every second, giving us a smooth clock
@@ -23,7 +34,11 @@ struct DriverView: View {
             GeometryReader { geo in
                 let isLandscape = geo.size.width > geo.size.height
                 let numCols = isLandscape ? 3 : 2
-                let cards = driverVM.orderedVisibleCards
+                // Hide BOX cards entirely when the user lacks pit permissions,
+                // even if a preset or saved config marks them visible.
+                let cards = driverVM.orderedVisibleCards.filter { card in
+                    canShowBoxCards || card.group != .box
+                }
                 let numRows = (cards.count + numCols - 1) / numCols
                 let spacing: CGFloat = 6
                 // Use safe area insets so cards don't clip behind rounded corners
