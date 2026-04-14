@@ -1,0 +1,30 @@
+# Built application files
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Gradle build outputs
+/build
+/app/build
+/*/build
+.gradle
+/captures
+
+# Local configuration (SDK paths)
+local.properties
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+.vscode/
+
+# Kotlin
+.kotlin/
+
+# Logs and OS junk
+*.log
+.DS_Store
+
+# Proguard
+/proguard/
