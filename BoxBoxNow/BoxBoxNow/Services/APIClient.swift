@@ -21,6 +21,12 @@ final class APIClient {
         return try await post("/auth/verify-mfa", body: body)
     }
 
+    /// Fetch the current user from /auth/me (used after token hydration on app launch,
+    /// since JWT payload doesn't contain all User fields like is_admin, tab_access, ...)
+    func getMe() async throws -> User {
+        return try await get("/auth/me")
+    }
+
     func fetchPresets() async throws -> [DriverConfigPreset] {
         return try await get("/config/presets")
     }

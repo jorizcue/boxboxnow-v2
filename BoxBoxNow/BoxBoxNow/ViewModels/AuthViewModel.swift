@@ -93,11 +93,8 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
 
                 KeychainHelper.saveToken(token)
                 self.isAuthenticated = true
-                if let payload = KeychainHelper.decodeJWTPayload(token),
-                   let userData = try? JSONSerialization.data(withJSONObject: payload),
-                   let user = try? JSONDecoder().decode(User.self, from: userData) {
-                    self.user = user
-                }
+                // Fetch full User from /auth/me (JWT payload lacks is_admin / tab_access)
+                Task { await self.refreshMe() }
                 print("[Auth] Google login OK")
             }
         }
@@ -148,21 +145,30 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
             return
         }
 
-        // Decode user from token payload
-        let decodedUser: User? = {
-            guard let data = try? JSONSerialization.data(withJSONObject: payload) else { return nil }
-            return try? JSONDecoder().decode(User.self, from: data)
-        }()
+        // JWT payload only contains {sub, sid, exp, ...} — NOT full User fields.
+        // We'll fetch /auth/me below to populate is_admin, tab_access, etc.
 
         if BiometricService.isEnabled && BiometricService.isAvailable {
-            // Require biometric before granting access
+            // Require biometric before granting access; fetch user in background
             biometricPending = true
-            user = decodedUser
+            Task { await refreshMe() }
             Task { await authenticateWithBiometric() }
         } else {
-            // No biometric — auto-login as before
+            // No biometric — auto-login as before; fetch user in background
             isAuthenticated = true
-            user = decodedUser
+            Task { await refreshMe() }
+        }
+    }
+
+    /// Refresh the local User object from /auth/me (id, is_admin, tab_access, ...)
+    @MainActor
+    func refreshMe() async {
+        do {
+            let fresh = try await APIClient.shared.getMe()
+            self.user = fresh
+        } catch {
+            // If unauthorized, APIClient already deletes the token
+            print("[Auth] /auth/me failed: \(error)")
         }
     }
 

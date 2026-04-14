@@ -8,7 +8,24 @@ struct ConfigView: View {
         return auth.user?.tabAccess?.contains(tab) == true
     }
 
+    @ViewBuilder
     var body: some View {
+        if auth.user == nil {
+            VStack(spacing: 12) {
+                ProgressView()
+                Text("Cargando permisos...")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .navigationTitle("Configuracion")
+            .task { await auth.refreshMe() }
+        } else {
+            configList
+        }
+    }
+
+    private var configList: some View {
         List {
             if canAccess("app-config-carrera") {
                 NavigationLink(destination: SessionConfigView()) {
