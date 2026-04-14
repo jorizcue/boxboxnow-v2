@@ -120,7 +120,7 @@ export interface WsUpdateEvent {
 }
 
 export interface WsMessage {
-  type: "snapshot" | "update" | "analytics" | "fifo_update" | "replay_status" | "teams_updated";
+  type: "snapshot" | "update" | "analytics" | "fifo_update" | "replay_status" | "teams_updated" | "box_call";
   data?: RaceSnapshot & { teams?: any[]; fifo?: FifoState };
   events?: WsUpdateEvent[];
 }
