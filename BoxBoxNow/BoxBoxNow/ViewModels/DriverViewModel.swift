@@ -48,6 +48,28 @@ final class DriverViewModel: ObservableObject {
         let lockStr = defaults.string(forKey: Constants.Keys.orientation) ?? "free"
         orientationLock = OrientationLock(rawValue: lockStr) ?? .free
 
+        // Migrate cached config: ensure any newly-added DriverCard cases
+        // (e.g. pitCount, currentPit) are appended to cardOrder and visibleCards
+        // so they show up for users who had a cached config from before the new
+        // cards existed. Without this the `orderedVisibleCards` iteration would
+        // never yield them because `cardOrder` wouldn't contain their rawValue.
+        let allIds = DriverCard.allCases.map { $0.rawValue }
+        let missing = allIds.filter { !cardOrder.contains($0) }
+        if !missing.isEmpty {
+            cardOrder.append(contentsOf: missing)
+            for id in missing where visibleCards[id] == nil {
+                // Default: visible for standard cards, off for GPS-only cards
+                if let card = DriverCard(rawValue: id) {
+                    visibleCards[id] = !card.requiresGPS
+                }
+            }
+            // Persist immediately so the migration is sticky
+            if let data = try? JSONEncoder().encode(visibleCards) {
+                defaults.set(data, forKey: Constants.Keys.visibleCards)
+            }
+            defaults.set(cardOrder, forKey: Constants.Keys.cardOrder)
+        }
+
         // Load persisted finish line for GPS lap tracking
         lapTracker.loadFinishLine()
     }
