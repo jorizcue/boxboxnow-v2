@@ -180,7 +180,7 @@ struct DriverView: View {
                     }
 
                     // ── IMU Calibration banner ──
-                    if gpsVM.source != .none && gpsVM.calibrator.phase != .aligned {
+                    if gpsVM.source == .racebox && gpsVM.calibrator.phase != .aligned {
                         VStack {
                             Spacer()
                             calibrationBanner

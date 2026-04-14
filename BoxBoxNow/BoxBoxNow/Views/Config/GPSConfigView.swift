@@ -23,55 +23,68 @@ struct GPSConfigView: View {
 
             if gpsVM.source == .racebox {
                 Section("RaceBox BLE") {
-                    if gpsVM.bleManager.isScanning {
+                    // Connected device — show disconnect button
+                    if let device = gpsVM.bleManager.connectedDevice {
                         HStack {
-                            ProgressView()
-                            Text("Buscando dispositivos...")
-                                .foregroundColor(.gray)
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text(device.name ?? "RaceBox")
+                            Spacer()
+                            Button("Desconectar") {
+                                gpsVM.bleManager.disconnect()
+                                gpsVM.isConnected = false
+                                gpsVM.signalQuality = .none
+                                toast.warning("RaceBox desconectado")
+                            }
+                            .foregroundColor(.red)
+                            .font(.subheadline)
                         }
-                    }
-
-                    if gpsVM.bleManager.discoveredDevices.isEmpty && !gpsVM.bleManager.isScanning {
-                        VStack(spacing: 6) {
-                            Text("No se encontraron dispositivos")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                            Text("Asegurate de que tu RaceBox esta encendido y cerca")
-                                .font(.caption)
-                                .foregroundColor(Color(.systemGray3))
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                    }
-
-                    ForEach(gpsVM.bleManager.discoveredDevices, id: \.identifier) { device in
-                        Button(action: { connectToDevice(device) }) {
+                        .frame(minHeight: 44)
+                    } else {
+                        // Scanning / discovery
+                        if gpsVM.bleManager.isScanning {
                             HStack {
-                                Text(device.name ?? "Desconocido")
-                                Spacer()
-                                if connectingDeviceId == device.identifier {
-                                    ProgressView()
-                                } else if gpsVM.bleManager.connectedDevice?.identifier == device.identifier {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.accentColor)
+                                ProgressView()
+                                Text("Buscando dispositivos...")
+                                    .foregroundColor(.gray)
+                            }
+                        }
+
+                        if gpsVM.bleManager.discoveredDevices.isEmpty && !gpsVM.bleManager.isScanning {
+                            VStack(spacing: 6) {
+                                Text("No se encontraron dispositivos")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                Text("Asegurate de que tu RaceBox esta encendido y cerca")
+                                    .font(.caption)
+                                    .foregroundColor(Color(.systemGray3))
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                        }
+
+                        ForEach(gpsVM.bleManager.discoveredDevices, id: \.identifier) { device in
+                            Button(action: { connectToDevice(device) }) {
+                                HStack {
+                                    Text(device.name ?? "Desconocido")
+                                    Spacer()
+                                    if connectingDeviceId == device.identifier {
+                                        ProgressView()
+                                    }
                                 }
+                                .frame(minHeight: 44)
+                            }
+                            .disabled(connectingDeviceId != nil)
+                            .accessibilityLabel("Conectar a \(device.name ?? "dispositivo desconocido")")
+                        }
+
+                        if !gpsVM.bleManager.isScanning {
+                            Button("Buscar dispositivos") {
+                                gpsVM.bleManager.startScan()
                             }
                             .frame(minHeight: 44)
                         }
-                        .disabled(connectingDeviceId != nil)
-                        .accessibilityLabel(
-                            gpsVM.bleManager.connectedDevice?.identifier == device.identifier
-                                ? "\(device.name ?? "Dispositivo"), conectado"
-                                : "Conectar a \(device.name ?? "dispositivo desconocido")"
-                        )
-                    }
-
-                    if !gpsVM.bleManager.isScanning && gpsVM.bleManager.connectedDevice == nil {
-                        Button("Buscar dispositivos") {
-                            gpsVM.bleManager.startScan()
-                        }
-                        .frame(minHeight: 44)
                     }
                 }
             }
@@ -89,6 +102,14 @@ struct GPSConfigView: View {
                                 .foregroundColor(.gray)
                         }
                     }
+
+                    if gpsVM.isConnected {
+                        Button("Desconectar GPS", role: .destructive) {
+                            gpsVM.selectSource(.none)
+                            toast.warning("GPS del telefono desconectado")
+                        }
+                        .frame(minHeight: 44)
+                    }
                 }
             }
 
@@ -101,7 +122,10 @@ struct GPSConfigView: View {
                     HStack { Text("Senal"); Spacer(); Text(gpsVM.signalQuality.displayName).foregroundColor(.gray) }
                     HStack { Text("Frecuencia"); Spacer(); Text("\(Int(gpsVM.sampleRate)) Hz").foregroundColor(.gray) }
                 }
+            }
 
+            // IMU Calibration — only for RaceBox (phone GPS doesn't have an external IMU)
+            if gpsVM.source == .racebox {
                 Section("Calibracion IMU") {
                     HStack {
                         Text("Fase")
@@ -148,10 +172,10 @@ struct GPSConfigView: View {
                             toast.info("Manten el kart quieto durante la calibracion")
                         }
                         .frame(minHeight: 44)
-                        .disabled(!gpsVM.isConnected)
+                        .disabled(gpsVM.bleManager.connectedDevice == nil)
 
-                        if !gpsVM.isConnected {
-                            Text("Conecta un dispositivo GPS para calibrar")
+                        if gpsVM.bleManager.connectedDevice == nil {
+                            Text("Conecta un RaceBox para calibrar")
                                 .font(.caption)
                                 .foregroundColor(Color(.systemGray3))
                         }
