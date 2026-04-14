@@ -56,6 +56,39 @@ final class APIClient {
         return try await patch("/config/session", body: body)
     }
 
+    /// PATCH session with an arbitrary dict (for fields not in RaceSession model, e.g. auto_load_teams)
+    func patchSession(_ fields: [String: Any]) async throws {
+        var req = try buildRequest("/config/session", method: "PATCH")
+        req.httpBody = try JSONSerialization.data(withJSONObject: fields)
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let (_, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw APIError.requestFailed
+        }
+    }
+
+    // MARK: - Teams
+
+    func getTeams() async throws -> [Team] {
+        return try await get("/config/teams")
+    }
+
+    func replaceTeams(_ teams: [Team]) async throws {
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(teams)
+        var req = try buildRequest("/config/teams", method: "PUT")
+        req.httpBody = data
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let (_, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw APIError.requestFailed
+        }
+    }
+
+    func getLiveTeams() async throws -> LiveTeamsResponse {
+        return try await get("/race/live-teams")
+    }
+
     // MARK: - Circuits
 
     func getMyCircuits() async throws -> [Circuit] {

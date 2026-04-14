@@ -283,6 +283,20 @@ async def init_db():
         except Exception:
             pass
 
+        # Add concurrency_web, concurrency_mobile, per_circuit to product_tab_config
+        try:
+            await conn.execute(text("ALTER TABLE product_tab_config ADD COLUMN concurrency_web INTEGER"))
+        except Exception:
+            pass
+        try:
+            await conn.execute(text("ALTER TABLE product_tab_config ADD COLUMN concurrency_mobile INTEGER"))
+        except Exception:
+            pass
+        try:
+            await conn.execute(text("ALTER TABLE product_tab_config ADD COLUMN per_circuit BOOLEAN DEFAULT 1 NOT NULL"))
+        except Exception:
+            pass
+
 async def get_db():
     async with async_session() as session:
         yield session

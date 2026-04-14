@@ -504,6 +504,9 @@ def _serialize_config(c, _json) -> dict:
         "plan_type": c.plan_type,
         "tabs": _json.loads(c.tabs) if c.tabs else [],
         "max_devices": c.max_devices,
+        "concurrency_web": c.concurrency_web,
+        "concurrency_mobile": c.concurrency_mobile,
+        "per_circuit": bool(c.per_circuit) if c.per_circuit is not None else True,
         "display_name": c.display_name,
         "description": c.description,
         "features": _json.loads(c.features) if c.features else [],
@@ -553,6 +556,9 @@ async def create_product_config(request: Request, admin: User = Depends(require_
         plan_type=plan_type,
         tabs=_json.dumps(body.get("tabs", [])),
         max_devices=body.get("max_devices", 1),
+        concurrency_web=body.get("concurrency_web"),
+        concurrency_mobile=body.get("concurrency_mobile"),
+        per_circuit=body.get("per_circuit", True),
         display_name=body.get("display_name", ""),
         description=body.get("description"),
         features=_json.dumps(body.get("features", [])),
@@ -586,9 +592,11 @@ async def update_product_config(config_id: int, request: Request, admin: User = 
         config.tabs = _json.dumps(body["tabs"])
     if "features" in body:
         config.features = _json.dumps(body["features"])
-    for field in ("max_devices", "sort_order"):
+    for field in ("max_devices", "concurrency_web", "concurrency_mobile", "sort_order"):
         if field in body:
             setattr(config, field, body[field])
+    if "per_circuit" in body:
+        config.per_circuit = bool(body["per_circuit"])
     for field in ("price_amount",):
         if field in body:
             setattr(config, field, body[field])

@@ -3,38 +3,44 @@ import SwiftUI
 struct CardVisibilityView: View {
     @EnvironmentObject var driverVM: DriverViewModel
     @EnvironmentObject var toast: ToastManager
+    @EnvironmentObject var auth: AuthViewModel
 
-    private var standardCards: [DriverCard] {
-        DriverCard.allCases.filter { !$0.requiresGPS }
+    private var canBox: Bool {
+        if auth.user?.isAdmin == true { return true }
+        return auth.user?.tabAccess?.contains("app-config-box") == true
     }
 
-    private var gpsCards: [DriverCard] {
-        DriverCard.allCases.filter { $0.requiresGPS }
+    private var visibleGroups: [DriverCardGroup] {
+        DriverCardGroup.allCases.filter { $0 != .box || canBox }
+    }
+
+    private func cards(in group: DriverCardGroup) -> [DriverCard] {
+        DriverCard.allCases.filter { $0.group == group }
+    }
+
+    private func sectionTitle(_ group: DriverCardGroup) -> String {
+        switch group {
+        case .race: return "Carrera"
+        case .box:  return "BOX"
+        case .gps:  return "GPS (requieren RaceBox o GPS del telefono)"
+        }
     }
 
     var body: some View {
         List {
-            Section("Tarjetas estandar") {
-                ForEach(standardCards) { card in
-                    Toggle(isOn: binding(for: card)) {
-                        HStack {
-                            Image(systemName: card.iconName)
-                                .foregroundColor(card.accentColor)
-                                .frame(width: 24)
-                            Text(card.displayName)
-                        }
-                    }
-                }
-            }
-
-            Section("Tarjetas GPS (requieren RaceBox o GPS del telefono)") {
-                ForEach(gpsCards) { card in
-                    Toggle(isOn: binding(for: card)) {
-                        HStack {
-                            Image(systemName: card.iconName)
-                                .foregroundColor(card.accentColor)
-                                .frame(width: 24)
-                            Text(card.displayName)
+            ForEach(visibleGroups, id: \.self) { group in
+                let groupCards = cards(in: group)
+                if !groupCards.isEmpty {
+                    Section(sectionTitle(group)) {
+                        ForEach(groupCards) { card in
+                            Toggle(isOn: binding(for: card)) {
+                                HStack {
+                                    Image(systemName: card.iconName)
+                                        .foregroundColor(card.accentColor)
+                                        .frame(width: 24)
+                                    Text(card.displayName)
+                                }
+                            }
                         }
                     }
                 }

@@ -29,28 +29,48 @@ export type DriverCardId =
   | "gpsGForce"
   | "bestStintLap"
   | "lapsToMaxStint"
-  | "pitWindow";
+  | "pitWindow"
+  | "pitCount"
+  | "currentPit";
 
-export const ALL_DRIVER_CARDS: { id: DriverCardId; label: string; requiresGps: boolean }[] = [
-  { id: "raceTimer", label: "Tiempo de carrera", requiresGps: false },
-  { id: "currentLapTime", label: "Vuelta actual (tiempo real)", requiresGps: true },
-  { id: "lastLap", label: "Última vuelta", requiresGps: false },
-  { id: "deltaBestLap", label: "Delta vs Best Lap (GPS)", requiresGps: true },
-  { id: "gForceRadar", label: "G-Force (diana)", requiresGps: true },
-  { id: "position", label: "Posición (tiempos medios)", requiresGps: false },
-  { id: "realPos", label: "Posición (clasif. real)", requiresGps: false },
-  { id: "gapAhead", label: "Gap kart delante", requiresGps: false },
-  { id: "gapBehind", label: "Gap kart detrás", requiresGps: false },
-  { id: "avgLap20", label: "Vuelta media (20v)", requiresGps: false },
-  { id: "best3", label: "Mejor 3 (3V)", requiresGps: false },
-  { id: "avgFutureStint", label: "Media stint futuro", requiresGps: false },
-  { id: "boxScore", label: "Puntuación Box", requiresGps: false },
-  { id: "bestStintLap", label: "Mejor vuelta stint", requiresGps: false },
-  { id: "gpsLapDelta", label: "Delta vuelta anterior GPS", requiresGps: true },
-  { id: "gpsSpeed", label: "Velocidad GPS", requiresGps: true },
-  { id: "gpsGForce", label: "G-Force (números)", requiresGps: true },
-  { id: "lapsToMaxStint", label: "Vueltas hasta stint máximo", requiresGps: false },
-  { id: "pitWindow", label: "Ventana de pit (open/closed)", requiresGps: false },
+export type DriverCardGroup = "race" | "box" | "gps";
+
+export const ALL_DRIVER_CARDS: {
+  id: DriverCardId;
+  label: string;
+  requiresGps: boolean;
+  group: DriverCardGroup;
+}[] = [
+  // --- Race group ---
+  { id: "raceTimer", label: "Tiempo de carrera", requiresGps: false, group: "race" },
+  { id: "currentLapTime", label: "Vuelta actual (tiempo real)", requiresGps: true, group: "race" },
+  { id: "lastLap", label: "Última vuelta", requiresGps: false, group: "race" },
+  { id: "position", label: "Posición (tiempos medios)", requiresGps: false, group: "race" },
+  { id: "realPos", label: "Posición (clasif. real)", requiresGps: false, group: "race" },
+  { id: "gapAhead", label: "Gap kart delante", requiresGps: false, group: "race" },
+  { id: "gapBehind", label: "Gap kart detrás", requiresGps: false, group: "race" },
+  { id: "avgLap20", label: "Vuelta media (20v)", requiresGps: false, group: "race" },
+  { id: "best3", label: "Mejor 3 (3V)", requiresGps: false, group: "race" },
+  { id: "bestStintLap", label: "Mejor vuelta stint", requiresGps: false, group: "race" },
+  { id: "avgFutureStint", label: "Media stint futuro", requiresGps: false, group: "race" },
+  { id: "lapsToMaxStint", label: "Vueltas hasta stint máximo", requiresGps: false, group: "race" },
+  // --- BOX group ---
+  { id: "boxScore", label: "Puntuación Box", requiresGps: false, group: "box" },
+  { id: "pitCount", label: "PITS (realizados / mínimos)", requiresGps: false, group: "box" },
+  { id: "currentPit", label: "Pit en curso", requiresGps: false, group: "box" },
+  { id: "pitWindow", label: "Ventana de pit (open/closed)", requiresGps: false, group: "box" },
+  // --- GPS group ---
+  { id: "deltaBestLap", label: "Delta vs Best Lap (GPS)", requiresGps: true, group: "gps" },
+  { id: "gForceRadar", label: "G-Force (diana)", requiresGps: true, group: "gps" },
+  { id: "gpsLapDelta", label: "Delta vuelta anterior GPS", requiresGps: true, group: "gps" },
+  { id: "gpsSpeed", label: "Velocidad GPS", requiresGps: true, group: "gps" },
+  { id: "gpsGForce", label: "G-Force (números)", requiresGps: true, group: "gps" },
+];
+
+export const DRIVER_CARD_GROUPS: { id: DriverCardGroup; label: string }[] = [
+  { id: "race", label: "Carrera" },
+  { id: "box", label: "BOX" },
+  { id: "gps", label: "GPS" },
 ];
 
 export const DEFAULT_CARD_ORDER: DriverCardId[] = ALL_DRIVER_CARDS.map((c) => c.id);

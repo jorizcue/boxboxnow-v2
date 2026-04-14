@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "@/lib/api";
-import { useDriverConfig, ALL_DRIVER_CARDS, DEFAULT_CARD_ORDER, type DriverCardId } from "@/hooks/useDriverConfig";
+import { useDriverConfig, ALL_DRIVER_CARDS, DEFAULT_CARD_ORDER, DRIVER_CARD_GROUPS, type DriverCardId } from "@/hooks/useDriverConfig";
 import { useAuth } from "@/hooks/useAuth";
 
 interface Circuit {
@@ -28,6 +28,8 @@ interface Preset {
 export function DriverConfigTab() {
   const config = useDriverConfig();
   const { user } = useAuth();
+  const userTabs = user?.tab_access ?? [];
+  const canBox = user?.is_admin || userTabs.includes("app-config-box");
   const [circuits, setCircuits] = useState<Circuit[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -101,8 +103,7 @@ export function DriverConfigTab() {
     } catch {}
   };
 
-  const gpsCards = ALL_DRIVER_CARDS.filter((c) => c.requiresGps);
-  const standardCards = ALL_DRIVER_CARDS.filter((c) => !c.requiresGps);
+  const visibleGroups = DRIVER_CARD_GROUPS.filter((g) => g.id !== "box" || canBox);
   const canSaveMore = presets.length < 10;
 
   return (
@@ -235,54 +236,42 @@ export function DriverConfigTab() {
         <h3 className="text-xs font-bold text-accent uppercase tracking-wider">Tarjetas visibles</h3>
         <p className="text-[11px] text-neutral-500">Selecciona las tarjetas que quieres ver en la vista del piloto.</p>
 
-        <div className="space-y-3">
-          <h4 className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Estandar</h4>
-          <div className="grid grid-cols-2 gap-2">
-            {standardCards.map((card) => (
-              <label
-                key={card.id}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/40 border border-border hover:border-neutral-600 cursor-pointer transition-colors"
-              >
-                <input
-                  type="checkbox"
-                  checked={config.visibleCards[card.id] ?? true}
-                  onChange={(e) => config.setCardVisible(card.id, e.target.checked)}
-                  className="w-3.5 h-3.5 rounded accent-accent"
-                />
-                <span className={`text-xs ${config.visibleCards[card.id] ? "text-neutral-200" : "text-neutral-500"}`}>
-                  {card.label}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <h4 className="text-[10px] font-semibold text-cyan-500 uppercase tracking-wider flex items-center gap-1.5">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-            </svg>
-            GPS (requieren RaceBox o GPS del movil)
-          </h4>
-          <div className="grid grid-cols-2 gap-2">
-            {gpsCards.map((card) => (
-              <label
-                key={card.id}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/40 border border-cyan-900/30 hover:border-cyan-700/40 cursor-pointer transition-colors"
-              >
-                <input
-                  type="checkbox"
-                  checked={config.visibleCards[card.id] ?? true}
-                  onChange={(e) => config.setCardVisible(card.id, e.target.checked)}
-                  className="w-3.5 h-3.5 rounded accent-cyan-500"
-                />
-                <span className={`text-xs ${config.visibleCards[card.id] ? "text-neutral-200" : "text-neutral-500"}`}>
-                  {card.label}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
+        {visibleGroups.map((group) => {
+          const groupCards = ALL_DRIVER_CARDS.filter((c) => c.group === group.id);
+          if (groupCards.length === 0) return null;
+          const isGps = group.id === "gps";
+          return (
+            <div key={group.id} className="space-y-3">
+              <h4 className={`text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5 ${isGps ? "text-cyan-500" : "text-accent"}`}>
+                {isGps && (
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                  </svg>
+                )}
+                {group.label}
+                {isGps && <span className="text-[9px] text-cyan-700 normal-case tracking-normal font-normal">(requieren RaceBox o GPS del movil)</span>}
+              </h4>
+              <div className="grid grid-cols-2 gap-2">
+                {groupCards.map((card) => (
+                  <label
+                    key={card.id}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-black/40 border cursor-pointer transition-colors ${isGps ? "border-cyan-900/30 hover:border-cyan-700/40" : "border-border hover:border-neutral-600"}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={config.visibleCards[card.id] ?? true}
+                      onChange={(e) => config.setCardVisible(card.id, e.target.checked)}
+                      className={`w-3.5 h-3.5 rounded ${isGps ? "accent-cyan-500" : "accent-accent"}`}
+                    />
+                    <span className={`text-xs ${config.visibleCards[card.id] ? "text-neutral-200" : "text-neutral-500"}`}>
+                      {card.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Visual preview with drag-and-drop */}
@@ -320,6 +309,8 @@ const CARD_ACCENTS: Record<DriverCardId, string> = {
   gpsGForce: "from-emerald-500/20 to-emerald-500/5 border-emerald-500/30",
   lapsToMaxStint: "from-teal-500/20 to-teal-500/5 border-teal-500/30",
   pitWindow: "from-green-500/25 to-green-500/5 border-green-400/50",
+  pitCount: "from-orange-500/25 to-orange-500/5 border-orange-400/50",
+  currentPit: "from-cyan-500/25 to-cyan-500/5 border-cyan-400/50",
 };
 
 const CARD_SAMPLE_VALUES: Record<DriverCardId, string> = {
@@ -342,6 +333,8 @@ const CARD_SAMPLE_VALUES: Record<DriverCardId, string> = {
   gpsGForce: "1.2G",
   lapsToMaxStint: "5.2",
   pitWindow: "OPEN",
+  pitCount: "2/4",
+  currentPit: "0:45",
 };
 
 /* ------------------------------------------------------------------ */

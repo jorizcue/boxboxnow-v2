@@ -92,7 +92,7 @@ export function useRaceWebSocket(options?: WsOptions) {
 
     function connect() {
       const viewSuffix = viewParam ? `&view=${viewParam}` : "";
-      const ws = new WebSocket(`${WS_BASE}?token=${token}${viewSuffix}`);
+      const ws = new WebSocket(`${WS_BASE}?token=${token}&device=web${viewSuffix}`);
       wsRef.current = ws;
 
       ws.onopen = () => {

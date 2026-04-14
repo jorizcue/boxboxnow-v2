@@ -19,7 +19,7 @@ export function EmbeddedCheckout({
   onCancel,
 }: {
   plan: string;
-  circuitId: number;
+  circuitId: number | null;
   eventDates?: string[];
   onCancel: () => void;
 }) {

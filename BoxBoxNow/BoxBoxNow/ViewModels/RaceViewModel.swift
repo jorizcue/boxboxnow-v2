@@ -49,7 +49,7 @@ final class RaceViewModel: ObservableObject {
             print("[RaceVM] No token for WS connection")
             return
         }
-        let urlStr = "\(Constants.wsBaseURL)/race?token=\(token)&view=driver"
+        let urlStr = "\(Constants.wsBaseURL)/race?token=\(token)&device=mobile&view=driver"
         print("[RaceVM] Connecting to: \(urlStr)")
         wsClient.connectToURL(urlStr)
     }

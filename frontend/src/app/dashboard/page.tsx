@@ -31,7 +31,9 @@ export default function DashboardPage() {
   const { token, user, _hydrated, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("race");
   const [pendingPlan, setPendingPlan] = useState<string | null>(null);
+  const [pendingPlanPerCircuit, setPendingPlanPerCircuit] = useState<boolean>(true);
   const [checkoutCircuitId, setCheckoutCircuitId] = useState<number | null>(null);
+  const [checkoutReady, setCheckoutReady] = useState(false);
   const [eventDates, setEventDates] = useState<string[] | undefined>(undefined);
   const router = useRouter();
 
@@ -64,6 +66,33 @@ export default function DashboardPage() {
       setPendingPlan(plan);
     }
   }, [_hydrated, token]);
+
+  // Look up per_circuit flag for the pending plan to decide whether to show
+  // the circuit selector or go straight to checkout with a null circuit.
+  useEffect(() => {
+    if (!pendingPlan) {
+      setCheckoutReady(false);
+      return;
+    }
+    setCheckoutReady(false);
+    import("@/lib/api").then(({ api }) =>
+      api
+        .getPlans()
+        .then((plans) => {
+          const match = plans.find((p) => p.plan_type === pendingPlan);
+          const perCircuit = match ? match.per_circuit : true;
+          setPendingPlanPerCircuit(perCircuit);
+          if (!perCircuit) {
+            setCheckoutCircuitId(null);
+          }
+          setCheckoutReady(true);
+        })
+        .catch(() => {
+          setPendingPlanPerCircuit(true);
+          setCheckoutReady(true);
+        })
+    );
+  }, [pendingPlan]);
 
   // Handle circuit selection → show embedded checkout
   const handleCircuitSelected = (circuitId: number, dates?: string[]) => {
@@ -102,17 +131,28 @@ export default function DashboardPage() {
   }
 
   // Checkout flow: circuit selection → embedded payment
-  if (pendingPlan && checkoutCircuitId) {
-    return (
-      <EmbeddedCheckout
-        plan={pendingPlan}
-        circuitId={checkoutCircuitId}
-        eventDates={eventDates}
-        onCancel={() => { setCheckoutCircuitId(null); setPendingPlan(null); setEventDates(undefined); }}
-      />
-    );
-  }
-  if (pendingPlan) {
+  if (pendingPlan && checkoutReady) {
+    // Cross-circuit plans skip the circuit selector entirely.
+    if (!pendingPlanPerCircuit) {
+      return (
+        <EmbeddedCheckout
+          plan={pendingPlan}
+          circuitId={null}
+          eventDates={eventDates}
+          onCancel={() => { setCheckoutCircuitId(null); setPendingPlan(null); setEventDates(undefined); }}
+        />
+      );
+    }
+    if (checkoutCircuitId) {
+      return (
+        <EmbeddedCheckout
+          plan={pendingPlan}
+          circuitId={checkoutCircuitId}
+          eventDates={eventDates}
+          onCancel={() => { setCheckoutCircuitId(null); setPendingPlan(null); setEventDates(undefined); }}
+        />
+      );
+    }
     return <CircuitSelector plan={pendingPlan} onSelect={handleCircuitSelected} onCancel={() => setPendingPlan(null)} />;
   }
 

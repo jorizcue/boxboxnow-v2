@@ -543,6 +543,28 @@ export function DriverView() {
   // Avg lap 20 from kart data
   const avgLap20Ms = paceDisplay?.avgLapMs ?? 0;
 
+  // --- BOX: pit count + current pit elapsed (mirrors FifoQueue cards) ---
+  const ourKartObj = karts.find((k) => k.kartNumber === ourKart) || null;
+  const pitsDone = ourKartObj?.pitCount ?? 0;
+  const pitsMissing = Math.max(0, config.minPits - pitsDone);
+  const pitInProgress = ourKartObj?.pitStatus === "in_pit";
+  // Current pit elapsed: matches FifoQueue.pitElapsedSec — (pitTimeS) - stintStartCountdownMs-remaining.
+  // Simpler approximation: use the kart's stintStartCountdownMs to compute elapsed pit seconds.
+  const pitElapsedSec = (() => {
+    if (!ourKartObj || !pitInProgress || raceClock === 0) return 0;
+    // When a kart is in_pit, stintStartCountdownMs represents the race clock at which the pit started
+    // plus pitTimeS. Elapsed = pitTimeS - (stintStartCountdownMs - raceClock) / 1000.
+    const remainingMs = Math.max(0, ourKartObj.stintStartCountdownMs - raceClock);
+    const elapsed = config.pitTimeS - remainingMs / 1000;
+    return Math.max(0, Math.min(config.pitTimeS, elapsed));
+  })();
+  const pitElapsedStr = (() => {
+    const s = Math.round(pitElapsedSec);
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${String(sec).padStart(2, "0")}`;
+  })();
+
   const cards: Record<DriverCardId, { label: string; content: React.ReactNode; accent: string }> = {
     raceTimer: {
       label: "Tiempo de carrera",
@@ -896,6 +918,44 @@ export function DriverView() {
               </span>
             );
           })()}
+        </div>
+      ),
+    },
+    pitCount: {
+      label: "PITS",
+      accent: pitsMissing > 0
+        ? "from-orange-500/25 to-orange-500/5 border-orange-400/50"
+        : "from-green-500/20 to-green-500/5 border-green-500/30",
+      content: (
+        <div className="flex flex-col items-center">
+          <span className={`text-4xl sm:text-5xl font-mono font-black leading-none ${
+            pitsMissing > 0 ? "text-orange-400" : "text-green-400"
+          }`}>
+            {pitsDone}<span className="text-neutral-500">/</span>{config.minPits}
+          </span>
+          {pitsMissing > 0 && (
+            <span className="text-[10px] text-orange-400/70 font-mono mt-1 uppercase tracking-widest">
+              faltan {pitsMissing}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    currentPit: {
+      label: "Pit en curso",
+      accent: pitInProgress
+        ? "from-cyan-500/25 to-cyan-500/5 border-cyan-400/50"
+        : "from-neutral-500/15 to-neutral-500/5 border-neutral-500/30",
+      content: (
+        <div className="flex flex-col items-center">
+          <span className={`text-3xl sm:text-4xl font-mono font-black leading-none ${
+            pitInProgress ? "text-cyan-400 animate-pulse" : "text-neutral-500"
+          }`}>
+            {pitInProgress ? pitElapsedStr : "--:--"}
+          </span>
+          <span className="text-[9px] sm:text-[10px] text-neutral-500 uppercase tracking-widest mt-1">
+            {pitInProgress ? `/ ${Math.floor(config.pitTimeS / 60)}:${String(config.pitTimeS % 60).padStart(2, "0")}` : "inactivo"}
+          </span>
         </div>
       ),
     },

@@ -32,6 +32,7 @@ async def list_plans(db: AsyncSession = Depends(get_db)):
             "billing_interval": c.billing_interval,
             "is_popular": c.is_popular,
             "sort_order": c.sort_order,
+            "per_circuit": bool(c.per_circuit) if c.per_circuit is not None else True,
         }
         for c in configs
     ]

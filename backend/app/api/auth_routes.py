@@ -244,6 +244,9 @@ ALL_TABS = [
     "driver", "driver-config",
     "replay", "analytics", "insights",
     "admin-users", "admin-circuits", "admin-hub",
+    # iOS app config sections
+    "app-config-carrera", "app-config-box", "app-config-visualizacion",
+    "app-config-plantillas", "app-config-gps-racebox",
 ]
 
 

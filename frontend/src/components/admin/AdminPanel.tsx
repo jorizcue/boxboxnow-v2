@@ -74,6 +74,12 @@ const STANDARD_TAB_OPTIONS: [string, string][] = [
   ["replay", "Replay"],
   ["analytics", "Karts"],
   ["insights", "GPS Insights"],
+  // iOS app config sections
+  ["app-config-carrera", "App: Carrera"],
+  ["app-config-box", "App: Box"],
+  ["app-config-visualizacion", "App: Visualizacion"],
+  ["app-config-plantillas", "App: Plantillas"],
+  ["app-config-gps-racebox", "App: GPS RaceBox"],
 ];
 
 const ADMIN_TAB_OPTIONS: [string, string][] = [
@@ -1181,6 +1187,9 @@ function PlatformSettingsManager() {
     plan_type: "",
     tabs: [] as string[],
     max_devices: 1,
+    concurrency_web: null as number | null,
+    concurrency_mobile: null as number | null,
+    per_circuit: true,
     display_name: "",
     description: "",
     features: [] as string[],
@@ -1211,6 +1220,9 @@ function PlatformSettingsManager() {
       plan_type: c.plan_type,
       tabs: c.tabs || [],
       max_devices: c.max_devices,
+      concurrency_web: c.concurrency_web ?? null,
+      concurrency_mobile: c.concurrency_mobile ?? null,
+      per_circuit: c.per_circuit !== false,
       display_name: c.display_name || "",
       description: c.description || "",
       features: c.features || [],
@@ -1507,7 +1519,13 @@ function PlatformSettingsManager() {
                           {c.price_amount != null ? `${c.price_amount.toFixed(2)}€` : <span className="text-neutral-700">—</span>}
                         </td>
                         <td className="py-2.5 pr-4 text-neutral-400">{c.billing_interval || <span className="text-neutral-700">—</span>}</td>
-                        <td className="py-2.5 pr-4 text-center text-neutral-400">{c.max_devices}</td>
+                        <td className="py-2.5 pr-4 text-center text-neutral-400">
+                          <span title="Web / Movil">
+                            {c.concurrency_web ?? c.max_devices}
+                            <span className="text-neutral-600"> / </span>
+                            {c.concurrency_mobile ?? c.max_devices}
+                          </span>
+                        </td>
                         <td className="py-2.5 pr-4 text-center">
                           <span className={c.is_visible ? "text-accent" : "text-neutral-600"}>
                             {c.is_visible ? "Si" : "No"}
@@ -1649,8 +1667,51 @@ function PlatformSettingsManager() {
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-neutral-400 mb-1 uppercase">
+                          Concurrencia Web
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={configForm.concurrency_web ?? ""}
+                          onChange={(e) =>
+                            setConfigForm((p) => ({
+                              ...p,
+                              concurrency_web: e.target.value ? parseInt(e.target.value) : null,
+                            }))
+                          }
+                          placeholder={`fallback: ${configForm.max_devices}`}
+                          className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-neutral-400 mb-1 uppercase">
+                          Concurrencia App movil
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={configForm.concurrency_mobile ?? ""}
+                          onChange={(e) =>
+                            setConfigForm((p) => ({
+                              ...p,
+                              concurrency_mobile: e.target.value ? parseInt(e.target.value) : null,
+                            }))
+                          }
+                          placeholder={`fallback: ${configForm.max_devices}`}
+                          className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
+                        />
+                      </div>
+                    </div>
+
                     <div>
-                      <label className="block text-xs text-neutral-400 mb-1 uppercase">Max dispositivos</label>
+                      <label className="block text-xs text-neutral-400 mb-1 uppercase">
+                        Max dispositivos (fallback)
+                      </label>
                       <input
                         type="number"
                         min="1"
@@ -1659,6 +1720,25 @@ function PlatformSettingsManager() {
                         onChange={(e) => setConfigForm((p) => ({ ...p, max_devices: parseInt(e.target.value) || 1 }))}
                         className="w-24 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
                       />
+                      <p className="text-xs text-neutral-500 mt-1">
+                        Se usa si no se especifican concurrencias por tipo de dispositivo.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="flex items-center gap-2 text-sm text-neutral-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={configForm.per_circuit}
+                          onChange={(e) => setConfigForm((p) => ({ ...p, per_circuit: e.target.checked }))}
+                          className="accent-accent"
+                        />
+                        Venta por circuito
+                      </label>
+                      <p className="text-xs text-neutral-500 mt-1 ml-6">
+                        Si esta activo, el usuario elige el circuito en la compra.
+                        Si no, el plan concede acceso a todos los circuitos.
+                      </p>
                     </div>
 
                     <div>

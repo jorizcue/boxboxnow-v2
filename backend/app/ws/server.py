@@ -15,7 +15,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy import select
 from app.api.auth_routes import decode_token
 from app.models.database import async_session
-from app.models.schemas import DeviceSession, User
+from app.models.schemas import DeviceSession, ProductTabConfig, Subscription, User
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +109,7 @@ async def race_websocket(
     websocket: WebSocket,
     token: str = Query(""),
     view: str = Query(""),
+    device: str = Query(""),
 ):
     """WebSocket endpoint for real-time race updates.
     Connect with: ws://host/ws/race?token=<jwt>
@@ -121,6 +122,7 @@ async def race_websocket(
     max_devices for the driver steering-wheel display.
     """
     is_driver_view = view == "driver"
+    client_kind = "mobile" if device == "mobile" else "web"
 
     # Authenticate
     if not token:
@@ -144,15 +146,54 @@ async def race_websocket(
         await websocket.close(code=4001, reason="Session terminated")
         return
 
-    # Enforce max concurrent WS connections per user
-    # Driver view gets +1 extra slot on top of max_devices
+    # Enforce max concurrent WS connections per user, split by device type.
+    # Driver view gets +1 extra slot on top of the per-kind limit (mobile only).
     async with async_session() as db:
-        result = await db.execute(select(User.max_devices).where(User.id == user_id))
-        max_devices = result.scalar_one_or_none() or 1
-    effective_max = max_devices + 1 if is_driver_view else max_devices
-    current_ws_count = len(_ws_connections.get(user_id, set()))
-    if current_ws_count >= effective_max:
-        logger.warning(f"WS rejected: max devices (user={user_id}, current={current_ws_count}, max={effective_max})")
+        u_row = await db.execute(
+            select(User.max_devices, User.is_admin).where(User.id == user_id)
+        )
+        u_val = u_row.first()
+        fallback_max = (u_val[0] if u_val else 1) or 1
+        is_admin_user = bool(u_val[1]) if u_val else False
+
+        # Resolve per-kind limits from the user's active subscription product config.
+        kind_limit: int | None = None
+        if not is_admin_user:
+            sub_row = await db.execute(
+                select(Subscription.plan_type).where(
+                    Subscription.user_id == user_id,
+                    Subscription.status.in_(("active", "trialing")),
+                )
+            )
+            plan_types = [r[0] for r in sub_row.all() if r[0]]
+            for pt in plan_types:
+                cfg_row = await db.execute(
+                    select(
+                        ProductTabConfig.concurrency_web,
+                        ProductTabConfig.concurrency_mobile,
+                    ).where(ProductTabConfig.plan_type == pt)
+                )
+                cfg = cfg_row.first()
+                if not cfg:
+                    continue
+                cw, cm = cfg
+                val = cm if client_kind == "mobile" else cw
+                if val is not None:
+                    kind_limit = val if kind_limit is None else max(kind_limit, val)
+
+    # Count only connections of the same kind for enforcement.
+    same_kind_count = sum(
+        1
+        for ws in _ws_connections.get(user_id, set())
+        if getattr(ws, "_bbn_client_kind", "web") == client_kind
+    )
+    base_limit = kind_limit if kind_limit is not None else fallback_max
+    effective_max = base_limit + 1 if (is_driver_view and client_kind == "mobile") else base_limit
+    if same_kind_count >= effective_max:
+        logger.warning(
+            f"WS rejected: max {client_kind} devices "
+            f"(user={user_id}, current={same_kind_count}, max={effective_max})"
+        )
         await websocket.close(code=4003, reason="Max devices reached")
         return
 
@@ -162,10 +203,14 @@ async def race_websocket(
     if user_id not in _ws_connections:
         _ws_connections[user_id] = set()
     _ws_connections[user_id].add(websocket)
-    logger.info(f"WS connected: user={user_id}, view={view}, total_connections={len(_ws_connections[user_id])}")
+    logger.info(
+        f"WS connected: user={user_id}, view={view}, device={client_kind}, "
+        f"total_connections={len(_ws_connections[user_id])}"
+    )
 
     # Track session_token -> ws for session killing
     websocket._bbn_session_token = session_token  # type: ignore[attr-defined]
+    websocket._bbn_client_kind = client_kind  # type: ignore[attr-defined]
     if session_token not in _ws_by_session:
         _ws_by_session[session_token] = set()
     _ws_by_session[session_token].add(websocket)

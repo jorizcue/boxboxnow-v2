@@ -289,7 +289,10 @@ class ProductTabConfig(Base):
     stripe_price_id = Column(String(255), unique=True, nullable=False, index=True)  # Unique per price
     plan_type = Column(String(50), nullable=False, unique=True)  # basic_monthly, basic_annual, etc. — unique
     tabs = Column(Text, nullable=False, default="[]")  # JSON array of tab slugs
-    max_devices = Column(Integer, nullable=False, default=1)
+    max_devices = Column(Integer, nullable=False, default=1)  # DEPRECATED: kept for backward compat, fallback when web/mobile not set
+    concurrency_web = Column(Integer, nullable=True)  # Max concurrent browser sessions (NULL = use max_devices)
+    concurrency_mobile = Column(Integer, nullable=True)  # Max concurrent mobile-app sessions (NULL = use max_devices)
+    per_circuit = Column(Boolean, nullable=False, default=True)  # If False, grants access to ALL circuits on purchase
     display_name = Column(String(100), nullable=False, default="")
     description = Column(Text, nullable=True)
     features = Column(Text, nullable=True, default="[]")  # JSON array of feature strings

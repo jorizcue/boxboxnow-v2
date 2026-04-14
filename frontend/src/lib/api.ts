@@ -304,13 +304,13 @@ export const api = {
   // Stripe
   getCheckoutCircuits: () =>
     fetchApi<{ id: number; name: string }[]>("/api/stripe/circuits"),
-  createCheckoutSession: (priceId: string, circuitId: number, plan?: string, eventDates?: string[]) =>
+  createCheckoutSession: (priceId: string, circuitId: number | null, plan?: string, eventDates?: string[]) =>
     fetchApi<{ client_secret: string; session_id: string }>("/api/stripe/create-checkout-session", {
       method: "POST",
       body: JSON.stringify({
         ...(priceId ? { price_id: priceId } : {}),
         ...(plan ? { plan } : {}),
-        circuit_id: circuitId,
+        ...(circuitId ? { circuit_id: circuitId } : {}),
         ...(eventDates?.length ? { event_dates: eventDates } : {}),
       }),
     }),
@@ -368,6 +368,7 @@ export const api = {
       billing_interval: string | null;
       is_popular: boolean;
       sort_order: number;
+      per_circuit: boolean;
     }[]>("/api/plans"),
 
   // Trial config (public)

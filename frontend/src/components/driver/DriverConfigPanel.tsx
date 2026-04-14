@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import { useDriverConfig, ALL_DRIVER_CARDS, DEFAULT_CARD_ORDER, type DriverCardId } from "@/hooks/useDriverConfig";
+import { useDriverConfig, ALL_DRIVER_CARDS, DEFAULT_CARD_ORDER, DRIVER_CARD_GROUPS, type DriverCardId, type DriverCardGroup } from "@/hooks/useDriverConfig";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Circuit {
   id: number;
@@ -22,6 +23,9 @@ interface Preset {
 
 export function DriverConfigPanel({ onClose }: { onClose: () => void }) {
   const config = useDriverConfig();
+  const { user } = useAuth();
+  const userTabs = user?.tab_access ?? [];
+  const canBox = user?.is_admin || userTabs.includes("app-config-box");
   const [circuits, setCircuits] = useState<Circuit[]>([]);
   const [loading, setLoading] = useState(true);
   const [presets, setPresets] = useState<Preset[]>([]);
@@ -107,30 +111,42 @@ export function DriverConfigPanel({ onClose }: { onClose: () => void }) {
         />
       </div>
 
-      {/* Card visibility */}
-      <div className="space-y-1">
+      {/* Card visibility — grouped by category */}
+      <div className="space-y-2">
         <label className="text-[10px] text-neutral-400 uppercase tracking-wider">Tarjetas visibles</label>
-        <div className="grid grid-cols-2 gap-1">
-          {ALL_DRIVER_CARDS.map((card) => (
-            <label
-              key={card.id}
-              className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white/5 cursor-pointer"
-            >
-              <input
-                type="checkbox"
-                checked={config.visibleCards[card.id] ?? true}
-                onChange={(e) => config.setCardVisible(card.id, e.target.checked)}
-                className="w-3 h-3 rounded border-neutral-600 accent-accent"
-              />
-              <span className={`text-[10px] ${config.visibleCards[card.id] ? "text-neutral-200" : "text-neutral-500"}`}>
-                {card.label}
-                {card.requiresGps && (
-                  <span className="ml-1 text-cyan-600 text-[8px]">GPS</span>
-                )}
-              </span>
-            </label>
-          ))}
-        </div>
+        {DRIVER_CARD_GROUPS.map((group) => {
+          if (group.id === "box" && !canBox) return null;
+          const groupCards = ALL_DRIVER_CARDS.filter((c) => c.group === group.id);
+          if (groupCards.length === 0) return null;
+          return (
+            <div key={group.id} className="space-y-1">
+              <div className="text-[9px] font-bold uppercase tracking-widest text-accent/80 border-b border-border/30 pb-0.5">
+                {group.label}
+              </div>
+              <div className="grid grid-cols-2 gap-1">
+                {groupCards.map((card) => (
+                  <label
+                    key={card.id}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white/5 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={config.visibleCards[card.id] ?? true}
+                      onChange={(e) => config.setCardVisible(card.id, e.target.checked)}
+                      className="w-3 h-3 rounded border-neutral-600 accent-accent"
+                    />
+                    <span className={`text-[10px] ${config.visibleCards[card.id] ? "text-neutral-200" : "text-neutral-500"}`}>
+                      {card.label}
+                      {card.requiresGps && (
+                        <span className="ml-1 text-cyan-600 text-[8px]">GPS</span>
+                      )}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

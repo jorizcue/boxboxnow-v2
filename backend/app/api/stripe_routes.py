@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.config import get_settings
 from app.models.database import get_db
-from app.models.schemas import User, Subscription, UserCircuitAccess, Circuit
+from app.models.schemas import User, Subscription, UserCircuitAccess, Circuit, ProductTabConfig
 from app.api.auth_routes import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -121,6 +121,37 @@ async def _grant_circuit_access(
         ))
 
 
+async def _plan_is_per_circuit(db: AsyncSession, plan_type: str) -> bool:
+    """Return the per_circuit flag for a plan (defaults to True if unknown)."""
+    if not plan_type:
+        return True
+    res = await db.execute(
+        select(ProductTabConfig.per_circuit).where(ProductTabConfig.plan_type == plan_type)
+    )
+    row = res.first()
+    if not row:
+        return True
+    return bool(row[0]) if row[0] is not None else True
+
+
+async def _grant_all_circuits_access(
+    db: AsyncSession, user_id: int, plan_type: str,
+    period_end: datetime | None = None,
+    event_start: datetime | None = None,
+    event_end: datetime | None = None,
+):
+    """Grant circuit access to every existing circuit (for products sold cross-circuit)."""
+    result = await db.execute(select(Circuit.id))
+    circuit_ids = [row[0] for row in result.all()]
+    for cid in circuit_ids:
+        await _grant_circuit_access(
+            db, user_id, cid, plan_type,
+            period_end=period_end,
+            event_start=event_start,
+            event_end=event_end,
+        )
+
+
 @router.get("/circuits")
 async def list_circuits_for_checkout(
     user: User = Depends(get_current_user),
@@ -166,19 +197,38 @@ async def create_checkout_session(
     if not price_id:
         raise HTTPException(400, "price_id or plan required")
 
-    if not circuit_id:
-        raise HTTPException(400, "circuit_id required")
+    # Resolve plan_type from price_id to check per_circuit flag
+    resolved_plan = _price_to_plan(price_id)
+    needs_circuit = await _plan_is_per_circuit(db, resolved_plan) if resolved_plan else True
 
-    # Prevent duplicate subscription for same circuit
-    existing = await db.execute(
-        select(Subscription).where(
-            Subscription.user_id == user.id,
-            Subscription.circuit_id == circuit_id,
-            Subscription.status.in_(("active", "trialing")),
+    if needs_circuit and not circuit_id:
+        raise HTTPException(400, "circuit_id required")
+    if not needs_circuit:
+        circuit_id = None  # Ignore any circuit hint for cross-circuit products
+
+    # Prevent duplicate subscription for same circuit (only meaningful for per-circuit plans)
+    if needs_circuit:
+        existing = await db.execute(
+            select(Subscription).where(
+                Subscription.user_id == user.id,
+                Subscription.circuit_id == circuit_id,
+                Subscription.status.in_(("active", "trialing")),
+            )
         )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(400, "Ya tienes una suscripcion activa para este circuito")
+        if existing.scalar_one_or_none():
+            raise HTTPException(400, "Ya tienes una suscripcion activa para este circuito")
+    else:
+        # For global plans, prevent duplicate plan_type active subscriptions
+        existing = await db.execute(
+            select(Subscription).where(
+                Subscription.user_id == user.id,
+                Subscription.plan_type == resolved_plan,
+                Subscription.circuit_id.is_(None),
+                Subscription.status.in_(("active", "trialing")),
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(400, "Ya tienes una suscripcion activa para este plan")
 
     settings = get_settings()
     s = get_stripe()
@@ -347,9 +397,14 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
             )
             db.add(sub)
 
-            # Grant circuit access for the selected circuit
+            # Grant circuit access: either the selected circuit, or all circuits
+            # when the plan is sold cross-circuit (per_circuit=false).
             if circuit_id:
                 await _grant_circuit_access(db, user_id, circuit_id, plan_type)
+            elif not await _plan_is_per_circuit(db, plan_type):
+                await _grant_all_circuits_access(
+                    db, user_id, plan_type, period_end=period_end
+                )
 
             await _apply_plan_to_user(user_id, plan_type, db, stripe_price_id=stripe_price_id)
             await db.commit()
@@ -399,6 +454,11 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
         if circuit_id:
             await _grant_circuit_access(
                 db, user_id, circuit_id, plan_type,
+                event_start=event_start, event_end=event_end,
+            )
+        elif not await _plan_is_per_circuit(db, plan_type):
+            await _grant_all_circuits_access(
+                db, user_id, plan_type,
                 event_start=event_start, event_end=event_end,
             )
 
@@ -481,6 +541,11 @@ async def _handle_invoice_paid(invoice_data: dict, db: AsyncSession):
                 db, sub.user_id, sub.circuit_id, sub.plan_type,
                 period_end=sub.current_period_end,
             )
+        elif sub.current_period_end and not await _plan_is_per_circuit(db, sub.plan_type):
+            await _grant_all_circuits_access(
+                db, sub.user_id, sub.plan_type,
+                period_end=sub.current_period_end,
+            )
 
         await db.commit()
         logger.info(f"Invoice paid: user={sub.user_id} plan={sub.plan_type} circuit={sub.circuit_id} until={sub.current_period_end}")
@@ -506,11 +571,17 @@ async def _handle_subscription_updated(sub_data: dict, db: AsyncSession):
             sub.current_period_start = datetime.fromtimestamp(current_period_start, tz=timezone.utc)
 
         # Sync circuit access if subscription is still active
-        if sub.circuit_id and sub.current_period_end and sub.status in ("active", "trialing"):
-            await _grant_circuit_access(
-                db, sub.user_id, sub.circuit_id, sub.plan_type,
-                period_end=sub.current_period_end,
-            )
+        if sub.current_period_end and sub.status in ("active", "trialing"):
+            if sub.circuit_id:
+                await _grant_circuit_access(
+                    db, sub.user_id, sub.circuit_id, sub.plan_type,
+                    period_end=sub.current_period_end,
+                )
+            elif not await _plan_is_per_circuit(db, sub.plan_type):
+                await _grant_all_circuits_access(
+                    db, sub.user_id, sub.plan_type,
+                    period_end=sub.current_period_end,
+                )
 
         await db.commit()
         logger.info(f"Subscription updated: sub={sub_id} status={sub.status} cancel_at_end={sub.cancel_at_period_end}")

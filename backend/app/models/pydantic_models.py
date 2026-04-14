@@ -500,6 +500,9 @@ class ProductTabConfigOut(BaseModel):
     plan_type: str
     tabs: list[str] = []
     max_devices: int = 1
+    concurrency_web: int | None = None
+    concurrency_mobile: int | None = None
+    per_circuit: bool = True
     display_name: str = ""
     description: str | None = None
     features: list[str] = []
@@ -519,6 +522,9 @@ class ProductTabConfigCreate(BaseModel):
     plan_type: str
     tabs: list[str] = []
     max_devices: int = 1
+    concurrency_web: int | None = None
+    concurrency_mobile: int | None = None
+    per_circuit: bool = True
     display_name: str = ""
     description: str | None = None
     features: list[str] = []
@@ -536,6 +542,9 @@ class ProductTabConfigUpdate(BaseModel):
     plan_type: str | None = None
     tabs: list[str] | None = None
     max_devices: int | None = None
+    concurrency_web: int | None = None
+    concurrency_mobile: int | None = None
+    per_circuit: bool | None = None
     display_name: str | None = None
     description: str | None = None
     features: list[str] | None = None
@@ -556,3 +565,4 @@ class PlanPublicOut(BaseModel):
     billing_interval: str | None = None
     is_popular: bool = False
     sort_order: int = 0
+    per_circuit: bool = True

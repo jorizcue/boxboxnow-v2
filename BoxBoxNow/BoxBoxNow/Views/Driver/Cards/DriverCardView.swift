@@ -471,6 +471,51 @@ struct DriverCardView: View {
                 }
             }
 
+        // ── PITS (done / min) ──
+        case .pitCount:
+            let done = kart?.pitCount ?? 0
+            let missing = max(0, raceVM.minPits - done)
+            VStack(spacing: 2 * scale) {
+                HStack(alignment: .lastTextBaseline, spacing: 1) {
+                    Text("\(done)")
+                        .font(.system(size: bigFont, weight: .black, design: .rounded))
+                        .foregroundColor(missing == 0 ? .green : .white)
+                    Text("/\(raceVM.minPits)")
+                        .font(.system(size: 14 * scale, weight: .semibold))
+                        .foregroundColor(Color(.systemGray))
+                }
+                if missing > 0 {
+                    Text("Faltan \(missing)")
+                        .font(.system(size: smallFont, weight: .bold))
+                        .foregroundColor(.orange)
+                }
+            }
+
+        // ── Current Pit (live elapsed time) ──
+        case .currentPit:
+            let inPit = (kart?.pitStatus == "in_pit")
+            if inPit, let k = kart {
+                let stintStart = k.stintStartCountdownMs ?? (raceVM.durationMs > 0 ? raceVM.durationMs : raceClock)
+                let remainingMs = max(0, stintStart - raceClock)
+                let elapsed = max(0, min(raceVM.pitTimeS, raceVM.pitTimeS - remainingMs / 1000))
+                let m = Int(elapsed) / 60
+                let s = Int(elapsed) % 60
+                VStack(spacing: 2 * scale) {
+                    Text("\(m):\(String(format: "%02d", s))")
+                        .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                        .foregroundColor(.cyan)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                    Text("EN PIT")
+                        .font(.system(size: smallFont, weight: .bold))
+                        .foregroundColor(Color(.systemGray))
+                }
+            } else {
+                Text("--")
+                    .font(.system(size: mainFont, design: .monospaced))
+                    .foregroundColor(Color(.systemGray4))
+            }
+
         // ── Pit Window (no title — full card) ──
         case .pitWindow:
             VStack(spacing: 4 * scale) {
@@ -565,6 +610,12 @@ struct DriverCardView: View {
             if pitWindowOpen == true { return "Ventana de pit: abierta" }
             if pitWindowOpen == false { return "Ventana de pit: cerrada" }
             return "Ventana de pit: sin datos"
+        case .pitCount:
+            let done = kart?.pitCount ?? 0
+            return "Pits: \(done) de \(raceVM.minPits)"
+        case .currentPit:
+            if kart?.pitStatus == "in_pit" { return "Pit en curso" }
+            return "Pit en curso: sin datos"
         }
     }
 

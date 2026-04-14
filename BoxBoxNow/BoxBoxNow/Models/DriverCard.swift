@@ -1,6 +1,20 @@
 import Foundation
 import SwiftUI
 
+enum DriverCardGroup: String, CaseIterable {
+    case race
+    case box
+    case gps
+
+    var label: String {
+        switch self {
+        case .race: return "Carrera"
+        case .box:  return "BOX"
+        case .gps:  return "GPS"
+        }
+    }
+}
+
 enum DriverCard: String, CaseIterable, Codable, Identifiable {
     case raceTimer
     case currentLapTime
@@ -21,8 +35,21 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
     case gpsGForce
     case lapsToMaxStint
     case pitWindow
+    case pitCount
+    case currentPit
 
     var id: String { rawValue }
+
+    var group: DriverCardGroup {
+        switch self {
+        case .boxScore, .pitCount, .currentPit, .pitWindow:
+            return .box
+        case .deltaBestLap, .gForceRadar, .gpsLapDelta, .gpsSpeed, .gpsGForce:
+            return .gps
+        default:
+            return .race
+        }
+    }
 
     var displayName: String {
         switch self {
@@ -45,6 +72,8 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .gpsGForce:      return "G-Force (numeros)"
         case .lapsToMaxStint: return "Vueltas hasta stint maximo"
         case .pitWindow:      return "Ventana de pit (open/closed)"
+        case .pitCount:       return "PITS (realizados / minimos)"
+        case .currentPit:     return "Pit en curso"
         }
     }
 
@@ -69,6 +98,8 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .gpsGForce:      return "move.3d"
         case .lapsToMaxStint: return "repeat"
         case .pitWindow:      return "door.left.hand.open"
+        case .pitCount:       return "number.circle"
+        case .currentPit:     return "stopwatch.fill"
         }
     }
 
@@ -104,6 +135,8 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .gpsGForce:      return "1.2G"
         case .lapsToMaxStint: return "5.2"
         case .pitWindow:      return "OPEN"
+        case .pitCount:       return "2/4"
+        case .currentPit:     return "0:45"
         }
     }
 
@@ -129,6 +162,8 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .gpsGForce:      return .green
         case .lapsToMaxStint: return .teal
         case .pitWindow:      return .green
+        case .pitCount:       return .orange
+        case .currentPit:     return .cyan
         }
     }
 
