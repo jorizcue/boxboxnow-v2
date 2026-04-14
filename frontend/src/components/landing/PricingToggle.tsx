@@ -23,6 +23,12 @@ interface GroupedPlan {
   price_monthly: number | null;
   price_annual: number | null;
   price_event: number | null;
+  // Exact plan_type keys from DB so we can round-trip without reconstructing
+  // from suffix. Needed for admin-created plans whose plan_type doesn't
+  // follow the `_monthly` / `_annual` naming convention.
+  plan_type_monthly: string | null;
+  plan_type_annual: string | null;
+  plan_type_event: string | null;
   is_popular: boolean;
   is_event: boolean;
   sort_order: number;
@@ -47,6 +53,8 @@ function groupPlans(raw: PlanData[]): GroupedPlan[] {
   for (const p of raw) {
     const base = p.plan_type.replace(/_monthly$/, "").replace(/_annual$/, "");
     const isEvent = p.billing_interval === "one_time" || p.plan_type === "event";
+    const isMonthly = p.billing_interval === "month";
+    const isAnnual = p.billing_interval === "year";
 
     if (!map.has(base)) {
       map.set(base, {
@@ -54,19 +62,30 @@ function groupPlans(raw: PlanData[]): GroupedPlan[] {
         display_name: p.display_name,
         description: p.description,
         features: p.features,
-        price_monthly: p.billing_interval === "month" ? p.price_amount : null,
-        price_annual: p.billing_interval === "year" ? p.price_amount : null,
+        price_monthly: isMonthly ? p.price_amount : null,
+        price_annual: isAnnual ? p.price_amount : null,
         price_event: isEvent ? p.price_amount : null,
+        plan_type_monthly: isMonthly ? p.plan_type : null,
+        plan_type_annual: isAnnual ? p.plan_type : null,
+        plan_type_event: isEvent ? p.plan_type : null,
         is_popular: p.is_popular,
         is_event: isEvent,
         sort_order: p.sort_order,
       });
     } else {
       const existing = map.get(base)!;
-      if (p.billing_interval === "month" && existing.price_monthly == null)
+      if (isMonthly && existing.price_monthly == null) {
         existing.price_monthly = p.price_amount;
-      if (p.billing_interval === "year" && existing.price_annual == null)
+        existing.plan_type_monthly = p.plan_type;
+      }
+      if (isAnnual && existing.price_annual == null) {
         existing.price_annual = p.price_amount;
+        existing.plan_type_annual = p.plan_type;
+      }
+      if (isEvent && existing.price_event == null) {
+        existing.price_event = p.price_amount;
+        existing.plan_type_event = p.plan_type;
+      }
       if (p.is_popular) existing.is_popular = true;
       if (p.features.length > existing.features.length) existing.features = p.features;
     }
@@ -110,8 +129,16 @@ export function PricingToggle() {
   }, []);
 
   const planLink = (p: GroupedPlan) => {
-    if (p.is_event) return `/register?plan=event`;
-    return `/register?plan=${p.base_type}${annual ? "_annual" : "_monthly"}`;
+    // Use the exact plan_type from the DB so the /register → /dashboard
+    // round-trip preserves it (required so per_circuit lookup matches).
+    if (p.is_event) {
+      const evt = p.plan_type_event ?? "event";
+      return `/register?plan=${encodeURIComponent(evt)}`;
+    }
+    const exact = annual ? p.plan_type_annual : p.plan_type_monthly;
+    // Fallback (shouldn't happen with real data): reconstruct from base.
+    const planParam = exact ?? `${p.base_type}${annual ? "_annual" : "_monthly"}`;
+    return `/register?plan=${encodeURIComponent(planParam)}`;
   };
 
   const planButtonText = (p: GroupedPlan) => {

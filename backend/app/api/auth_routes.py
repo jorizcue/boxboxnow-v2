@@ -1071,7 +1071,20 @@ async def reset_password(request: Request, db: AsyncSession = Depends(get_db)):
 
 @router.post("/set-password")
 async def set_password(request: Request, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Set or change password for logged-in user (especially for Google-only accounts)."""
+    """Set or change password for logged-in user.
+
+    Google-authenticated users cannot set a password: their account is tied
+    to Google SSO and we don't want a parallel credential pathway. Users who
+    registered by email already have a password from registration.
+    """
+    # Block Google SSO users from setting a password at all. Their account
+    # is authenticated exclusively through Google.
+    if getattr(user, "google_id", None):
+        raise HTTPException(
+            403,
+            "Las cuentas con inicio de sesion de Google no pueden establecer contrasena.",
+        )
+
     body = await request.json()
     new_password = body.get("password", "")
 
