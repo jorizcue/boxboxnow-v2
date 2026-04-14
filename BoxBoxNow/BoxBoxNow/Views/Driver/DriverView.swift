@@ -222,6 +222,8 @@ struct DriverView: View {
             previousBrightness = UIScreen.main.brightness
             UIScreen.main.brightness = 1.0
             UIApplication.shared.isIdleTimerDisabled = true
+            // Apply orientation lock chosen by the user
+            OrientationManager.shared.apply(driverVM.orientationLock)
             // Staggered card entrance
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 cardsAppeared = true
@@ -232,6 +234,11 @@ struct DriverView: View {
             // Restore previous brightness + allow screen sleep
             UIScreen.main.brightness = previousBrightness
             UIApplication.shared.isIdleTimerDisabled = false
+            // Release orientation lock so the rest of the app can rotate freely
+            OrientationManager.shared.lock(.all)
+        }
+        .onChange(of: driverVM.orientationLock) { _, newValue in
+            OrientationManager.shared.apply(newValue)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // Re-sync state when returning from background (may have missed

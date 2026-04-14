@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct BoxBoxNowApp: App {
+    @UIApplicationDelegateAdaptor(BoxBoxNowAppDelegate.self) private var appDelegate
     @StateObject private var appState = AppState()
 
     var body: some Scene {
