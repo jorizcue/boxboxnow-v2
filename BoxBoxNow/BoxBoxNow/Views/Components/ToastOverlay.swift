@@ -46,6 +46,7 @@ final class ToastManager: ObservableObject {
     func error(_ message: String) { show(message, style: .error, duration: 4) }
     func success(_ message: String) { show(message, style: .success) }
     func warning(_ message: String) { show(message, style: .warning) }
+    func info(_ message: String) { show(message, style: .info) }
 
     func dismiss() { current = nil }
 }

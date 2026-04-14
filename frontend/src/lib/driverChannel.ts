@@ -36,9 +36,16 @@ export function sendBoxCall() {
     const ws = _wsRef?.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "box_call" }));
+      console.log("[BoxCall] Sent via WebSocket");
+    } else {
+      console.warn("[BoxCall] WebSocket not available", {
+        hasRef: !!_wsRef,
+        hasCurrent: !!_wsRef?.current,
+        readyState: _wsRef?.current?.readyState,
+      });
     }
-  } catch {
-    // ignore
+  } catch (e) {
+    console.error("[BoxCall] Failed to send:", e);
   }
 }
 

@@ -6,14 +6,18 @@ struct SessionConfigView: View {
     @State private var isSaving = false
     @State private var showSaved = false
 
+    private let columns = [GridItem(.flexible(), spacing: 10),
+                           GridItem(.flexible(), spacing: 10),
+                           GridItem(.flexible(), spacing: 10)]
+
     var body: some View {
         ScrollView {
             if configVM.isLoading {
                 ProgressView("Cargando sesion...")
                     .padding(.top, 60)
             } else {
-                VStack(spacing: 12) {
-                    // Circuit
+                VStack(spacing: 20) {
+                    // ── Circuit picker ──
                     if !configVM.circuits.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("CIRCUITO").font(.caption).foregroundColor(.gray)
@@ -30,24 +34,79 @@ struct SessionConfigView: View {
                         }
                     }
 
-                    // Cards grid - 3 columns
-                    let columns = [GridItem(.flexible(), spacing: 10),
-                                   GridItem(.flexible(), spacing: 10),
-                                   GridItem(.flexible(), spacing: 10)]
-
-                    LazyVGrid(columns: columns, spacing: 10) {
-                        NumberCard(title: "NUESTRO KART", value: $configVM.session.ourKartNumber, accent: true, range: 1...999)
-                        NumberCard(title: "DURACION (MIN)", value: $configVM.session.durationMin, range: 1...1440)
-                        NumberCard(title: "PITS MINIMOS", value: $configVM.session.minPits, range: 0...50)
-                        NumberCard(title: "TIEMPO PIT (S)", value: $configVM.session.pitTimeS, range: 0...600)
-                        NumberCard(title: "STINT MIN (MIN)", value: $configVM.session.minStintMin, range: 0...300)
-                        NumberCard(title: "STINT MAX (MIN)", value: $configVM.session.maxStintMin, range: 0...300)
-                        NumberCard(title: "TIEMPO MIN\nPILOTO (MIN)", value: $configVM.session.minDriverTimeMin, range: 0...300)
-                        NumberCard(title: "PIT CERRADO\nINICIO (MIN)", value: $configVM.session.pitClosedStartMin, range: 0...1440)
-                        NumberCard(title: "PIT CERRADO\nFINAL (MIN)", value: $configVM.session.pitClosedEndMin, range: 0...1440)
+                    // ── Section: Carrera ──
+                    ConfigSection(title: "CARRERA", icon: "flag.checkered") {
+                        LazyVGrid(columns: columns, spacing: 10) {
+                            NumberCard(
+                                title: "NUESTRO KART",
+                                value: $configVM.session.ourKartNumber,
+                                accent: true, range: 1...999,
+                                tooltip: "Numero del kart de tu equipo"
+                            )
+                            NumberCard(
+                                title: "DURACION (MIN)",
+                                value: $configVM.session.durationMin,
+                                range: 1...1440,
+                                tooltip: "Duracion total de la carrera en minutos"
+                            )
+                            NumberCard(
+                                title: "PITS MINIMOS",
+                                value: $configVM.session.minPits,
+                                range: 0...50,
+                                tooltip: "Paradas obligatorias minimas segun reglamento"
+                            )
+                        }
                     }
 
-                    // Save button
+                    // ── Section: Pit Stops ──
+                    ConfigSection(title: "PIT STOPS", icon: "wrench.and.screwdriver") {
+                        LazyVGrid(columns: columns, spacing: 10) {
+                            NumberCard(
+                                title: "TIEMPO PIT (S)",
+                                value: $configVM.session.pitTimeS,
+                                range: 0...600,
+                                tooltip: "Segundos que tardas en hacer una parada en boxes"
+                            )
+                            NumberCard(
+                                title: "PIT CERRADO\nINICIO (MIN)",
+                                value: $configVM.session.pitClosedStartMin,
+                                range: 0...1440,
+                                tooltip: "Minuto en el que se cierra la ventana de pit (desde el inicio)"
+                            )
+                            NumberCard(
+                                title: "PIT CERRADO\nFINAL (MIN)",
+                                value: $configVM.session.pitClosedEndMin,
+                                range: 0...1440,
+                                tooltip: "Minuto en el que se reabre la ventana de pit"
+                            )
+                        }
+                    }
+
+                    // ── Section: Stints ──
+                    ConfigSection(title: "STINTS Y PILOTOS", icon: "person.2.fill") {
+                        LazyVGrid(columns: columns, spacing: 10) {
+                            NumberCard(
+                                title: "STINT MIN (MIN)",
+                                value: $configVM.session.minStintMin,
+                                range: 0...300,
+                                tooltip: "Tiempo minimo que un piloto debe estar en pista antes de poder entrar a boxes"
+                            )
+                            NumberCard(
+                                title: "STINT MAX (MIN)",
+                                value: $configVM.session.maxStintMin,
+                                range: 0...300,
+                                tooltip: "Tiempo maximo que un piloto puede estar en pista antes de ser obligado a parar"
+                            )
+                            NumberCard(
+                                title: "TIEMPO MIN\nPILOTO (MIN)",
+                                value: $configVM.session.minDriverTimeMin,
+                                range: 0...300,
+                                tooltip: "Tiempo minimo total que cada piloto debe conducir durante la carrera"
+                            )
+                        }
+                    }
+
+                    // ── Save button ──
                     Button(action: saveSession) {
                         HStack {
                             if isSaving {
@@ -63,8 +122,8 @@ struct SessionConfigView: View {
                         .cornerRadius(12)
                     }
                     .disabled(isSaving)
-                    .accessibilityLabel(showSaved ? "Guardado" : "Actualizar sesión")
-                    .padding(.top, 8)
+                    .accessibilityLabel(showSaved ? "Guardado" : "Actualizar sesion")
+                    .padding(.top, 4)
                 }
                 .padding(16)
             }
@@ -102,23 +161,63 @@ struct SessionConfigView: View {
     }
 }
 
+// MARK: - Config Section Header
+
+struct ConfigSection<Content: View>: View {
+    let title: String
+    let icon: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 11))
+                    .foregroundColor(.accentColor)
+                Text(title)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(Color(.systemGray2))
+                    .tracking(1)
+            }
+            .padding(.leading, 4)
+
+            content
+        }
+    }
+}
+
+// MARK: - Number Card
+
 struct NumberCard: View {
     let title: String
     @Binding var value: Int
     var accent: Bool = false
     var range: ClosedRange<Int> = 0...9999
+    var tooltip: String? = nil
     @State private var text: String = ""
     @State private var isInvalid = false
+    @State private var showTooltip = false
     @FocusState private var isFocused: Bool
 
     var body: some View {
         VStack(spacing: 8) {
-            Text(title)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 2) {
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.gray)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if tooltip != nil {
+                    Button(action: { showTooltip = true }) {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 9))
+                            .foregroundColor(Color(.systemGray3))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
 
             TextField("0", text: $text)
                 .font(.system(size: 28, weight: .bold, design: .rounded))
@@ -127,7 +226,6 @@ struct NumberCard: View {
                 .keyboardType(.numberPad)
                 .focused($isFocused)
                 .onChange(of: text) {
-                    // Strip non-numeric characters
                     let filtered = text.filter { $0.isNumber }
                     if filtered != text { text = filtered }
                     if let n = Int(filtered) {
@@ -139,7 +237,6 @@ struct NumberCard: View {
                 }
                 .onChange(of: isFocused) {
                     if !isFocused {
-                        // Clamp on blur
                         if let n = Int(text) {
                             let clamped = min(max(n, range.lowerBound), range.upperBound)
                             value = clamped
@@ -174,5 +271,10 @@ struct NumberCard: View {
         )
         .onAppear { text = "\(value)" }
         .onChange(of: value) { text = "\(value)" }
+        .alert(title, isPresented: $showTooltip) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(tooltip ?? "")
+        }
     }
 }

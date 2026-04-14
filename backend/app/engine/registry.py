@@ -636,28 +636,34 @@ class ReplaySession:
             # Keep state aware of replay speed for lap-based race countdown simulation
             self.state._replay_speed = getattr(self.engine, '_speed', 1.0)
 
-            # Broadcast replay status (time + progress) to clients
-            if self.state._ws_clients:
-                status = self.engine.status
-                if status.get("currentTime"):
-                    rs_msg = json.dumps({
-                        "type": "replay_status",
-                        "data": {
-                            "progress": status["progress"],
-                            "currentTime": status["currentTime"],
-                            "paused": status["paused"],
-                            "active": status["active"],
-                            "speed": status.get("speed", 1),
-                        },
-                    })
-                    dead = set()
-                    for client in self.state._ws_clients:
-                        try:
-                            await client.send_text(rs_msg)
-                        except Exception:
-                            dead.add(client)
-                    for c in dead:
-                        self.state._ws_clients.discard(c)
+            # Broadcast replay status to ALL user connections (not just replay
+            # state clients).  This ensures devices on the live state (e.g. iOS
+            # driver view) also learn about replay start/stop and can switch.
+            status = self.engine.status
+            if status.get("currentTime"):
+                rs_msg = json.dumps({
+                    "type": "replay_status",
+                    "data": {
+                        "progress": status["progress"],
+                        "currentTime": status["currentTime"],
+                        "paused": status["paused"],
+                        "active": status["active"],
+                        "speed": status.get("speed", 1),
+                    },
+                })
+                # Import lazily to avoid circular dependency
+                from app.ws.server import _ws_connections
+                all_user_ws = _ws_connections.get(self.user_id, set())
+                dead = set()
+                for client in list(all_user_ws):
+                    try:
+                        await client.send_text(rs_msg)
+                    except Exception:
+                        dead.add(client)
+                # Clean up dead connections from replay state if applicable
+                for c in dead:
+                    self.state._ws_clients.discard(c)
+                    all_user_ws.discard(c)
 
             # Track pit transitions
             pre_pit_status = {

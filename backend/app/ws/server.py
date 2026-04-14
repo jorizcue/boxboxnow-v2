@@ -162,6 +162,7 @@ async def race_websocket(
     if user_id not in _ws_connections:
         _ws_connections[user_id] = set()
     _ws_connections[user_id].add(websocket)
+    logger.info(f"WS connected: user={user_id}, view={view}, total_connections={len(_ws_connections[user_id])}")
 
     # Track session_token -> ws for session killing
     websocket._bbn_session_token = session_token  # type: ignore[attr-defined]
@@ -214,11 +215,12 @@ async def race_websocket(
                     # Broadcast box call to all other connections of the same user
                     relay_msg = json.dumps({"type": "box_call"})
                     others = _ws_connections.get(user_id, set()) - {websocket}
+                    logger.info(f"BOX CALL from user={user_id}, relaying to {len(others)} other connection(s)")
                     for ws in list(others):
                         try:
                             await ws.send_text(relay_msg)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning(f"BOX CALL relay failed: {e}")
             except json.JSONDecodeError:
                 pass
 

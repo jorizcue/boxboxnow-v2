@@ -2,73 +2,121 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject var authVM: AuthViewModel
+    @EnvironmentObject var configVM: ConfigViewModel
+    @EnvironmentObject var raceVM: RaceViewModel
     @State private var showDriver = false
+    @State private var showDriverConfirm = false
+
+    private var hasSession: Bool {
+        configVM.session.ourKartNumber > 0 && configVM.session.durationMin > 0
+    }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.black.ignoresSafeArea()
 
-                VStack(spacing: 24) {
-                    Spacer()
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // ── Branding ──
+                        VStack(spacing: 6) {
+                            HStack(spacing: 0) {
+                                Text("BB")
+                                    .font(.system(size: 48, weight: .black, design: .rounded))
+                                    .foregroundColor(.white)
+                                Text("N")
+                                    .font(.system(size: 48, weight: .black, design: .rounded))
+                                    .foregroundColor(.accentColor)
+                            }
 
-                    // ── Branding (matches web login header) ──
-                    VStack(spacing: 6) {
-                        HStack(spacing: 0) {
-                            Text("BB")
-                                .font(.system(size: 48, weight: .black, design: .rounded))
-                                .foregroundColor(.white)
-                            Text("N")
-                                .font(.system(size: 48, weight: .black, design: .rounded))
-                                .foregroundColor(.accentColor)
+                            HStack(spacing: 0) {
+                                Text("BOXBOX")
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundColor(.white)
+                                Text("NOW")
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundColor(.accentColor)
+                            }
+
+                            Text("ESTRATEGIA DE KARTING EN TIEMPO REAL")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(Color(.systemGray))
+                                .tracking(1.5)
+                        }
+                        .padding(.top, 32)
+                        .padding(.bottom, 8)
+
+                        // ── Session summary card ──
+                        if hasSession {
+                            SessionSummaryCard(session: configVM.session, circuits: configVM.circuits)
+                        } else {
+                            VStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.orange)
+                                Text("Configura la sesion antes de entrar")
+                                    .font(.subheadline)
+                                    .foregroundColor(.orange)
+                                Text("Necesitas definir al menos el kart y la duracion")
+                                    .font(.caption)
+                                    .foregroundColor(Color(.systemGray3))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.orange.opacity(0.08))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
                         }
 
-                        HStack(spacing: 0) {
-                            Text("BOXBOX")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(.white)
-                            Text("NOW")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(.accentColor)
+                        // ── Action cards ──
+                        NavigationLink(destination: ConfigView()) {
+                            HomeCard(
+                                icon: "gearshape.fill",
+                                title: "Configuracion",
+                                subtitle: "Sesion, tarjetas, GPS"
+                            )
                         }
 
-                        Text("ESTRATEGIA DE KARTING EN TIEMPO REAL")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(Color(.systemGray))
-                            .tracking(1.5)
-                    }
-                    .padding(.bottom, 12)
+                        Button(action: {
+                            if hasSession {
+                                showDriverConfirm = true
+                            } else {
+                                showDriver = true
+                            }
+                        }) {
+                            HomeCard(
+                                icon: "gauge.open.with.lines.needle.33percent.and.arrowtriangle",
+                                title: "Vista Piloto",
+                                subtitle: hasSession
+                                    ? "Kart #\(configVM.session.ourKartNumber) · \(configVM.session.durationMin) min"
+                                    : "Pantalla completa",
+                                accentBorder: true
+                            )
+                        }
+                        .fullScreenCover(isPresented: $showDriver) {
+                            DriverView()
+                        }
 
-                    Spacer()
-
-                    NavigationLink(destination: ConfigView()) {
-                        HomeCard(
-                            icon: "gearshape.fill",
-                            title: "Configuracion",
-                            subtitle: "Sesion, tarjetas, GPS"
-                        )
+                        Spacer(minLength: 24)
                     }
-
-                    Button(action: { showDriver = true }) {
-                        HomeCard(
-                            icon: "gauge.open.with.lines.needle.33percent.and.arrowtriangle",
-                            title: "Vista Piloto",
-                            subtitle: "Pantalla completa"
-                        )
-                    }
-                    .fullScreenCover(isPresented: $showDriver) {
-                        DriverView()
-                    }
-
-                    Spacer()
+                    .padding(.horizontal, 24)
                 }
-                .padding(.horizontal, 24)
             }
             .navigationTitle("")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Text(authVM.user?.displayName ?? "")
-                        .foregroundColor(.gray)
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(raceVM.isConnected ? Color.green : Color(.systemGray4))
+                            .frame(width: 8, height: 8)
+                        Text(authVM.user?.displayName ?? "")
+                            .foregroundColor(.gray)
+                    }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Salir") { authVM.logout() }
@@ -77,14 +125,98 @@ struct HomeView: View {
                         .accessibilityLabel("Cerrar sesion")
                 }
             }
+            .task {
+                await configVM.loadSession()
+                await configVM.loadCircuits()
+            }
+            // Confirmation before entering driver view
+            .alert("Entrar a Vista Piloto", isPresented: $showDriverConfirm) {
+                Button("Entrar") { showDriver = true }
+                Button("Cancelar", role: .cancel) {}
+            } message: {
+                let circuit = configVM.circuits.first(where: { $0.id == configVM.session.circuitId })
+                Text("Kart #\(configVM.session.ourKartNumber)\n\(circuit?.name ?? "Sin circuito") · \(configVM.session.durationMin) min\n\nBrillo al maximo, pantalla siempre encendida")
+            }
         }
     }
 }
+
+// MARK: - Session Summary Card
+
+struct SessionSummaryCard: View {
+    let session: RaceSession
+    let circuits: [Circuit]
+
+    private var circuitName: String {
+        circuits.first(where: { $0.id == session.circuitId })?.name ?? "Sin circuito"
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("SESION ACTIVA")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.accentColor)
+                    .tracking(1)
+                Spacer()
+                Image(systemName: "flag.checkered")
+                    .foregroundColor(Color(.systemGray3))
+                    .font(.system(size: 14))
+            }
+
+            HStack(spacing: 16) {
+                SessionInfoPill(label: "KART", value: "#\(session.ourKartNumber)", accent: true)
+                SessionInfoPill(label: "DURACION", value: "\(session.durationMin) min")
+                SessionInfoPill(label: "PITS", value: "\(session.minPits)")
+            }
+
+            HStack(spacing: 16) {
+                SessionInfoPill(label: "CIRCUITO", value: circuitName)
+                SessionInfoPill(label: "MAX STINT", value: "\(session.maxStintMin) min")
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemGray6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
+                )
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Sesion activa: Kart \(session.ourKartNumber), \(circuitName), \(session.durationMin) minutos")
+    }
+}
+
+struct SessionInfoPill: View {
+    let label: String
+    let value: String
+    var accent: Bool = false
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(label)
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundColor(Color(.systemGray3))
+                .tracking(0.5)
+            Text(value)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundColor(accent ? .accentColor : .white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Home Card
 
 struct HomeCard: View {
     let icon: String
     let title: String
     let subtitle: String
+    var accentBorder: Bool = false
 
     var body: some View {
         HStack(spacing: 16) {
@@ -108,8 +240,16 @@ struct HomeCard: View {
                 .foregroundColor(.gray)
         }
         .padding(20)
-        .background(Color(.systemGray6))
-        .cornerRadius(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemGray6))
+                .overlay(
+                    accentBorder
+                        ? RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.accentColor.opacity(0.25), lineWidth: 1)
+                        : nil
+                )
+        )
         .accessibilityElement(children: .combine)
     }
 }

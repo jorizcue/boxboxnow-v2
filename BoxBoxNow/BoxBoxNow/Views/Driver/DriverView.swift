@@ -4,12 +4,14 @@ struct DriverView: View {
     @EnvironmentObject var driverVM: DriverViewModel
     @EnvironmentObject var raceVM: RaceViewModel
     @EnvironmentObject var configVM: ConfigViewModel
+    @EnvironmentObject var gpsVM: GPSViewModel
     @Environment(\.dismiss) private var dismiss
     @StateObject private var speech = DriverSpeechService()
     @State private var showMenu = false
     @State private var lapDelta: String? = nil // "faster" | "slower"
     @State private var prevLapMs: Double = 0
     @State private var previousBrightness: CGFloat = 0.5
+    @State private var cardsAppeared = false
 
     var body: some View {
         // TimelineView ticks every second, giving us a smooth clock
@@ -54,7 +56,7 @@ struct DriverView: View {
                         Group {
                             if numRows > 0 && availableHeight / CGFloat(numRows) >= 60 {
                                 LazyVGrid(columns: columns, spacing: spacing) {
-                                    ForEach(cards) { card in
+                                    ForEach(Array(cards.enumerated()), id: \.element.id) { idx, card in
                                         DriverCardView(
                                             card: card,
                                             kart: myKart,
@@ -65,6 +67,12 @@ struct DriverView: View {
                                             cardHeight: cardHeight,
                                             clockMs: clockMs,
                                             lapTracker: driverVM.lapTracker
+                                        )
+                                        .opacity(cardsAppeared ? 1 : 0)
+                                        .offset(y: cardsAppeared ? 0 : 12)
+                                        .animation(
+                                            .easeOut(duration: 0.3).delay(Double(idx) * 0.04),
+                                            value: cardsAppeared
                                         )
                                     }
                                 }
@@ -105,21 +113,44 @@ struct DriverView: View {
                         DriverMenuOverlay(speech: speech, isPresented: $showMenu, onDismiss: { dismiss() })
                     }
 
-                    // Audio indicator (top-left when menu is hidden)
-                    if speech.enabled && !showMenu {
+                    // Indicators (top-left audio, right-center menu handle)
+                    if !showMenu {
                         VStack {
                             HStack {
-                                Image(systemName: "speaker.wave.2.fill")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.accentColor)
-                                    .padding(6)
-                                    .background(Color.black.opacity(0.6))
-                                    .clipShape(Circle())
-                                    .padding(.leading, 12)
-                                    .padding(.top, 8)
+                                // Audio indicator
+                                if speech.enabled {
+                                    Image(systemName: "speaker.wave.2.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.accentColor)
+                                        .padding(6)
+                                        .background(Color.black.opacity(0.6))
+                                        .clipShape(Circle())
+                                        .padding(.leading, 12)
+                                        .padding(.top, 8)
+                                }
                                 Spacer()
                             }
                             Spacer()
+                        }
+                        .allowsHitTesting(false)
+
+                        // Menu handle (right edge, vertically centered)
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 3) {
+                                ForEach(0..<3, id: \.self) { _ in
+                                    RoundedRectangle(cornerRadius: 1)
+                                        .fill(Color.white.opacity(0.3))
+                                        .frame(width: 4, height: 4)
+                                }
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 4)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.08))
+                            )
+                            .padding(.trailing, 2)
                         }
                         .allowsHitTesting(false)
                     }
@@ -146,6 +177,18 @@ struct DriverView: View {
                         .transition(.move(edge: .top).combined(with: .opacity))
                         .animation(.easeInOut(duration: 0.3), value: raceVM.isConnected)
                         .accessibilityLabel("Conexion perdida, reconectando")
+                    }
+
+                    // ── IMU Calibration banner ──
+                    if gpsVM.source != .none && gpsVM.calibrator.phase != .aligned {
+                        VStack {
+                            Spacer()
+                            calibrationBanner
+                                .padding(.bottom, safeBottom + 4)
+                        }
+                        .allowsHitTesting(gpsVM.calibrator.phase == .idle || gpsVM.calibrator.phase == .ready)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .animation(.easeInOut(duration: 0.3), value: gpsVM.calibrator.phase)
                     }
 
                     // ── BOX CALL overlay (full-screen red flash) ──
@@ -176,10 +219,13 @@ struct DriverView: View {
         }
         .onAppear {
             raceVM.connect()
-            // Max brightness + keep screen on for driver view
             previousBrightness = UIScreen.main.brightness
             UIScreen.main.brightness = 1.0
             UIApplication.shared.isIdleTimerDisabled = true
+            // Staggered card entrance
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                cardsAppeared = true
+            }
         }
         .onDisappear {
             raceVM.disconnect()
@@ -187,8 +233,15 @@ struct DriverView: View {
             UIScreen.main.brightness = previousBrightness
             UIApplication.shared.isIdleTimerDisabled = false
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            // Re-sync state when returning from background (may have missed
+            // replay start, box calls, or race updates while suspended)
+            raceVM.requestSnapshot()
+        }
         .onChange(of: myKart?.lastLapMs) {
             detectLapDelta()
+            // Haptic on new lap
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         }
         .onChange(of: ourKartNumber) {
             prevLapMs = 0
@@ -197,11 +250,16 @@ struct DriverView: View {
         }
         .onChange(of: raceVM.boxCallActive) {
             if raceVM.boxCallActive {
-                // Auto-dismiss after 30 seconds (matching web)
+                // Heavy haptic for BOX call
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
                     raceVM.boxCallActive = false
                 }
             }
+        }
+        .onChange(of: raceVM.karts.first(where: { $0.kartNumber == ourKartNumber })?.pitStatus) {
+            // Haptic when pit status changes
+            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
         }
     }
 
@@ -222,6 +280,77 @@ struct DriverView: View {
     }
     private var contrastToSaturation: Double {
         1.0 + driverVM.brightness * 0.5
+    }
+
+    @ViewBuilder
+    private var calibrationBanner: some View {
+        let phase = gpsVM.calibrator.phase
+        HStack(spacing: 10) {
+            switch phase {
+            case .idle:
+                Image(systemName: "gyroscope")
+                    .foregroundColor(.black)
+                Text("IMU sin calibrar")
+                    .font(.caption.bold())
+                    .foregroundColor(.black)
+                Spacer()
+                Button("Calibrar") {
+                    gpsVM.calibrator.startCalibration()
+                }
+                .font(.caption.bold())
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(Color.black.opacity(0.2))
+                .foregroundColor(.black)
+                .cornerRadius(12)
+
+            case .sampling:
+                ProgressView()
+                    .tint(.white)
+                    .scaleEffect(0.7)
+                Text("Calibrando... \(Int(gpsVM.calibrator.progress * 100))%")
+                    .font(.caption.bold())
+                    .foregroundColor(.white)
+                Spacer()
+                ProgressView(value: gpsVM.calibrator.progress)
+                    .tint(.white)
+                    .frame(width: 60)
+
+            case .ready:
+                Image(systemName: "car.fill")
+                    .foregroundColor(.black)
+                Text("Conduce >15 km/h")
+                    .font(.caption.bold())
+                    .foregroundColor(.black)
+                Spacer()
+                Button("Omitir") {
+                    gpsVM.calibrator.skipAlignment()
+                }
+                .font(.caption.bold())
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(Color.black.opacity(0.2))
+                .foregroundColor(.black)
+                .cornerRadius(12)
+
+            case .aligned:
+                EmptyView()
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(calibrationBannerColor.opacity(0.9))
+        .cornerRadius(20)
+        .padding(.horizontal, 20)
+    }
+
+    private var calibrationBannerColor: Color {
+        switch gpsVM.calibrator.phase {
+        case .idle: return .yellow
+        case .sampling: return .blue
+        case .ready: return .cyan
+        case .aligned: return .green
+        }
     }
 
     private func syncConfigToRaceVM() {

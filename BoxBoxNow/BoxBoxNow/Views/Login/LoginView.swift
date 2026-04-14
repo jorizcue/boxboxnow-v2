@@ -10,24 +10,50 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            // Background: dark with subtle racing-inspired gradient
+            LinearGradient(
+                colors: [Color(red: 0.04, green: 0.06, blue: 0.04), .black, Color(red: 0.02, green: 0.03, blue: 0.02)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            // Subtle grid pattern overlay
+            GeometryReader { geo in
+                Canvas { context, size in
+                    let spacing: CGFloat = 40
+                    for x in stride(from: 0, through: size.width, by: spacing) {
+                        var path = Path()
+                        path.move(to: CGPoint(x: x, y: 0))
+                        path.addLine(to: CGPoint(x: x, y: size.height))
+                        context.stroke(path, with: .color(.white.opacity(0.015)), lineWidth: 0.5)
+                    }
+                    for y in stride(from: 0, through: size.height, by: spacing) {
+                        var path = Path()
+                        path.move(to: CGPoint(x: 0, y: y))
+                        path.addLine(to: CGPoint(x: size.width, y: y))
+                        context.stroke(path, with: .color(.white.opacity(0.015)), lineWidth: 0.5)
+                    }
+                }
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+            }
 
             if authVM.biometricPending {
-                // Waiting for Face ID / Touch ID
                 biometricWaitingView
             } else {
                 ScrollView {
-                    VStack(spacing: 24) {
+                    VStack(spacing: 28) {
                         Spacer(minLength: 60)
 
-                        // Branding
-                        VStack(spacing: 6) {
+                        // ── Branding ──
+                        VStack(spacing: 8) {
                             HStack(spacing: 0) {
                                 Text("BB")
-                                    .font(.system(size: 48, weight: .black, design: .rounded))
+                                    .font(.system(size: 56, weight: .black, design: .rounded))
                                     .foregroundColor(.white)
                                 Text("N")
-                                    .font(.system(size: 48, weight: .black, design: .rounded))
+                                    .font(.system(size: 56, weight: .black, design: .rounded))
                                     .foregroundColor(.accentColor)
                             }
 
@@ -40,11 +66,13 @@ struct LoginView: View {
                                     .foregroundColor(.accentColor)
                             }
 
-                            Text("Vista Piloto")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
+                            Text("VISTA PILOTO")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(Color(.systemGray2))
+                                .tracking(3)
+                                .padding(.top, 2)
                         }
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 8)
 
                         if authVM.showMfa {
                             mfaSection
@@ -60,28 +88,28 @@ struct LoginView: View {
             }
         }
         // Biometric prompt alert is shown at app root level (BoxBoxNowApp)
-        // to survive the LoginView → HomeView transition
     }
 
     // MARK: - Biometric waiting screen
 
     private var biometricWaitingView: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 28) {
             Spacer()
 
             Image(systemName: BiometricService.iconName)
                 .font(.system(size: 64))
                 .foregroundColor(.accentColor)
+                .shadow(color: .accentColor.opacity(0.3), radius: 20)
 
             Text("Verificando identidad...")
-                .font(.title3)
+                .font(.title3.bold())
                 .foregroundColor(.white)
 
-            // Retry button in case Face ID was dismissed
             Button(action: {
                 Task { await authVM.authenticateWithBiometric() }
             }) {
                 Text("Reintentar \(BiometricService.biometricName)")
+                    .font(.headline)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Color.accentColor)
                     .foregroundColor(.black)
@@ -102,40 +130,71 @@ struct LoginView: View {
     // MARK: - Login form
 
     private var loginSection: some View {
-        VStack(spacing: 16) {
-            TextField("Email", text: $email)
-                .textFieldStyle(.roundedBorder)
-                .textContentType(.emailAddress)
-                .autocapitalization(.none)
-                .keyboardType(.emailAddress)
-                .focused($focusedField, equals: .email)
-                .submitLabel(.next)
-                .onSubmit { focusedField = .password }
-                .accessibilityLabel("Email")
+        VStack(spacing: 14) {
+            // Custom styled email field
+            HStack(spacing: 12) {
+                Image(systemName: "envelope")
+                    .foregroundColor(Color(.systemGray3))
+                    .frame(width: 20)
+                TextField("Email", text: $email)
+                    .textContentType(.emailAddress)
+                    .autocapitalization(.none)
+                    .keyboardType(.emailAddress)
+                    .focused($focusedField, equals: .email)
+                    .submitLabel(.next)
+                    .onSubmit { focusedField = .password }
+                    .foregroundColor(.white)
+            }
+            .padding(14)
+            .background(Color(.systemGray6))
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(focusedField == .email ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
+            )
+            .accessibilityLabel("Email")
 
-            SecureField("Contrasena", text: $password)
-                .textFieldStyle(.roundedBorder)
-                .textContentType(.password)
-                .focused($focusedField, equals: .password)
-                .submitLabel(.go)
-                .onSubmit {
-                    if !email.isEmpty && !password.isEmpty {
-                        authVM.login(email: email, password: password)
+            // Custom styled password field
+            HStack(spacing: 12) {
+                Image(systemName: "lock")
+                    .foregroundColor(Color(.systemGray3))
+                    .frame(width: 20)
+                SecureField("Contrasena", text: $password)
+                    .textContentType(.password)
+                    .focused($focusedField, equals: .password)
+                    .submitLabel(.go)
+                    .onSubmit {
+                        if !email.isEmpty && !password.isEmpty {
+                            authVM.login(email: email, password: password)
+                        }
                     }
-                }
-                .accessibilityLabel("Contraseña")
+                    .foregroundColor(.white)
+            }
+            .padding(14)
+            .background(Color(.systemGray6))
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(focusedField == .password ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
+            )
+            .accessibilityLabel("Contrasena")
 
             if let error = authVM.errorMessage {
-                Text(error)
-                    .foregroundColor(.red)
-                    .font(.caption)
-                    .accessibilityLabel("Error: \(error)")
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                    Text(error)
+                        .font(.caption)
+                }
+                .foregroundColor(.red)
+                .accessibilityLabel("Error: \(error)")
             }
 
             Button(action: { authVM.login(email: email, password: password) }) {
                 HStack {
                     if authVM.isLoading { ProgressView().tint(.black) }
                     Text("Iniciar sesion")
+                        .font(.headline)
                 }
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background(Color.accentColor)
@@ -144,12 +203,24 @@ struct LoginView: View {
             }
             .disabled(authVM.isLoading || email.isEmpty || password.isEmpty)
             .accessibilityLabel("Iniciar sesion")
+            .padding(.top, 4)
+
+            // Divider
+            HStack {
+                Rectangle().fill(Color(.systemGray5)).frame(height: 0.5)
+                Text("o")
+                    .font(.caption)
+                    .foregroundColor(Color(.systemGray3))
+                    .padding(.horizontal, 8)
+                Rectangle().fill(Color(.systemGray5)).frame(height: 0.5)
+            }
+            .padding(.vertical, 4)
 
             Button(action: {
                 authVM.isGoogleLoading = true
                 authVM.loginWithGoogle()
             }) {
-                HStack {
+                HStack(spacing: 8) {
                     if authVM.isGoogleLoading {
                         ProgressView().tint(.white)
                     } else {
@@ -158,14 +229,18 @@ struct LoginView: View {
                     Text("Continuar con Google")
                 }
                 .frame(maxWidth: .infinity, minHeight: 44)
-                .background(Color(.systemGray5))
+                .background(Color(.systemGray6))
                 .foregroundColor(.white)
                 .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color(.systemGray4), lineWidth: 0.5)
+                )
             }
             .disabled(authVM.isLoading || authVM.isGoogleLoading)
             .accessibilityLabel("Continuar con Google")
 
-            // Biometric quick-login (if enabled and token exists)
+            // Biometric quick-login
             if BiometricService.isEnabled && BiometricService.isAvailable && KeychainHelper.loadToken() != nil {
                 Button(action: {
                     authVM.biometricPending = true
@@ -176,9 +251,13 @@ struct LoginView: View {
                         Text("Entrar con \(BiometricService.biometricName)")
                     }
                     .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(Color(.systemGray5))
+                    .background(Color(.systemGray6))
                     .foregroundColor(.white)
                     .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.accentColor.opacity(0.3), lineWidth: 0.5)
+                    )
                 }
                 .accessibilityLabel("Iniciar sesion con \(BiometricService.biometricName)")
             }
@@ -189,30 +268,46 @@ struct LoginView: View {
 
     private var mfaSection: some View {
         VStack(spacing: 16) {
+            Image(systemName: "lock.shield")
+                .font(.system(size: 36))
+                .foregroundColor(.accentColor)
+
             Text("Verificacion en dos pasos")
                 .font(.headline)
                 .foregroundColor(.white)
 
-            TextField("Codigo MFA", text: $authVM.mfaCode)
-                .textFieldStyle(.roundedBorder)
-                .keyboardType(.numberPad)
-                .focused($focusedField, equals: .mfa)
-                .accessibilityLabel("Codigo de verificacion")
-                .toolbar {
-                    ToolbarItemGroup(placement: .keyboard) {
-                        Spacer()
-                        Button("OK") { focusedField = nil }
-                    }
+            HStack(spacing: 12) {
+                Image(systemName: "number")
+                    .foregroundColor(Color(.systemGray3))
+                    .frame(width: 20)
+                TextField("Codigo MFA", text: $authVM.mfaCode)
+                    .keyboardType(.numberPad)
+                    .focused($focusedField, equals: .mfa)
+                    .foregroundColor(.white)
+            }
+            .padding(14)
+            .background(Color(.systemGray6))
+            .cornerRadius(10)
+            .accessibilityLabel("Codigo de verificacion")
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("OK") { focusedField = nil }
                 }
+            }
 
             Button(action: { authVM.verifyMfa(code: authVM.mfaCode) }) {
-                Text("Verificar")
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(Color.accentColor)
-                    .foregroundColor(.black)
-                    .cornerRadius(10)
+                HStack {
+                    if authVM.isLoading { ProgressView().tint(.black) }
+                    Text("Verificar")
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(Color.accentColor)
+                .foregroundColor(.black)
+                .cornerRadius(10)
             }
-            .disabled(authVM.mfaCode.count < 6)
+            .disabled(authVM.mfaCode.count < 6 || authVM.isLoading)
 
             Button("Volver") {
                 authVM.showMfa = false

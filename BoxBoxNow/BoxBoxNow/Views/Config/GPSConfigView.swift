@@ -103,18 +103,83 @@ struct GPSConfigView: View {
                 }
 
                 Section("Calibracion IMU") {
-                    HStack { Text("Fase"); Spacer()
-                        Text(calibPhaseText).foregroundColor(.gray)
+                    HStack {
+                        Text("Fase")
+                        Spacer()
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(calibPhaseColor)
+                                .frame(width: 8, height: 8)
+                            Text(calibPhaseText)
+                                .foregroundColor(.gray)
+                        }
                     }
-                    Button("Iniciar calibracion") {
-                        // TODO: Wire calibration through gpsVM
-                    }
-                    .disabled(true)
-                    .frame(minHeight: 44)
 
-                    Text("La calibracion automatica estara disponible en una futura actualizacion")
-                        .font(.caption)
-                        .foregroundColor(Color(.systemGray3))
+                    if gpsVM.calibrator.phase == .sampling {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Muestras: \(Int(gpsVM.calibrator.progress * 100))%")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            ProgressView(value: gpsVM.calibrator.progress)
+                                .tint(.blue)
+                        }
+                    }
+
+                    if gpsVM.calibrator.phase == .ready {
+                        Text("Conduce a mas de 15 km/h para alinear los ejes del dispositivo")
+                            .font(.caption)
+                            .foregroundColor(.cyan)
+                    }
+
+                    if gpsVM.calibrator.phase == .aligned {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("Calibracion completa")
+                                .foregroundColor(.green)
+                        }
+                        .font(.subheadline)
+                    }
+
+                    // Action buttons
+                    if gpsVM.calibrator.phase == .idle {
+                        Button("Iniciar calibracion") {
+                            gpsVM.calibrator.startCalibration()
+                            toast.info("Manten el kart quieto durante la calibracion")
+                        }
+                        .frame(minHeight: 44)
+                        .disabled(!gpsVM.isConnected)
+
+                        if !gpsVM.isConnected {
+                            Text("Conecta un dispositivo GPS para calibrar")
+                                .font(.caption)
+                                .foregroundColor(Color(.systemGray3))
+                        }
+                    } else if gpsVM.calibrator.phase == .sampling {
+                        Text("Manten el kart quieto...")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    } else if gpsVM.calibrator.phase == .ready {
+                        Button("Omitir alineacion") {
+                            gpsVM.calibrator.skipAlignment()
+                            toast.success("Calibracion completada (sin alineacion)")
+                        }
+                        .frame(minHeight: 44)
+                    } else if gpsVM.calibrator.phase == .aligned {
+                        Button("Recalibrar") {
+                            gpsVM.calibrator.reset()
+                            gpsVM.calibrator.startCalibration()
+                            toast.info("Recalibrando — manten el kart quieto")
+                        }
+                        .frame(minHeight: 44)
+                    }
+
+                    Button("Resetear calibracion", role: .destructive) {
+                        gpsVM.calibrator.reset()
+                        toast.warning("Calibracion reseteada")
+                    }
+                    .frame(minHeight: 44)
+                    .disabled(gpsVM.calibrator.phase == .idle)
                 }
             }
         }
@@ -122,7 +187,21 @@ struct GPSConfigView: View {
     }
 
     private var calibPhaseText: String {
-        "Pendiente"
+        switch gpsVM.calibrator.phase {
+        case .idle: return "Sin calibrar"
+        case .sampling: return "Capturando gravedad..."
+        case .ready: return "Gravedad OK — alineando"
+        case .aligned: return "Calibrado"
+        }
+    }
+
+    private var calibPhaseColor: Color {
+        switch gpsVM.calibrator.phase {
+        case .idle: return .gray
+        case .sampling: return .blue
+        case .ready: return .cyan
+        case .aligned: return .green
+        }
     }
 
     private func connectToDevice(_ device: CBPeripheral) {

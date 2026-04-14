@@ -39,14 +39,24 @@ struct DriverCardView: View {
         card == .pitWindow
     }
 
+    /// Cards that are visually prominent (position, pit window)
+    private var isProminent: Bool {
+        card == .position || card == .realPos || card == .pitWindow
+    }
+
     var body: some View {
         VStack(spacing: 2 * scale) {
             if !hideLabel {
-                Text(cardLabel)
-                    .font(.system(size: 9 * scale, weight: .medium))
-                    .foregroundColor(.gray)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
+                HStack(spacing: 3 * scale) {
+                    Image(systemName: card.iconName)
+                        .font(.system(size: 7 * scale))
+                        .foregroundColor(cardAccentColor.opacity(0.7))
+                    Text(cardLabel)
+                        .font(.system(size: 9 * scale, weight: .medium))
+                        .foregroundColor(.gray)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                }
             }
 
             cardContent
@@ -57,10 +67,10 @@ struct DriverCardView: View {
         .frame(height: cardHeight)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(cardAccentColor.opacity(0.08))
+                .fill(cardAccentColor.opacity(isProminent ? 0.18 : 0.12))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .stroke(cardBorderColor.opacity(0.4), lineWidth: 1)
+                        .stroke(cardBorderColor.opacity(isProminent ? 0.7 : 0.5), lineWidth: isProminent ? 2 : 1.5)
                 )
         )
         .accessibilityElement(children: .combine)

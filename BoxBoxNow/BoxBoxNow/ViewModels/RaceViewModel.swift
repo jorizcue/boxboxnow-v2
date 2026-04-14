@@ -56,6 +56,12 @@ final class RaceViewModel: ObservableObject {
 
     func disconnect() { wsClient.disconnect() }
 
+    /// Ask server to re-resolve state and send a fresh snapshot.
+    /// Useful after returning from background or when replay/live switch is needed.
+    func requestSnapshot() {
+        wsClient.send("{\"type\":\"requestSnapshot\"}")
+    }
+
     // MARK: - Clock interpolation (matching web useRaceClock)
     // Server sends countdown every ~30s. View interpolates with TimelineView.
 

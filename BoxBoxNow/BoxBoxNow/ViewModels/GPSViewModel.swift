@@ -42,12 +42,18 @@ final class GPSViewModel: ObservableObject {
     let bleManager = BLEManager()
     let phoneGPS = PhoneGPSManager()
     private let ubxParser = UbxParser()
-    private let imuCalibrator = ImuCalibrator()
+    let calibrator = ImuCalibrator()
 
     private var lastSampleTime: TimeInterval = 0
     private var sampleCount = 0
+    private var calibratorSink: AnyCancellable?
 
     init() {
+        // Forward calibrator changes so SwiftUI views update
+        calibratorSink = calibrator.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
+
         bleManager.onData = { [weak self] data in
             self?.ubxParser.feed(data)
         }
@@ -90,7 +96,7 @@ final class GPSViewModel: ObservableObject {
     }
 
     private func handleSample(_ raw: GPSSample) {
-        let calibrated = imuCalibrator.calibrate(sample: raw)
+        let calibrated = calibrator.calibrate(sample: raw)
         lastSample = calibrated
         isConnected = true
 
