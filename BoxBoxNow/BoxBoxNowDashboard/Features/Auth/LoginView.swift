@@ -44,6 +44,8 @@ struct LoginView: View {
                     .disabled(email.isEmpty || password.isEmpty)
 
                     BBNSecondaryButton(title: "Continuar con Google", icon: "g.circle") {
+                        guard !isGoogleLoading else { return }
+                        isGoogleLoading = true
                         Task { await startGoogle() }
                     }
                     .disabled(isGoogleLoading)
@@ -53,7 +55,7 @@ struct LoginView: View {
             .frame(maxWidth: 400)
 
             Spacer()
-            Text("v1.0.0")
+            Text(appVersion)
                 .font(BBNTypography.caption)
                 .foregroundColor(BBNColors.textDim)
         }
@@ -74,12 +76,17 @@ struct LoginView: View {
         return false
     }
 
+    private var appVersion: String {
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String).map { "v\($0)" } ?? "—"
+    }
+
     private func startGoogle() async {
-        isGoogleLoading = true
+        // isGoogleLoading was set synchronously in the button action to
+        // prevent double-tap races. Clearing it is our responsibility here.
         defer { isGoogleLoading = false }
         do {
             let token = try await GoogleOAuthFlow().start()
-            await app.auth.loginWithExistingToken(token)
+            try await app.auth.loginWithExistingToken(token)
         } catch let err as GoogleOAuthError {
             switch err {
             case .cancelled:
@@ -91,7 +98,7 @@ struct LoginView: View {
                 errorMessage = msg
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = ErrorMessages.userFacing(error)
         }
     }
 }

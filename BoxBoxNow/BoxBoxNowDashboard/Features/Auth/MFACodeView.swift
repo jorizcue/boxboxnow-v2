@@ -30,7 +30,7 @@ struct MFACodeView: View {
                         .background(BBNColors.surface)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .onChange(of: code) { _, new in
-                            code = String(new.prefix(6).filter(\.isNumber))
+                            code = String(new.filter(\.isNumber).prefix(6))
                         }
 
                     if let err = errorMessage {

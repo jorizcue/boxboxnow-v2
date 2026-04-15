@@ -37,7 +37,7 @@ struct MFASetupView: View {
                         .monospacedDigit()
                         .multilineTextAlignment(.center)
                         .onChange(of: code) { _, new in
-                            code = String(new.prefix(6).filter(\.isNumber))
+                            code = String(new.filter(\.isNumber).prefix(6))
                         }
                     BBNPrimaryButton(title: "Verificar") {
                         Task { await app.auth.verifyMFA(code: code) }

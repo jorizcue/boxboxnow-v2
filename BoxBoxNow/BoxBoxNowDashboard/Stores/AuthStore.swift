@@ -61,7 +61,7 @@ final class AuthStore {
         }
     }
 
-    func loginWithExistingToken(_ token: String) async {
+    func loginWithExistingToken(_ token: String) async throws {
         keychain.saveToken(token)
         do {
             let me = try await service.me()
@@ -70,6 +70,7 @@ final class AuthStore {
         } catch {
             keychain.deleteToken()
             self.authState = .loggedOut
+            throw error
         }
     }
 
@@ -84,7 +85,11 @@ final class AuthStore {
     func bootstrap() async {
         if let token = keychain.loadToken() {
             authState = .authenticating
-            await loginWithExistingToken(token)
+            // Bootstrap swallows the rejection error on purpose: the user hasn't
+            // actively tried to sign in this session, so there's no UI to show
+            // an error in — we just fall back to the login screen. The catch
+            // inside `loginWithExistingToken` already set authState to .loggedOut.
+            try? await loginWithExistingToken(token)
         } else {
             authState = .loggedOut
         }

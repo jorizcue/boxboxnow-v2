@@ -27,12 +27,20 @@ struct BiometricLoginView: View {
         .background(BBNColors.background.ignoresSafeArea())
         .task {
             let ok = await BiometricService.authenticate()
-            if ok, let token = KeychainHelper.loadToken() {
-                await app.auth.loginWithExistingToken(token)
-            } else {
+            // Both conditions must hold: biometric passed AND a token exists in keychain.
+            guard ok, let token = KeychainHelper.loadToken() else {
                 errorMessage = "No se pudo verificar. Usa tu contraseña."
                 // Fall back to LoginView by going through the same cleanup
                 // path as a 401: clears keychain, user, pendingEmail, state.
+                NotificationCenter.default.post(name: .authExpired, object: nil)
+                return
+            }
+            do {
+                try await app.auth.loginWithExistingToken(token)
+                // Success: AuthStore sets authState = .loggedIn, RootView swaps us out.
+            } catch {
+                // Token was rejected by the server (expired, revoked, etc.).
+                errorMessage = "Sesión no válida. Inicia sesión de nuevo."
                 NotificationCenter.default.post(name: .authExpired, object: nil)
             }
         }
