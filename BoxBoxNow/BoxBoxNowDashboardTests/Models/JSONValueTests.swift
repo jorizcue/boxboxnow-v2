@@ -82,4 +82,20 @@ final class JSONValueTests: XCTestCase {
         XCTAssertEqual(JSONValue.double(-2.5).intValue, -2)
         XCTAssertEqual(JSONValue.double(0.0).intValue, 0)
     }
+
+    /// Pinning test for the upper-bound trap edge. `Double(Int.max)` is
+    /// actually `2^63` (Int.max = 2^63-1 isn't exactly representable as a
+    /// Double and rounds up), so a `d` exactly equal to `Double(Int.max)`
+    /// overflows when passed through `Int(d)`. The guard uses strict `<`
+    /// to exclude this value; if someone ever relaxes it to `<=`, this
+    /// test starts trapping.
+    func testIntValueReturnsNilAtIntMaxDoubleBoundary() {
+        XCTAssertNil(JSONValue.double(Double(Int.max)).intValue)
+    }
+
+    /// Lower bound: `Double(Int.min) == -2^63`, which IS exactly
+    /// representable, so the guard uses `>=` and this value is valid.
+    func testIntValueAcceptsIntMinDoubleBoundary() {
+        XCTAssertEqual(JSONValue.double(Double(Int.min)).intValue, Int.min)
+    }
 }

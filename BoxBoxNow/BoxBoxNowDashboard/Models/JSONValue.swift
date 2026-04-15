@@ -67,6 +67,13 @@ enum JSONValue: Codable, Equatable, Hashable {
     /// finite `.double` whose truncated value fits in `Int`. Returns `nil` for
     /// `.nan`, `.infinity`, or doubles outside the representable `Int` range
     /// instead of trapping (`Int(d)` traps on non-finite / out-of-range inputs).
+    ///
+    /// Note on the upper bound: `Double(Int.max)` is `2^63`, NOT `Int.max`
+    /// (which is `2^63 - 1`) — `Int.max` isn't exactly representable as a
+    /// `Double`, so the cast rounds up. That means a `d` exactly equal to
+    /// `Double(Int.max)` is actually `2^63`, which overflows when passed
+    /// through `Int(d)`. The upper bound therefore uses strict `<`, not `<=`.
+    /// The lower bound uses `>=` because `Double(Int.min)` IS exactly `-2^63`.
     var intValue: Int? {
         switch self {
         case let .int(i):
@@ -74,7 +81,7 @@ enum JSONValue: Codable, Equatable, Hashable {
         case let .double(d):
             guard d.isFinite,
                   d >= Double(Int.min),
-                  d <= Double(Int.max) else { return nil }
+                  d < Double(Int.max) else { return nil }
             return Int(d)
         default:
             return nil
