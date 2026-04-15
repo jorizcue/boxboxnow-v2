@@ -6,8 +6,35 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		6A306500092801DB65E90E25 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
+		9ACC87C64B0B9BFBD25BC818 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
+		C4BEB02FBD94EFF88B830694 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		3B16F56063F165E9A12316A3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 244C0A792F8D3A2A0047102F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 061208C358105A983F07D5E6;
+			remoteInfo = BoxBoxNowDashboard;
+		};
+		662324416A384F7C46E58E4C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 244C0A792F8D3A2A0047102F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 061208C358105A983F07D5E6;
+			remoteInfo = BoxBoxNowDashboard;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		244C0A812F8D3A2A0047102F /* BoxBoxNow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BoxBoxNow.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4132D5E13DE7435DACF4F43C /* BoxBoxNowDashboardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BoxBoxNowDashboardTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		53D95657E1ADF2BB1647C14F /* BoxBoxNowDashboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BoxBoxNowDashboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B978CAD275F81D34EC842DD0 /* BoxBoxNowDashboardUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BoxBoxNowDashboardUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C2C533B2DA82843B7A10971F /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -39,6 +66,30 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		415F6C6A7F2247113B807F6C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6A306500092801DB65E90E25 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		686DB7FE0E97F23C391D6C8E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9ACC87C64B0B9BFBD25BC818 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B218F78FB221A608BBABCE0C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C4BEB02FBD94EFF88B830694 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -47,6 +98,8 @@
 			children = (
 				244C0A832F8D3A2A0047102F /* BoxBoxNow */,
 				244C0A822F8D3A2A0047102F /* Products */,
+				6DA2DEE9AC55C61895B71D0E /* Frameworks */,
+				79151AA7EC142F3FA42398AE /* BoxBoxNowDashboard */,
 			);
 			sourceTree = "<group>";
 		};
@@ -54,13 +107,74 @@
 			isa = PBXGroup;
 			children = (
 				244C0A812F8D3A2A0047102F /* BoxBoxNow.app */,
+				53D95657E1ADF2BB1647C14F /* BoxBoxNowDashboard.app */,
+				4132D5E13DE7435DACF4F43C /* BoxBoxNowDashboardTests.xctest */,
+				B978CAD275F81D34EC842DD0 /* BoxBoxNowDashboardUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		6DA2DEE9AC55C61895B71D0E /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				9ABAB475B30569560153F162 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		79151AA7EC142F3FA42398AE /* BoxBoxNowDashboard */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = BoxBoxNowDashboard;
+			sourceTree = "<group>";
+		};
+		9ABAB475B30569560153F162 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				C2C533B2DA82843B7A10971F /* Foundation.framework */,
+			);
+			name = iOS;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		03C4AE6E5EA25A62ECD8CF14 /* BoxBoxNowDashboardTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E7E68FC72F3B0F24480A8ADC /* Build configuration list for PBXNativeTarget "BoxBoxNowDashboardTests" */;
+			buildPhases = (
+				A1B02E70345C5BB45194BE9B /* Sources */,
+				686DB7FE0E97F23C391D6C8E /* Frameworks */,
+				E6BAD099884103D7FD76318C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				9C588804C3CA61EC48C848D7 /* PBXTargetDependency */,
+			);
+			name = BoxBoxNowDashboardTests;
+			productName = BoxBoxNowDashboardTests;
+			productReference = 4132D5E13DE7435DACF4F43C /* BoxBoxNowDashboardTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		061208C358105A983F07D5E6 /* BoxBoxNowDashboard */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8A5F8D5D0F909AC5B9774B03 /* Build configuration list for PBXNativeTarget "BoxBoxNowDashboard" */;
+			buildPhases = (
+				C18EE7E53318666422264824 /* Sources */,
+				415F6C6A7F2247113B807F6C /* Frameworks */,
+				FEED8132E382F68AD95FA5F5 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BoxBoxNowDashboard;
+			productName = BoxBoxNowDashboard;
+			productReference = 53D95657E1ADF2BB1647C14F /* BoxBoxNowDashboard.app */;
+			productType = "com.apple.product-type.application";
+		};
 		244C0A802F8D3A2A0047102F /* BoxBoxNow */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 244C0A8C2F8D3A2C0047102F /* Build configuration list for PBXNativeTarget "BoxBoxNow" */;
@@ -77,11 +191,27 @@
 				244C0A832F8D3A2A0047102F /* BoxBoxNow */,
 			);
 			name = BoxBoxNow;
-			packageProductDependencies = (
-			);
 			productName = BoxBoxNow;
 			productReference = 244C0A812F8D3A2A0047102F /* BoxBoxNow.app */;
 			productType = "com.apple.product-type.application";
+		};
+		786AA2F857BF6166460B1BFD /* BoxBoxNowDashboardUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B94410C78A168B87D30F2BA8 /* Build configuration list for PBXNativeTarget "BoxBoxNowDashboardUITests" */;
+			buildPhases = (
+				15CCB5CB4F9B0E5CF3C21635 /* Sources */,
+				B218F78FB221A608BBABCE0C /* Frameworks */,
+				7295167385084CAA5B3AD736 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0F3218180E58E35D8EDE75F6 /* PBXTargetDependency */,
+			);
+			name = BoxBoxNowDashboardUITests;
+			productName = BoxBoxNowDashboardUITests;
+			productReference = B978CAD275F81D34EC842DD0 /* BoxBoxNowDashboardUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
@@ -113,6 +243,9 @@
 			projectRoot = "";
 			targets = (
 				244C0A802F8D3A2A0047102F /* BoxBoxNow */,
+				061208C358105A983F07D5E6 /* BoxBoxNowDashboard */,
+				03C4AE6E5EA25A62ECD8CF14 /* BoxBoxNowDashboardTests */,
+				786AA2F857BF6166460B1BFD /* BoxBoxNowDashboardUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -125,10 +258,52 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7295167385084CAA5B3AD736 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E6BAD099884103D7FD76318C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FEED8132E382F68AD95FA5F5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		15CCB5CB4F9B0E5CF3C21635 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		244C0A7D2F8D3A2A0047102F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1B02E70345C5BB45194BE9B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C18EE7E53318666422264824 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -137,7 +312,86 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		0F3218180E58E35D8EDE75F6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = BoxBoxNowDashboard;
+			target = 061208C358105A983F07D5E6 /* BoxBoxNowDashboard */;
+			targetProxy = 3B16F56063F165E9A12316A3 /* PBXContainerItemProxy */;
+		};
+		9C588804C3CA61EC48C848D7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = BoxBoxNowDashboard;
+			target = 061208C358105A983F07D5E6 /* BoxBoxNowDashboard */;
+			targetProxy = 662324416A384F7C46E58E4C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		0A2F3387272FC15E70A52B5B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jizcue.BoxBoxNowDashboard.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_TARGET_NAME = BoxBoxNowDashboard;
+			};
+			name = Debug;
+		};
+		126FFB11C08B285814B562EF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = BoxBoxNowDashboard/BoxBoxNowDashboard.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "$(DEVELOPMENT_TEAM)";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BoxBoxNowDashboard/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.jizcue.BoxBoxNowDashboard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		17C8E039D58BDF5E13157388 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = BoxBoxNowDashboard/BoxBoxNowDashboard.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "$(DEVELOPMENT_TEAM)";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BoxBoxNowDashboard/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.jizcue.BoxBoxNowDashboard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		244C0A8A2F8D3A2C0047102F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -262,6 +516,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = BoxBoxNow/BoxBoxNow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8HBXJXJC68;
@@ -296,6 +551,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = BoxBoxNow/BoxBoxNow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8HBXJXJC68;
@@ -325,6 +581,49 @@
 			};
 			name = Release;
 		};
+		84FBC0F8ECDC265256F21DE0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jizcue.BoxBoxNowDashboard.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_TARGET_NAME = BoxBoxNowDashboard;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		C6D065E72190E5EBDD99570B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jizcue.BoxBoxNowDashboard.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BoxBoxNowDashboard.app/BoxBoxNowDashboard";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		FF01BBC2801055214E17EF69 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jizcue.BoxBoxNowDashboard.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BoxBoxNowDashboard.app/BoxBoxNowDashboard";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -342,6 +641,33 @@
 			buildConfigurations = (
 				244C0A8D2F8D3A2C0047102F /* Debug */,
 				244C0A8E2F8D3A2C0047102F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8A5F8D5D0F909AC5B9774B03 /* Build configuration list for PBXNativeTarget "BoxBoxNowDashboard" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				17C8E039D58BDF5E13157388 /* Release */,
+				126FFB11C08B285814B562EF /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B94410C78A168B87D30F2BA8 /* Build configuration list for PBXNativeTarget "BoxBoxNowDashboardUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				84FBC0F8ECDC265256F21DE0 /* Release */,
+				0A2F3387272FC15E70A52B5B /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E7E68FC72F3B0F24480A8ADC /* Build configuration list for PBXNativeTarget "BoxBoxNowDashboardTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C6D065E72190E5EBDD99570B /* Release */,
+				FF01BBC2801055214E17EF69 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
