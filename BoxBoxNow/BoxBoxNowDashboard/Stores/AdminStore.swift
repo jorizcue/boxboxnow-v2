@@ -24,7 +24,7 @@ final class AdminStore {
             self.circuits = try await circs
             self.platformMetrics = try? await metrics
         } catch {
-            self.lastError = error.localizedDescription
+            self.lastError = ErrorMessages.userFacing(error)
         }
     }
 }

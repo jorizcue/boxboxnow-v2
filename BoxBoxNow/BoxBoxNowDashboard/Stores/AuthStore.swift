@@ -116,18 +116,9 @@ final class AuthStore {
     }
 
     private func userFacingMessage(for error: Error) -> String {
-        if let apiError = error as? APIError {
-            switch apiError {
-            case .unauthorized:
-                return "Invalid email or password. Please try again."
-            case .requestFailed:
-                return "Couldn't reach the server. Check your connection and try again."
-            case .invalidURL:
-                return "Invalid request. Please contact support."
-            case .decodingError:
-                return "Unexpected response from the server. Please try again."
-            }
+        if let apiError = error as? APIError, case .unauthorized = apiError {
+            return "Invalid email or password. Please try again."
         }
-        return error.localizedDescription
+        return ErrorMessages.userFacing(error)
     }
 }

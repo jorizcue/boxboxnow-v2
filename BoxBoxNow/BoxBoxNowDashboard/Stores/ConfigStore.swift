@@ -13,11 +13,9 @@ final class ConfigStore {
     var lastError: String?
 
     private let configService: ConfigService
-    private let raceService: RaceService
 
-    init(configService: ConfigService = ConfigService(), raceService: RaceService = RaceService()) {
+    init(configService: ConfigService = ConfigService()) {
         self.configService = configService
-        self.raceService = raceService
     }
 
     func refresh() async {
@@ -34,7 +32,7 @@ final class ConfigStore {
             self.preferences = try await prefs
             self.selectedCircuitId = self.circuits.first(where: { $0.isActive == true })?.id
         } catch {
-            self.lastError = error.localizedDescription
+            self.lastError = ErrorMessages.userFacing(error)
         }
     }
 
@@ -43,7 +41,20 @@ final class ConfigStore {
             try await configService.selectCircuit(id: id)
             selectedCircuitId = id
         } catch {
-            lastError = error.localizedDescription
+            lastError = ErrorMessages.userFacing(error)
         }
+    }
+
+    /// Clears all observable state back to initial values. Called on logout
+    /// so a subsequent login on the same AppStore instance doesn't briefly
+    /// flash the previous user's config at the new user.
+    func reset() {
+        circuits = []
+        selectedCircuitId = nil
+        liveTimingURL = nil
+        presets = []
+        preferences = nil
+        isLoading = false
+        lastError = nil
     }
 }

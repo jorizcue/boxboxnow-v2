@@ -143,6 +143,29 @@ final class RaceStore {
         boxCallActive = false
     }
 
+    /// Clears all race-data state back to initial values. Called on logout
+    /// so a subsequent login on the same RaceStore instance doesn't briefly
+    /// flash the previous user's race data at the new user. Does NOT touch
+    /// WS connection state (`isConnected`, `reconnectReason`) — those are
+    /// driven by `handleState` from the WS observer and remain authoritative.
+    func reset() {
+        raceStarted = false
+        raceFinished = false
+        countdownMs = 0
+        durationMs = 0
+        trackName = ""
+        karts = []
+        fifo = .empty
+        classification = []
+        config = nil
+        replayStatus = .idle
+        teams = []
+        boxCallClearTask?.cancel()
+        boxCallClearTask = nil
+        boxCallActive = false
+        boxCallGeneration &+= 1  // invalidate any in-flight clear task
+    }
+
     // MARK: - WebSocket wiring
 
     private func startObservingClient() {
