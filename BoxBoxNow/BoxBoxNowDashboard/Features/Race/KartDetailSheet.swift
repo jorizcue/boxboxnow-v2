@@ -63,7 +63,7 @@ struct KartDetailSheet: View {
                 Text("Últimas vueltas")
                     .font(BBNTypography.caption)
                     .foregroundStyle(BBNColors.textMuted)
-                ForEach(Array(kart.recentLaps.enumerated()), id: \.offset) { _, lap in
+                ForEach(Array(kart.recentLaps.enumerated()), id: \.element.totalLap) { idx, lap in
                     HStack {
                         Text("Vuelta \(lap.totalLap)")
                             .font(BBNTypography.body)
@@ -72,7 +72,7 @@ struct KartDetailSheet: View {
                         Text(RaceFormatters.lapTime(ms: lap.lapTime))
                             .font(BBNTypography.body)
                             .monospacedDigit()
-                            .foregroundStyle(isBest(lap) ? BBNColors.accent : BBNColors.textPrimary)
+                            .foregroundStyle(idx == bestLapIndex ? BBNColors.accent : BBNColors.textPrimary)
                     }
                     .padding(.vertical, 6)
                     .padding(.horizontal, 12)
@@ -113,8 +113,10 @@ struct KartDetailSheet: View {
         }
     }
 
-    private func isBest(_ lap: KartState.RecentLap) -> Bool {
-        guard let best = kart.base.bestLapMs else { return false }
-        return abs(lap.lapTime - best) < 0.5
+    private var bestLapIndex: Int? {
+        kart.recentLaps
+            .enumerated()
+            .min(by: { $0.element.lapTime < $1.element.lapTime })?
+            .offset
     }
 }
