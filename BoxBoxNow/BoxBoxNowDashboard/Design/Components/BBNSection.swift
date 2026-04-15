@@ -15,9 +15,9 @@ struct BBNSection<Content: View>: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.bbnTitle).foregroundColor(.bbnText)
+                    Text(title).font(BBNTypography.title2).foregroundColor(BBNColors.textPrimary)
                     if let subtitle {
-                        Text(subtitle).font(.bbnCaption).foregroundColor(.bbnTextMuted)
+                        Text(subtitle).font(BBNTypography.caption).foregroundColor(BBNColors.textMuted)
                     }
                 }
                 Spacer()
@@ -26,7 +26,7 @@ struct BBNSection<Content: View>: View {
         }
         .padding(.vertical, 16)
         .overlay(alignment: .bottom) {
-            Rectangle().fill(Color.bbnBorder).frame(height: 1)
+            Rectangle().fill(BBNColors.border).frame(height: 1)
         }
     }
 }

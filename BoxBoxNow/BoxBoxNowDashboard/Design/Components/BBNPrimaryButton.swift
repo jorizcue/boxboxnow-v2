@@ -14,11 +14,11 @@ struct BBNPrimaryButton: View {
                 } else if let icon {
                     Image(systemName: icon)
                 }
-                Text(title).font(.bbnHeadline.weight(.semibold))
+                Text(title).font(BBNTypography.title3)
             }
             .foregroundColor(.black)
             .frame(maxWidth: .infinity, minHeight: 44)
-            .background(Color.bbnAccent)
+            .background(BBNColors.accent)
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .disabled(isLoading)

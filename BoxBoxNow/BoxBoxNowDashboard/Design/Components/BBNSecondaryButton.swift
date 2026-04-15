@@ -9,12 +9,12 @@ struct BBNSecondaryButton: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 if let icon { Image(systemName: icon) }
-                Text(title).font(.bbnHeadline.weight(.medium))
+                Text(title).font(BBNTypography.title3.weight(.medium))
             }
-            .foregroundColor(.bbnText)
+            .foregroundColor(BBNColors.textPrimary)
             .frame(maxWidth: .infinity, minHeight: 44)
-            .background(Color.bbnSurface)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.bbnBorder, lineWidth: 1))
+            .background(BBNColors.surface)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(BBNColors.border, lineWidth: 1))
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }

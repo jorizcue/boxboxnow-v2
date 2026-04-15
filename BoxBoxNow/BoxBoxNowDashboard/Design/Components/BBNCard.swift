@@ -7,10 +7,10 @@ struct BBNCard<Content: View>: View {
     var body: some View {
         content()
             .padding(12)
-            .background(Color.bbnCard)
+            .background(BBNColors.card)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.bbnBorder, lineWidth: 1)
+                    .stroke(BBNColors.border, lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 12))
     }

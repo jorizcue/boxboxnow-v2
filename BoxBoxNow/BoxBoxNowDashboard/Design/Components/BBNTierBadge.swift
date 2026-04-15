@@ -5,12 +5,13 @@ struct BBNTierBadge: View {
 
     var body: some View {
         Text(score.map { String(Int($0)) } ?? "—")
-            .font(.bbnMono.weight(.semibold))
+            .font(BBNTypography.bodyBold)
+            .monospacedDigit()
             .foregroundColor(color)
             .padding(.horizontal, 8).padding(.vertical, 2)
             .background(color.opacity(0.15))
             .clipShape(Capsule())
     }
 
-    private var color: Color { Color.bbnTier(forScore: score ?? 0) }
+    private var color: Color { BBNColors.tier(forScore: score ?? 0) }
 }
