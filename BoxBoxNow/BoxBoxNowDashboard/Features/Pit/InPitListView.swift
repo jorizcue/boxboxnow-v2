@@ -50,9 +50,23 @@ struct InPitListView: View {
                         .padding(.horizontal, 12)
                         .background(BBNColors.background)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(rowLabel(for: kart))
                     }
                 }
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(karts.isEmpty ? "En boxes, vacío" : "En boxes, \(karts.count) karts")
         }
+    }
+
+    private func rowLabel(for kart: KartStateFull) -> String {
+        var parts: [String] = []
+        parts.append("Posición \(kart.base.position)")
+        parts.append("kart \(kart.base.kartNumber)")
+        if let driver = kart.base.driverName { parts.append(driver) }
+        if let team = kart.base.teamName, !team.isEmpty { parts.append("equipo \(team)") }
+        parts.append("\(kart.base.pitCount) paradas")
+        return parts.joined(separator: ", ")
     }
 }

@@ -53,9 +53,17 @@ struct PitHistoryListView: View {
                         .padding(.horizontal, 12)
                         .background(BBNColors.background)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(rowLabel(for: entry))
                     }
                 }
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(entries.isEmpty ? "Historial reciente, vacío" : "Historial reciente, \(entries.count) paradas")
         }
+    }
+
+    private func rowLabel(for entry: Entry) -> String {
+        "Kart \(entry.kartNumber), \(entry.driverName), vuelta \(entry.lap), parada de \(RaceFormatters.lapTime(ms: entry.pitTimeMs))"
     }
 }

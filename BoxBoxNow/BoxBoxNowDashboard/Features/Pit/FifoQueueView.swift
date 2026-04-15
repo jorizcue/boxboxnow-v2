@@ -39,17 +39,20 @@ struct FifoQueueView: View {
                                         .font(BBNTypography.caption)
                                         .foregroundStyle(BBNColors.textPrimary)
                                         .lineLimit(1)
-                                        .truncationMode(.tail)
                                 }
                                 .frame(width: 80)
                                 .padding(.vertical, 8)
                                 .background(BBNColors.background)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("Posición en cola \(idx + 1), kart \(entry.kartNumber), \(entry.driverName)")
                             }
                         }
                     }
                 }
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Cola FIFO, \(state.queue.count) karts en espera")
         }
     }
 }

@@ -13,6 +13,8 @@ struct PitView: View {
             .padding(20)
         }
         .background(BBNColors.background)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Boxes")
     }
 
     private var inPitKarts: [KartStateFull] {
