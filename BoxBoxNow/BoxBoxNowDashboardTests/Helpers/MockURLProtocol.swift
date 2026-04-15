@@ -30,4 +30,23 @@ final class MockURLProtocol: URLProtocol {
         config.protocolClasses = [MockURLProtocol.self]
         return config
     }
+
+    /// Extracts the HTTP body from a request. `URLProtocol` receives the body
+    /// as a stream (`httpBodyStream`), NOT as `httpBody`, so tests that want
+    /// to assert on the outgoing payload must drain the stream here.
+    static func body(of request: URLRequest) -> Data? {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        let bufferSize = 1024
+        var buffer = [UInt8](repeating: 0, count: bufferSize)
+        while stream.hasBytesAvailable {
+            let read = stream.read(&buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
+    }
 }

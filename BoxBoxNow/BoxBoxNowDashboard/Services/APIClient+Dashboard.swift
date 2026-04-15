@@ -22,6 +22,12 @@ extension APIClient {
         return e
     }()
 
+    // Dashboard models currently use `String?` for timestamps (see
+    // User.createdAt, DeviceSession.createdAt/lastSeenAt), so `.iso8601` is
+    // defensive-only — it does nothing for String fields. If someone later
+    // adds a `Date` field to a dashboard model, make sure the server emits
+    // strict ISO 8601 with no fractional-second variation, or swap the
+    // strategy to `.formatted` with an explicit DateFormatter.
     private static let jsonDecoder: JSONDecoder = {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
@@ -52,7 +58,7 @@ extension APIClient {
     func deleteJSON(_ path: String) async throws {
         let req = try buildDashboardRequest(path, method: "DELETE", query: nil, body: nil)
         let (_, response) = try await effectiveSession.data(for: req)
-        try handleStatus(response)
+        try handleStatus(response, request: req)
     }
 
     // --- Internals ---
@@ -75,15 +81,19 @@ extension APIClient {
 
     private func executeJSON<T: Decodable>(_ req: URLRequest) async throws -> T {
         let (data, response) = try await effectiveSession.data(for: req)
-        try handleStatus(response)
+        try handleStatus(response, request: req)
         return try Self.jsonDecoder.decode(T.self, from: data)
     }
 
-    private func handleStatus(_ response: URLResponse) throws {
+    /// Posts `.authExpired` only when the originating request was authenticated — avoids logging the user out of the login screen itself when bad credentials return 401.
+    private func handleStatus(_ response: URLResponse, request: URLRequest) throws {
         guard let http = response as? HTTPURLResponse else { throw APIError.requestFailed }
         if http.statusCode == 401 {
+            let wasAuthenticated = request.value(forHTTPHeaderField: "Authorization") != nil
             KeychainHelper.deleteToken()
-            NotificationCenter.default.post(name: .authExpired, object: nil)
+            if wasAuthenticated {
+                NotificationCenter.default.post(name: .authExpired, object: nil)
+            }
             throw APIError.unauthorized
         }
         guard (200...299).contains(http.statusCode) else { throw APIError.requestFailed }
