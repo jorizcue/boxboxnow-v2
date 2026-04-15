@@ -646,7 +646,9 @@ Committed under `BoxBoxNowDashboardTests/Fixtures/`. Any backward-incompatible s
 
 ## Phased Delivery Plan (A → B → C → D)
 
-Each phase closes with a PR, review, and a TestFlight build.
+**Delivery mode: single final build.** The user does not require intermediate validation between phases. Phases below represent the **logical build order** imposed by dependencies (you cannot build Admin before Auth exists, you cannot build Replay before the WebSocket pipeline exists), but there are no intermediate release gates, TestFlight checkpoints, or per-phase user reviews. The implementation plan ships the final app in one continuous pass through A → B → C → D.
+
+Exit criteria per phase below are kept as **internal engineering milestones** — useful for structuring commits and catching regressions early — but should be interpreted as "this phase is done, move to the next" rather than "pause and wait for feedback".
 
 ### Phase A — Shell + live data (~2-3 weeks)
 
@@ -664,10 +666,11 @@ Each phase closes with a PR, review, and a TestFlight build.
 
 **Out of scope for A**: Driver, Driver-Config, Replay, Analytics, Insights, Admin (all)
 
-**Exit criteria**:
-- A user can log in and watch the Race table live for 30 minutes without interruption.
-- Unit + integration tests passing (>100 tests).
-- TestFlight build installable on iPad Pro.
+**Internal engineering milestone**:
+- Smoke test: a user can log in (all 3 flows) and watch the Race table live for 30 minutes without interruption.
+- Unit + integration tests passing.
+- App builds cleanly and runs in the iPad simulator.
+- _No TestFlight release or user review required_; proceed directly to Phase B.
 
 ### Phase B — Full Config + Driver module (~1.5-2 weeks)
 
@@ -678,9 +681,10 @@ Each phase closes with a PR, review, and a TestFlight build.
 - **Driver** (`DriverLiveView`): port existing driver-app code with adaptation (no local GPS, all values via WS)
 - **Driver Config** (`DriverConfigView`): drag-to-reorder editor of the 21 cards, save per preset
 
-**Exit criteria**:
+**Internal engineering milestone**:
 - A user can edit teams from the iPad and the change reflects in the web in real time.
-- The pilot view renders all 21 cards correctly in both 2-col portrait and 3-col landscape orientations.
+- The pilot view renders all 21 cards correctly in landscape (portrait is out of scope — orientation is locked).
+- _No release or review gate_; proceed directly to Phase C.
 
 ### Phase C — Analysis & replay (~2 weeks)
 
@@ -692,9 +696,10 @@ Each phase closes with a PR, review, and a TestFlight build.
 - **Insights** GPS with the 3 custom `Canvas` views (trajectory, speed trace, G-forces)
 - Apex Replay integration (`GET /api/apex-replay/sessions`)
 
-**Exit criteria**:
+**Internal engineering milestone**:
 - Replay of a 1-hour race is smooth (no perceptible scrub lag).
 - Insights renders +10k points without frame drops.
+- _No release or review gate_; proceed directly to Phase D.
 
 ### Phase D — Admin (~1.5-2 weeks)
 
@@ -706,13 +711,15 @@ Each phase closes with a PR, review, and a TestFlight build.
 - **Admin Hub**: multi-tenant circuit management
 - **Admin Platform**: metrics (Swift Charts)
 
-**Exit criteria**:
+**Final exit criteria (end of Phase D = final release)**:
 - An admin can create a new user from the iPad and the new user can log in immediately.
 - The iPad app has reached full feature parity with the web dashboard, excluding account/subscription.
+- All unit + integration + UI tests passing.
+- App is ready for TestFlight submission and App Store review.
 
-### Total estimated timeline: 7-9 weeks
+### Total estimated timeline: 7-9 weeks (single continuous pass)
 
-Assumes solo iOS work + occasional small backend iterations (e.g., `google_callback_ios`). Each phase ends with a note in the `MEMORY.md → ios_native_app.md` file tracking status and blockers.
+Assumes solo iOS work + occasional small backend iterations (e.g., `google_callback_ios`). Phase boundaries are internal engineering markers only — no user reviews, no intermediate releases. The final build at the end of Phase D is the **first user-facing delivery**. Status and blockers are still tracked in `MEMORY.md → ios_native_app.md` as they surface during implementation.
 
 ## Out of Scope
 
