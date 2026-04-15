@@ -32,6 +32,7 @@ final class RaceStore {
     private var messagesTask: Task<Void, Never>?
     private var statesTask: Task<Void, Never>?
     private var boxCallClearTask: Task<Void, Never>?
+    private var boxCallGeneration: UInt64 = 0
 
     init(wsClient: RaceWebSocketClientProtocol = RaceWebSocketClient(), boxCallTimeout: TimeInterval = 10) {
         self.wsClient = wsClient
@@ -64,6 +65,12 @@ final class RaceStore {
         case .update:
             applyUpdateEvents(message.events ?? [])
         case .fifoUpdate:
+            // Intentional: a `.fifoUpdate` with `data.fifo == nil` is treated as a
+            // no-op, not a clear. The server-side invariant is that every
+            // `fifo_update` carries a full `data.fifo` payload; a nil here means
+            // "malformed message" and we prefer stale-but-valid state over blanking
+            // the queue. If the server ever starts sending nil to mean "cleared",
+            // change this branch to `self.fifo = message.data?.fifo ?? .empty`.
             if let fifo = message.data?.fifo { self.fifo = fifo }
         case .analytics:
             applyAnalytics(message.data)
@@ -109,7 +116,7 @@ final class RaceStore {
         }
     }
 
-    private func applyAnalytics(_ data: WsMessageData?) {
+    private func applyAnalytics(_: WsMessageData?) {
         // Phase C will flesh this out; for Phase A we accept the message without
         // state changes to keep the pipeline unblocked.
     }
@@ -117,16 +124,22 @@ final class RaceStore {
     private func triggerBoxCall() {
         boxCallActive = true
         boxCallClearTask?.cancel()
+        boxCallGeneration &+= 1
         let timeout = boxCallTimeout
+        let gen = boxCallGeneration
         boxCallClearTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
             guard !Task.isCancelled else { return }
-            await MainActor.run { self?.boxCallActive = false }
+            await MainActor.run {
+                guard let self, self.boxCallGeneration == gen else { return }
+                self.boxCallActive = false
+            }
         }
     }
 
     func clearBoxCall() {
         boxCallClearTask?.cancel()
+        boxCallGeneration &+= 1
         boxCallActive = false
     }
 
@@ -151,6 +164,9 @@ final class RaceStore {
     private func handleState(_ state: RaceConnectionState) {
         switch state {
         case .connecting:
+            // Intentional: do NOT clear reconnectReason here. UI uses (reconnectReason != nil && !isConnected)
+            // as a "reconnect in progress" signal so the banner stays visible across the
+            // .disconnected → .connecting transition until we actually succeed at .connected.
             self.isConnected = false
         case .connected:
             self.isConnected = true
