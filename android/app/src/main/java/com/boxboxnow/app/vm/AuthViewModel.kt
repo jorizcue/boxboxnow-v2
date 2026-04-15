@@ -15,11 +15,12 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Authentication state holder + flows. Matches the iOS AuthViewModel feature set:
- *   • username/password login
- *   • /auth/me hydration after cold start (JWT payload lacks is_admin/tab_access)
- *   • biometric re-login gated on token presence + user opt-in
- *   • logout (keeps token) vs fullSignOut (wipes everything)
+ * Mirrors iOS AuthViewModel 1:1:
+ *   - email/pass login with optional MFA (showMfa + mfaCode + tempToken)
+ *   - Google SSO via Custom Tabs + redirect to boxboxnow://?token=XXX
+ *   - biometric re-login on cold start (token in Keychain + user opt-in)
+ *   - logout keeps the token (Face-unlock can bring you back) /
+ *     fullSignOut wipes everything
  */
 @HiltViewModel
 class AuthViewModel @Inject constructor(
@@ -37,8 +38,17 @@ class AuthViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
 
+    private val _isGoogleLoading = MutableStateFlow(false)
+    val isGoogleLoading = _isGoogleLoading.asStateFlow()
+
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage = _errorMessage.asStateFlow()
+
+    private val _showMfa = MutableStateFlow(false)
+    val showMfa = _showMfa.asStateFlow()
+
+    private val _mfaCode = MutableStateFlow("")
+    val mfaCode = _mfaCode.asStateFlow()
 
     private val _biometricPending = MutableStateFlow(false)
     val biometricPending = _biometricPending.asStateFlow()
@@ -46,40 +56,74 @@ class AuthViewModel @Inject constructor(
     private val _showBiometricPrompt = MutableStateFlow(false)
     val showBiometricPrompt = _showBiometricPrompt.asStateFlow()
 
-    init {
-        checkExistingSession()
+    private var tempToken: String? = null
+
+    val biometricAvailable: Boolean get() = biometric.isAvailable
+    val biometricEnabled: Boolean get() = biometric.isEnabled
+    val hasStoredToken: Boolean get() = tokenStore.loadToken() != null
+
+    init { checkExistingSession() }
+
+    fun setMfaCode(code: String) { _mfaCode.value = code.filter { it.isDigit() }.take(6) }
+    fun cancelMfa() {
+        _showMfa.value = false
+        _mfaCode.value = ""
+        tempToken = null
     }
+    fun clearError() { _errorMessage.value = null }
+    fun setBiometricPending(v: Boolean) { _biometricPending.value = v }
 
     fun login(email: String, password: String) {
         _isLoading.value = true
         _errorMessage.value = null
         viewModelScope.launch {
             try {
-                val resp = api.login(email, password)
+                val resp = api.login(email.trim(), password)
                 handleAuthResponse(resp)
             } catch (e: Throwable) {
-                _errorMessage.value = e.message ?: "Error"
+                _errorMessage.value = e.message ?: "Error de conexion"
             } finally {
                 _isLoading.value = false
             }
         }
     }
 
-    fun verifyMfa(tempToken: String, code: String) {
+    /** Called by MainActivity when the Custom Tab redirect delivers the token. */
+    fun completeGoogleLogin(token: String) {
+        _isGoogleLoading.value = false
+        tokenStore.saveToken(token)
+        _isAuthenticated.value = true
+        viewModelScope.launch { refreshMe() }
+    }
+
+    fun googleLoginFailed(message: String?) {
+        _isGoogleLoading.value = false
+        _errorMessage.value = message ?: "Error iniciando sesion con Google"
+    }
+
+    fun startGoogleLogin() {
+        _isGoogleLoading.value = true
+        _errorMessage.value = null
+    }
+
+    fun verifyMfa() {
+        val tmp = tempToken ?: return
+        val code = _mfaCode.value
+        if (code.length < 6) return
         _isLoading.value = true
         viewModelScope.launch {
             try {
-                val resp = api.verifyMfa(tempToken, code)
+                val resp = api.verifyMfa(tmp, code)
                 handleAuthResponse(resp)
             } catch (e: Throwable) {
-                _errorMessage.value = e.message ?: "Error"
+                _errorMessage.value = e.message ?: "Codigo invalido"
             } finally {
                 _isLoading.value = false
             }
         }
     }
 
-    /** Normal logout — keeps token + biometric so user can Face-unlock back in. */
+    /** Normal logout — keeps token + biometric so user can face-unlock back in. */
     fun logout() {
         _isAuthenticated.value = false
         _user.value = null
@@ -103,7 +147,6 @@ class AuthViewModel @Inject constructor(
             biometric.disable()
             return
         }
-
         if (biometric.isEnabled && biometric.isAvailable) {
             _biometricPending.value = true
             viewModelScope.launch { refreshMe() }
@@ -130,14 +173,21 @@ class AuthViewModel @Inject constructor(
         _showBiometricPrompt.value = false
     }
 
-    fun skipBiometric() {
-        _showBiometricPrompt.value = false
-    }
+    fun skipBiometric() { _showBiometricPrompt.value = false }
 
     private suspend fun handleAuthResponse(resp: AuthResponse) {
+        // MFA branch
+        if (resp.mfaRequired == true && !resp.tempToken.isNullOrBlank()) {
+            tempToken = resp.tempToken
+            _showMfa.value = true
+            return
+        }
         tokenStore.saveToken(resp.accessToken)
         _user.value = resp.user
         _isAuthenticated.value = true
+        _showMfa.value = false
+        _mfaCode.value = ""
+        tempToken = null
         refreshMe()
         if (biometric.isAvailable && !biometric.isEnabled) {
             _showBiometricPrompt.value = true

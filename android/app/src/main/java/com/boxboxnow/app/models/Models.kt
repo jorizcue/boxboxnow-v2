@@ -22,10 +22,14 @@ data class User(
 
 @Serializable
 data class AuthResponse(
-    @SerialName("access_token") val accessToken: String,
+    @SerialName("access_token") val accessToken: String = "",
     @SerialName("token_type") val tokenType: String? = null,
     @SerialName("session_token") val sessionToken: String? = null,
     val user: User? = null,
+    // MFA branch — when mfa_required=true the backend returns a short-lived
+    // temp_token that the client uses to call /auth/verify-mfa.
+    @SerialName("mfa_required") val mfaRequired: Boolean? = null,
+    @SerialName("temp_token") val tempToken: String? = null,
 )
 
 @Serializable

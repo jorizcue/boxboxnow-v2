@@ -138,6 +138,46 @@ class DriverViewModel @Inject constructor(
         saveConfig()
     }
 
+    /**
+     * Persists the current visible-cards + order as a new named preset on the
+     * backend and refreshes the local list. Mirrors iOS `saveAsPreset(name:)`.
+     */
+    fun saveAsPreset(name: String, onError: (Throwable) -> Unit = {}) {
+        viewModelScope.launch {
+            runCatching {
+                api.createPreset(
+                    name = name,
+                    visibleCards = _visibleCards.value,
+                    cardOrder = _cardOrder.value,
+                )
+            }.onSuccess { created ->
+                _presets.value = _presets.value + created
+                _selectedPresetId.value = created.id
+            }.onFailure(onError)
+        }
+    }
+
+    fun deletePreset(preset: DriverConfigPreset) {
+        viewModelScope.launch {
+            runCatching { api.deletePreset(preset.id) }.onSuccess {
+                _presets.value = _presets.value.filterNot { it.id == preset.id }
+                if (_selectedPresetId.value == preset.id) _selectedPresetId.value = null
+            }
+        }
+    }
+
+    /** Push visibleCards/order to the backend (fire-and-forget). */
+    fun pushPreferencesToServer() {
+        viewModelScope.launch {
+            runCatching {
+                api.updatePreferences(
+                    visibleCards = _visibleCards.value,
+                    cardOrder = _cardOrder.value,
+                )
+            }
+        }
+    }
+
     fun processSample(sample: GPSSample) {
         _gpsData.value = sample
         lapTracker.gpsSource = if (sample.batteryPercent != null) "racebox" else "phone"

@@ -1,6 +1,27 @@
 package com.boxboxnow.app.models
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.AvTimer
+import androidx.compose.material.icons.filled.CompareArrows
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.GpsFixed
+import androidx.compose.material.icons.filled.LooksOne
+import androidx.compose.material.icons.filled.MeetingRoom
+import androidx.compose.material.icons.filled.MultilineChart
+import androidx.compose.material.icons.filled.OpenWith
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarOutline
+import androidx.compose.material.icons.filled.Timelapse
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.TrendingFlat
+import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 
 enum class DriverCardGroup(val label: String) {
     RACE("Carrera"),
@@ -47,27 +68,51 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
     }
 
     val accent: Color get() = when (this) {
-        RaceTimer -> Color.Gray
-        CurrentLapTime -> Color(0xFF2196F3)
-        LastLap -> Color.Gray
-        DeltaBestLap -> Color(0xFF9C27B0)
-        GForceRadar -> Color.Gray
-        Position -> Color(0xFF9C27B0)
-        RealPos -> Color(0xFFFF9800)
-        GapAhead -> Color(0xFFF44336)
-        GapBehind -> Color(0xFF4CAF50)
-        AvgLap20 -> Color(0xFF3F51B5)
-        Best3 -> Color(0xFFFF9800)
-        AvgFutureStint -> Color(0xFF009688)
-        BoxScore -> Color(0xFFFFEB3B)
-        BestStintLap -> Color(0xFF9C27B0)
-        GpsLapDelta -> Color(0xFF00BCD4)
-        GpsSpeed -> Color(0xFF2196F3)
-        GpsGForce -> Color(0xFF4CAF50)
-        LapsToMaxStint -> Color(0xFF009688)
-        PitWindow -> Color(0xFF4CAF50)
-        PitCount -> Color(0xFFFF9800)
-        CurrentPit -> Color(0xFF00BCD4)
+        RaceTimer -> Color(0xFF8E8E93)        // systemGray
+        CurrentLapTime -> Color(0xFF2196F3)   // blue
+        LastLap -> Color(0xFF8E8E93)          // systemGray
+        DeltaBestLap -> Color(0xFF9C27B0)     // purple
+        GForceRadar -> Color(0xFF8E8E93)      // systemGray
+        Position -> Color(0xFF9C27B0)         // purple
+        RealPos -> Color(0xFF41D238)          // accent (green radioactive)
+        GapAhead -> Color(0xFFFF453A)         // errorRed
+        GapBehind -> Color(0xFF30D158)        // successGreen
+        AvgLap20 -> Color(0xFF3F51B5)         // indigo
+        Best3 -> Color(0xFFFF9F0A)            // warningOrange
+        AvgFutureStint -> Color(0xFF00BFA5)   // teal
+        BoxScore -> Color(0xFFFFCC00)         // yellow
+        BestStintLap -> Color(0xFF9C27B0)     // purple
+        GpsLapDelta -> Color(0xFF00BCD4)      // cyan
+        GpsSpeed -> Color(0xFF2196F3)         // blue
+        GpsGForce -> Color(0xFF34C759)        // emerald
+        LapsToMaxStint -> Color(0xFF00BFA5)   // teal
+        PitWindow -> Color(0xFF30D158)        // successGreen
+        PitCount -> Color(0xFFFF9F0A)         // warningOrange
+        CurrentPit -> Color(0xFF00BCD4)       // cyan
+    }
+
+    val iconMaterial: ImageVector get() = when (this) {
+        RaceTimer -> Icons.Filled.Timer
+        CurrentLapTime -> Icons.Filled.AvTimer
+        LastLap -> Icons.Filled.Timelapse
+        DeltaBestLap -> Icons.Filled.CompareArrows
+        GForceRadar -> Icons.Filled.GpsFixed
+        Position -> Icons.Filled.EmojiEvents
+        RealPos -> Icons.Outlined.EmojiEvents
+        GapAhead -> Icons.Filled.ArrowUpward
+        GapBehind -> Icons.Filled.ArrowDownward
+        AvgLap20 -> Icons.Filled.MultilineChart
+        Best3 -> Icons.Filled.Star
+        AvgFutureStint -> Icons.Filled.ShowChart
+        BoxScore -> Icons.Filled.Speed
+        BestStintLap -> Icons.Filled.StarOutline
+        GpsLapDelta -> Icons.Filled.TrendingFlat
+        GpsSpeed -> Icons.Filled.Speed
+        GpsGForce -> Icons.Filled.OpenWith
+        LapsToMaxStint -> Icons.Filled.Refresh
+        PitWindow -> Icons.Filled.MeetingRoom
+        PitCount -> Icons.Filled.LooksOne
+        CurrentPit -> Icons.Filled.AvTimer
     }
 
     companion object {

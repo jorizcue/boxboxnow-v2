@@ -1,20 +1,42 @@
 package com.boxboxnow.app.ui.login
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockReset
+import androidx.compose.material.icons.filled.Mail
+import androidx.compose.material.icons.filled.Pin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
+import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.vm.AuthViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -22,73 +44,385 @@ import com.boxboxnow.app.vm.AuthViewModel
 fun LoginScreen(
     authVM: AuthViewModel,
     onLoggedIn: () -> Unit,
+    onStartGoogleSso: () -> Unit,
 ) {
     val isAuth by authVM.isAuthenticated.collectAsState()
-    val isLoading by authVM.isLoading.collectAsState()
-    val errorMessage by authVM.errorMessage.collectAsState()
+    val showMfa by authVM.showMfa.collectAsState()
     val biometricPending by authVM.biometricPending.collectAsState()
-    val context = LocalContext.current
-
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
 
     LaunchedEffect(isAuth) { if (isAuth) onLoggedIn() }
 
-    LaunchedEffect(biometricPending) {
-        if (biometricPending) {
-            (context as? FragmentActivity)?.let { authVM.authenticateWithBiometric(it) }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(BoxBoxNowColors.DarkBg1, Color.Black, BoxBoxNowColors.DarkBg2),
+                ),
+            ),
+    ) {
+        GridOverlay()
+
+        when {
+            biometricPending -> BiometricWaiting(authVM)
+            showMfa -> MfaSection(authVM)
+            else -> LoginForm(authVM, onStartGoogleSso)
         }
     }
+}
+
+@Composable
+private fun GridOverlay() {
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val spacing = 40f
+        val stroke = Stroke(width = 0.5f)
+        var x = 0f
+        while (x < size.width) {
+            drawLine(
+                SolidColor(Color.White.copy(alpha = 0.015f)),
+                androidx.compose.ui.geometry.Offset(x, 0f),
+                androidx.compose.ui.geometry.Offset(x, size.height),
+                strokeWidth = stroke.width,
+            )
+            x += spacing
+        }
+        var y = 0f
+        while (y < size.height) {
+            drawLine(
+                SolidColor(Color.White.copy(alpha = 0.015f)),
+                androidx.compose.ui.geometry.Offset(0f, y),
+                androidx.compose.ui.geometry.Offset(size.width, y),
+                strokeWidth = stroke.width,
+            )
+            y += spacing
+        }
+    }
+}
+
+@Composable
+private fun Branding(small: Boolean = false) {
+    val logoSize = if (small) 42.sp else 56.sp
+    val subSize = if (small) 16.sp else 20.sp
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row {
+            Text("BB", fontSize = logoSize, fontWeight = FontWeight.Black, color = Color.White, fontFamily = FontFamily.SansSerif)
+            Text("N", fontSize = logoSize, fontWeight = FontWeight.Black, color = BoxBoxNowColors.Accent, fontFamily = FontFamily.SansSerif)
+        }
+        Row {
+            Text("BOXBOX", fontSize = subSize, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("NOW", fontSize = subSize, fontWeight = FontWeight.Bold, color = BoxBoxNowColors.Accent)
+        }
+        Text(
+            "VISTA PILOTO",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = BoxBoxNowColors.SystemGray2,
+            letterSpacing = 3.sp,
+        )
+    }
+}
+
+@Composable
+private fun LoginForm(authVM: AuthViewModel, onStartGoogleSso: () -> Unit) {
+    val isLoading by authVM.isLoading.collectAsState()
+    val isGoogleLoading by authVM.isGoogleLoading.collectAsState()
+    val error by authVM.errorMessage.collectAsState()
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
-            .padding(24.dp),
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
     ) {
-        Text(
-            "BoxBoxNow",
-            color = Color(0xFFE10600),
-            fontSize = 42.sp,
-            fontWeight = FontWeight.Black,
-        )
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(60.dp))
+        Branding()
+        Spacer(Modifier.height(36.dp))
 
-        OutlinedTextField(
+        InputField(
             value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            modifier = Modifier.fillMaxWidth(),
+            onChange = { email = it },
+            placeholder = "Email",
+            icon = Icons.Default.Mail,
+            keyboardType = KeyboardType.Email,
         )
-        Spacer(Modifier.height(12.dp))
-        OutlinedTextField(
+        Spacer(Modifier.height(14.dp))
+        InputField(
             value = password,
-            onValueChange = { password = it },
-            label = { Text("Contraseña") },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth(),
+            onChange = { password = it },
+            placeholder = "Contraseña",
+            icon = Icons.Default.Lock,
+            keyboardType = KeyboardType.Password,
+            secure = true,
         )
 
-        errorMessage?.let {
+        error?.let {
             Spacer(Modifier.height(8.dp))
-            Text(it, color = MaterialTheme.colorScheme.error)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = BoxBoxNowColors.ErrorRed, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(it, color = BoxBoxNowColors.ErrorRed, fontSize = 12.sp)
+            }
         }
 
-        Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = { authVM.login(email.trim(), password) },
+        Spacer(Modifier.height(16.dp))
+        PrimaryAccentButton(
+            text = "Iniciar sesión",
+            loading = isLoading,
             enabled = !isLoading && email.isNotBlank() && password.isNotBlank(),
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE10600)),
-        ) {
-            if (isLoading) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
-            else Text("Entrar", fontWeight = FontWeight.Bold)
+            onClick = { authVM.login(email.trim(), password) },
+        )
+
+        Spacer(Modifier.height(16.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Divider(Modifier.weight(1f), color = BoxBoxNowColors.SystemGray5)
+            Text("o", color = BoxBoxNowColors.SystemGray3, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
+            Divider(Modifier.weight(1f), color = BoxBoxNowColors.SystemGray5)
+        }
+        Spacer(Modifier.height(14.dp))
+
+        SecondaryButton(
+            text = if (isGoogleLoading) "Abriendo Google..." else "Continuar con Google",
+            icon = Icons.Default.Language,
+            enabled = !isLoading && !isGoogleLoading,
+            loading = isGoogleLoading,
+            onClick = { authVM.startGoogleLogin(); onStartGoogleSso() },
+        )
+
+        if (authVM.biometricEnabled && authVM.biometricAvailable && authVM.hasStoredToken) {
+            Spacer(Modifier.height(10.dp))
+            val ctx = LocalContext.current
+            SecondaryButton(
+                text = "Entrar con biometría",
+                icon = Icons.Default.Fingerprint,
+                enabled = true,
+                loading = false,
+                accent = true,
+                onClick = {
+                    authVM.setBiometricPending(true)
+                    (ctx as? FragmentActivity)?.let { authVM.authenticateWithBiometric(it) }
+                },
+            )
+        }
+
+        Spacer(Modifier.height(40.dp))
+    }
+}
+
+@Composable
+private fun MfaSection(authVM: AuthViewModel) {
+    val code by authVM.mfaCode.collectAsState()
+    val loading by authVM.isLoading.collectAsState()
+    val error by authVM.errorMessage.collectAsState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.height(60.dp))
+        Branding()
+        Spacer(Modifier.height(40.dp))
+
+        Icon(Icons.Default.LockReset, contentDescription = null, tint = BoxBoxNowColors.Accent, modifier = Modifier.size(42.dp))
+        Spacer(Modifier.height(12.dp))
+        Text("Verificación en dos pasos", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Spacer(Modifier.height(20.dp))
+
+        InputField(
+            value = code,
+            onChange = { authVM.setMfaCode(it) },
+            placeholder = "Código MFA",
+            icon = Icons.Default.Pin,
+            keyboardType = KeyboardType.NumberPassword,
+        )
+
+        error?.let {
+            Spacer(Modifier.height(6.dp))
+            Text(it, color = BoxBoxNowColors.ErrorRed, fontSize = 12.sp)
+        }
+
+        Spacer(Modifier.height(16.dp))
+        PrimaryAccentButton(
+            text = "Verificar",
+            loading = loading,
+            enabled = code.length >= 6 && !loading,
+            onClick = { authVM.verifyMfa() },
+        )
+
+        Spacer(Modifier.height(10.dp))
+        TextButton(onClick = { authVM.cancelMfa() }) {
+            Text("Volver", color = BoxBoxNowColors.SystemGray)
         }
     }
 }
+
+@Composable
+private fun BiometricWaiting(authVM: AuthViewModel) {
+    val ctx = LocalContext.current
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            Icons.Default.Fingerprint,
+            contentDescription = null,
+            tint = BoxBoxNowColors.Accent,
+            modifier = Modifier.size(80.dp),
+        )
+        Spacer(Modifier.height(20.dp))
+        Text("Verificando identidad...", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(28.dp))
+        PrimaryAccentButton(
+            text = "Reintentar biometría",
+            loading = false,
+            enabled = true,
+            onClick = {
+                (ctx as? FragmentActivity)?.let { authVM.authenticateWithBiometric(it) }
+            },
+        )
+        Spacer(Modifier.height(10.dp))
+        TextButton(onClick = { authVM.setBiometricPending(false) }) {
+            Text("Usar contraseña", color = BoxBoxNowColors.SystemGray)
+        }
+    }
+}
+
+@Composable
+private fun InputField(
+    value: String,
+    onChange: (String) -> Unit,
+    placeholder: String,
+    icon: ImageVector,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    secure: Boolean = false,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(BoxBoxNowColors.SystemGray6)
+            .then(
+                if (focused) Modifier.border(1.dp, BoxBoxNowColors.AccentSoft, RoundedCornerShape(10.dp))
+                else Modifier,
+            )
+            .padding(horizontal = 14.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = BoxBoxNowColors.SystemGray3, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(12.dp))
+        BasicInput(
+            value = value,
+            onChange = onChange,
+            placeholder = placeholder,
+            keyboardType = keyboardType,
+            secure = secure,
+            onFocusChange = { focused = it },
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun BasicInput(
+    value: String,
+    onChange: (String) -> Unit,
+    placeholder: String,
+    keyboardType: KeyboardType,
+    secure: Boolean,
+    onFocusChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.foundation.text.BasicTextField(
+        value = value,
+        onValueChange = onChange,
+        singleLine = true,
+        textStyle = TextStyle(color = Color.White, fontSize = 15.sp),
+        cursorBrush = SolidColor(BoxBoxNowColors.Accent),
+        visualTransformation = if (secure) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        modifier = modifier
+            .height(48.dp)
+            .onFocusChanged { onFocusChange(it.isFocused) },
+        decorationBox = { inner ->
+            Box(contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty()) {
+                    Text(placeholder, color = BoxBoxNowColors.SystemGray2, fontSize = 15.sp)
+                }
+                inner()
+            }
+        },
+    )
+}
+
+@Composable
+private fun PrimaryAccentButton(
+    text: String,
+    loading: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(10.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = BoxBoxNowColors.Accent,
+            contentColor = Color.Black,
+            disabledContainerColor = BoxBoxNowColors.Accent.copy(alpha = 0.35f),
+            disabledContentColor = Color.Black.copy(alpha = 0.6f),
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
+    ) {
+        if (loading) {
+            CircularProgressIndicator(color = Color.Black, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(10.dp))
+        }
+        Text(text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+    }
+}
+
+@Composable
+private fun SecondaryButton(
+    text: String,
+    icon: ImageVector,
+    enabled: Boolean,
+    loading: Boolean,
+    accent: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(10.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = BoxBoxNowColors.SystemGray6,
+            contentColor = Color.White,
+            disabledContainerColor = BoxBoxNowColors.SystemGray6.copy(alpha = 0.5f),
+            disabledContentColor = Color.White.copy(alpha = 0.5f),
+        ),
+        border = if (accent)
+            androidx.compose.foundation.BorderStroke(0.5.dp, BoxBoxNowColors.AccentSoft)
+        else
+            androidx.compose.foundation.BorderStroke(0.5.dp, BoxBoxNowColors.SystemGray4),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
+    ) {
+        if (loading) {
+            CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+        } else {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+    }
+}
+

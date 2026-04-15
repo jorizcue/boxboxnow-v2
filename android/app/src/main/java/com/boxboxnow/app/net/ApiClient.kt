@@ -26,7 +26,9 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import io.ktor.http.content.TextContent
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -202,7 +204,7 @@ class ApiClient @Inject constructor(
         val body = buildJsonObject { put("laps", laps.toJsonElement()) }
         client.post(url("/gps/laps")) {
             authorized()
-            setBody(body)
+            setBody(jsonBody(body))
         }
     }
 
@@ -229,15 +231,22 @@ class ApiClient @Inject constructor(
     private suspend inline fun <reified T> getJson(path: String): T =
         client.get(url(path)) { authorized() }.body()
 
-    private suspend inline fun <reified T> postJson(path: String, body: Any): T =
+    // NOTE: we serialise JsonObject bodies ourselves with JsonObject.serializer() and send them
+    // as TextContent. Passing a JsonObject to Ktor's setBody() tries reflection-based lookup
+    // which fails at runtime because JsonPrimitive values are internally `JsonLiteral`
+    // (a private subclass) and kotlinx.serialization 1.7.3 has no runtime serializer for it.
+    private fun jsonBody(obj: JsonObject): TextContent =
+        TextContent(json.encodeToString(JsonObject.serializer(), obj), ContentType.Application.Json)
+
+    private suspend inline fun <reified T> postJson(path: String, body: JsonObject): T =
         client.post(url(path)) {
             authorized()
-            setBody(body)
+            setBody(jsonBody(body))
         }.body()
 
-    private suspend inline fun <reified T> patchJson(path: String, body: Any): T =
+    private suspend inline fun <reified T> patchJson(path: String, body: JsonObject): T =
         client.patch(url(path)) {
             authorized()
-            setBody(body)
+            setBody(jsonBody(body))
         }.body()
 }
