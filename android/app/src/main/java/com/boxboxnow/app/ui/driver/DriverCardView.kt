@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
 import com.boxboxnow.app.models.DriverCard
 import com.boxboxnow.app.models.GPSSample
 import com.boxboxnow.app.models.KartState
@@ -63,74 +65,87 @@ fun DriverCardView(
     cardHeight: Dp,
     modifier: Modifier = Modifier,
 ) {
-    // Scale factor relative to the iOS base height (90dp)
-    val scale: Float = min(2.0f, max(0.8f, cardHeight.value / 90f))
-    val mainFont: TextUnit = (24f * scale).sp
-    val bigFont: TextUnit = (32f * scale).sp
-    val subFont: TextUnit = (10f * scale).sp
-    val smallFont: TextUnit = (8f * scale).sp
-    val labelFont: TextUnit = (9f * scale).sp
-
     val accent = cardAccent(card, lastLapMs, bestLapMs, deltaBestMs, ourKart, raceClockMs)
     val prominent = card == DriverCard.Position || card == DriverCard.RealPos || card == DriverCard.PitWindow
     val bgAlpha = if (prominent) 0.18f else 0.12f
     val borderAlpha = if (prominent) 0.7f else 0.5f
     val borderWidth = if (prominent) 2.dp else 1.5.dp
 
-    Column(
+    // Read the actual card width so font scaling can be width-aware — cards
+    // in 2-col portrait are much narrower than they are tall, so scaling only
+    // by height would produce fonts too wide to fit (wrapping time strings).
+    BoxWithConstraints(
         modifier = modifier
             .height(cardHeight)
             .clip(RoundedCornerShape(10.dp))
             .background(accent.copy(alpha = bgAlpha))
-            .border(borderWidth, accent.copy(alpha = borderAlpha), RoundedCornerShape(10.dp))
-            .padding((8f * scale).dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .border(borderWidth, accent.copy(alpha = borderAlpha), RoundedCornerShape(10.dp)),
     ) {
-        // Header (label + icon) — hidden for pitWindow
-        if (card != DriverCard.PitWindow) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+        // Base dimensions target ~150dp wide × 90dp tall (iOS card baseline).
+        // Use the more restrictive axis so the card never produces fonts that
+        // overflow the shorter dimension.
+        val widthScale = maxWidth.value / 150f
+        val heightScale = cardHeight.value / 90f
+        val scale: Float = min(1.8f, max(0.7f, min(widthScale, heightScale)))
+
+        val mainFont: TextUnit = (22f * scale).sp
+        val bigFont: TextUnit = (30f * scale).sp
+        val subFont: TextUnit = (10f * scale).sp
+        val smallFont: TextUnit = (8f * scale).sp
+        val labelFont: TextUnit = (9f * scale).sp
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding((8f * scale).dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            // Header (label + icon) — hidden for pitWindow
+            if (card != DriverCard.PitWindow) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        card.iconMaterial,
+                        contentDescription = null,
+                        tint = accent.copy(alpha = 0.7f),
+                        modifier = Modifier.size((11f * scale).dp),
+                    )
+                    Text(
+                        cardLabel(card, ourKart, raceVM, deltaBestMs),
+                        color = BoxBoxNowColors.SystemGray,
+                        fontSize = labelFont,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 2,
+                    )
+                }
+                Spacer(Modifier.height((2f * scale).dp))
+            }
+
+            // Content
+            Box(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    card.iconMaterial,
-                    contentDescription = null,
-                    tint = accent.copy(alpha = 0.7f),
-                    modifier = Modifier.size((11f * scale).dp),
-                )
-                Text(
-                    cardLabel(card, ourKart, raceVM, deltaBestMs),
-                    color = BoxBoxNowColors.SystemGray,
-                    fontSize = labelFont,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 2,
+                CardContent(
+                    card = card,
+                    ourKart = ourKart,
+                    raceVM = raceVM,
+                    raceClockMs = raceClockMs,
+                    lastLapMs = lastLapMs,
+                    bestLapMs = bestLapMs,
+                    deltaBestMs = deltaBestMs,
+                    gps = gps,
+                    boxScore = boxScore,
+                    mainFont = mainFont,
+                    bigFont = bigFont,
+                    subFont = subFont,
+                    smallFont = smallFont,
+                    scale = scale,
+                    accent = accent,
                 )
             }
-            Spacer(Modifier.height((2f * scale).dp))
-        }
-
-        // Content
-        Box(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            contentAlignment = Alignment.Center,
-        ) {
-            CardContent(
-                card = card,
-                ourKart = ourKart,
-                raceVM = raceVM,
-                raceClockMs = raceClockMs,
-                lastLapMs = lastLapMs,
-                bestLapMs = bestLapMs,
-                deltaBestMs = deltaBestMs,
-                gps = gps,
-                boxScore = boxScore,
-                mainFont = mainFont,
-                bigFont = bigFont,
-                subFont = subFont,
-                smallFont = smallFont,
-                scale = scale,
-                accent = accent,
-            )
         }
     }
 }
@@ -421,5 +436,7 @@ private fun MonoValue(text: String, color: Color, size: TextUnit) {
         fontWeight = FontWeight.Black,
         fontFamily = FontFamily.Monospace,
         maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Clip,
     )
 }
