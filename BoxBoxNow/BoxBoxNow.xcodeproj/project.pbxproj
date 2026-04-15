@@ -10,6 +10,7 @@
 		01C6FB8BF0F29CFCC4D4F582 /* snapshot.json in Resources */ = {isa = PBXBuildFile; fileRef = FF9191539843FAF88AD2810E /* snapshot.json */; };
 		024D8DBEE10FB2698F35DCF3 /* ClassificationEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CAB0D3FBBB6BF2C7A7386F /* ClassificationEntry.swift */; };
 		108A1079BB932315AE85174F /* replay_status.json in Resources */ = {isa = PBXBuildFile; fileRef = B37F20E81BB1582179DFDA9B /* replay_status.json */; };
+		10D9431A4248D41C2156DB51 /* RaceStore+TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ACE79CD368311DA6FB2542D /* RaceStore+TestHelpers.swift */; };
 		11636BFF83B325BDD662F6FA /* PublicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F0761AFE0F86F8EA9447381 /* PublicService.swift */; };
 		140684EF36EE17EF914B3C4E /* BoxBoxNowDashboardApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC2AB5820A74FC7D77F31256 /* BoxBoxNowDashboardApp.swift */; };
 		152F197498E3285BA362AE71 /* FifoState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91DEE2D48BD5F5C1C9E1D07 /* FifoState.swift */; };
@@ -17,6 +18,7 @@
 		1A40A5D449E1B2308B404D70 /* APIClientDashboardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE9B41368B3473E19EEEE5CE /* APIClientDashboardTests.swift */; };
 		1CA18F6940832DEE70895997 /* RaceSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4A8BF665A9FAAAD621DCD4 /* RaceSnapshot.swift */; };
 		1D0D179E0535E0D16F07EA59 /* RaceWebSocketClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4502BAB3CE61EC1C3DE376 /* RaceWebSocketClientTests.swift */; };
+		1D6E9AB90C99B8D63D5B9AB6 /* RaceStoreWebSocketIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FF543B259C0AF62F8317293 /* RaceStoreWebSocketIntegrationTests.swift */; };
 		1FB3D7DAD8A0EB3E24B7CA78 /* APIClient+Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E485FA80390A19423F682CF /* APIClient+Dashboard.swift */; };
 		291DFB0EFA081CA4709978AF /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6450E4BD57F2989352AFB301 /* AuthStore.swift */; };
 		2DE6A83752A10AF7CBF04EAB /* BBNToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = F12229FCE4736357FC38AC5D /* BBNToast.swift */; };
@@ -55,12 +57,14 @@
 		C4BEB02FBD94EFF88B830694 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
 		CA24B295C83006D2F2AE881F /* BBNStatusDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16ADD04E208136B7F7652CFB /* BBNStatusDot.swift */; };
 		D3176DA7E4B042103217B8A1 /* DecodeFixturesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD90191EE4504727D0DC9F2D /* DecodeFixturesTests.swift */; };
+		D7F20CAE8348BF030B4465B1 /* RaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7826E17ED74C1A408F110B1D /* RaceStore.swift */; };
 		D982C51F6B58A36147A13779 /* MockRaceWebSocketClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C7CEE6557A432E12F92C4C1 /* MockRaceWebSocketClient.swift */; };
 		DCEF1D89165A2B67E2FD8CB9 /* MockKeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39360E9737FD8F36A30DA8DF /* MockKeychainHelper.swift */; };
 		E15680155663A52D76787AA0 /* PitRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED03ED34CD17D732029ADE58 /* PitRecord.swift */; };
 		E5636489B335E0A6D27C41DD /* kart_state_extended.json in Resources */ = {isa = PBXBuildFile; fileRef = F205186513E7161023210D38 /* kart_state_extended.json */; };
 		E938A0BB87913D93115DB2FE /* update.json in Resources */ = {isa = PBXBuildFile; fileRef = 236D0520DA0FEFD14CD4AEF5 /* update.json */; };
 		F6B3E87A922E83EFF57EFDAA /* ConfigService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C978D3BC578AC4BF0A3167 /* ConfigService.swift */; };
+		F6E828BFD4FBB22496F12DDC /* RaceStoreReducerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F849B0990A9D5D86DFF48538 /* RaceStoreReducerTests.swift */; };
 		F997C9767BE7B0B12ADC4B9D /* WsUpdateEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50AC16025237E1E494C9D5A0 /* WsUpdateEvent.swift */; };
 		FDDC6047C2526C75C03565E1 /* MockAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7814A1631861CA7D179CA18 /* MockAuthService.swift */; };
 /* End PBXBuildFile section */
@@ -84,6 +88,7 @@
 
 /* Begin PBXFileReference section */
 		003B0EE2019A297341BE3956 /* BBNColors.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNColors.swift; sourceTree = "<group>"; };
+		0ACE79CD368311DA6FB2542D /* RaceStore+TestHelpers.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "RaceStore+TestHelpers.swift"; sourceTree = "<group>"; };
 		0B7287D32B32CF5CB8CF88CC /* BBNPrimaryButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNPrimaryButton.swift; sourceTree = "<group>"; };
 		0C59CBF0B27A03B35E925A98 /* AuthService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		0C7CEE6557A432E12F92C4C1 /* MockRaceWebSocketClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MockRaceWebSocketClient.swift; sourceTree = "<group>"; };
@@ -113,7 +118,9 @@
 		64D3260E44ADE5768F10CAEF /* AuthStoreStateMachineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthStoreStateMachineTests.swift; sourceTree = "<group>"; };
 		69DE783EB983464BB83A5B56 /* ReplayStatus.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayStatus.swift; sourceTree = "<group>"; };
 		6DFEE1E2E80BCB61D4D15B11 /* WsUpdateEventTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WsUpdateEventTests.swift; sourceTree = "<group>"; };
+		7826E17ED74C1A408F110B1D /* RaceStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceStore.swift; sourceTree = "<group>"; };
 		79E30CAE14869C40E9C22A70 /* SharedModelExtensionsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedModelExtensionsTests.swift; sourceTree = "<group>"; };
+		7FF543B259C0AF62F8317293 /* RaceStoreWebSocketIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceStoreWebSocketIntegrationTests.swift; sourceTree = "<group>"; };
 		835130EAF2454A3C8D55C1A1 /* FifoEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoEntry.swift; sourceTree = "<group>"; };
 		8B27F23A1CCCF192DCDFC293 /* KeychainProtocol.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainProtocol.swift; sourceTree = "<group>"; };
 		8F0761AFE0F86F8EA9447381 /* PublicService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PublicService.swift; sourceTree = "<group>"; };
@@ -140,6 +147,7 @@
 		F12229FCE4736357FC38AC5D /* BBNToast.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNToast.swift; sourceTree = "<group>"; };
 		F205186513E7161023210D38 /* kart_state_extended.json */ = {isa = PBXFileReference; includeInIndex = 1; path = kart_state_extended.json; sourceTree = "<group>"; };
 		F26D9D1C4A0C580FF84AF5CA /* JSONValueTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JSONValueTests.swift; sourceTree = "<group>"; };
+		F849B0990A9D5D86DFF48538 /* RaceStoreReducerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceStoreReducerTests.swift; sourceTree = "<group>"; };
 		FF9191539843FAF88AD2810E /* snapshot.json */ = {isa = PBXFileReference; includeInIndex = 1; path = snapshot.json; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -277,6 +285,7 @@
 			isa = PBXGroup;
 			children = (
 				6450E4BD57F2989352AFB301 /* AuthStore.swift */,
+				7826E17ED74C1A408F110B1D /* RaceStore.swift */,
 			);
 			name = Stores;
 			path = Stores;
@@ -349,6 +358,9 @@
 			isa = PBXGroup;
 			children = (
 				64D3260E44ADE5768F10CAEF /* AuthStoreStateMachineTests.swift */,
+				F849B0990A9D5D86DFF48538 /* RaceStoreReducerTests.swift */,
+				0ACE79CD368311DA6FB2542D /* RaceStore+TestHelpers.swift */,
+				7FF543B259C0AF62F8317293 /* RaceStoreWebSocketIntegrationTests.swift */,
 			);
 			name = Stores;
 			path = Stores;
@@ -597,6 +609,9 @@
 				FDDC6047C2526C75C03565E1 /* MockAuthService.swift in Sources */,
 				DCEF1D89165A2B67E2FD8CB9 /* MockKeychainHelper.swift in Sources */,
 				841FA937AA3BA58C150FD290 /* AuthStoreStateMachineTests.swift in Sources */,
+				F6E828BFD4FBB22496F12DDC /* RaceStoreReducerTests.swift in Sources */,
+				10D9431A4248D41C2156DB51 /* RaceStore+TestHelpers.swift in Sources */,
+				1D6E9AB90C99B8D63D5B9AB6 /* RaceStoreWebSocketIntegrationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -640,6 +655,7 @@
 				90FAB080C9AEB53370AF380A /* RaceWebSocketClient.swift in Sources */,
 				B276E659F7DEE02AE658F709 /* KeychainProtocol.swift in Sources */,
 				291DFB0EFA081CA4709978AF /* AuthStore.swift in Sources */,
+				D7F20CAE8348BF030B4465B1 /* RaceStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -16,7 +16,7 @@ extension KartState {
 // payload on KartState when needed. The dashboard never mutates KartState
 // itself for these; it decodes a KartStateFull aggregate instead.
 struct KartStateFull: Codable, Identifiable, Hashable {
-    let base: KartState
+    var base: KartState
     var pitHistory: [PitRecord]
     var driverTotalMs: [String: Double]
     var driverAvgLapMs: [String: Double]
