@@ -48,6 +48,13 @@ actor RaceWebSocketClient: RaceWebSocketClientProtocol {
     private var reconnectDelayMs: UInt64 = 1_000
     private let maxReconnectDelayMs: UInt64 = 30_000
 
+    /// Monotonic session counter. Incremented by `connect()` so any in-flight
+    /// `reconnectTask` whose sleep has already completed can detect it is stale
+    /// before queueing a `connectLoop()` call onto the actor. Without this, a
+    /// stale reconnect can land after a new user-initiated `connect()` and
+    /// silently overwrite the live session's `task`/`pingTask`/`readTask`.
+    private var sessionGeneration: UInt64 = 0
+
     private var currentURL: URL?
     private var currentToken: String?
 
@@ -73,6 +80,8 @@ actor RaceWebSocketClient: RaceWebSocketClientProtocol {
     // MARK: - Public API
 
     func connect(url: URL, token: String) async {
+        sessionGeneration &+= 1   // Invalidate any pending reconnect from prior session.
+
         // Tear down any prior session before starting a new one.
         pingTask?.cancel(); pingTask = nil
         readTask?.cancel(); readTask = nil
@@ -190,8 +199,16 @@ actor RaceWebSocketClient: RaceWebSocketClientProtocol {
         stateContinuation.yield(.disconnected(reason: reason))
 
         // Terminal reasons: do not retry
-        if case .sessionTerminated = reason { shouldReconnect = false; return }
-        if case .maxDevices = reason { shouldReconnect = false; return }
+        if case .sessionTerminated = reason {
+            shouldReconnect = false
+            reconnectTask?.cancel(); reconnectTask = nil
+            return
+        }
+        if case .maxDevices = reason {
+            shouldReconnect = false
+            reconnectTask?.cancel(); reconnectTask = nil
+            return
+        }
         if case .normal = reason { return }
 
         // Transient reasons: exponential backoff reconnect
@@ -199,9 +216,18 @@ actor RaceWebSocketClient: RaceWebSocketClientProtocol {
         let delay = reconnectDelayMs
         reconnectDelayMs = min(reconnectDelayMs * 2, maxReconnectDelayMs)
 
+        let gen = sessionGeneration
         reconnectTask = Task { [weak self] in
             do { try await Task.sleep(nanoseconds: delay * 1_000_000) } catch { return }
-            await self?.connectLoop()
+            await self?.reconnectIfCurrent(generation: gen)
         }
+    }
+
+    /// Actor-isolated reconnect entry point. The generation check bails out if
+    /// `connect()` has been called since this reconnect was scheduled, preventing
+    /// a stale backoff timer from clobbering a fresh session.
+    private func reconnectIfCurrent(generation: UInt64) async {
+        guard generation == sessionGeneration else { return }
+        await connectLoop()
     }
 }
