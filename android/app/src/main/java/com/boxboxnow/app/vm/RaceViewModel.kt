@@ -107,6 +107,9 @@ class RaceViewModel @Inject constructor(
 
     init {
         ws.onMessage = { text -> handleMessage(text) }
+        // After every (re)connect, ask the backend for a full snapshot so the
+        // cached karts/config don't go stale after a network blip.
+        ws.onConnected = { requestSnapshot() }
     }
 
     fun connect() {

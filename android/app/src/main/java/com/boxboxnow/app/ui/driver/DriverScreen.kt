@@ -160,29 +160,24 @@ fun DriverScreen(onBack: () -> Unit) {
                 },
             ),
     ) {
-        if (!isConnected && karts.isEmpty()) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                CircularProgressIndicator(color = BoxBoxNowColors.Accent, strokeWidth = 2.dp, modifier = Modifier.size(36.dp))
-                Spacer(Modifier.height(12.dp))
-                Text("Conectando...", color = BoxBoxNowColors.SystemGray, fontSize = 12.sp)
-            }
-        } else {
-            CardsGrid(
-                cards = cards,
-                ourKart = ourKart,
-                raceVM = raceVM,
-                raceClockMs = clockMs,
-                lastLapMs = lastLap,
-                bestLapMs = bestLap,
-                deltaBestMs = deltaBest,
-                gps = gps,
-                boxScore = boxScore.toInt(),
-            )
-        }
+        // Always render the grid — matches iOS DriverView. When the socket
+        // drops, cards simply keep their last values (or show "--" placeholders
+        // if we haven't received any snapshot yet) and the "Reconectando..."
+        // banner below signals that we're working on it. Previously we
+        // rendered a full-screen spinner here when `karts.isEmpty()`, but the
+        // reconnect flow would leave the user stuck on that screen whenever
+        // the backend reaped an idle connection.
+        CardsGrid(
+            cards = cards,
+            ourKart = ourKart,
+            raceVM = raceVM,
+            raceClockMs = clockMs,
+            lastLapMs = lastLap,
+            bestLapMs = bestLap,
+            deltaBestMs = deltaBest,
+            gps = gps,
+            boxScore = boxScore.toInt(),
+        )
 
         // Menu handle — small dots on the right edge
         AnimatedVisibility(
@@ -215,9 +210,12 @@ fun DriverScreen(onBack: () -> Unit) {
             }
         }
 
-        // Connection lost banner
+        // Connection lost banner — visible whenever the socket isn't up,
+        // regardless of whether we already have kart data cached. On first
+        // entry this tells the user the initial connect is in flight; on an
+        // interrupted session it signals the reconnect attempt.
         AnimatedVisibility(
-            visible = !isConnected && karts.isNotEmpty(),
+            visible = !isConnected,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter),
