@@ -57,10 +57,10 @@ struct StatusBarView: View {
     private var accountMenu: some View {
         Menu {
             if let user = app.auth.user {
-                Text(user.email ?? user.username).font(BBNTypography.caption)
-                Divider()
-                Button("Cerrar sesión", role: .destructive) {
-                    Task { await app.auth.logout() }
+                Section(user.email ?? user.username) {
+                    Button("Cerrar sesión", role: .destructive) {
+                        Task { await app.auth.logout() }
+                    }
                 }
             }
         } label: {

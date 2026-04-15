@@ -16,7 +16,12 @@ struct BoxCallOverlay: View {
                 .foregroundStyle(.white)
             }
             .transition(.opacity)
+            .contentShape(Rectangle())
             .onTapGesture { app.race.clearBoxCall() }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Llamada a boxes. BOX BOX BOX.")
+            .accessibilityHint("Toca para cerrar.")
+            .accessibilityAddTraits(.isButton)
         }
     }
 }
