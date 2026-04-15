@@ -103,6 +103,38 @@ final class AuthStoreStateMachineTests: XCTestCase {
         XCTAssertEqual(store.authState, .loggedOut)
     }
 
+    func testLoginFailureWithUnauthorizedGetsUserFacingMessage() async throws {
+        let mock = MockAuthService()
+        mock.loginHandler = { _, _ in throw APIError.unauthorized }
+        let store = AuthStore(service: mock, keychain: MockKeychainHelper())
+        await store.login(email: "a@b.c", password: "bad")
+        if case .loginFailed(let msg) = store.authState {
+            // Must NOT contain the Cocoa default garbage.
+            XCTAssertFalse(msg.contains("The operation couldn't be completed"), "got Cocoa default: \(msg)")
+            XCTAssertFalse(msg.contains("APIError error"), "got Cocoa default: \(msg)")
+            // Must be a real user-facing message.
+            XCTAssertTrue(msg.lowercased().contains("invalid") || msg.lowercased().contains("password"),
+                          "expected user-facing message, got: \(msg)")
+        } else {
+            XCTFail("expected loginFailed, got \(store.authState)")
+        }
+    }
+
+    func testLogoutClearsPendingEmail() async throws {
+        let mock = MockAuthService()
+        mock.loginHandler = { _, _ in
+            LoginResponse(accessToken: "tkn",
+                          user: Self.makeUser(mfaEnabled: false, mfaRequired: false),
+                          mfaRequired: false, mfaEnabled: false, mfaSecret: nil)
+        }
+        mock.logoutHandler = {}
+        let store = AuthStore(service: mock, keychain: MockKeychainHelper())
+        await store.login(email: "a@b.c", password: "pw")
+        XCTAssertEqual(store.pendingEmail, "a@b.c")
+        await store.logout()
+        XCTAssertEqual(store.pendingEmail, "")
+    }
+
     // MARK: - Helpers
     private static func makeUser(mfaEnabled: Bool, mfaRequired: Bool) -> User {
         User(

@@ -47,7 +47,7 @@ final class AuthStore {
             let resp = try await service.login(email: email, password: password)
             apply(resp)
         } catch {
-            authState = .loginFailed(message: error.localizedDescription)
+            authState = .loginFailed(message: userFacingMessage(for: error))
         }
     }
 
@@ -57,7 +57,7 @@ final class AuthStore {
             let resp = try await service.verifyMFA(code: code)
             apply(resp)
         } catch {
-            authState = .loginFailed(message: error.localizedDescription)
+            authState = .loginFailed(message: userFacingMessage(for: error))
         }
     }
 
@@ -77,6 +77,7 @@ final class AuthStore {
         try? await service.logout()
         keychain.deleteToken()
         user = nil
+        pendingEmail = ""
         authState = .loggedOut
     }
 
@@ -110,6 +111,23 @@ final class AuthStore {
     private func handleAuthExpired() {
         keychain.deleteToken()
         user = nil
+        pendingEmail = ""
         authState = .loggedOut
+    }
+
+    private func userFacingMessage(for error: Error) -> String {
+        if let apiError = error as? APIError {
+            switch apiError {
+            case .unauthorized:
+                return "Invalid email or password. Please try again."
+            case .requestFailed:
+                return "Couldn't reach the server. Check your connection and try again."
+            case .invalidURL:
+                return "Invalid request. Please contact support."
+            case .decodingError:
+                return "Unexpected response from the server. Please try again."
+            }
+        }
+        return error.localizedDescription
     }
 }
