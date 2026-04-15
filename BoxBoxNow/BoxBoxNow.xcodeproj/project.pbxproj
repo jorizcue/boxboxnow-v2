@@ -94,6 +94,7 @@
 		D3176DA7E4B042103217B8A1 /* DecodeFixturesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD90191EE4504727D0DC9F2D /* DecodeFixturesTests.swift */; };
 		D68179B669973F68BB55BD91 /* DriverConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E0C2E608723CF8FBD0CA128 /* DriverConfigView.swift */; };
 		D7F20CAE8348BF030B4465B1 /* RaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7826E17ED74C1A408F110B1D /* RaceStore.swift */; };
+		D80825F3FE728BD27450FFC1 /* LiveWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC5D3173109E19A2D14A6AB8 /* LiveWebView.swift */; };
 		D982C51F6B58A36147A13779 /* MockRaceWebSocketClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C7CEE6557A432E12F92C4C1 /* MockRaceWebSocketClient.swift */; };
 		DCEF1D89165A2B67E2FD8CB9 /* MockKeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39360E9737FD8F36A30DA8DF /* MockKeychainHelper.swift */; };
 		DEA06B00B322BB15633AA7E2 /* GoogleOAuthFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 483E97C925E47FED7D0FF29D /* GoogleOAuthFlow.swift */; };
@@ -219,6 +220,7 @@
 		DA50485A6E7EDADD652C23E9 /* BBNCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNCard.swift; sourceTree = "<group>"; };
 		DC2AB5820A74FC7D77F31256 /* BoxBoxNowDashboardApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoxBoxNowDashboardApp.swift; sourceTree = "<group>"; };
 		DC4353D02B94C87B0136798F /* AdminService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminService.swift; sourceTree = "<group>"; };
+		DC5D3173109E19A2D14A6AB8 /* LiveWebView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveWebView.swift; sourceTree = "<group>"; };
 		E3367624A2930C80D0C82300 /* FifoQueueView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoQueueView.swift; sourceTree = "<group>"; };
 		E569E3B298818FA60DE45660 /* BBNSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNSection.swift; sourceTree = "<group>"; };
 		E7856AF9152E00BC79E39E70 /* RaceRowView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceRowView.swift; sourceTree = "<group>"; };
@@ -684,6 +686,7 @@
 			isa = PBXGroup;
 			children = (
 				DA26C19EF0F2C2B515CCF221 /* LiveDashboardView.swift */,
+				DC5D3173109E19A2D14A6AB8 /* LiveWebView.swift */,
 			);
 			name = Live;
 			path = Live;
@@ -972,6 +975,7 @@
 				5393D5A06D0E3A8E8C14F0F5 /* FifoQueueView.swift in Sources */,
 				227BA39D131C28977A71EEE9 /* InPitListView.swift in Sources */,
 				2B3BC1FB1BEAD5CCA9DDF228 /* PitHistoryListView.swift in Sources */,
+				D80825F3FE728BD27450FFC1 /* LiveWebView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
