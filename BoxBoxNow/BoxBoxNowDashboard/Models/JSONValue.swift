@@ -1,7 +1,20 @@
 import Foundation
 
-/// Flexible JSON value for payloads whose shape varies per subtype (e.g. WS update events).
-/// Decodes any JSON scalar, array, or object into a strongly-typed enum without dropping data.
+/// Flexible JSON value for payloads whose shape varies per subtype (e.g. WS
+/// update events). Decodes any JSON scalar, array, or object into a
+/// strongly-typed enum without dropping data.
+///
+/// # Whole-number-double lossiness
+///
+/// The decode-attempt order is Bool → Int → Double → String → Array → Object.
+/// JSON has a single numeric type, so `3` and `3.0` are wire-indistinguishable.
+/// As a result, `.double(3.0)` encoded through `JSONEncoder` emits `3`, which
+/// decodes back as `.int(3)`. Round-trip of whole-number doubles collapses
+/// the case tag. This is intentional and pinned by
+/// `JSONValueTests.testWholeNumberDoubleRoundTripsAsInt`.
+///
+/// If you need to preserve "this was a Double", don't rely on the enum case
+/// alone — use `doubleValue`, which coerces `.int` to `Double` transparently.
 enum JSONValue: Codable, Equatable, Hashable {
     case string(String)
     case int(Int)
@@ -46,12 +59,37 @@ enum JSONValue: Codable, Equatable, Hashable {
         return nil
     }
 
-    var stringValue: String? { if case let .string(s) = self { return s } else { return nil } }
+    var stringValue: String? {
+        if case let .string(s) = self { return s } else { return nil }
+    }
+
+    /// Returns the value as an `Int` if the enum is `.int`, or if it is a
+    /// finite `.double` whose truncated value fits in `Int`. Returns `nil` for
+    /// `.nan`, `.infinity`, or doubles outside the representable `Int` range
+    /// instead of trapping (`Int(d)` traps on non-finite / out-of-range inputs).
     var intValue: Int? {
-        switch self { case let .int(i): return i; case let .double(d): return Int(d); default: return nil }
+        switch self {
+        case let .int(i):
+            return i
+        case let .double(d):
+            guard d.isFinite,
+                  d >= Double(Int.min),
+                  d <= Double(Int.max) else { return nil }
+            return Int(d)
+        default:
+            return nil
+        }
     }
+
     var doubleValue: Double? {
-        switch self { case let .double(d): return d; case let .int(i): return Double(i); default: return nil }
+        switch self {
+        case let .double(d): return d
+        case let .int(i):    return Double(i)
+        default:             return nil
+        }
     }
-    var boolValue: Bool? { if case let .bool(b) = self { return b } else { return nil } }
+
+    var boolValue: Bool? {
+        if case let .bool(b) = self { return b } else { return nil }
+    }
 }

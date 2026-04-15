@@ -22,6 +22,7 @@
 		667D374AD78D3FE1FED7ABCA /* BBNNumericField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BE45342DDC9620ABADDBF44 /* BBNNumericField.swift */; };
 		6A306500092801DB65E90E25 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
 		6E9B28881723E58E990AF783 /* BBNTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11FF2A2767E16F4B71E59B7A /* BBNTypography.swift */; };
+		7E41824EE7ABA55AEA8B57F9 /* WsUpdateEventTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DFEE1E2E80BCB61D4D15B11 /* WsUpdateEventTests.swift */; };
 		841B83B318959F4EB40C7C9E /* BBNSecondaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C87B55B13B78A1D126F7C8C /* BBNSecondaryButton.swift */; };
 		869271EFDCD0929F85F5421A /* KartState+Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4D0BC5623AC1BB7C474B769 /* KartState+Dashboard.swift */; };
 		911AF43F10BAF48C01A715E1 /* BBNTierBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC97D4B59A8484A2E32DE90A /* BBNTierBadge.swift */; };
@@ -76,6 +77,7 @@
 		5BE45342DDC9620ABADDBF44 /* BBNNumericField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNNumericField.swift; sourceTree = "<group>"; };
 		6119E6C3C7B8C120381BC458 /* WsMessage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WsMessage.swift; sourceTree = "<group>"; };
 		69DE783EB983464BB83A5B56 /* ReplayStatus.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayStatus.swift; sourceTree = "<group>"; };
+		6DFEE1E2E80BCB61D4D15B11 /* WsUpdateEventTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WsUpdateEventTests.swift; sourceTree = "<group>"; };
 		79E30CAE14869C40E9C22A70 /* SharedModelExtensionsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedModelExtensionsTests.swift; sourceTree = "<group>"; };
 		835130EAF2454A3C8D55C1A1 /* FifoEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoEntry.swift; sourceTree = "<group>"; };
 		96B3268BFEF3AF7F2526CBD8 /* FifoSnapshot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoSnapshot.swift; sourceTree = "<group>"; };
@@ -212,6 +214,7 @@
 			children = (
 				79E30CAE14869C40E9C22A70 /* SharedModelExtensionsTests.swift */,
 				F26D9D1C4A0C580FF84AF5CA /* JSONValueTests.swift */,
+				6DFEE1E2E80BCB61D4D15B11 /* WsUpdateEventTests.swift */,
 			);
 			name = Models;
 			path = Models;
@@ -463,6 +466,7 @@
 			files = (
 				B0750A3EE3397107E1B0AFA5 /* SharedModelExtensionsTests.swift in Sources */,
 				33B68322DA07AEED6F7B515A /* JSONValueTests.swift in Sources */,
+				7E41824EE7ABA55AEA8B57F9 /* WsUpdateEventTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

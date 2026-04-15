@@ -39,4 +39,47 @@ final class JSONValueTests: XCTestCase {
         XCTAssertEqual(v["a"]?["b"], .int(7))
         XCTAssertNil(v["missing"])
     }
+
+    // MARK: - Behavior pins
+
+    /// Pins the "whole-number double collapses to .int" behavior documented
+    /// in the JSONValue type comment. If this test starts failing, someone
+    /// either reordered the decode attempts or added raw-string preservation
+    /// — both require updating the doc comment on JSONValue.
+    func testWholeNumberDoubleRoundTripsAsInt() throws {
+        let original: JSONValue = .double(3.0)
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(JSONValue.self, from: data)
+        // Wire-indistinguishable from .int(3); decode lands in the Int branch.
+        XCTAssertEqual(decoded, .int(3))
+
+        // doubleValue accessor still works: coerces .int back to Double.
+        XCTAssertEqual(decoded.doubleValue, 3.0)
+    }
+
+    func testBoolDecodesBeforeInt() throws {
+        // JSON `true` must become .bool(true), not .int(1). Pinned so the
+        // decode order never gets reshuffled accidentally.
+        let json = "true".data(using: .utf8)!
+        let v = try JSONDecoder().decode(JSONValue.self, from: json)
+        XCTAssertEqual(v, .bool(true))
+    }
+
+    /// `intValue` must NOT trap on non-finite or out-of-range doubles.
+    /// `Int(d)` itself traps on `.nan`, `.infinity`, `-.infinity`, and
+    /// values outside `Int.min...Int.max` — if we ever drop the guard,
+    /// a malformed payload would crash the dashboard.
+    func testIntValueReturnsNilForNonFiniteDoubles() {
+        XCTAssertNil(JSONValue.double(.nan).intValue)
+        XCTAssertNil(JSONValue.double(.infinity).intValue)
+        XCTAssertNil(JSONValue.double(-.infinity).intValue)
+        XCTAssertNil(JSONValue.double(1e300).intValue)
+        XCTAssertNil(JSONValue.double(-1e300).intValue)
+    }
+
+    func testIntValueTruncatesFiniteInRangeDouble() {
+        XCTAssertEqual(JSONValue.double(3.9).intValue, 3)
+        XCTAssertEqual(JSONValue.double(-2.5).intValue, -2)
+        XCTAssertEqual(JSONValue.double(0.0).intValue, 0)
+    }
 }
