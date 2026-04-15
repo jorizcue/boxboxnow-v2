@@ -4,12 +4,15 @@ struct BBNEmptyState: View {
     /// Optional call-to-action button shown below the subtitle.
     ///
     /// Modeled as a nested struct (not a tuple) so consumers can construct
-    /// it with a trailing closure at the call site, e.g.
+    /// it with a trailing closure at the call site. The handler is sync;
+    /// wrap async work in a `Task { }` at the call site, e.g.
     ///
     ///     BBNEmptyState(
     ///         icon: "tray",
     ///         title: "Sin datos",
-    ///         action: .init(title: "Reintentar") { await store.refresh() }
+    ///         action: .init(title: "Reintentar") {
+    ///             Task { await store.refresh() }
+    ///         }
     ///     )
     struct Action {
         let title: String
