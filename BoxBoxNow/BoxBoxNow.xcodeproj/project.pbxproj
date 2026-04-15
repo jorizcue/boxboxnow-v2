@@ -15,6 +15,7 @@
 		10D9431A4248D41C2156DB51 /* RaceStore+TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ACE79CD368311DA6FB2542D /* RaceStore+TestHelpers.swift */; };
 		11636BFF83B325BDD662F6FA /* PublicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F0761AFE0F86F8EA9447381 /* PublicService.swift */; };
 		140684EF36EE17EF914B3C4E /* BoxBoxNowDashboardApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC2AB5820A74FC7D77F31256 /* BoxBoxNowDashboardApp.swift */; };
+		14EC50FDD516249F4AAD47EF /* RaceFormattersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D840B33E3FF748BA4E2D2992 /* RaceFormattersTests.swift */; };
 		152F197498E3285BA362AE71 /* FifoState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91DEE2D48BD5F5C1C9E1D07 /* FifoState.swift */; };
 		188765FB1A4BED5827DC57C6 /* PlatformMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D41CC5B26F70B3489AE2E8AD /* PlatformMetrics.swift */; };
 		1A40A5D449E1B2308B404D70 /* APIClientDashboardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE9B41368B3473E19EEEE5CE /* APIClientDashboardTests.swift */; };
@@ -27,6 +28,7 @@
 		2DE6A83752A10AF7CBF04EAB /* BBNToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = F12229FCE4736357FC38AC5D /* BBNToast.swift */; };
 		32370AE437BF27AA40BAEFD6 /* BBNCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA50485A6E7EDADD652C23E9 /* BBNCard.swift */; };
 		33B68322DA07AEED6F7B515A /* JSONValueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26D9D1C4A0C580FF84AF5CA /* JSONValueTests.swift */; };
+		3A124CBF4612CD4ADB090D6F /* RaceTableHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED146384A5BA8F1E0D35F350 /* RaceTableHeader.swift */; };
 		470E821102349844D4948ED1 /* BBNEmptyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A2BD764B4C6A8A7EEE66A8B /* BBNEmptyState.swift */; };
 		4B35F6A4BA0C446321AEB084 /* AdjustedClassificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C374CEFB5AF135DFBA1B7B17 /* AdjustedClassificationView.swift */; };
 		4B7F9D4D6052E11D6C583A9E /* BBNPrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B7287D32B32CF5CB8CF88CC /* BBNPrimaryButton.swift */; };
@@ -39,6 +41,8 @@
 		629BE3974689719A386358BB /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59229E2D110C6F146EBCEC97 /* JSONValue.swift */; };
 		64AA66966CCDE54763CA37FE /* fifo_update.json in Resources */ = {isa = PBXBuildFile; fileRef = 2BD72A620151DBF945560B96 /* fifo_update.json */; };
 		667D374AD78D3FE1FED7ABCA /* BBNNumericField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BE45342DDC9620ABADDBF44 /* BBNNumericField.swift */; };
+		683A44E6EEA131A5D0A3ADC4 /* BBNStatCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB82689DA21993AA5A90FF11 /* BBNStatCard.swift */; };
+		68B5CA338250403CC69E9B6B /* KartNumberBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B419B4157B3624BFD1D53DD8 /* KartNumberBadge.swift */; };
 		69FD671DB0082AA9240BD68D /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49FA1337C4CA7FADA768B59A /* RootView.swift */; };
 		6A306500092801DB65E90E25 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
 		6DF2F049F2CF391C3A413E2D /* LiveDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA26C19EF0F2C2B515CCF221 /* LiveDashboardView.swift */; };
@@ -50,6 +54,7 @@
 		81FCB47D013EE801FF2AFACB /* PlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B74EEA0A4E029DB828ACDC /* PlaceholderView.swift */; };
 		841B83B318959F4EB40C7C9E /* BBNSecondaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C87B55B13B78A1D126F7C8C /* BBNSecondaryButton.swift */; };
 		841FA937AA3BA58C150FD290 /* AuthStoreStateMachineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64D3260E44ADE5768F10CAEF /* AuthStoreStateMachineTests.swift */; };
+		84A9938F30EB9F34008D0900 /* RaceRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7856AF9152E00BC79E39E70 /* RaceRowView.swift */; };
 		869271EFDCD0929F85F5421A /* KartState+Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4D0BC5623AC1BB7C474B769 /* KartState+Dashboard.swift */; };
 		89911E15E6A83AFAD3A364AB /* RaceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E34F3AC93FC3FE75EB9179E /* RaceService.swift */; };
 		89C6B39F3A6C4109D2BBCBD4 /* FixtureLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9C3CD543925C6B9AB750C60 /* FixtureLoader.swift */; };
@@ -68,6 +73,7 @@
 		A7EA8935429FA5467CE5A285 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C59CBF0B27A03B35E925A98 /* AuthService.swift */; };
 		AC0AEDB26882D3FE32FED1A9 /* BBNSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E569E3B298818FA60DE45660 /* BBNSection.swift */; };
 		AC3D0AE39C6B8185CE796FFE /* UserListItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5F5056B5407DAD1552A229 /* UserListItem.swift */; };
+		AC9C277C6CB7F39F5532B0C3 /* RaceFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25EBE6983A792542D270F6D6 /* RaceFormatters.swift */; };
 		B0750A3EE3397107E1B0AFA5 /* SharedModelExtensionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79E30CAE14869C40E9C22A70 /* SharedModelExtensionsTests.swift */; };
 		B276E659F7DEE02AE658F709 /* KeychainProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B27F23A1CCCF192DCDFC293 /* KeychainProtocol.swift */; };
 		B4A973259304816BCD25287D /* ReplayStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69DE783EB983464BB83A5B56 /* ReplayStatus.swift */; };
@@ -80,6 +86,7 @@
 		CA1EB85F530AF5DE08484D52 /* ConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B76FDAA343695CB38541957 /* ConfigStore.swift */; };
 		CA24B295C83006D2F2AE881F /* BBNStatusDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16ADD04E208136B7F7652CFB /* BBNStatusDot.swift */; };
 		CB0CB311F82FEAE1122DD805 /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B74567B1346431031C47C91 /* AppStore.swift */; };
+		CBBB2BEF2618E7FBCE668035 /* KartDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7BD3E54B75379ED5907AB35 /* KartDetailSheet.swift */; };
 		D2DCF4BAFD6F221BD38A9BC9 /* AdminCircuitsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D67B82F132534E90134A6DE /* AdminCircuitsView.swift */; };
 		D3176DA7E4B042103217B8A1 /* DecodeFixturesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD90191EE4504727D0DC9F2D /* DecodeFixturesTests.swift */; };
 		D68179B669973F68BB55BD91 /* DriverConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E0C2E608723CF8FBD0CA128 /* DriverConfigView.swift */; };
@@ -136,6 +143,7 @@
 		23CAB0D3FBBB6BF2C7A7386F /* ClassificationEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClassificationEntry.swift; sourceTree = "<group>"; };
 		244C0A812F8D3A2A0047102F /* BoxBoxNow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BoxBoxNow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		25E7735976C6A9E5B5F723AD /* AdminStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminStore.swift; sourceTree = "<group>"; };
+		25EBE6983A792542D270F6D6 /* RaceFormatters.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceFormatters.swift; sourceTree = "<group>"; };
 		2A9A5C399A2BCCDAF140E6B3 /* BoxCallOverlay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoxCallOverlay.swift; sourceTree = "<group>"; };
 		2BD72A620151DBF945560B96 /* fifo_update.json */ = {isa = PBXFileReference; includeInIndex = 1; path = fifo_update.json; sourceTree = "<group>"; };
 		34193E933EE80922D8F736A4 /* AdminPlatformView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminPlatformView.swift; sourceTree = "<group>"; };
@@ -185,6 +193,7 @@
 		AE9B41368B3473E19EEEE5CE /* APIClientDashboardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClientDashboardTests.swift; sourceTree = "<group>"; };
 		AFAD0DB2B2D79155CA0AA1F9 /* RaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceView.swift; sourceTree = "<group>"; };
 		B37F20E81BB1582179DFDA9B /* replay_status.json */ = {isa = PBXFileReference; includeInIndex = 1; path = replay_status.json; sourceTree = "<group>"; };
+		B419B4157B3624BFD1D53DD8 /* KartNumberBadge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KartNumberBadge.swift; sourceTree = "<group>"; };
 		B978CAD275F81D34EC842DD0 /* BoxBoxNowDashboardUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = BoxBoxNowDashboardUITests.xctest; path = .xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC97D4B59A8484A2E32DE90A /* BBNTierBadge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNTierBadge.swift; sourceTree = "<group>"; };
 		BD90191EE4504727D0DC9F2D /* DecodeFixturesTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DecodeFixturesTests.swift; sourceTree = "<group>"; };
@@ -194,9 +203,11 @@
 		C35FC7D573120DBC35E7BA93 /* DetailRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DetailRouter.swift; sourceTree = "<group>"; };
 		C374CEFB5AF135DFBA1B7B17 /* AdjustedClassificationView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdjustedClassificationView.swift; sourceTree = "<group>"; };
 		C5C978D3BC578AC4BF0A3167 /* ConfigService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfigService.swift; sourceTree = "<group>"; };
+		CB82689DA21993AA5A90FF11 /* BBNStatCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNStatCard.swift; sourceTree = "<group>"; };
 		CFCE66BB3867BF7253532A8E /* ErrorMessages.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ErrorMessages.swift; sourceTree = "<group>"; };
 		D41CC5B26F70B3489AE2E8AD /* PlatformMetrics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlatformMetrics.swift; sourceTree = "<group>"; };
 		D4D0BC5623AC1BB7C474B769 /* KartState+Dashboard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "KartState+Dashboard.swift"; sourceTree = "<group>"; };
+		D840B33E3FF748BA4E2D2992 /* RaceFormattersTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceFormattersTests.swift; sourceTree = "<group>"; };
 		D962BBCD5521A8AFAB2680A2 /* AdjustedBetaClassificationView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdjustedBetaClassificationView.swift; sourceTree = "<group>"; };
 		D9C3CD543925C6B9AB750C60 /* FixtureLoader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FixtureLoader.swift; sourceTree = "<group>"; };
 		DA26C19EF0F2C2B515CCF221 /* LiveDashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveDashboardView.swift; sourceTree = "<group>"; };
@@ -204,14 +215,17 @@
 		DC2AB5820A74FC7D77F31256 /* BoxBoxNowDashboardApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoxBoxNowDashboardApp.swift; sourceTree = "<group>"; };
 		DC4353D02B94C87B0136798F /* AdminService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminService.swift; sourceTree = "<group>"; };
 		E569E3B298818FA60DE45660 /* BBNSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNSection.swift; sourceTree = "<group>"; };
+		E7856AF9152E00BC79E39E70 /* RaceRowView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceRowView.swift; sourceTree = "<group>"; };
 		E91DEE2D48BD5F5C1C9E1D07 /* FifoState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoState.swift; sourceTree = "<group>"; };
 		ED03ED34CD17D732029ADE58 /* PitRecord.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PitRecord.swift; sourceTree = "<group>"; };
+		ED146384A5BA8F1E0D35F350 /* RaceTableHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceTableHeader.swift; sourceTree = "<group>"; };
 		EE2A0F478A02471DD29E87D5 /* ReplayView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayView.swift; sourceTree = "<group>"; };
 		F076C7DDFF8222620E3532C6 /* SidebarItem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SidebarItem.swift; sourceTree = "<group>"; };
 		F12229FCE4736357FC38AC5D /* BBNToast.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNToast.swift; sourceTree = "<group>"; };
 		F169E4E49CAEF6665E8F9482 /* MFACodeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MFACodeView.swift; sourceTree = "<group>"; };
 		F205186513E7161023210D38 /* kart_state_extended.json */ = {isa = PBXFileReference; includeInIndex = 1; path = kart_state_extended.json; sourceTree = "<group>"; };
 		F26D9D1C4A0C580FF84AF5CA /* JSONValueTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JSONValueTests.swift; sourceTree = "<group>"; };
+		F7BD3E54B75379ED5907AB35 /* KartDetailSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KartDetailSheet.swift; sourceTree = "<group>"; };
 		F849B0990A9D5D86DFF48538 /* RaceStoreReducerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceStoreReducerTests.swift; sourceTree = "<group>"; };
 		FCA66F6BE6FA42C45673659A /* KartAnalyticsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KartAnalyticsView.swift; sourceTree = "<group>"; };
 		FF9191539843FAF88AD2810E /* snapshot.json */ = {isa = PBXFileReference; includeInIndex = 1; path = snapshot.json; sourceTree = "<group>"; };
@@ -293,6 +307,8 @@
 				5A2BD764B4C6A8A7EEE66A8B /* BBNEmptyState.swift */,
 				19AB82D71D21F2C68C0F05AD /* BBNLoadingOverlay.swift */,
 				F12229FCE4736357FC38AC5D /* BBNToast.swift */,
+				B419B4157B3624BFD1D53DD8 /* KartNumberBadge.swift */,
+				CB82689DA21993AA5A90FF11 /* BBNStatCard.swift */,
 			);
 			name = Components;
 			path = Components;
@@ -359,9 +375,19 @@
 				44462D27036B1EEB8536DA54 /* Helpers */,
 				F3214C676C7DC30EB8958FBD /* Services */,
 				C0799A27CA19969AD9077E64 /* Stores */,
+				43E0D42C4547F1D3977A8B27 /* Features */,
 			);
 			name = BoxBoxNowDashboardTests;
 			path = BoxBoxNowDashboardTests;
+			sourceTree = "<group>";
+		};
+		43E0D42C4547F1D3977A8B27 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				8FAA4892231F3C21098444BB /* Race */,
+			);
+			name = Features;
+			path = Features;
 			sourceTree = "<group>";
 		};
 		44462D27036B1EEB8536DA54 /* Helpers */ = {
@@ -447,6 +473,15 @@
 			path = Auth;
 			sourceTree = "<group>";
 		};
+		8FAA4892231F3C21098444BB /* Race */ = {
+			isa = PBXGroup;
+			children = (
+				D840B33E3FF748BA4E2D2992 /* RaceFormattersTests.swift */,
+			);
+			name = Race;
+			path = Race;
+			sourceTree = "<group>";
+		};
 		9ABAB475B30569560153F162 /* iOS */ = {
 			isa = PBXGroup;
 			children = (
@@ -517,6 +552,10 @@
 			isa = PBXGroup;
 			children = (
 				AFAD0DB2B2D79155CA0AA1F9 /* RaceView.swift */,
+				25EBE6983A792542D270F6D6 /* RaceFormatters.swift */,
+				ED146384A5BA8F1E0D35F350 /* RaceTableHeader.swift */,
+				E7856AF9152E00BC79E39E70 /* RaceRowView.swift */,
+				F7BD3E54B75379ED5907AB35 /* KartDetailSheet.swift */,
 			);
 			name = Race;
 			path = Race;
@@ -838,6 +877,7 @@
 				10D9431A4248D41C2156DB51 /* RaceStore+TestHelpers.swift in Sources */,
 				1D6E9AB90C99B8D63D5B9AB6 /* RaceStoreWebSocketIntegrationTests.swift in Sources */,
 				995C7C0FF8AB4539539C725C /* AsyncTestHelpers.swift in Sources */,
+				14EC50FDD516249F4AAD47EF /* RaceFormattersTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -914,6 +954,12 @@
 				D2DCF4BAFD6F221BD38A9BC9 /* AdminCircuitsView.swift in Sources */,
 				7AAA24CC65A83BAE66A0AC48 /* AdminHubView.swift in Sources */,
 				E86B51C329ABB526A9662FC7 /* AdminPlatformView.swift in Sources */,
+				68B5CA338250403CC69E9B6B /* KartNumberBadge.swift in Sources */,
+				683A44E6EEA131A5D0A3ADC4 /* BBNStatCard.swift in Sources */,
+				AC9C277C6CB7F39F5532B0C3 /* RaceFormatters.swift in Sources */,
+				3A124CBF4612CD4ADB090D6F /* RaceTableHeader.swift in Sources */,
+				84A9938F30EB9F34008D0900 /* RaceRowView.swift in Sources */,
+				CBBB2BEF2618E7FBCE668035 /* KartDetailSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
