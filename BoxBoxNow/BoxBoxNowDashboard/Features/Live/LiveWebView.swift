@@ -14,6 +14,9 @@ struct LiveWebView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
+        // The embedded page is backend-owned and fully trusted, so we allow
+        // inline media and autoplay without user interaction — the live-timing
+        // dashboard may embed karting cameras or ambient video overlays.
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
         let web = WKWebView(frame: .zero, configuration: config)
