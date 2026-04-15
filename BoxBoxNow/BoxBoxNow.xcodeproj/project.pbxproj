@@ -27,6 +27,7 @@
 		33B68322DA07AEED6F7B515A /* JSONValueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26D9D1C4A0C580FF84AF5CA /* JSONValueTests.swift */; };
 		470E821102349844D4948ED1 /* BBNEmptyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A2BD764B4C6A8A7EEE66A8B /* BBNEmptyState.swift */; };
 		4B7F9D4D6052E11D6C583A9E /* BBNPrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B7287D32B32CF5CB8CF88CC /* BBNPrimaryButton.swift */; };
+		4CEE5D9D3CA5D5AB84F76206 /* BiometricLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60846C94F559502132745197 /* BiometricLoginView.swift */; };
 		4F8993BE8C39E12AABA1FFBC /* WsMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6119E6C3C7B8C120381BC458 /* WsMessage.swift */; };
 		5A79AE48FDA736229E3D7CD2 /* AdminService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC4353D02B94C87B0136798F /* AdminService.swift */; };
 		5E60E50BDE546299494CA626 /* FifoEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 835130EAF2454A3C8D55C1A1 /* FifoEntry.swift */; };
@@ -48,6 +49,7 @@
 		995C7C0FF8AB4539539C725C /* AsyncTestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DF5ACFDAE7C9C80EF8A9E39 /* AsyncTestHelpers.swift */; };
 		9ACC87C64B0B9BFBD25BC818 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
 		A2821609E7D7D5D10A89F78E /* BBNColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 003B0EE2019A297341BE3956 /* BBNColors.swift */; };
+		A2A869E1C58AFBAE82B876B0 /* AuthFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABABB34C05F49051365BAEB0 /* AuthFlowView.swift */; };
 		A6D44B5BA43504D9202B02E9 /* DeviceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A3BD6BD01F9F40B0AD06A31 /* DeviceSession.swift */; };
 		A7EA8935429FA5467CE5A285 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C59CBF0B27A03B35E925A98 /* AuthService.swift */; };
 		AC0AEDB26882D3FE32FED1A9 /* BBNSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E569E3B298818FA60DE45660 /* BBNSection.swift */; };
@@ -56,6 +58,8 @@
 		B276E659F7DEE02AE658F709 /* KeychainProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B27F23A1CCCF192DCDFC293 /* KeychainProtocol.swift */; };
 		B4A973259304816BCD25287D /* ReplayStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69DE783EB983464BB83A5B56 /* ReplayStatus.swift */; };
 		B5D31F026F268562DE2B275A /* BBNLoadingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19AB82D71D21F2C68C0F05AD /* BBNLoadingOverlay.swift */; };
+		B7DF2C65013BE1C09B9C6D7F /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237109830CC151188A561377 /* LoginView.swift */; };
+		B86CE21F588C093F229E82B2 /* MFACodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F169E4E49CAEF6665E8F9482 /* MFACodeView.swift */; };
 		B95EA2593974CC92C6649394 /* FifoSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96B3268BFEF3AF7F2526CBD8 /* FifoSnapshot.swift */; };
 		C4BEB02FBD94EFF88B830694 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
 		CA1EB85F530AF5DE08484D52 /* ConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B76FDAA343695CB38541957 /* ConfigStore.swift */; };
@@ -65,8 +69,10 @@
 		D7F20CAE8348BF030B4465B1 /* RaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7826E17ED74C1A408F110B1D /* RaceStore.swift */; };
 		D982C51F6B58A36147A13779 /* MockRaceWebSocketClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C7CEE6557A432E12F92C4C1 /* MockRaceWebSocketClient.swift */; };
 		DCEF1D89165A2B67E2FD8CB9 /* MockKeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39360E9737FD8F36A30DA8DF /* MockKeychainHelper.swift */; };
+		DEA06B00B322BB15633AA7E2 /* GoogleOAuthFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 483E97C925E47FED7D0FF29D /* GoogleOAuthFlow.swift */; };
 		E15680155663A52D76787AA0 /* PitRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED03ED34CD17D732029ADE58 /* PitRecord.swift */; };
 		E5636489B335E0A6D27C41DD /* kart_state_extended.json in Resources */ = {isa = PBXBuildFile; fileRef = F205186513E7161023210D38 /* kart_state_extended.json */; };
+		E684D0DFAB392A16C766A928 /* MFASetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21392B7494C9541A5A6EE41C /* MFASetupView.swift */; };
 		E938A0BB87913D93115DB2FE /* update.json in Resources */ = {isa = PBXBuildFile; fileRef = 236D0520DA0FEFD14CD4AEF5 /* update.json */; };
 		F6B3E87A922E83EFF57EFDAA /* ConfigService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C978D3BC578AC4BF0A3167 /* ConfigService.swift */; };
 		F6E828BFD4FBB22496F12DDC /* RaceStoreReducerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F849B0990A9D5D86DFF48538 /* RaceStoreReducerTests.swift */; };
@@ -101,7 +107,9 @@
 		11FF2A2767E16F4B71E59B7A /* BBNTypography.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNTypography.swift; sourceTree = "<group>"; };
 		16ADD04E208136B7F7652CFB /* BBNStatusDot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNStatusDot.swift; sourceTree = "<group>"; };
 		19AB82D71D21F2C68C0F05AD /* BBNLoadingOverlay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNLoadingOverlay.swift; sourceTree = "<group>"; };
+		21392B7494C9541A5A6EE41C /* MFASetupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MFASetupView.swift; sourceTree = "<group>"; };
 		236D0520DA0FEFD14CD4AEF5 /* update.json */ = {isa = PBXFileReference; includeInIndex = 1; path = update.json; sourceTree = "<group>"; };
+		237109830CC151188A561377 /* LoginView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		23CAB0D3FBBB6BF2C7A7386F /* ClassificationEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClassificationEntry.swift; sourceTree = "<group>"; };
 		244C0A812F8D3A2A0047102F /* BoxBoxNow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BoxBoxNow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		25E7735976C6A9E5B5F723AD /* AdminStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminStore.swift; sourceTree = "<group>"; };
@@ -111,6 +119,7 @@
 		3E34F3AC93FC3FE75EB9179E /* RaceService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceService.swift; sourceTree = "<group>"; };
 		3E485FA80390A19423F682CF /* APIClient+Dashboard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "APIClient+Dashboard.swift"; sourceTree = "<group>"; };
 		4132D5E13DE7435DACF4F43C /* BoxBoxNowDashboardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = BoxBoxNowDashboardTests.xctest; path = BoxBoxNowDashboardTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		483E97C925E47FED7D0FF29D /* GoogleOAuthFlow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GoogleOAuthFlow.swift; sourceTree = "<group>"; };
 		4A4A8BF665A9FAAAD621DCD4 /* RaceSnapshot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceSnapshot.swift; sourceTree = "<group>"; };
 		50AC16025237E1E494C9D5A0 /* WsUpdateEvent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WsUpdateEvent.swift; sourceTree = "<group>"; };
 		53D95657E1ADF2BB1647C14F /* BoxBoxNowDashboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BoxBoxNowDashboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -121,6 +130,7 @@
 		5C5F5056B5407DAD1552A229 /* UserListItem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserListItem.swift; sourceTree = "<group>"; };
 		5DF5ACFDAE7C9C80EF8A9E39 /* AsyncTestHelpers.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AsyncTestHelpers.swift; sourceTree = "<group>"; };
 		5EF849D96B812EF5AE75AA99 /* RaceWebSocketClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceWebSocketClient.swift; sourceTree = "<group>"; };
+		60846C94F559502132745197 /* BiometricLoginView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BiometricLoginView.swift; sourceTree = "<group>"; };
 		6119E6C3C7B8C120381BC458 /* WsMessage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WsMessage.swift; sourceTree = "<group>"; };
 		6450E4BD57F2989352AFB301 /* AuthStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
 		64D3260E44ADE5768F10CAEF /* AuthStoreStateMachineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthStoreStateMachineTests.swift; sourceTree = "<group>"; };
@@ -136,6 +146,7 @@
 		9B74567B1346431031C47C91 /* AppStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
 		A7814A1631861CA7D179CA18 /* MockAuthService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MockAuthService.swift; sourceTree = "<group>"; };
 		AB4502BAB3CE61EC1C3DE376 /* RaceWebSocketClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceWebSocketClientTests.swift; sourceTree = "<group>"; };
+		ABABB34C05F49051365BAEB0 /* AuthFlowView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthFlowView.swift; sourceTree = "<group>"; };
 		AE9B41368B3473E19EEEE5CE /* APIClientDashboardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClientDashboardTests.swift; sourceTree = "<group>"; };
 		B37F20E81BB1582179DFDA9B /* replay_status.json */ = {isa = PBXFileReference; includeInIndex = 1; path = replay_status.json; sourceTree = "<group>"; };
 		B978CAD275F81D34EC842DD0 /* BoxBoxNowDashboardUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = BoxBoxNowDashboardUITests.xctest; path = .xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -155,6 +166,7 @@
 		E91DEE2D48BD5F5C1C9E1D07 /* FifoState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoState.swift; sourceTree = "<group>"; };
 		ED03ED34CD17D732029ADE58 /* PitRecord.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PitRecord.swift; sourceTree = "<group>"; };
 		F12229FCE4736357FC38AC5D /* BBNToast.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNToast.swift; sourceTree = "<group>"; };
+		F169E4E49CAEF6665E8F9482 /* MFACodeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MFACodeView.swift; sourceTree = "<group>"; };
 		F205186513E7161023210D38 /* kart_state_extended.json */ = {isa = PBXFileReference; includeInIndex = 1; path = kart_state_extended.json; sourceTree = "<group>"; };
 		F26D9D1C4A0C580FF84AF5CA /* JSONValueTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JSONValueTests.swift; sourceTree = "<group>"; };
 		F849B0990A9D5D86DFF48538 /* RaceStoreReducerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceStoreReducerTests.swift; sourceTree = "<group>"; };
@@ -333,6 +345,7 @@
 				CF7A40DA7FA63D373470007B /* Design */,
 				EC9CE3782DBFBDECEC97FCA9 /* Services */,
 				4E5E297ABEF5039AC38C4B23 /* Stores */,
+				F799F1921EDBF482E43003F7 /* Features */,
 			);
 			name = BoxBoxNowDashboard;
 			path = BoxBoxNowDashboard;
@@ -345,6 +358,19 @@
 			);
 			name = App;
 			path = App;
+			sourceTree = "<group>";
+		};
+		88886460718FE879EA4197BD /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				237109830CC151188A561377 /* LoginView.swift */,
+				F169E4E49CAEF6665E8F9482 /* MFACodeView.swift */,
+				21392B7494C9541A5A6EE41C /* MFASetupView.swift */,
+				60846C94F559502132745197 /* BiometricLoginView.swift */,
+				ABABB34C05F49051365BAEB0 /* AuthFlowView.swift */,
+			);
+			name = Auth;
+			path = Auth;
 			sourceTree = "<group>";
 		};
 		9ABAB475B30569560153F162 /* iOS */ = {
@@ -403,6 +429,7 @@
 				5EF849D96B812EF5AE75AA99 /* RaceWebSocketClient.swift */,
 				8B27F23A1CCCF192DCDFC293 /* KeychainProtocol.swift */,
 				CFCE66BB3867BF7253532A8E /* ErrorMessages.swift */,
+				483E97C925E47FED7D0FF29D /* GoogleOAuthFlow.swift */,
 			);
 			name = Services;
 			path = Services;
@@ -438,6 +465,15 @@
 			);
 			name = Models;
 			path = Models;
+			sourceTree = "<group>";
+		};
+		F799F1921EDBF482E43003F7 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				88886460718FE879EA4197BD /* Auth */,
+			);
+			name = Features;
+			path = Features;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -676,6 +712,12 @@
 				26400F3AEB640F29C722C63C /* AdminStore.swift in Sources */,
 				CB0CB311F82FEAE1122DD805 /* AppStore.swift in Sources */,
 				929CE2681D31863205C83BAC /* ErrorMessages.swift in Sources */,
+				DEA06B00B322BB15633AA7E2 /* GoogleOAuthFlow.swift in Sources */,
+				B7DF2C65013BE1C09B9C6D7F /* LoginView.swift in Sources */,
+				B86CE21F588C093F229E82B2 /* MFACodeView.swift in Sources */,
+				E684D0DFAB392A16C766A928 /* MFASetupView.swift in Sources */,
+				4CEE5D9D3CA5D5AB84F76206 /* BiometricLoginView.swift in Sources */,
+				A2A869E1C58AFBAE82B876B0 /* AuthFlowView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
