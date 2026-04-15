@@ -34,8 +34,8 @@ actor RaceWebSocketClient: RaceWebSocketClientProtocol {
     nonisolated let messages: AsyncStream<WsMessage>
     nonisolated let connectionStates: AsyncStream<RaceConnectionState>
 
-    private let messagesContinuation: AsyncStream<WsMessage>.Continuation
-    private let stateContinuation: AsyncStream<RaceConnectionState>.Continuation
+    nonisolated(unsafe) private let messagesContinuation: AsyncStream<WsMessage>.Continuation
+    nonisolated(unsafe) private let stateContinuation: AsyncStream<RaceConnectionState>.Continuation
 
     // MARK: - Internal state
 
@@ -73,6 +73,13 @@ actor RaceWebSocketClient: RaceWebSocketClientProtocol {
     // MARK: - Public API
 
     func connect(url: URL, token: String) async {
+        // Tear down any prior session before starting a new one.
+        pingTask?.cancel(); pingTask = nil
+        readTask?.cancel(); readTask = nil
+        reconnectTask?.cancel(); reconnectTask = nil
+        task?.cancel(with: .goingAway, reason: nil)
+        task = nil
+
         currentURL = url
         currentToken = token
         shouldReconnect = true
@@ -123,10 +130,11 @@ actor RaceWebSocketClient: RaceWebSocketClientProtocol {
     }
 
     private func sendPing() async {
-        task?.sendPing { [weak self] error in
-            if error != nil {
-                Task { await self?.handleDisconnect(reason: .networkError(error?.localizedDescription)) }
-            }
+        guard let task else { return }
+        task.sendPing { [weak self] error in
+            guard let self, let error else { return }
+            let description = error.localizedDescription
+            Task { await self.handleDisconnect(reason: .networkError(description)) }
         }
     }
 
@@ -136,13 +144,22 @@ actor RaceWebSocketClient: RaceWebSocketClientProtocol {
                 let message = try await task.receive()
                 switch message {
                 case .string(let text):
-                    if let data = text.data(using: .utf8),
-                       let wsMsg = try? JSONDecoder().decode(WsMessage.self, from: data) {
-                        messagesContinuation.yield(wsMsg)
+                    if let data = text.data(using: .utf8) {
+                        if let wsMsg = try? JSONDecoder().decode(WsMessage.self, from: data) {
+                            messagesContinuation.yield(wsMsg)
+                        } else {
+                            #if DEBUG
+                            print("[RaceWebSocketClient] failed to decode string frame: \(text.prefix(200))")
+                            #endif
+                        }
                     }
                 case .data(let data):
                     if let wsMsg = try? JSONDecoder().decode(WsMessage.self, from: data) {
                         messagesContinuation.yield(wsMsg)
+                    } else {
+                        #if DEBUG
+                        print("[RaceWebSocketClient] failed to decode data frame (\(data.count) bytes)")
+                        #endif
                     }
                 @unknown default:
                     continue
@@ -156,6 +173,8 @@ actor RaceWebSocketClient: RaceWebSocketClientProtocol {
     }
 
     private func mapCloseReason(task: URLSessionWebSocketTask, error: Error) -> RaceConnectionState.CloseReason {
+        if error is CancellationError { return .normal }
+        if (error as? URLError)?.code == .cancelled { return .normal }
         let code = task.closeCode.rawValue
         if code == 4001 { return .sessionTerminated }
         if code == 4003 { return .maxDevices }
@@ -163,6 +182,8 @@ actor RaceWebSocketClient: RaceWebSocketClientProtocol {
     }
 
     private func handleDisconnect(reason: RaceConnectionState.CloseReason) async {
+        // Idempotency guard — prior call already cleaned up.
+        guard task != nil else { return }
         pingTask?.cancel(); pingTask = nil
         readTask?.cancel(); readTask = nil
         task = nil

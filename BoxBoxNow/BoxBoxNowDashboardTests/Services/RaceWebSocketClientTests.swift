@@ -6,14 +6,14 @@ final class RaceWebSocketClientTests: XCTestCase {
         let client = RaceWebSocketClient()
         await client.disconnect()
 
-        // Disconnecting when never connected should yield a `.normal` state and not crash.
-        var receivedState: RaceConnectionState?
-        for await state in client.connectionStates {
-            receivedState = state
-            break
-        }
-        if case .disconnected(reason: .normal) = receivedState! {} else {
-            XCTFail("expected .disconnected(.normal), got \(String(describing: receivedState))")
+        // Disconnecting when never connected should yield a `.normal` state without crashing.
+        // Pins the buffer assumption: disconnect's yield is buffered (default .unbounded) so the
+        // iterator-based read below can collect it even though the yield happened before iteration.
+        var iterator = client.connectionStates.makeAsyncIterator()
+        let state = await iterator.next()
+        guard case .disconnected(reason: .normal) = state else {
+            XCTFail("expected .disconnected(.normal), got \(String(describing: state))")
+            return
         }
     }
 }
