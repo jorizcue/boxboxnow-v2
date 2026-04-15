@@ -1,0 +1,28 @@
+{
+  "rowId": "k-1",
+  "kartNumber": 1,
+  "position": 3,
+  "totalLaps": 42,
+  "lastLapMs": 88345,
+  "bestLapMs": 87120,
+  "avgLapMs": 88500,
+  "bestAvgMs": 88012,
+  "bestStintLapMs": 87400,
+  "gap": "+4.123",
+  "interval": "+1.012",
+  "pitCount": 2,
+  "pitStatus": "racing",
+  "tierScore": 88,
+  "driverName": "Ayrton",
+  "teamName": "Redline",
+  "driverDifferentialMs": 320,
+  "pitHistory": [
+    {"pitNumber": 1, "lap": 18, "raceTimeMs": 1620000, "onTrackMs": 1580000, "driverName": "Ayrton", "totalDriverMs": 1580000, "pitTimeMs": 180000, "stintLaps": 18}
+  ],
+  "driverTotalMs": {"Ayrton": 3200000, "Niki": 1500000},
+  "driverAvgLapMs": {"Ayrton": 88500, "Niki": 89100},
+  "recentLaps": [
+    {"lapTime": 88345, "totalLap": 42, "driverName": "Ayrton"},
+    {"lapTime": 88012, "totalLap": 41, "driverName": "Ayrton"}
+  ]
+}

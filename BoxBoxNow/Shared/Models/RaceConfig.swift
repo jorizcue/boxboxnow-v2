@@ -48,13 +48,45 @@ struct RaceSession: Codable {
     )
 }
 
-struct Circuit: Codable, Identifiable {
+struct Circuit: Codable, Identifiable, Hashable {
     let id: Int
     let name: String
     let lengthM: Int?
+    var finishLat1: Double?
+    var finishLon1: Double?
+    var finishLat2: Double?
+    var finishLon2: Double?
+    var isActive: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, name
         case lengthM = "length_m"
+        case finishLat1 = "finish_lat_1"
+        case finishLon1 = "finish_lon_1"
+        case finishLat2 = "finish_lat_2"
+        case finishLon2 = "finish_lon_2"
+        case isActive   = "is_active"
     }
+}
+
+// Dashboard-only race config (wider than the driver's RaceSession).
+// Decoded from the dashboard snapshot; the driver app does not use this type.
+struct RaceConfig: Codable, Hashable {
+    var circuitLengthM: Double
+    var pitTimeS: Double
+    var ourKartNumber: Int
+    var minPits: Int
+    var maxStintMin: Int
+    var minStintMin: Int
+    var durationMin: Int
+    var boxLines: Int
+    var boxKarts: Int
+    var minDriverTimeMin: Int
+    var pitClosedStartMin: Int
+    var pitClosedEndMin: Int
+    var rain: Bool
+    var finishLat1: Double?
+    var finishLon1: Double?
+    var finishLat2: Double?
+    var finishLon2: Double?
 }

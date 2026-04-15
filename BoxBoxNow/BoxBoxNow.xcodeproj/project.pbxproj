@@ -9,8 +9,11 @@
 /* Begin PBXBuildFile section */
 		140684EF36EE17EF914B3C4E /* BoxBoxNowDashboardApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC2AB5820A74FC7D77F31256 /* BoxBoxNowDashboardApp.swift */; };
 		6A306500092801DB65E90E25 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
+		869271EFDCD0929F85F5421A /* KartState+Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4D0BC5623AC1BB7C474B769 /* KartState+Dashboard.swift */; };
 		9ACC87C64B0B9BFBD25BC818 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
+		B0750A3EE3397107E1B0AFA5 /* SharedModelExtensionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79E30CAE14869C40E9C22A70 /* SharedModelExtensionsTests.swift */; };
 		C4BEB02FBD94EFF88B830694 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
+		E5636489B335E0A6D27C41DD /* kart_state_extended.json in Resources */ = {isa = PBXBuildFile; fileRef = F205186513E7161023210D38 /* kart_state_extended.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,11 +35,14 @@
 
 /* Begin PBXFileReference section */
 		244C0A812F8D3A2A0047102F /* BoxBoxNow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BoxBoxNow.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		4132D5E13DE7435DACF4F43C /* BoxBoxNowDashboardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = BoxBoxNowDashboardTests.xctest; path = .xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4132D5E13DE7435DACF4F43C /* BoxBoxNowDashboardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = BoxBoxNowDashboardTests.xctest; path = BoxBoxNowDashboardTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		53D95657E1ADF2BB1647C14F /* BoxBoxNowDashboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BoxBoxNowDashboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		79E30CAE14869C40E9C22A70 /* SharedModelExtensionsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedModelExtensionsTests.swift; sourceTree = "<group>"; };
 		B978CAD275F81D34EC842DD0 /* BoxBoxNowDashboardUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = BoxBoxNowDashboardUITests.xctest; path = .xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2C533B2DA82843B7A10971F /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		D4D0BC5623AC1BB7C474B769 /* KartState+Dashboard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "KartState+Dashboard.swift"; sourceTree = "<group>"; };
 		DC2AB5820A74FC7D77F31256 /* BoxBoxNowDashboardApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoxBoxNowDashboardApp.swift; sourceTree = "<group>"; };
+		F205186513E7161023210D38 /* kart_state_extended.json */ = {isa = PBXFileReference; includeInIndex = 1; path = kart_state_extended.json; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -110,6 +116,7 @@
 				6DA2DEE9AC55C61895B71D0E /* Frameworks */,
 				79151AA7EC142F3FA42398AE /* BoxBoxNowDashboard */,
 				14C1079D210221371A8FA163 /* Shared */,
+				3CC268C9A5A02F9BBAB1C276 /* BoxBoxNowDashboardTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -124,6 +131,25 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		3CC268C9A5A02F9BBAB1C276 /* BoxBoxNowDashboardTests */ = {
+			isa = PBXGroup;
+			children = (
+				52FFFF66EB6F73E27D1B037A /* Models */,
+				C034E987FE4E8DE5E4EAB00F /* Fixtures */,
+			);
+			name = BoxBoxNowDashboardTests;
+			path = BoxBoxNowDashboardTests;
+			sourceTree = "<group>";
+		};
+		52FFFF66EB6F73E27D1B037A /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				79E30CAE14869C40E9C22A70 /* SharedModelExtensionsTests.swift */,
+			);
+			name = Models;
+			path = Models;
+			sourceTree = "<group>";
+		};
 		6DA2DEE9AC55C61895B71D0E /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -136,6 +162,7 @@
 			isa = PBXGroup;
 			children = (
 				7D68E450CC8EFF592749FA12 /* App */,
+				F3BA989C68055B8BC3E82680 /* Models */,
 			);
 			name = BoxBoxNowDashboard;
 			path = BoxBoxNowDashboard;
@@ -156,6 +183,24 @@
 				C2C533B2DA82843B7A10971F /* Foundation.framework */,
 			);
 			name = iOS;
+			sourceTree = "<group>";
+		};
+		C034E987FE4E8DE5E4EAB00F /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				F205186513E7161023210D38 /* kart_state_extended.json */,
+			);
+			name = Fixtures;
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
+		F3BA989C68055B8BC3E82680 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				D4D0BC5623AC1BB7C474B769 /* KartState+Dashboard.swift */,
+			);
+			name = Models;
+			path = Models;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -294,6 +339,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E5636489B335E0A6D27C41DD /* kart_state_extended.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -325,6 +371,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B0750A3EE3397107E1B0AFA5 /* SharedModelExtensionsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -333,6 +380,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				140684EF36EE17EF914B3C4E /* BoxBoxNowDashboardApp.swift in Sources */,
+				869271EFDCD0929F85F5421A /* KartState+Dashboard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -629,7 +677,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jizcue.BoxBoxNowDashboard.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 2;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BoxBoxNowDashboard.app/BoxBoxNowDashboard";
 				VALIDATE_PRODUCT = YES;
@@ -644,7 +694,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jizcue.BoxBoxNowDashboard.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 2;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BoxBoxNowDashboard.app/BoxBoxNowDashboard";
 			};

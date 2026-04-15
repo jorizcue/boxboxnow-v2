@@ -10,6 +10,8 @@ struct User: Codable, Identifiable {
     let tabAccess: [String]?
     let hasActiveSubscription: Bool?
     let subscriptionPlan: String?
+    let subscriptionStatus: String?
+    let createdAt: Date?
 
     var displayName: String { username }
 
@@ -21,6 +23,8 @@ struct User: Codable, Identifiable {
         case tabAccess = "tab_access"
         case hasActiveSubscription = "has_active_subscription"
         case subscriptionPlan = "subscription_plan"
+        case subscriptionStatus = "subscription_status"
+        case createdAt = "created_at"
     }
 }
 
