@@ -2,10 +2,20 @@ import SwiftUI
 
 @main
 struct BoxBoxNowDashboardApp: App {
+    @State private var app = AppStore()
+
     var body: some Scene {
         WindowGroup {
-            Text("BoxBoxNowDashboard — placeholder")
-                .preferredColorScheme(.dark)
+            Group {
+                if case .loggedIn = app.auth.authState {
+                    RootView()
+                } else {
+                    AuthFlowView()
+                }
+            }
+            .environment(app)
+            .preferredColorScheme(.dark)
+            .tint(BBNColors.accent)
         }
     }
 }
