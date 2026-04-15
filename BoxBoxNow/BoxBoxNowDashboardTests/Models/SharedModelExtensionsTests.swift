@@ -2,9 +2,6 @@ import XCTest
 @testable import BoxBoxNowDashboard
 
 // Spec: verify the dashboard-only decoding extensions on shared models.
-// The KartState extended-fields test ships in Task 5, alongside PitRecord
-// and KartStateFull. This file covers the three extensions that have no
-// Task 5 dependency.
 final class SharedModelExtensionsTests: XCTestCase {
     func testRaceConfigDecodesExtendedFields() throws {
         let json = """
@@ -70,5 +67,19 @@ final class SharedModelExtensionsTests: XCTestCase {
         let u = try JSONDecoder().decode(User.self, from: json)
         XCTAssertEqual(u.subscriptionStatus, "active")
         XCTAssertEqual(u.createdAt, "2026-01-01T00:00:00Z")
+    }
+
+    func testKartStateDecodesExtendedFields() throws {
+        let url = Bundle(for: type(of: self)).url(forResource: "kart_state_extended", withExtension: "json")!
+        let data = try Data(contentsOf: url)
+        let kart = try JSONDecoder().decode(KartStateFull.self, from: data)
+
+        XCTAssertEqual(kart.base.kartNumber, 1)
+        XCTAssertEqual(kart.pitHistory.count, 1)
+        XCTAssertEqual(kart.pitHistory.first?.pitNumber, 1)
+        XCTAssertEqual(kart.driverTotalMs["Ayrton"], 3200000)
+        XCTAssertEqual(kart.driverAvgLapMs["Ayrton"], 88500)
+        XCTAssertEqual(kart.recentLaps.count, 2)
+        XCTAssertEqual(kart.recentLaps.first?.lapTime, 88345)
     }
 }
