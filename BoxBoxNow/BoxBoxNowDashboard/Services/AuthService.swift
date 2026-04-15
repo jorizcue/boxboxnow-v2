@@ -1,5 +1,14 @@
 import Foundation
 
+protocol AuthServicing {
+    func login(email: String, password: String) async throws -> LoginResponse
+    func verifyMFA(code: String) async throws -> LoginResponse
+    func me() async throws -> User
+    func logout() async throws
+    func sessions() async throws -> [DeviceSession]
+    func deleteSession(id: Int) async throws
+}
+
 struct LoginResponse: Codable {
     let accessToken: String
     let user: User
@@ -19,6 +28,8 @@ struct LoginResponse: Codable {
 struct MFAVerifyRequest: Codable { let mfaCode: String; enum CodingKeys: String, CodingKey { case mfaCode = "mfa_code" } }
 struct LoginRequest: Codable { let username: String; let password: String }
 struct EmptyBody: Codable {}
+
+extension AuthService: AuthServicing {}
 
 struct AuthService {
     let api = APIClient.shared

@@ -18,6 +18,7 @@
 		1CA18F6940832DEE70895997 /* RaceSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4A8BF665A9FAAAD621DCD4 /* RaceSnapshot.swift */; };
 		1D0D179E0535E0D16F07EA59 /* RaceWebSocketClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4502BAB3CE61EC1C3DE376 /* RaceWebSocketClientTests.swift */; };
 		1FB3D7DAD8A0EB3E24B7CA78 /* APIClient+Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E485FA80390A19423F682CF /* APIClient+Dashboard.swift */; };
+		291DFB0EFA081CA4709978AF /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6450E4BD57F2989352AFB301 /* AuthStore.swift */; };
 		2DE6A83752A10AF7CBF04EAB /* BBNToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = F12229FCE4736357FC38AC5D /* BBNToast.swift */; };
 		32370AE437BF27AA40BAEFD6 /* BBNCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA50485A6E7EDADD652C23E9 /* BBNCard.swift */; };
 		33B68322DA07AEED6F7B515A /* JSONValueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26D9D1C4A0C580FF84AF5CA /* JSONValueTests.swift */; };
@@ -33,6 +34,7 @@
 		6E9B28881723E58E990AF783 /* BBNTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11FF2A2767E16F4B71E59B7A /* BBNTypography.swift */; };
 		7E41824EE7ABA55AEA8B57F9 /* WsUpdateEventTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DFEE1E2E80BCB61D4D15B11 /* WsUpdateEventTests.swift */; };
 		841B83B318959F4EB40C7C9E /* BBNSecondaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C87B55B13B78A1D126F7C8C /* BBNSecondaryButton.swift */; };
+		841FA937AA3BA58C150FD290 /* AuthStoreStateMachineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64D3260E44ADE5768F10CAEF /* AuthStoreStateMachineTests.swift */; };
 		869271EFDCD0929F85F5421A /* KartState+Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4D0BC5623AC1BB7C474B769 /* KartState+Dashboard.swift */; };
 		89911E15E6A83AFAD3A364AB /* RaceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E34F3AC93FC3FE75EB9179E /* RaceService.swift */; };
 		89C6B39F3A6C4109D2BBCBD4 /* FixtureLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9C3CD543925C6B9AB750C60 /* FixtureLoader.swift */; };
@@ -46,6 +48,7 @@
 		AC0AEDB26882D3FE32FED1A9 /* BBNSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E569E3B298818FA60DE45660 /* BBNSection.swift */; };
 		AC3D0AE39C6B8185CE796FFE /* UserListItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5F5056B5407DAD1552A229 /* UserListItem.swift */; };
 		B0750A3EE3397107E1B0AFA5 /* SharedModelExtensionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79E30CAE14869C40E9C22A70 /* SharedModelExtensionsTests.swift */; };
+		B276E659F7DEE02AE658F709 /* KeychainProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B27F23A1CCCF192DCDFC293 /* KeychainProtocol.swift */; };
 		B4A973259304816BCD25287D /* ReplayStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69DE783EB983464BB83A5B56 /* ReplayStatus.swift */; };
 		B5D31F026F268562DE2B275A /* BBNLoadingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19AB82D71D21F2C68C0F05AD /* BBNLoadingOverlay.swift */; };
 		B95EA2593974CC92C6649394 /* FifoSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96B3268BFEF3AF7F2526CBD8 /* FifoSnapshot.swift */; };
@@ -53,11 +56,13 @@
 		CA24B295C83006D2F2AE881F /* BBNStatusDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16ADD04E208136B7F7652CFB /* BBNStatusDot.swift */; };
 		D3176DA7E4B042103217B8A1 /* DecodeFixturesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD90191EE4504727D0DC9F2D /* DecodeFixturesTests.swift */; };
 		D982C51F6B58A36147A13779 /* MockRaceWebSocketClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C7CEE6557A432E12F92C4C1 /* MockRaceWebSocketClient.swift */; };
+		DCEF1D89165A2B67E2FD8CB9 /* MockKeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39360E9737FD8F36A30DA8DF /* MockKeychainHelper.swift */; };
 		E15680155663A52D76787AA0 /* PitRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED03ED34CD17D732029ADE58 /* PitRecord.swift */; };
 		E5636489B335E0A6D27C41DD /* kart_state_extended.json in Resources */ = {isa = PBXBuildFile; fileRef = F205186513E7161023210D38 /* kart_state_extended.json */; };
 		E938A0BB87913D93115DB2FE /* update.json in Resources */ = {isa = PBXBuildFile; fileRef = 236D0520DA0FEFD14CD4AEF5 /* update.json */; };
 		F6B3E87A922E83EFF57EFDAA /* ConfigService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C978D3BC578AC4BF0A3167 /* ConfigService.swift */; };
 		F997C9767BE7B0B12ADC4B9D /* WsUpdateEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50AC16025237E1E494C9D5A0 /* WsUpdateEvent.swift */; };
+		FDDC6047C2526C75C03565E1 /* MockAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7814A1631861CA7D179CA18 /* MockAuthService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -90,6 +95,7 @@
 		23CAB0D3FBBB6BF2C7A7386F /* ClassificationEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClassificationEntry.swift; sourceTree = "<group>"; };
 		244C0A812F8D3A2A0047102F /* BoxBoxNow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BoxBoxNow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2BD72A620151DBF945560B96 /* fifo_update.json */ = {isa = PBXFileReference; includeInIndex = 1; path = fifo_update.json; sourceTree = "<group>"; };
+		39360E9737FD8F36A30DA8DF /* MockKeychainHelper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MockKeychainHelper.swift; sourceTree = "<group>"; };
 		3E34F3AC93FC3FE75EB9179E /* RaceService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceService.swift; sourceTree = "<group>"; };
 		3E485FA80390A19423F682CF /* APIClient+Dashboard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "APIClient+Dashboard.swift"; sourceTree = "<group>"; };
 		4132D5E13DE7435DACF4F43C /* BoxBoxNowDashboardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = BoxBoxNowDashboardTests.xctest; path = BoxBoxNowDashboardTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -103,12 +109,16 @@
 		5C5F5056B5407DAD1552A229 /* UserListItem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserListItem.swift; sourceTree = "<group>"; };
 		5EF849D96B812EF5AE75AA99 /* RaceWebSocketClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceWebSocketClient.swift; sourceTree = "<group>"; };
 		6119E6C3C7B8C120381BC458 /* WsMessage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WsMessage.swift; sourceTree = "<group>"; };
+		6450E4BD57F2989352AFB301 /* AuthStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
+		64D3260E44ADE5768F10CAEF /* AuthStoreStateMachineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthStoreStateMachineTests.swift; sourceTree = "<group>"; };
 		69DE783EB983464BB83A5B56 /* ReplayStatus.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayStatus.swift; sourceTree = "<group>"; };
 		6DFEE1E2E80BCB61D4D15B11 /* WsUpdateEventTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WsUpdateEventTests.swift; sourceTree = "<group>"; };
 		79E30CAE14869C40E9C22A70 /* SharedModelExtensionsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedModelExtensionsTests.swift; sourceTree = "<group>"; };
 		835130EAF2454A3C8D55C1A1 /* FifoEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoEntry.swift; sourceTree = "<group>"; };
+		8B27F23A1CCCF192DCDFC293 /* KeychainProtocol.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainProtocol.swift; sourceTree = "<group>"; };
 		8F0761AFE0F86F8EA9447381 /* PublicService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PublicService.swift; sourceTree = "<group>"; };
 		96B3268BFEF3AF7F2526CBD8 /* FifoSnapshot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoSnapshot.swift; sourceTree = "<group>"; };
+		A7814A1631861CA7D179CA18 /* MockAuthService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MockAuthService.swift; sourceTree = "<group>"; };
 		AB4502BAB3CE61EC1C3DE376 /* RaceWebSocketClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceWebSocketClientTests.swift; sourceTree = "<group>"; };
 		AE9B41368B3473E19EEEE5CE /* APIClientDashboardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClientDashboardTests.swift; sourceTree = "<group>"; };
 		B37F20E81BB1582179DFDA9B /* replay_status.json */ = {isa = PBXFileReference; includeInIndex = 1; path = replay_status.json; sourceTree = "<group>"; };
@@ -244,6 +254,7 @@
 				C034E987FE4E8DE5E4EAB00F /* Fixtures */,
 				44462D27036B1EEB8536DA54 /* Helpers */,
 				F3214C676C7DC30EB8958FBD /* Services */,
+				C0799A27CA19969AD9077E64 /* Stores */,
 			);
 			name = BoxBoxNowDashboardTests;
 			path = BoxBoxNowDashboardTests;
@@ -255,9 +266,20 @@
 				D9C3CD543925C6B9AB750C60 /* FixtureLoader.swift */,
 				C29D186C97F4930A74ABA6FA /* MockURLProtocol.swift */,
 				0C7CEE6557A432E12F92C4C1 /* MockRaceWebSocketClient.swift */,
+				A7814A1631861CA7D179CA18 /* MockAuthService.swift */,
+				39360E9737FD8F36A30DA8DF /* MockKeychainHelper.swift */,
 			);
 			name = Helpers;
 			path = Helpers;
+			sourceTree = "<group>";
+		};
+		4E5E297ABEF5039AC38C4B23 /* Stores */ = {
+			isa = PBXGroup;
+			children = (
+				6450E4BD57F2989352AFB301 /* AuthStore.swift */,
+			);
+			name = Stores;
+			path = Stores;
 			sourceTree = "<group>";
 		};
 		52FFFF66EB6F73E27D1B037A /* Models */ = {
@@ -287,6 +309,7 @@
 				F3BA989C68055B8BC3E82680 /* Models */,
 				CF7A40DA7FA63D373470007B /* Design */,
 				EC9CE3782DBFBDECEC97FCA9 /* Services */,
+				4E5E297ABEF5039AC38C4B23 /* Stores */,
 			);
 			name = BoxBoxNowDashboard;
 			path = BoxBoxNowDashboard;
@@ -322,6 +345,15 @@
 			path = Fixtures;
 			sourceTree = "<group>";
 		};
+		C0799A27CA19969AD9077E64 /* Stores */ = {
+			isa = PBXGroup;
+			children = (
+				64D3260E44ADE5768F10CAEF /* AuthStoreStateMachineTests.swift */,
+			);
+			name = Stores;
+			path = Stores;
+			sourceTree = "<group>";
+		};
 		CF7A40DA7FA63D373470007B /* Design */ = {
 			isa = PBXGroup;
 			children = (
@@ -343,6 +375,7 @@
 				DC4353D02B94C87B0136798F /* AdminService.swift */,
 				8F0761AFE0F86F8EA9447381 /* PublicService.swift */,
 				5EF849D96B812EF5AE75AA99 /* RaceWebSocketClient.swift */,
+				8B27F23A1CCCF192DCDFC293 /* KeychainProtocol.swift */,
 			);
 			name = Services;
 			path = Services;
@@ -561,6 +594,9 @@
 				1A40A5D449E1B2308B404D70 /* APIClientDashboardTests.swift in Sources */,
 				D982C51F6B58A36147A13779 /* MockRaceWebSocketClient.swift in Sources */,
 				1D0D179E0535E0D16F07EA59 /* RaceWebSocketClientTests.swift in Sources */,
+				FDDC6047C2526C75C03565E1 /* MockAuthService.swift in Sources */,
+				DCEF1D89165A2B67E2FD8CB9 /* MockKeychainHelper.swift in Sources */,
+				841FA937AA3BA58C150FD290 /* AuthStoreStateMachineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -602,6 +638,8 @@
 				AC3D0AE39C6B8185CE796FFE /* UserListItem.swift in Sources */,
 				188765FB1A4BED5827DC57C6 /* PlatformMetrics.swift in Sources */,
 				90FAB080C9AEB53370AF380A /* RaceWebSocketClient.swift in Sources */,
+				B276E659F7DEE02AE658F709 /* KeychainProtocol.swift in Sources */,
+				291DFB0EFA081CA4709978AF /* AuthStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
