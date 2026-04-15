@@ -819,6 +819,89 @@ async def google_callback_ios(code: str, request: Request, db: AsyncSession = De
     return RedirectResponse(f"boxboxnow://auth?{params}")
 
 
+@router.get("/google/ipad")
+async def google_login_ipad(request: Request):
+    """Start Google OAuth flow for iPad dashboard app — redirects back to boxboxnowdashboard:// scheme."""
+    settings = get_settings()
+    if not settings.google_client_id:
+        raise HTTPException(501, "Google login not configured")
+
+    redirect_uri = f"{'https' if 'localhost' not in str(request.url) else 'http'}://{request.headers.get('host', 'localhost:8000')}/api/auth/google/callback/ipad"
+
+    from urllib.parse import urlencode
+    params = {
+        "client_id": settings.google_client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+    }
+    url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url)
+
+
+@router.get("/google/callback/ipad")
+async def google_callback_ipad(code: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """Handle Google OAuth callback for iPad dashboard — redirects to boxboxnowdashboard:// custom scheme."""
+    import httpx
+    settings = get_settings()
+
+    redirect_uri = f"{'https' if 'localhost' not in str(request.url) else 'http'}://{request.headers.get('host', 'localhost:8000')}/api/auth/google/callback/ipad"
+
+    async with httpx.AsyncClient() as client:
+        token_response = await client.post("https://oauth2.googleapis.com/token", data={
+            "code": code,
+            "client_id": settings.google_client_id,
+            "client_secret": settings.google_client_secret,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+        })
+    if token_response.status_code != 200:
+        raise HTTPException(400, "Failed to authenticate with Google")
+    tokens = token_response.json()
+
+    async with httpx.AsyncClient() as client:
+        userinfo_response = await client.get(
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers={"Authorization": f"Bearer {tokens['access_token']}"},
+        )
+    if userinfo_response.status_code != 200:
+        raise HTTPException(400, "Failed to get user info from Google")
+
+    google_user = userinfo_response.json()
+    google_id = google_user["id"]
+    email = google_user.get("email", "")
+    name = google_user.get("name", email.split("@")[0])
+
+    result = await db.execute(
+        select(User).where((User.google_id == google_id) | (User.email == email))
+        .options(selectinload(User.tab_access), selectinload(User.subscriptions))
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(f"boxboxnowdashboard://auth?error=no_account")
+
+    await _cleanup_stale_sessions(db, user.id)
+
+    device_name, ip_address = _extract_device_info(request)
+    session_token = secrets.token_hex(32)
+    device_session = DeviceSession(
+        session_token=session_token, user_id=user.id,
+        device_name=f"iPad Dashboard: {device_name}", ip_address=ip_address,
+    )
+    db.add(device_session)
+    await db.commit()
+
+    access_token = create_token(user.id, user.username, user.is_admin, session_token)
+
+    from fastapi.responses import RedirectResponse
+    from urllib.parse import urlencode
+    params = urlencode({"token": access_token})
+    return RedirectResponse(f"boxboxnowdashboard://auth?{params}")
+
+
 # --- Session Management (user) ---
 
 @router.get("/me", response_model=UserOut)
