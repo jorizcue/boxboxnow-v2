@@ -120,6 +120,13 @@ struct GPSConfigView: View {
                             .foregroundColor(gpsVM.isConnected ? .green : .red)
                     }
                     HStack { Text("Senal"); Spacer(); Text(gpsVM.signalQuality.displayName).foregroundColor(.gray) }
+                    HStack {
+                        Text("Satelites")
+                        Spacer()
+                        Text("\(gpsVM.lastSample?.numSatellites ?? 0)")
+                            .foregroundColor(.gray)
+                            .monospacedDigit()
+                    }
                     HStack { Text("Frecuencia"); Spacer(); Text("\(Int(gpsVM.sampleRate)) Hz").foregroundColor(.gray) }
                 }
             }

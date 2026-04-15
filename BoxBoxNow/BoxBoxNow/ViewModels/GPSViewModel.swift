@@ -47,10 +47,19 @@ final class GPSViewModel: ObservableObject {
     private var lastSampleTime: TimeInterval = 0
     private var sampleCount = 0
     private var calibratorSink: AnyCancellable?
+    private var bleSink: AnyCancellable?
 
     init() {
         // Forward calibrator changes so SwiftUI views update
         calibratorSink = calibrator.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
+
+        // Forward BLEManager changes too — otherwise discoveredDevices /
+        // isScanning updates fire bleManager.objectWillChange but the views
+        // bind to gpsVM, so the scanning list never refreshes and the pilot
+        // sees "Buscando dispositivos..." forever.
+        bleSink = bleManager.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }
 

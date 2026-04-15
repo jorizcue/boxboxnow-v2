@@ -5,7 +5,6 @@ struct HomeView: View {
     @EnvironmentObject var configVM: ConfigViewModel
     @EnvironmentObject var raceVM: RaceViewModel
     @State private var showDriver = false
-    @State private var showDriverConfirm = false
 
     private var hasSession: Bool {
         configVM.session.ourKartNumber > 0 && configVM.session.durationMin > 0
@@ -82,13 +81,7 @@ struct HomeView: View {
                             )
                         }
 
-                        Button(action: {
-                            if hasSession {
-                                showDriverConfirm = true
-                            } else {
-                                showDriver = true
-                            }
-                        }) {
+                        Button(action: { showDriver = true }) {
                             HomeCard(
                                 icon: "gauge.open.with.lines.needle.33percent.and.arrowtriangle",
                                 title: "Vista Piloto",
@@ -128,14 +121,6 @@ struct HomeView: View {
             .task {
                 await configVM.loadSession()
                 await configVM.loadCircuits()
-            }
-            // Confirmation before entering driver view
-            .alert("Entrar a Vista Piloto", isPresented: $showDriverConfirm) {
-                Button("Entrar") { showDriver = true }
-                Button("Cancelar", role: .cancel) {}
-            } message: {
-                let circuit = configVM.circuits.first(where: { $0.id == configVM.session.circuitId })
-                Text("Kart #\(configVM.session.ourKartNumber)\n\(circuit?.name ?? "Sin circuito") · \(configVM.session.durationMin) min\n\nBrillo al maximo, pantalla siempre encendida")
             }
         }
     }

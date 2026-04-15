@@ -194,17 +194,9 @@ struct DriverView: View {
                         .accessibilityLabel("Conexion perdida, reconectando")
                     }
 
-                    // ── IMU Calibration banner ──
-                    if gpsVM.source == .racebox && gpsVM.calibrator.phase != .aligned {
-                        VStack {
-                            Spacer()
-                            calibrationBanner
-                                .padding(.bottom, safeBottom + 4)
-                        }
-                        .allowsHitTesting(gpsVM.calibrator.phase == .idle || gpsVM.calibrator.phase == .ready)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .animation(.easeInOut(duration: 0.3), value: gpsVM.calibrator.phase)
-                    }
+                    // IMU calibration banner removed per product request —
+                    // the pilot view should be a clean card grid on entry.
+                    // Calibration is still available from the driver menu.
 
                     // ── BOX CALL overlay (full-screen red flash) ──
                     if raceVM.boxCallActive {
