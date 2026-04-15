@@ -10625,7 +10625,7 @@ Edit `Info.plist`:
 <true/>
 <key>UIRequiredDeviceCapabilities</key>
 <array>
-    <string>armv7</string>
+    <string>arm64</string>
 </array>
 <key>UIDeviceFamily</key>
 <array>
@@ -10647,7 +10647,7 @@ Edit `BoxBoxNowDashboard.entitlements`:
 ```xml
 <key>keychain-access-groups</key>
 <array>
-    <string>$(AppIdentifierPrefix)com.boxboxnow.shared</string>
+    <string>$(AppIdentifierPrefix)com.jizcue.BoxBoxNow.shared</string>
 </array>
 ```
 
