@@ -1,6 +1,6 @@
 import Foundation
 
-struct KartState: Identifiable, Codable {
+struct KartState: Identifiable, Codable, Hashable {
     var id: String { rowId ?? "\(kartNumber)" }
 
     var rowId: String?
