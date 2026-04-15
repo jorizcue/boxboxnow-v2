@@ -1,0 +1,7 @@
+{
+  "type": "update",
+  "events": [
+    {"event": "lap_completed", "rowId": "k-1", "kartNumber": 1, "lapMs": 88000, "totalLaps": 51},
+    {"event": "pit_entered", "rowId": "k-7", "kartNumber": 7, "raceTimeMs": 4500000}
+  ]
+}
