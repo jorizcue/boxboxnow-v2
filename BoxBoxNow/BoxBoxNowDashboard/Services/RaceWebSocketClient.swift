@@ -228,6 +228,7 @@ actor RaceWebSocketClient: RaceWebSocketClientProtocol {
     /// a stale backoff timer from clobbering a fresh session.
     private func reconnectIfCurrent(generation: UInt64) async {
         guard generation == sessionGeneration else { return }
+        guard shouldReconnect else { return }
         await connectLoop()
     }
 }
