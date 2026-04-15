@@ -347,7 +347,7 @@ Create `BoxBoxNow/BoxBoxNowDashboard/Info.plist`:
     <dict/>
     <key>UIRequiredDeviceCapabilities</key>
     <array>
-        <string>armv7</string>
+        <string>arm64</string>
     </array>
     <key>UISupportedInterfaceOrientations~ipad</key>
     <array>
