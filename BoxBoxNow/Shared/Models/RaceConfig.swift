@@ -71,6 +71,19 @@ struct Circuit: Codable, Identifiable, Hashable {
 
 // Dashboard-only race config (wider than the driver's RaceSession).
 // Decoded from the dashboard snapshot; the driver app does not use this type.
+//
+// Contract: this is an "all-or-nothing" snapshot. The dashboard backend emits
+// every non-optional field on every snapshot push — there is no partial
+// update semantics. Optional fields (finishLat1/Lon1/Lat2/Lon2) are the only
+// legitimately-absent fields; they represent two finish-line reference points
+// that may not be surveyed yet for a given circuit.
+//
+// Design note: circuitLengthM is a Double here even though Circuit.lengthM is
+// Int?. The dashboard snapshot promotes the circuit length to a Double to
+// accommodate future sub-meter precision (circuit-length survey data from the
+// insights service) without breaking the wire contract. Do not unify the two
+// types — Circuit is the admin-editable source of truth in integer meters;
+// RaceConfig is a derived view that may diverge.
 struct RaceConfig: Codable, Hashable {
     var circuitLengthM: Double
     var pitTimeS: Double

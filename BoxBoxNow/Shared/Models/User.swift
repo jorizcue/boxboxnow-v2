@@ -11,7 +11,10 @@ struct User: Codable, Identifiable {
     let hasActiveSubscription: Bool?
     let subscriptionPlan: String?
     let subscriptionStatus: String?
-    let createdAt: Date?
+    // Kept as String (ISO-8601) rather than Date? so APIClient.execute can
+    // decode it with a bare JSONDecoder (no .iso8601 strategy). The backend
+    // serializes UserOut.created_at as an ISO-8601 string via Pydantic.
+    let createdAt: String?
 
     var displayName: String { username }
 

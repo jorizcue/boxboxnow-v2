@@ -26,6 +26,10 @@ filename = File.basename(rel_path)
 file_ref = group.files.find { |f| f.display_name == filename } || group.new_reference(filename)
 
 unless target.resources_build_phase.files.any? { |bf| bf.file_ref == file_ref }
+  # The second arg (true) tells xcodeproj to suppress its own duplicate-check
+  # pass on the build files array. We already did the de-dup check above via
+  # files.any? { |bf| bf.file_ref == file_ref }, so asking the gem to repeat
+  # it is redundant work. Same convention as add_file_to_target.rb.
   target.resources_build_phase.add_file_reference(file_ref, true)
 end
 

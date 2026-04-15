@@ -31,8 +31,10 @@ final class SharedModelExtensionsTests: XCTestCase {
         let cfg = try JSONDecoder().decode(RaceConfig.self, from: json)
         XCTAssertEqual(cfg.boxLines, 2)
         XCTAssertEqual(cfg.pitClosedStartMin, 5)
-        XCTAssertEqual(cfg.finishLat1 ?? 0, 40.1234, accuracy: 0.0001)
-        XCTAssertEqual(cfg.finishLon2 ?? 0, -3.5679, accuracy: 0.0001)
+        let lat1 = try XCTUnwrap(cfg.finishLat1)
+        let lon2 = try XCTUnwrap(cfg.finishLon2)
+        XCTAssertEqual(lat1, 40.1234, accuracy: 0.0001)
+        XCTAssertEqual(lon2, -3.5679, accuracy: 0.0001)
     }
 
     func testCircuitDecodesExtendedFields() throws {
@@ -47,7 +49,8 @@ final class SharedModelExtensionsTests: XCTestCase {
         let c = try JSONDecoder().decode(Circuit.self, from: json)
         XCTAssertEqual(c.lengthM, 1200)
         XCTAssertEqual(c.isActive, true)
-        XCTAssertEqual(c.finishLat1 ?? 0, 40.1234, accuracy: 0.0001)
+        let lat1 = try XCTUnwrap(c.finishLat1)
+        XCTAssertEqual(lat1, 40.1234, accuracy: 0.0001)
     }
 
     func testUserDecodesExtendedFields() throws {
@@ -60,10 +63,12 @@ final class SharedModelExtensionsTests: XCTestCase {
           "subscription_status": "active", "created_at": "2026-01-01T00:00:00Z"
         }
         """.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let u = try decoder.decode(User.self, from: json)
+        // Use a bare JSONDecoder — APIClient.execute in the driver app decodes
+        // User with no .iso8601 strategy, so createdAt must round-trip through
+        // a plain JSONDecoder. If this ever regresses to Date?, the driver
+        // app's /auth/me call will crash at runtime.
+        let u = try JSONDecoder().decode(User.self, from: json)
         XCTAssertEqual(u.subscriptionStatus, "active")
-        XCTAssertNotNil(u.createdAt)
+        XCTAssertEqual(u.createdAt, "2026-01-01T00:00:00Z")
     }
 }
