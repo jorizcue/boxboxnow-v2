@@ -16,6 +16,7 @@
 		188765FB1A4BED5827DC57C6 /* PlatformMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D41CC5B26F70B3489AE2E8AD /* PlatformMetrics.swift */; };
 		1A40A5D449E1B2308B404D70 /* APIClientDashboardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE9B41368B3473E19EEEE5CE /* APIClientDashboardTests.swift */; };
 		1CA18F6940832DEE70895997 /* RaceSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4A8BF665A9FAAAD621DCD4 /* RaceSnapshot.swift */; };
+		1D0D179E0535E0D16F07EA59 /* RaceWebSocketClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4502BAB3CE61EC1C3DE376 /* RaceWebSocketClientTests.swift */; };
 		1FB3D7DAD8A0EB3E24B7CA78 /* APIClient+Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E485FA80390A19423F682CF /* APIClient+Dashboard.swift */; };
 		2DE6A83752A10AF7CBF04EAB /* BBNToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = F12229FCE4736357FC38AC5D /* BBNToast.swift */; };
 		32370AE437BF27AA40BAEFD6 /* BBNCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA50485A6E7EDADD652C23E9 /* BBNCard.swift */; };
@@ -35,6 +36,7 @@
 		869271EFDCD0929F85F5421A /* KartState+Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4D0BC5623AC1BB7C474B769 /* KartState+Dashboard.swift */; };
 		89911E15E6A83AFAD3A364AB /* RaceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E34F3AC93FC3FE75EB9179E /* RaceService.swift */; };
 		89C6B39F3A6C4109D2BBCBD4 /* FixtureLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9C3CD543925C6B9AB750C60 /* FixtureLoader.swift */; };
+		90FAB080C9AEB53370AF380A /* RaceWebSocketClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EF849D96B812EF5AE75AA99 /* RaceWebSocketClient.swift */; };
 		911AF43F10BAF48C01A715E1 /* BBNTierBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC97D4B59A8484A2E32DE90A /* BBNTierBadge.swift */; };
 		9528E26F3EDDAFF7F8F84B58 /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = C29D186C97F4930A74ABA6FA /* MockURLProtocol.swift */; };
 		9ACC87C64B0B9BFBD25BC818 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
@@ -50,6 +52,7 @@
 		C4BEB02FBD94EFF88B830694 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
 		CA24B295C83006D2F2AE881F /* BBNStatusDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16ADD04E208136B7F7652CFB /* BBNStatusDot.swift */; };
 		D3176DA7E4B042103217B8A1 /* DecodeFixturesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD90191EE4504727D0DC9F2D /* DecodeFixturesTests.swift */; };
+		D982C51F6B58A36147A13779 /* MockRaceWebSocketClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C7CEE6557A432E12F92C4C1 /* MockRaceWebSocketClient.swift */; };
 		E15680155663A52D76787AA0 /* PitRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED03ED34CD17D732029ADE58 /* PitRecord.swift */; };
 		E5636489B335E0A6D27C41DD /* kart_state_extended.json in Resources */ = {isa = PBXBuildFile; fileRef = F205186513E7161023210D38 /* kart_state_extended.json */; };
 		E938A0BB87913D93115DB2FE /* update.json in Resources */ = {isa = PBXBuildFile; fileRef = 236D0520DA0FEFD14CD4AEF5 /* update.json */; };
@@ -78,6 +81,7 @@
 		003B0EE2019A297341BE3956 /* BBNColors.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNColors.swift; sourceTree = "<group>"; };
 		0B7287D32B32CF5CB8CF88CC /* BBNPrimaryButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNPrimaryButton.swift; sourceTree = "<group>"; };
 		0C59CBF0B27A03B35E925A98 /* AuthService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		0C7CEE6557A432E12F92C4C1 /* MockRaceWebSocketClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MockRaceWebSocketClient.swift; sourceTree = "<group>"; };
 		0C87B55B13B78A1D126F7C8C /* BBNSecondaryButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNSecondaryButton.swift; sourceTree = "<group>"; };
 		11FF2A2767E16F4B71E59B7A /* BBNTypography.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNTypography.swift; sourceTree = "<group>"; };
 		16ADD04E208136B7F7652CFB /* BBNStatusDot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNStatusDot.swift; sourceTree = "<group>"; };
@@ -97,6 +101,7 @@
 		5A3BD6BD01F9F40B0AD06A31 /* DeviceSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeviceSession.swift; sourceTree = "<group>"; };
 		5BE45342DDC9620ABADDBF44 /* BBNNumericField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNNumericField.swift; sourceTree = "<group>"; };
 		5C5F5056B5407DAD1552A229 /* UserListItem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserListItem.swift; sourceTree = "<group>"; };
+		5EF849D96B812EF5AE75AA99 /* RaceWebSocketClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceWebSocketClient.swift; sourceTree = "<group>"; };
 		6119E6C3C7B8C120381BC458 /* WsMessage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WsMessage.swift; sourceTree = "<group>"; };
 		69DE783EB983464BB83A5B56 /* ReplayStatus.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayStatus.swift; sourceTree = "<group>"; };
 		6DFEE1E2E80BCB61D4D15B11 /* WsUpdateEventTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WsUpdateEventTests.swift; sourceTree = "<group>"; };
@@ -104,6 +109,7 @@
 		835130EAF2454A3C8D55C1A1 /* FifoEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoEntry.swift; sourceTree = "<group>"; };
 		8F0761AFE0F86F8EA9447381 /* PublicService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PublicService.swift; sourceTree = "<group>"; };
 		96B3268BFEF3AF7F2526CBD8 /* FifoSnapshot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoSnapshot.swift; sourceTree = "<group>"; };
+		AB4502BAB3CE61EC1C3DE376 /* RaceWebSocketClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceWebSocketClientTests.swift; sourceTree = "<group>"; };
 		AE9B41368B3473E19EEEE5CE /* APIClientDashboardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClientDashboardTests.swift; sourceTree = "<group>"; };
 		B37F20E81BB1582179DFDA9B /* replay_status.json */ = {isa = PBXFileReference; includeInIndex = 1; path = replay_status.json; sourceTree = "<group>"; };
 		B978CAD275F81D34EC842DD0 /* BoxBoxNowDashboardUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = BoxBoxNowDashboardUITests.xctest; path = .xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -248,6 +254,7 @@
 			children = (
 				D9C3CD543925C6B9AB750C60 /* FixtureLoader.swift */,
 				C29D186C97F4930A74ABA6FA /* MockURLProtocol.swift */,
+				0C7CEE6557A432E12F92C4C1 /* MockRaceWebSocketClient.swift */,
 			);
 			name = Helpers;
 			path = Helpers;
@@ -335,6 +342,7 @@
 				C5C978D3BC578AC4BF0A3167 /* ConfigService.swift */,
 				DC4353D02B94C87B0136798F /* AdminService.swift */,
 				8F0761AFE0F86F8EA9447381 /* PublicService.swift */,
+				5EF849D96B812EF5AE75AA99 /* RaceWebSocketClient.swift */,
 			);
 			name = Services;
 			path = Services;
@@ -344,6 +352,7 @@
 			isa = PBXGroup;
 			children = (
 				AE9B41368B3473E19EEEE5CE /* APIClientDashboardTests.swift */,
+				AB4502BAB3CE61EC1C3DE376 /* RaceWebSocketClientTests.swift */,
 			);
 			name = Services;
 			path = Services;
@@ -550,6 +559,8 @@
 				D3176DA7E4B042103217B8A1 /* DecodeFixturesTests.swift in Sources */,
 				9528E26F3EDDAFF7F8F84B58 /* MockURLProtocol.swift in Sources */,
 				1A40A5D449E1B2308B404D70 /* APIClientDashboardTests.swift in Sources */,
+				D982C51F6B58A36147A13779 /* MockRaceWebSocketClient.swift in Sources */,
+				1D0D179E0535E0D16F07EA59 /* RaceWebSocketClientTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -590,6 +601,7 @@
 				11636BFF83B325BDD662F6FA /* PublicService.swift in Sources */,
 				AC3D0AE39C6B8185CE796FFE /* UserListItem.swift in Sources */,
 				188765FB1A4BED5827DC57C6 /* PlatformMetrics.swift in Sources */,
+				90FAB080C9AEB53370AF380A /* RaceWebSocketClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
