@@ -23,8 +23,10 @@
 		1D0D179E0535E0D16F07EA59 /* RaceWebSocketClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4502BAB3CE61EC1C3DE376 /* RaceWebSocketClientTests.swift */; };
 		1D6E9AB90C99B8D63D5B9AB6 /* RaceStoreWebSocketIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FF543B259C0AF62F8317293 /* RaceStoreWebSocketIntegrationTests.swift */; };
 		1FB3D7DAD8A0EB3E24B7CA78 /* APIClient+Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E485FA80390A19423F682CF /* APIClient+Dashboard.swift */; };
+		227BA39D131C28977A71EEE9 /* InPitListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F5AA6F0090B7356B269CA5A /* InPitListView.swift */; };
 		26400F3AEB640F29C722C63C /* AdminStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25E7735976C6A9E5B5F723AD /* AdminStore.swift */; };
 		291DFB0EFA081CA4709978AF /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6450E4BD57F2989352AFB301 /* AuthStore.swift */; };
+		2B3BC1FB1BEAD5CCA9DDF228 /* PitHistoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1CA6753BFC24B438229FD56 /* PitHistoryListView.swift */; };
 		2DE6A83752A10AF7CBF04EAB /* BBNToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = F12229FCE4736357FC38AC5D /* BBNToast.swift */; };
 		32370AE437BF27AA40BAEFD6 /* BBNCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA50485A6E7EDADD652C23E9 /* BBNCard.swift */; };
 		33B68322DA07AEED6F7B515A /* JSONValueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26D9D1C4A0C580FF84AF5CA /* JSONValueTests.swift */; };
@@ -34,6 +36,7 @@
 		4B7F9D4D6052E11D6C583A9E /* BBNPrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B7287D32B32CF5CB8CF88CC /* BBNPrimaryButton.swift */; };
 		4CEE5D9D3CA5D5AB84F76206 /* BiometricLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60846C94F559502132745197 /* BiometricLoginView.swift */; };
 		4F8993BE8C39E12AABA1FFBC /* WsMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6119E6C3C7B8C120381BC458 /* WsMessage.swift */; };
+		5393D5A06D0E3A8E8C14F0F5 /* FifoQueueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3367624A2930C80D0C82300 /* FifoQueueView.swift */; };
 		556996700F809C4F4DCA0D23 /* DetailRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C35FC7D573120DBC35E7BA93 /* DetailRouter.swift */; };
 		5A79AE48FDA736229E3D7CD2 /* AdminService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC4353D02B94C87B0136798F /* AdminService.swift */; };
 		5C5957F052E5D9C74ADBCA5B /* KartAnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCA66F6BE6FA42C45673659A /* KartAnalyticsView.swift */; };
@@ -137,6 +140,7 @@
 		16ADD04E208136B7F7652CFB /* BBNStatusDot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNStatusDot.swift; sourceTree = "<group>"; };
 		18291C7AD173DE089C25688D /* AdminHubView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminHubView.swift; sourceTree = "<group>"; };
 		19AB82D71D21F2C68C0F05AD /* BBNLoadingOverlay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNLoadingOverlay.swift; sourceTree = "<group>"; };
+		1F5AA6F0090B7356B269CA5A /* InPitListView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InPitListView.swift; sourceTree = "<group>"; };
 		21392B7494C9541A5A6EE41C /* MFASetupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MFASetupView.swift; sourceTree = "<group>"; };
 		236D0520DA0FEFD14CD4AEF5 /* update.json */ = {isa = PBXFileReference; includeInIndex = 1; path = update.json; sourceTree = "<group>"; };
 		237109830CC151188A561377 /* LoginView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
@@ -205,6 +209,7 @@
 		C5C978D3BC578AC4BF0A3167 /* ConfigService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfigService.swift; sourceTree = "<group>"; };
 		CB82689DA21993AA5A90FF11 /* BBNStatCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNStatCard.swift; sourceTree = "<group>"; };
 		CFCE66BB3867BF7253532A8E /* ErrorMessages.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ErrorMessages.swift; sourceTree = "<group>"; };
+		D1CA6753BFC24B438229FD56 /* PitHistoryListView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PitHistoryListView.swift; sourceTree = "<group>"; };
 		D41CC5B26F70B3489AE2E8AD /* PlatformMetrics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlatformMetrics.swift; sourceTree = "<group>"; };
 		D4D0BC5623AC1BB7C474B769 /* KartState+Dashboard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "KartState+Dashboard.swift"; sourceTree = "<group>"; };
 		D840B33E3FF748BA4E2D2992 /* RaceFormattersTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceFormattersTests.swift; sourceTree = "<group>"; };
@@ -214,6 +219,7 @@
 		DA50485A6E7EDADD652C23E9 /* BBNCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNCard.swift; sourceTree = "<group>"; };
 		DC2AB5820A74FC7D77F31256 /* BoxBoxNowDashboardApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoxBoxNowDashboardApp.swift; sourceTree = "<group>"; };
 		DC4353D02B94C87B0136798F /* AdminService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminService.swift; sourceTree = "<group>"; };
+		E3367624A2930C80D0C82300 /* FifoQueueView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoQueueView.swift; sourceTree = "<group>"; };
 		E569E3B298818FA60DE45660 /* BBNSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNSection.swift; sourceTree = "<group>"; };
 		E7856AF9152E00BC79E39E70 /* RaceRowView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceRowView.swift; sourceTree = "<group>"; };
 		E91DEE2D48BD5F5C1C9E1D07 /* FifoState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoState.swift; sourceTree = "<group>"; };
@@ -318,6 +324,9 @@
 			isa = PBXGroup;
 			children = (
 				8BF158687F42CFCEA2E2ECDD /* PitView.swift */,
+				E3367624A2930C80D0C82300 /* FifoQueueView.swift */,
+				1F5AA6F0090B7356B269CA5A /* InPitListView.swift */,
+				D1CA6753BFC24B438229FD56 /* PitHistoryListView.swift */,
 			);
 			name = Pit;
 			path = Pit;
@@ -960,6 +969,9 @@
 				3A124CBF4612CD4ADB090D6F /* RaceTableHeader.swift in Sources */,
 				84A9938F30EB9F34008D0900 /* RaceRowView.swift in Sources */,
 				CBBB2BEF2618E7FBCE668035 /* KartDetailSheet.swift in Sources */,
+				5393D5A06D0E3A8E8C14F0F5 /* FifoQueueView.swift in Sources */,
+				227BA39D131C28977A71EEE9 /* InPitListView.swift in Sources */,
+				2B3BC1FB1BEAD5CCA9DDF228 /* PitHistoryListView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
