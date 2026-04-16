@@ -183,6 +183,16 @@ final class DriverViewModel: ObservableObject {
         }
     }
 
+    func updatePresetFull(id: Int, name: String, visibleCards: [String: Bool], cardOrder: [String],
+                         contrast: Double, orientation: String, audioEnabled: Bool) async throws {
+        let updated = try await APIClient.shared.updatePreset(
+            id: id, name: name, visibleCards: visibleCards, cardOrder: cardOrder,
+            contrast: contrast, orientation: orientation, audioEnabled: audioEnabled)
+        await MainActor.run {
+            self.presets = self.presets.map { $0.id == updated.id ? updated : $0 }
+        }
+    }
+
     func deletePreset(_ preset: DriverConfigPreset) async throws {
         try await APIClient.shared.deletePreset(id: preset.id)
         await MainActor.run { self.presets.removeAll { $0.id == preset.id } }

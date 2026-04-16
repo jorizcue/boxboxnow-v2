@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.WarningAmber
@@ -25,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
+import com.boxboxnow.app.ui.theme.InterFontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,6 +43,7 @@ fun HomeScreen(
     authVM: AuthViewModel,
     onOpenConfig: () -> Unit,
     onOpenDriver: () -> Unit,
+    onOpenSession: () -> Unit = onOpenConfig,
 ) {
     val configVM: ConfigViewModel = hiltViewModel()
     val raceVM: RaceViewModel = hiltViewModel()
@@ -69,10 +72,18 @@ fun HomeScreen(
                                 .background(if (isConnected) BoxBoxNowColors.SuccessGreen else BoxBoxNowColors.SystemGray4),
                         )
                         Spacer(Modifier.width(6.dp))
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            tint = BoxBoxNowColors.Accent,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(4.dp))
                         Text(
                             user?.username ?: "",
-                            color = BoxBoxNowColors.SystemGray,
+                            color = Color.White,
                             fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
                         )
                     }
                 },
@@ -100,8 +111,8 @@ fun HomeScreen(
             // Branding
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row {
-                    Text("BB", fontSize = 48.sp, fontWeight = FontWeight.Black, color = Color.White, fontFamily = FontFamily.SansSerif)
-                    Text("N", fontSize = 48.sp, fontWeight = FontWeight.Black, color = BoxBoxNowColors.Accent, fontFamily = FontFamily.SansSerif)
+                    Text("BB", fontSize = 48.sp, fontWeight = FontWeight.Black, color = Color.White, fontFamily = InterFontFamily)
+                    Text("N", fontSize = 48.sp, fontWeight = FontWeight.Black, color = BoxBoxNowColors.Accent, fontFamily = InterFontFamily)
                 }
                 Row {
                     Text("BOXBOX", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
@@ -116,9 +127,11 @@ fun HomeScreen(
                 )
             }
 
-            // Session summary or warning
+            // Session summary or warning — tap to go to session config
             if (hasSession) {
-                SessionSummaryCard(session, circuits.map { it.id to it.name }.toMap())
+                Box(modifier = Modifier.clickable(onClick = onOpenSession)) {
+                    SessionSummaryCard(session, circuits.map { it.id to it.name }.toMap())
+                }
             } else {
                 NoSessionCard()
             }
@@ -127,7 +140,7 @@ fun HomeScreen(
             HomeCard(
                 icon = Icons.Default.Settings,
                 title = "Configuración",
-                subtitle = "Sesión, tarjetas, GPS",
+                subtitle = "Carrera, Plantillas, GPS",
                 onClick = onOpenConfig,
             )
             HomeCard(

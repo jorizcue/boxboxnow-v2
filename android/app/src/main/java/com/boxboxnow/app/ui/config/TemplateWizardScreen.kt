@@ -1,6 +1,8 @@
 package com.boxboxnow.app.ui.config
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,15 +16,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
@@ -41,6 +44,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -52,13 +57,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.boxboxnow.app.models.DriverCard
 import com.boxboxnow.app.models.DriverCardGroup
+import com.boxboxnow.app.models.DriverConfigPreset
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.vm.DriverViewModel
 import com.boxboxnow.app.vm.OrientationLock
@@ -66,16 +74,23 @@ import com.boxboxnow.app.vm.OrientationLock
 private const val TOTAL_STEPS = 4
 
 /**
- * 4-step wizard for creating a new template preset.
+ * 4-step wizard for creating or editing a template preset.
  *   Step 1: Name
  *   Step 2: Card visibility (grouped toggles)
  *   Step 3: Card order (reorderable list)
  *   Step 4: Display options (contrast, orientation, audio) + save
+ *
+ * When [editPresetId] is provided the wizard opens in **edit** mode:
+ * fields are pre-populated from the existing preset and save calls
+ * `updatePresetWithOptions` instead of `createPreset`.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TemplateWizardScreen(onBack: () -> Unit) {
+fun TemplateWizardScreen(onBack: () -> Unit, editPresetId: Int? = null) {
     val driverVM: DriverViewModel = hiltViewModel()
+    val presets by driverVM.presets.collectAsState()
+    val editingPreset: DriverConfigPreset? = editPresetId?.let { id -> presets.firstOrNull { it.id == id } }
+    val isEditMode = editPresetId != null
 
     var step by remember { mutableIntStateOf(1) }
     var templateName by remember { mutableStateOf("") }
@@ -85,6 +100,25 @@ fun TemplateWizardScreen(onBack: () -> Unit) {
     var orientationLock by remember { mutableStateOf(OrientationLock.FREE) }
     var audioEnabled by remember { mutableStateOf(true) }
     var saving by remember { mutableStateOf(false) }
+    var initialized by remember { mutableStateOf(editPresetId == null) }
+
+    // In edit mode, load presets and populate local state once available
+    LaunchedEffect(editPresetId) {
+        if (editPresetId != null) driverVM.loadPresets()
+    }
+    LaunchedEffect(presets, editPresetId) {
+        if (!initialized && editPresetId != null) {
+            val preset = presets.firstOrNull { it.id == editPresetId } ?: return@LaunchedEffect
+            templateName = preset.name
+            visibleCards.clear()
+            visibleCards.putAll(preset.visibleCards)
+            cardOrder = preset.cardOrder
+            contrast = preset.contrast ?: 0.5
+            orientationLock = OrientationLock.from(preset.orientation)
+            audioEnabled = preset.audioEnabled ?: true
+            initialized = true
+        }
+    }
 
     val stepTitle = when (step) {
         1 -> "Nombre"
@@ -98,7 +132,7 @@ fun TemplateWizardScreen(onBack: () -> Unit) {
         containerColor = Color.Black,
         topBar = {
             TopAppBar(
-                title = { Text("Nueva plantilla", color = Color.White) },
+                title = { Text(if (isEditMode) "Editar plantilla" else "Nueva plantilla", color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = {
                         if (step > 1) step-- else onBack()
@@ -151,19 +185,34 @@ fun TemplateWizardScreen(onBack: () -> Unit) {
                     audioEnabled = audioEnabled,
                     onAudioChange = { audioEnabled = it },
                     saving = saving,
+                    saveLabel = if (isEditMode) "ACTUALIZAR PLANTILLA" else "GUARDAR PLANTILLA",
                     onBack = { step = 3 },
                     onSave = {
                         saving = true
-                        driverVM.saveAsPresetWithOptions(
-                            name = templateName.trim(),
-                            visibleCards = visibleCards.toMap(),
-                            cardOrder = cardOrder,
-                            contrast = contrast,
-                            orientation = orientationLock.raw,
-                            audioEnabled = audioEnabled,
-                            onSuccess = { onBack() },
-                            onError = { saving = false },
-                        )
+                        if (editingPreset != null) {
+                            driverVM.updatePresetWithOptions(
+                                id = editingPreset.id,
+                                name = templateName.trim(),
+                                visibleCards = visibleCards.toMap(),
+                                cardOrder = cardOrder,
+                                contrast = contrast,
+                                orientation = orientationLock.raw,
+                                audioEnabled = audioEnabled,
+                                onSuccess = { onBack() },
+                                onError = { saving = false },
+                            )
+                        } else {
+                            driverVM.saveAsPresetWithOptions(
+                                name = templateName.trim(),
+                                visibleCards = visibleCards.toMap(),
+                                cardOrder = cardOrder,
+                                contrast = contrast,
+                                orientation = orientationLock.raw,
+                                audioEnabled = audioEnabled,
+                                onSuccess = { onBack() },
+                                onError = { saving = false },
+                            )
+                        }
                     },
                 )
             }
@@ -362,7 +411,7 @@ private fun WizardCardToggleRow(
     }
 }
 
-// ── Step 3: Card Order ──
+// ── Step 3: Card Order (iOS-matching 2-column grid preview) ──
 
 @Composable
 private fun StepCardOrder(
@@ -376,13 +425,15 @@ private fun StepCardOrder(
         if (visibleCards[key] == true) DriverCard.fromKey(key) else null
     }
     val hiddenKeys: List<String> = cardOrder.filter { key -> visibleCards[key] != true }
+    var selectedIndex by remember { mutableStateOf<Int?>(null) }
 
-    fun moveVisible(from: Int, to: Int) {
-        if (from == to || from !in orderedVisible.indices || to !in orderedVisible.indices) return
+    fun swapCards(from: Int, to: Int) {
         val mutable = orderedVisible.map { it.key }.toMutableList()
-        val item = mutable.removeAt(from)
-        mutable.add(to, item)
+        val temp = mutable[from]
+        mutable[from] = mutable[to]
+        mutable[to] = temp
         onReorder(mutable + hiddenKeys)
+        selectedIndex = null
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -401,23 +452,58 @@ private fun StepCardOrder(
                 )
             }
         } else {
-            LazyColumn(
+            // Hint text
+            if (selectedIndex != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.SwapVert,
+                        contentDescription = null,
+                        tint = BoxBoxNowColors.Accent,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "Toca otra tarjeta para intercambiar",
+                        color = BoxBoxNowColors.Accent,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+
+            // 2-column grid matching iOS CardPreviewCell layout
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                itemsIndexed(orderedVisible, key = { _, card -> card.key }) { index, card ->
-                    WizardOrderRow(
-                        card = card,
-                        canMoveUp = index > 0,
-                        canMoveDown = index < orderedVisible.size - 1,
-                        onMoveUp = { moveVisible(index, index - 1) },
-                        onMoveDown = { moveVisible(index, index + 1) },
+                items(
+                    count = orderedVisible.size,
+                    key = { orderedVisible[it].key },
+                ) { index ->
+                    CardPreviewCell(
+                        card = orderedVisible[index],
+                        isSelected = selectedIndex == index,
+                        onClick = {
+                            val sel = selectedIndex
+                            if (sel != null && sel != index) {
+                                swapCards(sel, index)
+                            } else {
+                                selectedIndex = if (sel == index) null else index
+                            }
+                        },
                     )
                 }
-                item { Spacer(Modifier.height(8.dp)) }
             }
         }
         WizardNavButtons(
@@ -428,58 +514,52 @@ private fun StepCardOrder(
     }
 }
 
+/**
+ * Card preview cell matching iOS `CardPreviewCell`:
+ *   - Colored border (card accent at 50% opacity)
+ *   - Background tinted with card accent at 10% opacity
+ *   - Card title (small gray) + sample value (large monospaced white)
+ */
 @Composable
-private fun WizardOrderRow(
+private fun CardPreviewCell(
     card: DriverCard,
-    canMoveUp: Boolean,
-    canMoveDown: Boolean,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
+    isSelected: Boolean,
+    onClick: () -> Unit,
 ) {
-    Row(
+    val borderColor = if (isSelected) card.accent else card.accent.copy(alpha = 0.5f)
+    val borderWidth = if (isSelected) 2.5.dp else 1.5.dp
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
         modifier = Modifier
             .fillMaxWidth()
+            .height(120.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(BoxBoxNowColors.SystemGray6)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .background(card.accent.copy(alpha = 0.1f))
+            .border(borderWidth, borderColor, RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(6.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(card.accent.copy(alpha = 0.18f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = card.iconMaterial,
-                contentDescription = null,
-                tint = card.accent,
-                modifier = Modifier.size(16.dp),
-            )
-        }
-        Spacer(Modifier.width(12.dp))
         Text(
             card.display,
-            color = Color.White,
-            fontSize = 13.sp,
+            color = BoxBoxNowColors.SystemGray,
+            fontSize = 10.sp,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Center,
+            lineHeight = 13.sp,
+            maxLines = 2,
         )
-        IconButton(onClick = onMoveUp, enabled = canMoveUp) {
-            Icon(
-                Icons.Filled.ArrowUpward,
-                contentDescription = "Subir",
-                tint = if (canMoveUp) BoxBoxNowColors.Accent else BoxBoxNowColors.SystemGray4,
-            )
-        }
-        IconButton(onClick = onMoveDown, enabled = canMoveDown) {
-            Icon(
-                Icons.Filled.ArrowDownward,
-                contentDescription = "Bajar",
-                tint = if (canMoveDown) BoxBoxNowColors.Accent else BoxBoxNowColors.SystemGray4,
-            )
-        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            card.sampleValue,
+            color = Color.White,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+        )
     }
 }
 
@@ -494,6 +574,7 @@ private fun StepDisplayOptions(
     audioEnabled: Boolean,
     onAudioChange: (Boolean) -> Unit,
     saving: Boolean,
+    saveLabel: String = "GUARDAR PLANTILLA",
     onBack: () -> Unit,
     onSave: () -> Unit,
 ) {
@@ -662,7 +743,7 @@ private fun StepDisplayOptions(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
-                if (saving) "GUARDANDO..." else "GUARDAR PLANTILLA",
+                if (saving) "GUARDANDO..." else saveLabel,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
             )

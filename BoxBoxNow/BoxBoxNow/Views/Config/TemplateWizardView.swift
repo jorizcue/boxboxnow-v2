@@ -7,6 +7,10 @@ struct TemplateWizardView: View {
     @EnvironmentObject var toast: ToastManager
     @Environment(\.dismiss) private var dismiss
 
+    /// When non-nil the wizard is in **edit** mode: fields are pre-populated
+    /// from this preset and save calls `updatePresetFull` instead of `createPreset`.
+    var editingPreset: DriverConfigPreset? = nil
+
     @State private var step = 1
     @State private var presetName = ""
     @State private var visibleCards: [String: Bool] = [:]
@@ -17,6 +21,7 @@ struct TemplateWizardView: View {
     @State private var isSaving = false
     @State private var draggingCard: DriverCard?
 
+    private var isEditMode: Bool { editingPreset != nil }
     private let totalSteps = 4
 
     private var canBox: Bool {
@@ -69,7 +74,7 @@ struct TemplateWizardView: View {
                 navigationButtons
             }
             .background(Color.black.ignoresSafeArea())
-            .navigationTitle("Nueva plantilla")
+            .navigationTitle(isEditMode ? "Editar plantilla" : "Nueva plantilla")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -78,11 +83,21 @@ struct TemplateWizardView: View {
                 }
             }
             .onAppear {
-                // Initialize local state from current DriverViewModel config
-                visibleCards = driverVM.visibleCards
-                cardOrder = driverVM.cardOrder
-                contrast = driverVM.brightness
-                orientation = driverVM.orientationLock
+                if let preset = editingPreset {
+                    // Edit mode: populate from the existing preset
+                    presetName = preset.name
+                    visibleCards = preset.visibleCards
+                    cardOrder = preset.cardOrder
+                    contrast = preset.contrast ?? 0.0
+                    orientation = OrientationLock(rawValue: preset.orientation ?? "free") ?? .free
+                    audioEnabled = preset.audioEnabled ?? false
+                } else {
+                    // Create mode: initialize from current DriverViewModel config
+                    visibleCards = driverVM.visibleCards
+                    cardOrder = driverVM.cardOrder
+                    contrast = driverVM.brightness
+                    orientation = driverVM.orientationLock
+                }
             }
         }
     }
@@ -127,7 +142,7 @@ struct TemplateWizardView: View {
     private var stepName: some View {
         VStack(spacing: 24) {
             Spacer()
-            Image(systemName: "doc.badge.plus")
+            Image(systemName: isEditMode ? "pencil.circle" : "doc.badge.plus")
                 .font(.system(size: 48))
                 .foregroundColor(.accentColor)
 
@@ -135,7 +150,9 @@ struct TemplateWizardView: View {
                 .font(.title3.bold())
                 .foregroundColor(.white)
 
-            Text("Elige un nombre para identificar esta configuracion")
+            Text(isEditMode
+                 ? "Modifica el nombre de la plantilla si lo deseas"
+                 : "Elige un nombre para identificar esta configuracion")
                 .font(.subheadline)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
@@ -354,7 +371,7 @@ struct TemplateWizardView: View {
                             ProgressView()
                                 .tint(.black)
                         }
-                        Text("Guardar plantilla")
+                        Text(isEditMode ? "Actualizar plantilla" : "Guardar plantilla")
                             .fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity, minHeight: 48)
@@ -383,18 +400,37 @@ struct TemplateWizardView: View {
         isSaving = true
         Task {
             do {
-                try await driverVM.saveAsPreset(
-                    name: presetName,
-                    visibleCards: visibleCards,
-                    cardOrder: cardOrder,
-                    contrast: contrast,
-                    orientation: orientation.rawValue,
-                    audioEnabled: audioEnabled
-                )
-                await MainActor.run {
-                    toast.success("Plantilla \"\(presetName)\" guardada")
-                    isSaving = false
-                    dismiss()
+                if let preset = editingPreset {
+                    // Edit mode: update existing preset
+                    try await driverVM.updatePresetFull(
+                        id: preset.id,
+                        name: presetName,
+                        visibleCards: visibleCards,
+                        cardOrder: cardOrder,
+                        contrast: contrast,
+                        orientation: orientation.rawValue,
+                        audioEnabled: audioEnabled
+                    )
+                    await MainActor.run {
+                        toast.success("Plantilla \"\(presetName)\" actualizada")
+                        isSaving = false
+                        dismiss()
+                    }
+                } else {
+                    // Create mode: new preset
+                    try await driverVM.saveAsPreset(
+                        name: presetName,
+                        visibleCards: visibleCards,
+                        cardOrder: cardOrder,
+                        contrast: contrast,
+                        orientation: orientation.rawValue,
+                        audioEnabled: audioEnabled
+                    )
+                    await MainActor.run {
+                        toast.success("Plantilla \"\(presetName)\" guardada")
+                        isSaving = false
+                        dismiss()
+                    }
                 }
             } catch {
                 await MainActor.run {

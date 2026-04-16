@@ -48,7 +48,6 @@ struct DriverMenuOverlay: View {
 
                             if !driverVM.presets.isEmpty {
                                 Picker("Plantilla", selection: $driverVM.selectedPresetId) {
-                                    Text("Ninguna").tag(nil as Int?)
                                     ForEach(driverVM.presets) { p in
                                         Text(p.name).tag(p.id as Int?)
                                     }

@@ -6,6 +6,9 @@ struct RaceView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if app.race.raceStarted {
+                RaceInfoPanel()
+            }
             RaceTableHeader()
             if app.race.karts.isEmpty {
                 PlaceholderView(text: "Esperando datos de la carrera…")
@@ -15,6 +18,7 @@ struct RaceView: View {
                         ForEach(sortedKarts) { kart in
                             RaceRowView(
                                 kart: kart,
+                                config: app.race.config,
                                 onTap: { selected = kart }
                             )
                         }

@@ -72,6 +72,7 @@ data class RaceSession(
     @SerialName("our_kart_number") val ourKartNumber: Int = 0,
     @SerialName("refresh_interval_s") val refreshIntervalS: Int = 3,
     @SerialName("is_active") val isActive: Boolean = false,
+    @SerialName("auto_load_teams") val autoLoadTeams: Boolean = false,
 ) {
     companion object {
         val EMPTY = RaceSession()

@@ -2,10 +2,11 @@ import SwiftUI
 
 /// Box configuration: teams + drivers management (mirrors web TeamEditor).
 /// - Auto-load toggle (persists on /config/session.auto_load_teams)
-/// - Load from live timing
-/// - Add / remove / reorder teams
+/// - Load from live timing (replaces all teams)
+/// - Add team via popup (name + kart number)
 /// - Per team: kart number, team name, driver list
 /// - Per driver: name, differential_ms (seconds step)
+/// - Teams are read-only by default; edit button enables editing
 struct BoxConfigView: View {
     @EnvironmentObject var toast: ToastManager
 
@@ -15,6 +16,10 @@ struct BoxConfigView: View {
     @State private var loading = true
     @State private var saving = false
     @State private var importing = false
+    @State private var isEditing = false
+    @State private var showAddTeamSheet = false
+    @State private var newTeamName = ""
+    @State private var newTeamKart = ""
 
     var body: some View {
         List {
@@ -54,32 +59,16 @@ struct BoxConfigView: View {
                 .disabled(importing)
 
                 Button {
-                    addTeam()
+                    showAddTeamSheet = true
                 } label: {
-                    Label("Añadir equipo", systemImage: "plus.circle")
+                    Label("Anadir equipo", systemImage: "plus.circle")
                 }
-
-                Button {
-                    Task { await saveTeams() }
-                } label: {
-                    HStack {
-                        if saving {
-                            ProgressView().scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "square.and.arrow.down")
-                        }
-                        Text("Guardar cambios")
-                            .font(.system(size: 14, weight: .semibold))
-                    }
-                    .foregroundColor(.accentColor)
-                }
-                .disabled(saving)
             }
 
             // ── Team list ──
             if teams.isEmpty && !loading {
                 Section {
-                    Text("No hay equipos. Cárgalos desde Live Timing o añádelos manualmente.")
+                    Text("No hay equipos. Cargalos desde Live Timing o anadelos manualmente.")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity)
@@ -92,19 +81,44 @@ struct BoxConfigView: View {
                         TeamRowView(
                             team: $team,
                             isExpanded: expandedTeamIds.contains(team.id),
+                            isEditing: isEditing,
                             onToggleExpanded: { toggleExpanded(team.id) },
                             onRemove: { removeTeam(team.id) }
                         )
                     }
-                    .onMove(perform: moveTeam)
+                    .onMove { from, to in
+                        if isEditing { moveTeam(from: from, to: to) }
+                    }
                 }
+            }
+
+            // ── Save button (matches "Actualizar sesion" style) ──
+            Section {
+                Button(action: { Task { await saveTeams() } }) {
+                    HStack {
+                        if saving {
+                            ProgressView().tint(.black)
+                        }
+                        Text("GUARDAR CAMBIOS")
+                            .font(.headline)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(Color.accentColor)
+                    .foregroundColor(.black)
+                    .cornerRadius(12)
+                }
+                .disabled(saving)
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Configuración Box")
-        .toolbar {
-            EditButton()
-        }
+        .navigationTitle("Configuracion Box")
+        .navigationBarItems(trailing:
+            Button(isEditing ? "Listo" : "Editar") {
+                withAnimation { isEditing.toggle() }
+            }
+        )
         .overlay {
             if loading {
                 ProgressView()
@@ -112,6 +126,18 @@ struct BoxConfigView: View {
         }
         .task {
             await loadAll()
+        }
+        .alert("Anadir equipo", isPresented: $showAddTeamSheet) {
+            TextField("Nombre del equipo", text: $newTeamName)
+            TextField("Numero de kart", text: $newTeamKart)
+                .keyboardType(.numberPad)
+            Button("Anadir") { addTeamFromPopup() }
+            Button("Cancelar", role: .cancel) {
+                newTeamName = ""
+                newTeamKart = ""
+            }
+        } message: {
+            Text("Introduce el nombre y numero de kart del nuevo equipo.")
         }
     }
 
@@ -126,7 +152,6 @@ struct BoxConfigView: View {
     }
 
     private func loadAutoLoad() async {
-        // auto_load_teams is not in RaceSession model — read raw dict directly
         if let raw = try? await fetchSessionRaw(), let value = raw["auto_load_teams"] as? Bool {
             await MainActor.run { self.autoLoad = value }
         }
@@ -161,38 +186,26 @@ struct BoxConfigView: View {
         }
     }
 
+    /// Loads from live timing, replacing ALL existing teams (clears first).
     private func importFromLive() async {
         importing = true
         defer { importing = false }
         do {
             let live = try await APIClient.shared.getLiveTeams()
             await MainActor.run {
-                // Merge by kart: existing drivers kept; new live karts appended
-                var byKart: [Int: Team] = Dictionary(uniqueKeysWithValues: teams.map { ($0.kart, $0) })
-                for liveTeam in live.teams {
-                    if var existing = byKart[liveTeam.kart] {
-                        existing.teamName = liveTeam.teamName.isEmpty ? existing.teamName : liveTeam.teamName
-                        let existingNames = Set(existing.drivers.map { $0.driverName })
-                        for d in liveTeam.drivers where !existingNames.contains(d.driverName) && !d.driverName.isEmpty {
-                            existing.drivers.append(TeamDriver(driverName: d.driverName, differentialMs: 0))
+                // Clear existing teams and replace with live data
+                let imported = live.teams.enumerated().map { idx, liveTeam -> Team in
+                    Team(
+                        position: idx + 1,
+                        kart: liveTeam.kart,
+                        teamName: liveTeam.teamName,
+                        drivers: liveTeam.drivers.map {
+                            TeamDriver(driverName: $0.driverName, differentialMs: 0)
                         }
-                        byKart[liveTeam.kart] = existing
-                    } else {
-                        byKart[liveTeam.kart] = Team(
-                            position: teams.count + byKart.count,
-                            kart: liveTeam.kart,
-                            teamName: liveTeam.teamName,
-                            drivers: liveTeam.drivers.map { TeamDriver(driverName: $0.driverName, differentialMs: 0) }
-                        )
-                    }
+                    )
                 }
-                let merged = byKart.values.sorted { $0.kart < $1.kart }
-                self.teams = merged.enumerated().map { idx, t in
-                    var copy = t
-                    copy.position = idx + 1
-                    return copy
-                }
-                toast.success("Importados \(live.kartCount) karts")
+                self.teams = imported
+                toast.success("Importados \(live.kartCount) karts (equipos anteriores reemplazados)")
             }
         } catch {
             await MainActor.run { toast.warning("No se pudo cargar Live Timing") }
@@ -202,7 +215,6 @@ struct BoxConfigView: View {
     private func saveTeams() async {
         saving = true
         defer { saving = false }
-        // Recalculate positions from current order
         let ordered = teams.enumerated().map { idx, t -> Team in
             var copy = t
             copy.position = idx + 1
@@ -219,11 +231,20 @@ struct BoxConfigView: View {
         }
     }
 
-    private func addTeam() {
-        let nextKart = (teams.map { $0.kart }.max() ?? 0) + 1
-        let t = Team(position: teams.count + 1, kart: nextKart, teamName: "Equipo \(teams.count + 1)", drivers: [])
+    private func addTeamFromPopup() {
+        let name = newTeamName.trimmingCharacters(in: .whitespaces)
+        let kartNum = Int(newTeamKart) ?? ((teams.map { $0.kart }.max() ?? 0) + 1)
+        guard !name.isEmpty else {
+            newTeamName = ""
+            newTeamKart = ""
+            return
+        }
+        let t = Team(position: teams.count + 1, kart: kartNum, teamName: name, drivers: [])
         teams.append(t)
         expandedTeamIds.insert(t.id)
+        isEditing = true  // Enable editing after adding
+        newTeamName = ""
+        newTeamKart = ""
     }
 
     private func removeTeam(_ id: UUID) {
@@ -249,6 +270,7 @@ struct BoxConfigView: View {
 private struct TeamRowView: View {
     @Binding var team: Team
     let isExpanded: Bool
+    let isEditing: Bool
     let onToggleExpanded: () -> Void
     let onRemove: () -> Void
 
@@ -261,15 +283,30 @@ private struct TeamRowView: View {
                     .foregroundColor(.secondary)
                     .frame(width: 26)
 
-                // Kart number
-                TextField("Kart", value: $team.kart, format: .number)
-                    .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 60)
+                if isEditing {
+                    // Editable kart number
+                    TextField("Kart", value: $team.kart, format: .number)
+                        .keyboardType(.numberPad)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 60)
 
-                // Team name
-                TextField("Nombre equipo", text: $team.teamName)
-                    .textFieldStyle(.roundedBorder)
+                    // Editable team name
+                    TextField("Nombre equipo", text: $team.teamName)
+                        .textFieldStyle(.roundedBorder)
+                } else {
+                    // Read-only display
+                    Text("K\(team.kart)")
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(.accentColor)
+                        .frame(width: 48, alignment: .leading)
+
+                    Text(team.teamName)
+                        .font(.system(size: 14))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                }
+
+                Spacer()
 
                 // Expand toggle
                 Button(action: onToggleExpanded) {
@@ -278,12 +315,14 @@ private struct TeamRowView: View {
                 }
                 .buttonStyle(.borderless)
 
-                // Remove
-                Button(action: onRemove) {
-                    Image(systemName: "trash")
-                        .foregroundColor(.red)
+                // Remove (only in edit mode)
+                if isEditing {
+                    Button(action: onRemove) {
+                        Image(systemName: "trash")
+                            .foregroundColor(.red)
+                    }
+                    .buttonStyle(.borderless)
                 }
-                .buttonStyle(.borderless)
             }
 
             // Driver summary when collapsed
@@ -298,19 +337,21 @@ private struct TeamRowView: View {
             if isExpanded {
                 VStack(spacing: 6) {
                     ForEach($team.drivers) { $driver in
-                        DriverRowView(driver: $driver, onRemove: {
+                        DriverRowView(driver: $driver, isEditing: isEditing, onRemove: {
                             team.drivers.removeAll { $0.id == driver.id }
                         })
                     }
-                    Button {
-                        team.drivers.append(TeamDriver(driverName: "", differentialMs: 0))
-                    } label: {
-                        Label("Añadir piloto", systemImage: "plus")
-                            .font(.system(size: 12))
+                    if isEditing {
+                        Button {
+                            team.drivers.append(TeamDriver(driverName: "", differentialMs: 0))
+                        } label: {
+                            Label("Anadir piloto", systemImage: "plus")
+                                .font(.system(size: 12))
+                        }
+                        .buttonStyle(.borderless)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, 34)
                     }
-                    .buttonStyle(.borderless)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 34)
                 }
                 .padding(.top, 4)
             }
@@ -321,6 +362,7 @@ private struct TeamRowView: View {
 
 private struct DriverRowView: View {
     @Binding var driver: TeamDriver
+    let isEditing: Bool
     let onRemove: () -> Void
 
     var body: some View {
@@ -330,30 +372,44 @@ private struct DriverRowView: View {
                 .foregroundColor(.secondary)
                 .frame(width: 20)
 
-            TextField("Nombre piloto", text: $driver.driverName)
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 13))
-
-            // Differential: shown as seconds with ±100ms step
-            HStack(spacing: 2) {
-                TextField("0.0", value: Binding(
-                    get: { Double(driver.differentialMs) / 1000.0 },
-                    set: { driver.differentialMs = Int(($0 * 1000).rounded()) }
-                ), format: .number.precision(.fractionLength(1)))
-                    .keyboardType(.numbersAndPunctuation)
+            if isEditing {
+                TextField("Nombre piloto", text: $driver.driverName)
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 60)
-                    .font(.system(size: 12, design: .monospaced))
-                Text("s")
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
-            }
+                    .font(.system(size: 13))
 
-            Button(action: onRemove) {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundColor(.red.opacity(0.7))
+                // Differential: shown as seconds with ±100ms step
+                HStack(spacing: 2) {
+                    TextField("0.0", value: Binding(
+                        get: { Double(driver.differentialMs) / 1000.0 },
+                        set: { driver.differentialMs = Int(($0 * 1000).rounded()) }
+                    ), format: .number.precision(.fractionLength(1)))
+                        .keyboardType(.numbersAndPunctuation)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 60)
+                        .font(.system(size: 12, design: .monospaced))
+                    Text("s")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+
+                Button(action: onRemove) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.red.opacity(0.7))
+                }
+                .buttonStyle(.borderless)
+            } else {
+                Text(driver.driverName.isEmpty ? "Sin nombre" : driver.driverName)
+                    .font(.system(size: 13))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                if driver.differentialMs != 0 {
+                    Text(String(format: "%+.1fs", Double(driver.differentialMs) / 1000.0))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
             }
-            .buttonStyle(.borderless)
         }
         .padding(.leading, 14)
     }

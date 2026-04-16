@@ -16,7 +16,7 @@ struct HomeView: View {
                         HomeCard(
                             icon: "gearshape.fill",
                             title: "Configuracion",
-                            subtitle: "Sesion, tarjetas, GPS"
+                            subtitle: "Carrera, Plantillas, GPS"
                         )
                     }
 

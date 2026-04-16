@@ -6,7 +6,7 @@ struct LoginView: View {
     @State private var password = ""
     @FocusState private var focusedField: Field?
 
-    private enum Field { case email, password, mfa }
+    private enum Field { case email, password }
 
     var body: some View {
         ZStack {
@@ -74,11 +74,7 @@ struct LoginView: View {
                         }
                         .padding(.bottom, 8)
 
-                        if authVM.showMfa {
-                            mfaSection
-                        } else {
-                            loginSection
-                        }
+                        loginSection
 
                         Spacer(minLength: 40)
                     }
@@ -264,57 +260,4 @@ struct LoginView: View {
         }
     }
 
-    // MARK: - MFA
-
-    private var mfaSection: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "lock.shield")
-                .font(.system(size: 36))
-                .foregroundColor(.accentColor)
-
-            Text("Verificacion en dos pasos")
-                .font(.headline)
-                .foregroundColor(.white)
-
-            HStack(spacing: 12) {
-                Image(systemName: "number")
-                    .foregroundColor(Color(.systemGray3))
-                    .frame(width: 20)
-                TextField("Codigo MFA", text: $authVM.mfaCode)
-                    .keyboardType(.numberPad)
-                    .focused($focusedField, equals: .mfa)
-                    .foregroundColor(.white)
-            }
-            .padding(14)
-            .background(Color(.systemGray6))
-            .cornerRadius(10)
-            .accessibilityLabel("Codigo de verificacion")
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("OK") { focusedField = nil }
-                }
-            }
-
-            Button(action: { authVM.verifyMfa(code: authVM.mfaCode) }) {
-                HStack {
-                    if authVM.isLoading { ProgressView().tint(.black) }
-                    Text("Verificar")
-                        .font(.headline)
-                }
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background(Color.accentColor)
-                .foregroundColor(.black)
-                .cornerRadius(10)
-            }
-            .disabled(authVM.mfaCode.count < 6 || authVM.isLoading)
-
-            Button("Volver") {
-                authVM.showMfa = false
-                authVM.tempToken = nil
-            }
-            .frame(minHeight: 44)
-            .foregroundColor(.gray)
-        }
-    }
 }

@@ -8,9 +8,6 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var isGoogleLoading = false
-    @Published var showMfa = false
-    @Published var mfaCode = ""
-    @Published var tempToken: String?
     @Published var showBiometricPrompt = false  // offer to enable after first login
     @Published var biometricPending = false     // waiting for Face ID on app launch
 
@@ -24,10 +21,9 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
 
     // MARK: - ASWebAuthenticationPresentationContextProviding
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        // Return the key window as anchor
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let window = scene.windows.first else {
-            return ASPresentationAnchor()
+            return ASPresentationAnchor(windowScene: UIApplication.shared.connectedScenes.first as! UIWindowScene)
         }
         return window
     }
@@ -104,26 +100,10 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
         session.start()
     }
 
-    func verifyMfa(code: String) {
-        guard let tmp = tempToken else { return }
-        isLoading = true
-        Task { @MainActor in
-            do {
-                let resp = try await APIClient.shared.verifyMfa(tempToken: tmp, code: code)
-                handleAuthResponse(resp)
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-            isLoading = false
-        }
-    }
-
     /// Normal logout: keeps token + biometric so user can re-enter with Face ID
     func logout() {
         isAuthenticated = false
         user = nil
-        showMfa = false
-        tempToken = nil
         biometricPending = false
         // Token stays in Keychain for biometric re-login
     }

@@ -196,6 +196,56 @@ class DriverViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Updates an existing preset with full display options (edit mode in wizard).
+     */
+    fun updatePresetWithOptions(
+        id: Int,
+        name: String,
+        visibleCards: Map<String, Boolean>,
+        cardOrder: List<String>,
+        contrast: Double,
+        orientation: String,
+        audioEnabled: Boolean,
+        onSuccess: () -> Unit = {},
+        onError: (Throwable) -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                api.updatePreset(
+                    id = id,
+                    name = name,
+                    visibleCards = visibleCards,
+                    cardOrder = cardOrder,
+                    contrast = contrast,
+                    orientation = orientation,
+                    audioEnabled = audioEnabled,
+                )
+            }.onSuccess { updated ->
+                _presets.value = _presets.value.map { if (it.id == updated.id) updated else it }
+                onSuccess()
+            }.onFailure(onError)
+        }
+    }
+
+    /**
+     * Toggle a preset's default status. Mirrors iOS `setPresetDefault(_:isDefault:)`.
+     * When setting a preset as default, all others are un-defaulted client-side.
+     */
+    fun setPresetDefault(preset: DriverConfigPreset, isDefault: Boolean) {
+        viewModelScope.launch {
+            runCatching {
+                api.updatePreset(id = preset.id, isDefault = isDefault)
+            }.onSuccess { updated ->
+                _presets.value = _presets.value.map { p ->
+                    if (p.id == updated.id) updated
+                    else if (isDefault) p.copy(isDefault = false)
+                    else p
+                }
+            }
+        }
+    }
+
     fun deletePreset(preset: DriverConfigPreset) {
         viewModelScope.launch {
             runCatching { api.deletePreset(preset.id) }.onSuccess {

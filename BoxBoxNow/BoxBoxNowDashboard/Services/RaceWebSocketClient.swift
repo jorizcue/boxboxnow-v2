@@ -154,20 +154,23 @@ actor RaceWebSocketClient: RaceWebSocketClientProtocol {
                 switch message {
                 case .string(let text):
                     if let data = text.data(using: .utf8) {
-                        if let wsMsg = try? JSONDecoder().decode(WsMessage.self, from: data) {
+                        do {
+                            let wsMsg = try JSONDecoder().decode(WsMessage.self, from: data)
                             messagesContinuation.yield(wsMsg)
-                        } else {
+                        } catch {
                             #if DEBUG
-                            print("[RaceWebSocketClient] failed to decode string frame: \(text.prefix(200))")
+                            print("[RaceWebSocketClient] decode error: \(error)")
+                            print("[RaceWebSocketClient] raw frame: \(text.prefix(300))")
                             #endif
                         }
                     }
                 case .data(let data):
-                    if let wsMsg = try? JSONDecoder().decode(WsMessage.self, from: data) {
+                    do {
+                        let wsMsg = try JSONDecoder().decode(WsMessage.self, from: data)
                         messagesContinuation.yield(wsMsg)
-                    } else {
+                    } catch {
                         #if DEBUG
-                        print("[RaceWebSocketClient] failed to decode data frame (\(data.count) bytes)")
+                        print("[RaceWebSocketClient] decode error (data): \(error)")
                         #endif
                     }
                 @unknown default:

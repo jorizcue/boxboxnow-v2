@@ -43,11 +43,27 @@ struct HomeView: View {
                                 .tracking(1.5)
                         }
                         .padding(.top, 32)
-                        .padding(.bottom, 8)
+
+                        // ── User row ──
+                        if let name = authVM.user?.displayName, !name.isEmpty {
+                            HStack(spacing: 6) {
+                                Image(systemName: "person.circle.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(.accentColor)
+                                Text(name)
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(.white)
+                            }
+                            .padding(.bottom, 8)
+                        } else {
+                            Spacer().frame(height: 8)
+                        }
 
                         // ── Session summary card ──
                         if hasSession {
-                            SessionSummaryCard(session: configVM.session, circuits: configVM.circuits)
+                            NavigationLink(destination: SessionConfigView()) {
+                                SessionSummaryCard(session: configVM.session, circuits: configVM.circuits)
+                            }
                         } else {
                             VStack(spacing: 8) {
                                 Image(systemName: "exclamationmark.triangle")
@@ -77,7 +93,7 @@ struct HomeView: View {
                             HomeCard(
                                 icon: "gearshape.fill",
                                 title: "Configuracion",
-                                subtitle: "Sesion, tarjetas, GPS"
+                                subtitle: "Carrera, Plantillas, GPS"
                             )
                         }
 
@@ -103,13 +119,9 @@ struct HomeView: View {
             .navigationTitle("")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(raceVM.isConnected ? Color.green : Color(.systemGray4))
-                            .frame(width: 8, height: 8)
-                        Text(authVM.user?.displayName ?? "")
-                            .foregroundColor(.gray)
-                    }
+                    Circle()
+                        .fill(raceVM.isConnected ? Color.green : Color(.systemGray4))
+                        .frame(width: 8, height: 8)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Salir") { authVM.logout() }

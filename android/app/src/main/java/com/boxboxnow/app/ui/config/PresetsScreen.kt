@@ -15,17 +15,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -56,9 +60,10 @@ private const val MAX_PRESETS = 10
 
 /**
  * Driver config presets manager. Mirrors iOS `PresetsView`:
- *   - Lists saved presets with selection checkmark
- *   - Swipe-to-delete becomes trash-icon button on Android
- *   - "Guardar configuracion actual" opens a name dialog
+ *   - Lists saved presets inside a single rounded section with dividers
+ *   - Star toggle to mark/unmark default preset
+ *   - Edit button per row
+ *   - Delete via trash icon with confirmation dialog
  *   - Capped at 10 presets
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,6 +71,7 @@ private const val MAX_PRESETS = 10
 fun PresetsScreen(
     onBack: () -> Unit,
     onCreateNew: () -> Unit = {},
+    onEditPreset: (Int) -> Unit = {},
 ) {
     val driverVM: DriverViewModel = hiltViewModel()
     val presets by driverVM.presets.collectAsState()
@@ -101,6 +107,7 @@ fun PresetsScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            // Section header
             item {
                 Text(
                     "PLANTILLAS (${presets.size}/$MAX_PRESETS)",
@@ -122,18 +129,41 @@ fun PresetsScreen(
                     )
                 }
             } else {
-                items(presets, key = { it.id }) { preset ->
-                    PresetRow(
-                        preset = preset,
-                        selected = selectedId == preset.id,
-                        onApply = { driverVM.applyPreset(preset) },
-                        onDelete = { confirmDelete = preset },
-                    )
+                // Single card section containing all rows with dividers
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(BoxBoxNowColors.SystemGray6),
+                    ) {
+                        presets.forEachIndexed { index, preset ->
+                            PresetRow(
+                                preset = preset,
+                                selected = selectedId == preset.id,
+                                onApply = { driverVM.applyPreset(preset) },
+                                onToggleDefault = {
+                                    driverVM.setPresetDefault(preset, !preset.isDefault)
+                                },
+                                onEdit = { onEditPreset(preset.id) },
+                                onDelete = { confirmDelete = preset },
+                            )
+                            // Divider between rows (not after the last one)
+                            if (index < presets.size - 1) {
+                                HorizontalDivider(
+                                    color = BoxBoxNowColors.SystemGray4.copy(alpha = 0.4f),
+                                    thickness = 0.5.dp,
+                                    modifier = Modifier.padding(horizontal = 14.dp),
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
             item { Spacer(Modifier.height(12.dp)) }
 
+            // Create button
             item {
                 Button(
                     onClick = onCreateNew,
@@ -187,18 +217,34 @@ private fun PresetRow(
     preset: DriverConfigPreset,
     selected: Boolean,
     onApply: () -> Unit,
+    onToggleDefault: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val visibleCount = preset.visibleCards.count { it.value }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(BoxBoxNowColors.SystemGray6)
             .clickable(onClick = onApply)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Star toggle for default
+        IconButton(
+            onClick = onToggleDefault,
+            modifier = Modifier.size(32.dp),
+        ) {
+            Icon(
+                if (preset.isDefault) Icons.Filled.Star else Icons.Filled.StarBorder,
+                contentDescription = if (preset.isDefault) "Quitar predefinida" else "Marcar predefinida",
+                tint = if (preset.isDefault) BoxBoxNowColors.Accent else BoxBoxNowColors.SystemGray3,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+
+        Spacer(Modifier.width(8.dp))
+
+        // Name + badge + card count
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -209,42 +255,55 @@ private fun PresetRow(
                 )
                 if (preset.isDefault) {
                     Spacer(Modifier.width(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(BoxBoxNowColors.Accent.copy(alpha = 0.2f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                    ) {
-                        Text(
-                            "DEFAULT",
-                            color = BoxBoxNowColors.Accent,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
+                    Text(
+                        "PREDEFINIDA",
+                        color = BoxBoxNowColors.Accent,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
             }
             Text(
-                "$visibleCount tarjetas visibles",
+                "$visibleCount tarjetas",
                 color = BoxBoxNowColors.SystemGray,
                 fontSize = 11.sp,
             )
         }
+
+        // Checkmark when selected/applied
         if (selected) {
             Icon(
                 Icons.Filled.Check,
                 contentDescription = "Seleccionado",
                 tint = BoxBoxNowColors.Accent,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(18.dp),
             )
             Spacer(Modifier.width(4.dp))
         }
-        IconButton(onClick = onDelete) {
+
+        // Edit button
+        IconButton(
+            onClick = onEdit,
+            modifier = Modifier.size(32.dp),
+        ) {
+            Icon(
+                Icons.Filled.Edit,
+                contentDescription = "Editar",
+                tint = BoxBoxNowColors.Accent,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+
+        // Delete button
+        IconButton(
+            onClick = onDelete,
+            modifier = Modifier.size(32.dp),
+        ) {
             Icon(
                 Icons.Filled.Delete,
                 contentDescription = "Eliminar",
                 tint = BoxBoxNowColors.ErrorRed,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(18.dp),
             )
         }
     }

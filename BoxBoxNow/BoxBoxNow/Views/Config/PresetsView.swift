@@ -5,6 +5,7 @@ struct PresetsView: View {
     @EnvironmentObject var toast: ToastManager
     @EnvironmentObject var auth: AuthViewModel
     @State private var showWizard = false
+    @State private var editingPreset: DriverConfigPreset?
     @State private var isLoading = true
     @State private var presetToDelete: DriverConfigPreset?
 
@@ -74,6 +75,17 @@ struct PresetsView: View {
                                 .frame(minHeight: 44)
                             }
                             .accessibilityLabel("Plantilla \(preset.name), \(preset.visibleCards.filter { $0.value }.count) tarjetas\(driverVM.selectedPresetId == preset.id ? ", seleccionada" : "")\(preset.isDefault ? ", predefinida" : "")")
+
+                            // Edit button
+                            Button(action: { editingPreset = preset }) {
+                                Image(systemName: "pencil.circle")
+                                    .font(.system(size: 17))
+                                    .foregroundColor(.accentColor)
+                                    .frame(width: 32, height: 32)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Editar plantilla \(preset.name)")
                         }
                     }
                     .onDelete(perform: confirmDelete)
@@ -98,6 +110,15 @@ struct PresetsView: View {
         }
         .sheet(isPresented: $showWizard) {
             TemplateWizardView()
+                .environmentObject(driverVM)
+                .environmentObject(auth)
+                .environmentObject(toast)
+                .onDisappear {
+                    Task { await driverVM.loadPresets() }
+                }
+        }
+        .sheet(item: $editingPreset) { preset in
+            TemplateWizardView(editingPreset: preset)
                 .environmentObject(driverVM)
                 .environmentObject(auth)
                 .environmentObject(toast)

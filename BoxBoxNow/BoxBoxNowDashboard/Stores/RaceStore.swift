@@ -56,6 +56,10 @@ final class RaceStore {
         await wsClient.disconnect()
     }
 
+    func sendBoxCall() async {
+        try? await wsClient.send("{\"type\":\"box_call\"}")
+    }
+
     // MARK: - Reducer (pure, sync, testable)
 
     func apply(message: WsMessage) {

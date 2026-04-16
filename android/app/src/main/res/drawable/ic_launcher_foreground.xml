@@ -4,14 +4,14 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Red "BBN" monogram centred on transparent background -->
+    <!-- "BB" in white, "N" in accent green — matches iOS branding -->
     <path
-        android:fillColor="#E10600"
+        android:fillColor="#FFFFFF"
         android:pathData="M30,34 h12 a10,10 0 0 1 0,20 h-12 z M30,54 h14 a10,10 0 0 1 0,20 h-14 z" />
     <path
-        android:fillColor="#E10600"
+        android:fillColor="#FFFFFF"
         android:pathData="M54,34 h12 a10,10 0 0 1 0,20 h-12 z M54,54 h14 a10,10 0 0 1 0,20 h-14 z" />
     <path
-        android:fillColor="#E10600"
+        android:fillColor="#41D238"
         android:pathData="M78,34 h8 v40 h-6 l-16,-22 v22 h-8 v-40 h6 l16,22 z" />
 </vector>

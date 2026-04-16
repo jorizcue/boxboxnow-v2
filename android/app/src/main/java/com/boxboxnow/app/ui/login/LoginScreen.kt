@@ -13,9 +13,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.material.icons.filled.Mail
-import androidx.compose.material.icons.filled.Pin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,6 +28,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import com.boxboxnow.app.ui.theme.InterFontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -47,7 +46,6 @@ fun LoginScreen(
     onStartGoogleSso: () -> Unit,
 ) {
     val isAuth by authVM.isAuthenticated.collectAsState()
-    val showMfa by authVM.showMfa.collectAsState()
     val biometricPending by authVM.biometricPending.collectAsState()
 
     LaunchedEffect(isAuth) { if (isAuth) onLoggedIn() }
@@ -65,7 +63,6 @@ fun LoginScreen(
 
         when {
             biometricPending -> BiometricWaiting(authVM)
-            showMfa -> MfaSection(authVM)
             else -> LoginForm(authVM, onStartGoogleSso)
         }
     }
@@ -105,8 +102,8 @@ private fun Branding(small: Boolean = false) {
     val subSize = if (small) 16.sp else 20.sp
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row {
-            Text("BB", fontSize = logoSize, fontWeight = FontWeight.Black, color = Color.White, fontFamily = FontFamily.SansSerif)
-            Text("N", fontSize = logoSize, fontWeight = FontWeight.Black, color = BoxBoxNowColors.Accent, fontFamily = FontFamily.SansSerif)
+            Text("BB", fontSize = logoSize, fontWeight = FontWeight.Black, color = Color.White, fontFamily = InterFontFamily)
+            Text("N", fontSize = logoSize, fontWeight = FontWeight.Black, color = BoxBoxNowColors.Accent, fontFamily = InterFontFamily)
         }
         Row {
             Text("BOXBOX", fontSize = subSize, fontWeight = FontWeight.Bold, color = Color.White)
@@ -208,55 +205,6 @@ private fun LoginForm(authVM: AuthViewModel, onStartGoogleSso: () -> Unit) {
         }
 
         Spacer(Modifier.height(40.dp))
-    }
-}
-
-@Composable
-private fun MfaSection(authVM: AuthViewModel) {
-    val code by authVM.mfaCode.collectAsState()
-    val loading by authVM.isLoading.collectAsState()
-    val error by authVM.errorMessage.collectAsState()
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.height(60.dp))
-        Branding()
-        Spacer(Modifier.height(40.dp))
-
-        Icon(Icons.Default.LockReset, contentDescription = null, tint = BoxBoxNowColors.Accent, modifier = Modifier.size(42.dp))
-        Spacer(Modifier.height(12.dp))
-        Text("Verificación en dos pasos", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Spacer(Modifier.height(20.dp))
-
-        InputField(
-            value = code,
-            onChange = { authVM.setMfaCode(it) },
-            placeholder = "Código MFA",
-            icon = Icons.Default.Pin,
-            keyboardType = KeyboardType.NumberPassword,
-        )
-
-        error?.let {
-            Spacer(Modifier.height(6.dp))
-            Text(it, color = BoxBoxNowColors.ErrorRed, fontSize = 12.sp)
-        }
-
-        Spacer(Modifier.height(16.dp))
-        PrimaryAccentButton(
-            text = "Verificar",
-            loading = loading,
-            enabled = code.length >= 6 && !loading,
-            onClick = { authVM.verifyMfa() },
-        )
-
-        Spacer(Modifier.height(10.dp))
-        TextButton(onClick = { authVM.cancelMfa() }) {
-            Text("Volver", color = BoxBoxNowColors.SystemGray)
-        }
     }
 }
 

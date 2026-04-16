@@ -79,7 +79,7 @@ struct CardOrderPreviewView: View {
             driverVM.saveConfig()
             Task {
                 do {
-                    try await APIClient.shared.updatePreferences(
+                    _ = try await APIClient.shared.updatePreferences(
                         visibleCards: driverVM.visibleCards,
                         cardOrder: driverVM.cardOrder
                     )

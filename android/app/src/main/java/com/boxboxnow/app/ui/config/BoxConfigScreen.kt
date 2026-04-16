@@ -1,0 +1,539 @@
+package com.boxboxnow.app.ui.config
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.boxboxnow.app.models.Team
+import com.boxboxnow.app.models.TeamDriver
+import com.boxboxnow.app.net.ApiClient
+import com.boxboxnow.app.ui.theme.BoxBoxNowColors
+import com.boxboxnow.app.vm.ConfigViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+/** Thin ViewModel to access Hilt-injected ApiClient from BoxConfigScreen. */
+@HiltViewModel
+class BoxConfigVM @Inject constructor(val api: ApiClient) : ViewModel()
+
+/**
+ * Box configuration screen for managing teams and drivers.
+ * Teams are read-only by default; tap "Edit" to enable modifications.
+ * "Add team" opens a popup. "Load from Live Timing" replaces all teams.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BoxConfigScreen(onBack: () -> Unit) {
+    val vm: BoxConfigVM = hiltViewModel()
+    val api = vm.api
+    val scope = rememberCoroutineScope()
+    val teams = remember { mutableStateListOf<Team>() }
+    var loading by remember { mutableStateOf(true) }
+    var saving by remember { mutableStateOf(false) }
+    var importing by remember { mutableStateOf(false) }
+    var isEditing by remember { mutableStateOf(false) }
+    var autoLoad by remember { mutableStateOf(false) }
+    var expandedIndices by remember { mutableStateOf(setOf<Int>()) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var newTeamName by remember { mutableStateOf("") }
+    var newTeamKart by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        try {
+            val session = api.getActiveSession()
+            autoLoad = session?.autoLoadTeams ?: false
+        } catch (_: Throwable) {}
+        try {
+            val fetched = api.getTeams().sortedBy { it.position }
+            teams.clear()
+            teams.addAll(fetched)
+        } catch (_: Throwable) {}
+        loading = false
+    }
+
+    Scaffold(
+        containerColor = Color.Black,
+        topBar = {
+            TopAppBar(
+                title = { Text("Configuracion Box", color = Color.White) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+                    }
+                },
+                actions = {
+                    TextButton(onClick = { isEditing = !isEditing }) {
+                        Text(
+                            if (isEditing) "Listo" else "Editar",
+                            color = BoxBoxNowColors.Accent,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black),
+            )
+        },
+    ) { padding ->
+        if (loading) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) { CircularProgressIndicator(color = BoxBoxNowColors.Accent) }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                // Auto-load toggle
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(BoxBoxNowColors.SystemGray6)
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Auto-cargar al iniciar",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                "Refresca equipos desde Live Timing al arrancar la carrera.",
+                                color = BoxBoxNowColors.SystemGray,
+                                fontSize = 11.sp,
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Switch(
+                            checked = autoLoad,
+                            onCheckedChange = { newValue ->
+                                autoLoad = newValue
+                                scope.launch {
+                                    try {
+                                        api.patchSessionField("auto_load_teams", newValue)
+                                    } catch (_: Throwable) {}
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = BoxBoxNowColors.Accent,
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = BoxBoxNowColors.SystemGray4,
+                                uncheckedBorderColor = BoxBoxNowColors.SystemGray4,
+                            ),
+                        )
+                    }
+                }
+
+                // Actions
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(
+                            onClick = {
+                                importing = true
+                                scope.launch {
+                                    try {
+                                        val live = api.getLiveTeams()
+                                        teams.clear()
+                                        teams.addAll(live.teams.mapIndexed { idx, t ->
+                                            t.copy(position = idx + 1)
+                                        })
+                                    } catch (_: Throwable) {}
+                                    importing = false
+                                }
+                            },
+                            enabled = !importing,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = BoxBoxNowColors.SystemGray6,
+                                contentColor = Color.White,
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                        ) {
+                            if (importing) {
+                                CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                            } else {
+                                Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                            Spacer(Modifier.width(6.dp))
+                            Text("Live Timing", fontSize = 13.sp)
+                        }
+
+                        Button(
+                            onClick = { showAddDialog = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = BoxBoxNowColors.SystemGray6,
+                                contentColor = Color.White,
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Equipo", fontSize = 13.sp)
+                        }
+                    }
+                }
+
+                // Header
+                item {
+                    Text(
+                        "EQUIPOS (${teams.size})",
+                        color = BoxBoxNowColors.SystemGray3,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                    )
+                }
+
+                if (teams.isEmpty()) {
+                    item {
+                        Text(
+                            "No hay equipos. Cargalos desde Live Timing o anadilos manualmente.",
+                            color = BoxBoxNowColors.SystemGray,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                } else {
+                    itemsIndexed(teams, key = { idx, t -> "${t.kart}_$idx" }) { idx, team ->
+                        TeamRow(
+                            team = team,
+                            index = idx,
+                            isExpanded = expandedIndices.contains(idx),
+                            isEditing = isEditing,
+                            onToggleExpand = {
+                                expandedIndices = if (expandedIndices.contains(idx))
+                                    expandedIndices - idx else expandedIndices + idx
+                            },
+                            onUpdate = { updated -> teams[idx] = updated },
+                            onRemove = {
+                                teams.removeAt(idx)
+                                expandedIndices = expandedIndices.filter { it != idx }.map {
+                                    if (it > idx) it - 1 else it
+                                }.toSet()
+                            },
+                        )
+                    }
+                }
+
+                // Save button
+                item { Spacer(Modifier.height(8.dp)) }
+                item {
+                    Button(
+                        onClick = {
+                            saving = true
+                            scope.launch {
+                                try {
+                                    val ordered = teams.mapIndexed { idx, t -> t.copy(position = idx + 1) }
+                                    api.replaceTeams(ordered)
+                                    teams.clear()
+                                    teams.addAll(ordered)
+                                } catch (_: Throwable) {}
+                                saving = false
+                            }
+                        },
+                        enabled = !saving,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = BoxBoxNowColors.Accent,
+                            contentColor = Color.Black,
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(vertical = 14.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (saving) {
+                            CircularProgressIndicator(color = Color.Black, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text("GUARDAR CAMBIOS", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                }
+            }
+        }
+    }
+
+    // Add team dialog
+    if (showAddDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false; newTeamName = ""; newTeamKart = "" },
+            containerColor = BoxBoxNowColors.SystemGray6,
+            titleContentColor = Color.White,
+            textContentColor = Color.White,
+            title = { Text("Anadir equipo") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Nombre y numero de kart del nuevo equipo.", color = BoxBoxNowColors.SystemGray, fontSize = 13.sp)
+                    OutlinedTextField(
+                        value = newTeamName,
+                        onValueChange = { newTeamName = it },
+                        label = { Text("Nombre") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                        colors = fieldColors(),
+                    )
+                    OutlinedTextField(
+                        value = newTeamKart,
+                        onValueChange = { newTeamKart = it.filter { c -> c.isDigit() } },
+                        label = { Text("Kart") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = fieldColors(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val name = newTeamName.trim()
+                    val kart = newTeamKart.toIntOrNull() ?: ((teams.maxOfOrNull { it.kart } ?: 0) + 1)
+                    if (name.isNotEmpty()) {
+                        teams.add(Team(position = teams.size + 1, kart = kart, teamName = name))
+                        isEditing = true
+                    }
+                    newTeamName = ""; newTeamKart = ""; showAddDialog = false
+                }) { Text("Anadir", color = BoxBoxNowColors.Accent) }
+            },
+            dismissButton = {
+                TextButton(onClick = { newTeamName = ""; newTeamKart = ""; showAddDialog = false }) {
+                    Text("Cancelar", color = BoxBoxNowColors.SystemGray)
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun TeamRow(
+    team: Team,
+    index: Int,
+    isExpanded: Boolean,
+    isEditing: Boolean,
+    onToggleExpand: () -> Unit,
+    onUpdate: (Team) -> Unit,
+    onRemove: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(BoxBoxNowColors.SystemGray6)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Position
+            Text(
+                "#${index + 1}",
+                color = BoxBoxNowColors.SystemGray3,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.width(26.dp),
+            )
+
+            if (isEditing) {
+                OutlinedTextField(
+                    value = team.kart.toString(),
+                    onValueChange = { onUpdate(team.copy(kart = it.toIntOrNull() ?: team.kart)) },
+                    label = { Text("Kart", fontSize = 10.sp) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.width(64.dp),
+                    colors = fieldColors(),
+                )
+                Spacer(Modifier.width(8.dp))
+                OutlinedTextField(
+                    value = team.teamName,
+                    onValueChange = { onUpdate(team.copy(teamName = it)) },
+                    label = { Text("Equipo", fontSize = 10.sp) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    colors = fieldColors(),
+                )
+            } else {
+                Text(
+                    "K${team.kart}",
+                    color = BoxBoxNowColors.Accent,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.width(48.dp),
+                )
+                Text(
+                    team.teamName,
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                )
+            }
+
+            IconButton(onClick = onToggleExpand, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = BoxBoxNowColors.Accent,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+
+            if (isEditing) {
+                IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = BoxBoxNowColors.ErrorRed, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+
+        // Collapsed summary
+        if (!isExpanded && team.drivers.isNotEmpty()) {
+            Text(
+                "${team.drivers.size} piloto${if (team.drivers.size != 1) "s" else ""}",
+                color = BoxBoxNowColors.SystemGray,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(start = 26.dp, top = 4.dp),
+            )
+        }
+
+        // Expanded drivers
+        AnimatedVisibility(visible = isExpanded) {
+            Column(modifier = Modifier.padding(start = 26.dp, top = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                team.drivers.forEachIndexed { dIdx, driver ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = BoxBoxNowColors.SystemGray3, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(6.dp))
+                        if (isEditing) {
+                            OutlinedTextField(
+                                value = driver.driverName,
+                                onValueChange = { name ->
+                                    val updated = team.drivers.toMutableList()
+                                    updated[dIdx] = driver.copy(driverName = name)
+                                    onUpdate(team.copy(drivers = updated))
+                                },
+                                placeholder = { Text("Nombre", fontSize = 12.sp) },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f).height(48.dp),
+                                colors = fieldColors(),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            IconButton(
+                                onClick = {
+                                    val updated = team.drivers.toMutableList()
+                                    updated.removeAt(dIdx)
+                                    onUpdate(team.copy(drivers = updated))
+                                },
+                                modifier = Modifier.size(28.dp),
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = null, tint = BoxBoxNowColors.ErrorRed.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                            }
+                        } else {
+                            Text(
+                                driver.driverName.ifEmpty { "Sin nombre" },
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (driver.differentialMs != 0) {
+                                Text(
+                                    "%+.1fs".format(driver.differentialMs / 1000.0),
+                                    color = BoxBoxNowColors.SystemGray,
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                )
+                            }
+                        }
+                    }
+                }
+                if (isEditing) {
+                    TextButton(
+                        onClick = {
+                            val updated = team.drivers + TeamDriver()
+                            onUpdate(team.copy(drivers = updated))
+                        },
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp), tint = BoxBoxNowColors.Accent)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Piloto", color = BoxBoxNowColors.Accent, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun fieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = Color.White,
+    unfocusedTextColor = Color.White,
+    focusedBorderColor = BoxBoxNowColors.Accent,
+    unfocusedBorderColor = BoxBoxNowColors.SystemGray4,
+    focusedLabelColor = BoxBoxNowColors.Accent,
+    unfocusedLabelColor = BoxBoxNowColors.SystemGray,
+    cursorColor = BoxBoxNowColors.Accent,
+)

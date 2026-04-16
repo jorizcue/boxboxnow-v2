@@ -4,9 +4,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.boxboxnow.app.ui.config.BoxConfigScreen
 import com.boxboxnow.app.ui.config.ConfigScreen
 import com.boxboxnow.app.ui.config.GpsConfigScreen
 import com.boxboxnow.app.ui.config.PresetsScreen
@@ -24,6 +27,8 @@ object Routes {
     const val SESSION_CONFIG = "config/session"
     const val PRESETS = "config/presets"
     const val TEMPLATE_WIZARD = "config/template-wizard"
+    const val TEMPLATE_EDIT = "config/template-edit/{presetId}"
+    fun templateEdit(presetId: Int) = "config/template-edit/$presetId"
     const val BOX_CONFIG = "config/box"
     const val GPS_CONFIG = "config/gps"
     const val DRIVER = "driver"
@@ -67,10 +72,18 @@ fun AppNav(onStartGoogleSso: () -> Unit = {}) {
             PresetsScreen(
                 onBack = { nav.popBackStack() },
                 onCreateNew = { nav.navigate(Routes.TEMPLATE_WIZARD) },
+                onEditPreset = { id -> nav.navigate(Routes.templateEdit(id)) },
             )
         }
         composable(Routes.TEMPLATE_WIZARD) {
             TemplateWizardScreen(onBack = { nav.popBackStack() })
+        }
+        composable(
+            Routes.TEMPLATE_EDIT,
+            arguments = listOf(navArgument("presetId") { type = NavType.IntType }),
+        ) { backStackEntry ->
+            val presetId = backStackEntry.arguments?.getInt("presetId")
+            TemplateWizardScreen(onBack = { nav.popBackStack() }, editPresetId = presetId)
         }
         composable(Routes.GPS_CONFIG) { GpsConfigScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.DRIVER) { DriverScreen(onBack = { nav.popBackStack() }) }

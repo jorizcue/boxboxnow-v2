@@ -44,19 +44,11 @@ class AuthViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage = _errorMessage.asStateFlow()
 
-    private val _showMfa = MutableStateFlow(false)
-    val showMfa = _showMfa.asStateFlow()
-
-    private val _mfaCode = MutableStateFlow("")
-    val mfaCode = _mfaCode.asStateFlow()
-
     private val _biometricPending = MutableStateFlow(false)
     val biometricPending = _biometricPending.asStateFlow()
 
     private val _showBiometricPrompt = MutableStateFlow(false)
     val showBiometricPrompt = _showBiometricPrompt.asStateFlow()
-
-    private var tempToken: String? = null
 
     val biometricAvailable: Boolean get() = biometric.isAvailable
     val biometricEnabled: Boolean get() = biometric.isEnabled
@@ -64,12 +56,6 @@ class AuthViewModel @Inject constructor(
 
     init { checkExistingSession() }
 
-    fun setMfaCode(code: String) { _mfaCode.value = code.filter { it.isDigit() }.take(6) }
-    fun cancelMfa() {
-        _showMfa.value = false
-        _mfaCode.value = ""
-        tempToken = null
-    }
     fun clearError() { _errorMessage.value = null }
     fun setBiometricPending(v: Boolean) { _biometricPending.value = v }
 
@@ -104,23 +90,6 @@ class AuthViewModel @Inject constructor(
     fun startGoogleLogin() {
         _isGoogleLoading.value = true
         _errorMessage.value = null
-    }
-
-    fun verifyMfa() {
-        val tmp = tempToken ?: return
-        val code = _mfaCode.value
-        if (code.length < 6) return
-        _isLoading.value = true
-        viewModelScope.launch {
-            try {
-                val resp = api.verifyMfa(tmp, code)
-                handleAuthResponse(resp)
-            } catch (e: Throwable) {
-                _errorMessage.value = e.message ?: "Codigo invalido"
-            } finally {
-                _isLoading.value = false
-            }
-        }
     }
 
     /** Normal logout — keeps token + biometric so user can face-unlock back in. */
@@ -176,18 +145,9 @@ class AuthViewModel @Inject constructor(
     fun skipBiometric() { _showBiometricPrompt.value = false }
 
     private suspend fun handleAuthResponse(resp: AuthResponse) {
-        // MFA branch
-        if (resp.mfaRequired == true && !resp.tempToken.isNullOrBlank()) {
-            tempToken = resp.tempToken
-            _showMfa.value = true
-            return
-        }
         tokenStore.saveToken(resp.accessToken)
         _user.value = resp.user
         _isAuthenticated.value = true
-        _showMfa.value = false
-        _mfaCode.value = ""
-        tempToken = null
         refreshMe()
         if (biometric.isAvailable && !biometric.isEnabled) {
             _showBiometricPrompt.value = true

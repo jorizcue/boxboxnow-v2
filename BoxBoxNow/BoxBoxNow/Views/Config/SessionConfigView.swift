@@ -129,6 +129,17 @@ struct SessionConfigView: View {
             }
         }
         .background(Color.black)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("OK") {
+                    UIApplication.shared.sendAction(
+                        #selector(UIResponder.resignFirstResponder),
+                        to: nil, from: nil, for: nil
+                    )
+                }
+            }
+        }
         .navigationTitle("Sesion de carrera")
         .task {
             await configVM.loadSession()
@@ -248,12 +259,6 @@ struct NumberCard: View {
                     }
                 }
                 .onSubmit { isFocused = false }
-                .toolbar {
-                    ToolbarItemGroup(placement: .keyboard) {
-                        Spacer()
-                        Button("OK") { isFocused = false }
-                    }
-                }
                 .accessibilityLabel(title)
                 .accessibilityValue("\(value)")
         }

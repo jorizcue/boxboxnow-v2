@@ -53,7 +53,7 @@ private val DarkScheme = darkColorScheme(
 fun BoxBoxNowTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = DarkScheme,
-        typography = MaterialTheme.typography,
+        typography = AppTypography,
         content = content,
     )
 }

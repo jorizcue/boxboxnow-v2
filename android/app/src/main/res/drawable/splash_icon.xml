@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="240dp"
+    android:height="240dp"
+    android:viewportWidth="240"
+    android:viewportHeight="240">
+    <!-- BBN monogram for splash screen (visible area: inner 160dp circle) -->
+    <!-- "BB" in white -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M56,80 h22 a16,16 0 0 1 0,32 h-22 z M56,112 h26 a16,16 0 0 1 0,32 h-26 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M100,80 h22 a16,16 0 0 1 0,32 h-22 z M100,112 h26 a16,16 0 0 1 0,32 h-26 z" />
+    <!-- "N" in accent green -->
+    <path
+        android:fillColor="#41D238"
+        android:pathData="M146,80 h14 v64 h-10 l-28,-38 v38 h-14 v-64 h10 l28,38 z" />
+</vector>

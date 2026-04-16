@@ -136,12 +136,18 @@ class ApiClient @Inject constructor(
         visibleCards: Map<String, Boolean>? = null,
         cardOrder: List<String>? = null,
         isDefault: Boolean? = null,
+        contrast: Double? = null,
+        orientation: String? = null,
+        audioEnabled: Boolean? = null,
     ): DriverConfigPreset {
         val body = buildJsonObject {
             name?.let { put("name", it) }
             visibleCards?.let { put("visible_cards", it.toJsonElement()) }
             cardOrder?.let { put("card_order", it.toJsonElement()) }
             isDefault?.let { put("is_default", it) }
+            contrast?.let { put("contrast", it) }
+            orientation?.let { put("orientation", it) }
+            audioEnabled?.let { put("audio_enabled", it) }
         }
         return patchJson("/config/presets/$id", body)
     }
@@ -165,6 +171,14 @@ class ApiClient @Inject constructor(
             setBody(session)
         }
         return json.decodeFromString(RaceSession.serializer(), resp.bodyAsText())
+    }
+
+    /** Patch a single field on the active session (e.g. auto_load_teams). */
+    suspend fun patchSessionField(field: String, value: Boolean) {
+        client.patch(url("/config/session")) {
+            authorized()
+            setBody(buildJsonObject { put(field, value) })
+        }
     }
 
     suspend fun createSession(session: RaceSession): RaceSession {
