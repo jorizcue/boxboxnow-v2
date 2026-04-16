@@ -89,6 +89,7 @@
 		96148299F7069CA40B78A518 /* DriverRanking.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5915D0E8058F4E5A39739E57 /* DriverRanking.swift */; };
 		995C7C0FF8AB4539539C725C /* AsyncTestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DF5ACFDAE7C9C80EF8A9E39 /* AsyncTestHelpers.swift */; };
 		9ACC87C64B0B9BFBD25BC818 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
+		9F3F836E1131AD2F1BAEC8FA /* NewModuleModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E87C931E6632A670F6FCD3 /* NewModuleModelTests.swift */; };
 		A2821609E7D7D5D10A89F78E /* BBNColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 003B0EE2019A297341BE3956 /* BBNColors.swift */; };
 		A2A869E1C58AFBAE82B876B0 /* AuthFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABABB34C05F49051365BAEB0 /* AuthFlowView.swift */; };
 		A372B514DDEE9609A10A9A11 /* GForceScatterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81AA45AEF2A95C092E390B3D /* GForceScatterView.swift */; };
@@ -101,6 +102,7 @@
 		AC9C277C6CB7F39F5532B0C3 /* RaceFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25EBE6983A792542D270F6D6 /* RaceFormatters.swift */; };
 		B0750A3EE3397107E1B0AFA5 /* SharedModelExtensionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79E30CAE14869C40E9C22A70 /* SharedModelExtensionsTests.swift */; };
 		B0C904E7E4C8C6533352E9CE /* ConfigSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFD7E48FD590CE285BE71F91 /* ConfigSidebar.swift */; };
+		B0D3558D8F02319D03975975 /* BoxBoxNowDashboardUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0E10F82251013E005E679D /* BoxBoxNowDashboardUITests.swift */; };
 		B276E659F7DEE02AE658F709 /* KeychainProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B27F23A1CCCF192DCDFC293 /* KeychainProtocol.swift */; };
 		B4A973259304816BCD25287D /* ReplayStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69DE783EB983464BB83A5B56 /* ReplayStatus.swift */; };
 		B52952C1700C4498D5C91F71 /* ConfigSubTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B14A4D3236B9EB6C7F5E4FD /* ConfigSubTab.swift */; };
@@ -183,6 +185,7 @@
 		1F5AA6F0090B7356B269CA5A /* InPitListView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InPitListView.swift; sourceTree = "<group>"; };
 		21043E9C4531429CD721FB8D /* DriverRankingRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DriverRankingRow.swift; sourceTree = "<group>"; };
 		21392B7494C9541A5A6EE41C /* MFASetupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MFASetupView.swift; sourceTree = "<group>"; };
+		21E87C931E6632A670F6FCD3 /* NewModuleModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewModuleModelTests.swift; sourceTree = "<group>"; };
 		236D0520DA0FEFD14CD4AEF5 /* update.json */ = {isa = PBXFileReference; includeInIndex = 1; path = update.json; sourceTree = "<group>"; };
 		237109830CC151188A561377 /* LoginView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		23CAB0D3FBBB6BF2C7A7386F /* ClassificationEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClassificationEntry.swift; sourceTree = "<group>"; };
@@ -233,6 +236,7 @@
 		7826E17ED74C1A408F110B1D /* RaceStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceStore.swift; sourceTree = "<group>"; };
 		7844F19F8942C3D6CE90EF7F /* KartAnalyticsDetailSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KartAnalyticsDetailSheet.swift; sourceTree = "<group>"; };
 		79E30CAE14869C40E9C22A70 /* SharedModelExtensionsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedModelExtensionsTests.swift; sourceTree = "<group>"; };
+		7D0E10F82251013E005E679D /* BoxBoxNowDashboardUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoxBoxNowDashboardUITests.swift; sourceTree = "<group>"; };
 		7FF543B259C0AF62F8317293 /* RaceStoreWebSocketIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceStoreWebSocketIntegrationTests.swift; sourceTree = "<group>"; };
 		81AA45AEF2A95C092E390B3D /* GForceScatterView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GForceScatterView.swift; sourceTree = "<group>"; };
 		835130EAF2454A3C8D55C1A1 /* FifoEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoEntry.swift; sourceTree = "<group>"; };
@@ -419,6 +423,7 @@
 				79151AA7EC142F3FA42398AE /* BoxBoxNowDashboard */,
 				14C1079D210221371A8FA163 /* Shared */,
 				3CC268C9A5A02F9BBAB1C276 /* BoxBoxNowDashboardTests */,
+				B2290A3264797E27865EF189 /* BoxBoxNowDashboardUITests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -534,6 +539,7 @@
 				F26D9D1C4A0C580FF84AF5CA /* JSONValueTests.swift */,
 				6DFEE1E2E80BCB61D4D15B11 /* WsUpdateEventTests.swift */,
 				BD90191EE4504727D0DC9F2D /* DecodeFixturesTests.swift */,
+				21E87C931E6632A670F6FCD3 /* NewModuleModelTests.swift */,
 			);
 			name = Models;
 			path = Models;
@@ -629,6 +635,15 @@
 			);
 			name = Analytics;
 			path = Analytics;
+			sourceTree = "<group>";
+		};
+		B2290A3264797E27865EF189 /* BoxBoxNowDashboardUITests */ = {
+			isa = PBXGroup;
+			children = (
+				7D0E10F82251013E005E679D /* BoxBoxNowDashboardUITests.swift */,
+			);
+			name = BoxBoxNowDashboardUITests;
+			path = BoxBoxNowDashboardUITests;
 			sourceTree = "<group>";
 		};
 		BA9A9A034E73357F4C9641A3 /* Shell */ = {
@@ -1012,6 +1027,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B0D3558D8F02319D03975975 /* BoxBoxNowDashboardUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1043,6 +1059,7 @@
 				1D6E9AB90C99B8D63D5B9AB6 /* RaceStoreWebSocketIntegrationTests.swift in Sources */,
 				995C7C0FF8AB4539539C725C /* AsyncTestHelpers.swift in Sources */,
 				14EC50FDD516249F4AAD47EF /* RaceFormattersTests.swift in Sources */,
+				9F3F836E1131AD2F1BAEC8FA /* NewModuleModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
