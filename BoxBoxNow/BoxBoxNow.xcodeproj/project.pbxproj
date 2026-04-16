@@ -44,6 +44,7 @@
 		5E60E50BDE546299494CA626 /* FifoEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 835130EAF2454A3C8D55C1A1 /* FifoEntry.swift */; };
 		629BE3974689719A386358BB /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59229E2D110C6F146EBCEC97 /* JSONValue.swift */; };
 		64AA66966CCDE54763CA37FE /* fifo_update.json in Resources */ = {isa = PBXBuildFile; fileRef = 2BD72A620151DBF945560B96 /* fifo_update.json */; };
+		6506030C90803B0858BAD3F7 /* SessionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2D09A378A0D150AB8E38F6 /* SessionsView.swift */; };
 		65C8D6891BE0B017C9115CAE /* ClassificationRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A10FABB93D3BDE16AAD5F90 /* ClassificationRow.swift */; };
 		667D374AD78D3FE1FED7ABCA /* BBNNumericField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BE45342DDC9620ABADDBF44 /* BBNNumericField.swift */; };
 		683A44E6EEA131A5D0A3ADC4 /* BBNStatCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB82689DA21993AA5A90FF11 /* BBNStatCard.swift */; };
@@ -81,8 +82,10 @@
 		AC3D0AE39C6B8185CE796FFE /* UserListItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5F5056B5407DAD1552A229 /* UserListItem.swift */; };
 		AC9C277C6CB7F39F5532B0C3 /* RaceFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25EBE6983A792542D270F6D6 /* RaceFormatters.swift */; };
 		B0750A3EE3397107E1B0AFA5 /* SharedModelExtensionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79E30CAE14869C40E9C22A70 /* SharedModelExtensionsTests.swift */; };
+		B0C904E7E4C8C6533352E9CE /* ConfigSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFD7E48FD590CE285BE71F91 /* ConfigSidebar.swift */; };
 		B276E659F7DEE02AE658F709 /* KeychainProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B27F23A1CCCF192DCDFC293 /* KeychainProtocol.swift */; };
 		B4A973259304816BCD25287D /* ReplayStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69DE783EB983464BB83A5B56 /* ReplayStatus.swift */; };
+		B52952C1700C4498D5C91F71 /* ConfigSubTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B14A4D3236B9EB6C7F5E4FD /* ConfigSubTab.swift */; };
 		B5D31F026F268562DE2B275A /* BBNLoadingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19AB82D71D21F2C68C0F05AD /* BBNLoadingOverlay.swift */; };
 		B7DF2C65013BE1C09B9C6D7F /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237109830CC151188A561377 /* LoginView.swift */; };
 		B86CE21F588C093F229E82B2 /* MFACodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F169E4E49CAEF6665E8F9482 /* MFACodeView.swift */; };
@@ -198,6 +201,7 @@
 		8F0761AFE0F86F8EA9447381 /* PublicService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PublicService.swift; sourceTree = "<group>"; };
 		96B3268BFEF3AF7F2526CBD8 /* FifoSnapshot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoSnapshot.swift; sourceTree = "<group>"; };
 		9A85678CC115B160A445DA7F /* SidebarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		9B14A4D3236B9EB6C7F5E4FD /* ConfigSubTab.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfigSubTab.swift; sourceTree = "<group>"; };
 		9B74567B1346431031C47C91 /* AppStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
 		A7814A1631861CA7D179CA18 /* MockAuthService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MockAuthService.swift; sourceTree = "<group>"; };
 		AB4502BAB3CE61EC1C3DE376 /* RaceWebSocketClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceWebSocketClientTests.swift; sourceTree = "<group>"; };
@@ -224,6 +228,7 @@
 		D962BBCD5521A8AFAB2680A2 /* AdjustedBetaClassificationView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdjustedBetaClassificationView.swift; sourceTree = "<group>"; };
 		D9C3CD543925C6B9AB750C60 /* FixtureLoader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FixtureLoader.swift; sourceTree = "<group>"; };
 		DA26C19EF0F2C2B515CCF221 /* LiveDashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveDashboardView.swift; sourceTree = "<group>"; };
+		DA2D09A378A0D150AB8E38F6 /* SessionsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionsView.swift; sourceTree = "<group>"; };
 		DA50485A6E7EDADD652C23E9 /* BBNCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNCard.swift; sourceTree = "<group>"; };
 		DBE0E9216A31CA9B65677C04 /* ClassificationHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClassificationHeader.swift; sourceTree = "<group>"; };
 		DC2AB5820A74FC7D77F31256 /* BoxBoxNowDashboardApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoxBoxNowDashboardApp.swift; sourceTree = "<group>"; };
@@ -245,6 +250,7 @@
 		F849B0990A9D5D86DFF48538 /* RaceStoreReducerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceStoreReducerTests.swift; sourceTree = "<group>"; };
 		FCA66F6BE6FA42C45673659A /* KartAnalyticsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KartAnalyticsView.swift; sourceTree = "<group>"; };
 		FF9191539843FAF88AD2810E /* snapshot.json */ = {isa = PBXFileReference; includeInIndex = 1; path = snapshot.json; sourceTree = "<group>"; };
+		FFD7E48FD590CE285BE71F91 /* ConfigSidebar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfigSidebar.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -567,6 +573,15 @@
 			path = Stores;
 			sourceTree = "<group>";
 		};
+		C371B5349E0C256432A89257 /* Sessions */ = {
+			isa = PBXGroup;
+			children = (
+				DA2D09A378A0D150AB8E38F6 /* SessionsView.swift */,
+			);
+			name = Sessions;
+			path = Sessions;
+			sourceTree = "<group>";
+		};
 		CDB8366C37E72D31B3232C6E /* Race */ = {
 			isa = PBXGroup;
 			children = (
@@ -708,6 +723,9 @@
 			isa = PBXGroup;
 			children = (
 				76B3B035F178CA970A225F27 /* ConfigView.swift */,
+				9B14A4D3236B9EB6C7F5E4FD /* ConfigSubTab.swift */,
+				FFD7E48FD590CE285BE71F91 /* ConfigSidebar.swift */,
+				C371B5349E0C256432A89257 /* Sessions */,
 			);
 			name = Config;
 			path = Config;
@@ -992,6 +1010,9 @@
 				65C8D6891BE0B017C9115CAE /* ClassificationRow.swift in Sources */,
 				96148299F7069CA40B78A518 /* DriverRanking.swift in Sources */,
 				351FC61755922A47675080D9 /* DriverRankingRow.swift in Sources */,
+				B52952C1700C4498D5C91F71 /* ConfigSubTab.swift in Sources */,
+				B0C904E7E4C8C6533352E9CE /* ConfigSidebar.swift in Sources */,
+				6506030C90803B0858BAD3F7 /* SessionsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -43,6 +43,19 @@ extension APIClient {
         return try await executeJSON(req)
     }
 
+    /// Variant of `getJSON` that tolerates an empty or `null` response body
+    /// and returns `nil` in those cases. Used for endpoints like
+    /// `/config/session` that may legitimately have no active record.
+    func getJSONOptional<T: Decodable>(_ path: String, query: [URLQueryItem]? = nil) async throws -> T? {
+        let req = try buildDashboardRequest(path, method: "GET", query: query, body: nil)
+        let (data, response) = try await effectiveSession.data(for: req)
+        try handleStatus(response, request: req)
+        if data.isEmpty { return nil }
+        let trimmed = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed == "null" || trimmed == "" { return nil }
+        return try Self.jsonDecoder.decode(T.self, from: data)
+    }
+
     func postJSON<Body: Encodable, T: Decodable>(_ path: String, body: Body) async throws -> T {
         let data = try Self.jsonEncoder.encode(body)
         let req = try buildDashboardRequest(path, method: "POST", query: nil, body: data)
