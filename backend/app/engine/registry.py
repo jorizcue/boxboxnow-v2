@@ -597,6 +597,10 @@ class UserSession:
                                     "minDriverTimeMin": self.state.min_driver_time_min,
                                     "pitClosedStartMin": self.state.pit_closed_start_min,
                                     "pitClosedEndMin": self.state.pit_closed_end_min,
+                                    # `rain` must be present in every config payload
+                                    # — the iPad's `RaceConfig` decoder requires it
+                                    # and silently drops the entire frame otherwise.
+                                    "rain": self.state.rain_mode,
                                     "finishLat1": self.state.finish_lat1,
                                     "finishLon1": self.state.finish_lon1,
                                     "finishLat2": self.state.finish_lat2,
@@ -963,6 +967,10 @@ class ReplaySession:
                                     "minDriverTimeMin": self.state.min_driver_time_min,
                                     "pitClosedStartMin": self.state.pit_closed_start_min,
                                     "pitClosedEndMin": self.state.pit_closed_end_min,
+                                    # `rain` must be present in every config payload
+                                    # — the iPad's `RaceConfig` decoder requires it
+                                    # and silently drops the entire frame otherwise.
+                                    "rain": self.state.rain_mode,
                                     "finishLat1": self.state.finish_lat1,
                                     "finishLon1": self.state.finish_lon1,
                                     "finishLat2": self.state.finish_lat2,

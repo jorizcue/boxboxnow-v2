@@ -97,7 +97,10 @@ struct RaceConfig: Codable, Hashable {
     var minDriverTimeMin: Int
     var pitClosedStartMin: Int
     var pitClosedEndMin: Int
-    var rain: Bool
+    /// Optional so a config payload that omits `rain` (older backend builds,
+    /// analytics frames before April 2026) still decodes. Treat missing as
+    /// `false` at call sites.
+    var rain: Bool?
     var finishLat1: Double?
     var finishLon1: Double?
     var finishLat2: Double?

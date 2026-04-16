@@ -115,6 +115,11 @@ final class RaceStore {
             if let teams = message.data?.teams { self.teams = teams }
         case .boxCall:
             triggerBoxCall()
+        case .unknown:
+            // Server emits types we don't model yet (e.g.
+            // `preset_default_changed`). Ignore silently instead of dropping
+            // the whole frame at the decoder level.
+            break
         }
     }
 
@@ -156,9 +161,21 @@ final class RaceStore {
         }
     }
 
-    private func applyAnalytics(_: WsMessageData?) {
-        // Phase C will flesh this out; for Phase A we accept the message without
-        // state changes to keep the pipeline unblocked.
+    /// Analytics frames arrive roughly every second during an active race or
+    /// replay and carry a recomputed view of the karts + FIFO + classification
+    /// plus a fresh config block. The original stub treated them as no-ops,
+    /// which was fine when we received a snapshot every 30s — but during a
+    /// replay the server only sends ONE snapshot on connect, then relies on
+    /// `update` events (per-field, keyed by rowId) and these `analytics`
+    /// frames (full recompute). Ignoring analytics meant brand-new karts that
+    /// appeared mid-replay never entered the store and every row we had
+    /// remained frozen at its initial snapshot values.
+    private func applyAnalytics(_ data: WsMessageData?) {
+        guard let data else { return }
+        if let karts = data.karts { self.karts = karts }
+        if let fifo = data.fifo { self.fifo = fifo }
+        if let classification = data.classification { self.classification = classification }
+        if let config = data.config { self.config = config }
     }
 
     private func triggerBoxCall() {
