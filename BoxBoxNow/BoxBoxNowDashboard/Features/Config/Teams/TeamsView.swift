@@ -73,8 +73,8 @@ struct TeamsView: View {
         } else {
             ScrollView {
                 LazyVStack(spacing: 12) {
-                    ForEach(Array(draft.enumerated()), id: \.element.id) { idx, team in
-                        teamCard(index: idx, team: team)
+                    ForEach($draft) { $team in
+                        teamCard(team: $team)
                     }
                 }
                 .padding(20)
@@ -85,22 +85,26 @@ struct TeamsView: View {
     // MARK: - Team card
 
     @ViewBuilder
-    private func teamCard(index: Int, team: Team) -> some View {
+    private func teamCard(team: Binding<Team>) -> some View {
+        // Positions are always renumbered to match array-index + 1 after any
+        // mutation, so deriving the zero-based index from position is safe.
+        let index = team.wrappedValue.position - 1
         BBNCard {
             VStack(alignment: .leading, spacing: 12) {
                 teamHeader(index: index, team: team)
-                if expanded.contains(team.id) {
-                    driversSection(teamIndex: index, team: team)
+                if expanded.contains(team.wrappedValue.id) {
+                    driversSection(team: team)
                 }
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Equipo posición \(team.position), nombre \(team.teamName.isEmpty ? "sin nombre" : team.teamName), kart \(team.kart)")
+        .accessibilityLabel(teamA11yLabel(team.wrappedValue))
     }
 
-    private func teamHeader(index: Int, team: Team) -> some View {
-        HStack(spacing: 10) {
-            Text("\(team.position)")
+    private func teamHeader(index: Int, team: Binding<Team>) -> some View {
+        let teamValue = team.wrappedValue
+        return HStack(spacing: 10) {
+            Text("\(teamValue.position)")
                 .font(BBNTypography.title3)
                 .monospacedDigit()
                 .foregroundStyle(BBNColors.textMuted)
@@ -110,8 +114,8 @@ struct TeamsView: View {
                 Text("Kart")
                     .font(BBNTypography.caption)
                     .foregroundStyle(BBNColors.textMuted)
-                Stepper(value: kartBinding(index), in: 0...999) {
-                    Text("\(team.kart)")
+                Stepper(value: team.kart, in: 0...999) {
+                    Text("\(teamValue.kart)")
                         .font(BBNTypography.title3)
                         .monospacedDigit()
                         .foregroundStyle(BBNColors.accent)
@@ -124,7 +128,7 @@ struct TeamsView: View {
                 Text("Nombre del equipo")
                     .font(BBNTypography.caption)
                     .foregroundStyle(BBNColors.textMuted)
-                TextField("Nombre", text: nameBinding(index))
+                TextField("Nombre", text: team.teamName)
                     .textFieldStyle(.roundedBorder)
                     .font(BBNTypography.body)
             }
@@ -138,6 +142,7 @@ struct TeamsView: View {
                 }
                 .disabled(index == 0)
                 .accessibilityLabel("Subir equipo")
+                .accessibilityHint(index > 0 ? "Mueve a la posición \(index)" : "")
 
                 Button {
                     moveDown(index)
@@ -146,22 +151,23 @@ struct TeamsView: View {
                 }
                 .disabled(index == draft.count - 1)
                 .accessibilityLabel("Bajar equipo")
+                .accessibilityHint(index < draft.count - 1 ? "Mueve a la posición \(index + 2)" : "")
             }
             .font(BBNTypography.body)
             .foregroundStyle(BBNColors.accent)
 
             Button {
-                toggleExpand(team.id)
+                toggleExpand(teamValue.id)
             } label: {
-                Image(systemName: expanded.contains(team.id) ? "chevron.up" : "chevron.down")
+                Image(systemName: expanded.contains(teamValue.id) ? "chevron.up" : "chevron.down")
                     .font(BBNTypography.body)
                     .foregroundStyle(BBNColors.textMuted)
             }
-            .accessibilityLabel(expanded.contains(team.id) ? "Ocultar pilotos" : "Mostrar pilotos")
-            .accessibilityHint("\(team.drivers.count) pilotos")
+            .accessibilityLabel(expanded.contains(teamValue.id) ? "Ocultar pilotos" : "Mostrar pilotos")
+            .accessibilityHint(teamValue.drivers.count == 1 ? "1 piloto" : "\(teamValue.drivers.count) pilotos")
 
             Button {
-                removeTeam(at: index)
+                removeTeam(id: teamValue.id)
             } label: {
                 Image(systemName: "trash")
                     .font(BBNTypography.body)
@@ -171,15 +177,16 @@ struct TeamsView: View {
         }
     }
 
-    private func driversSection(teamIndex: Int, team: Team) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private func driversSection(team: Binding<Team>) -> some View {
+        let teamId = team.wrappedValue.id
+        return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Pilotos")
                     .font(BBNTypography.caption)
                     .foregroundStyle(BBNColors.textMuted)
                 Spacer()
                 Button {
-                    addDriver(teamIndex: teamIndex)
+                    addDriver(teamId: teamId)
                 } label: {
                     Label("Añadir piloto", systemImage: "plus")
                         .font(BBNTypography.caption)
@@ -187,40 +194,40 @@ struct TeamsView: View {
                 }
             }
 
-            if team.drivers.isEmpty {
+            if team.wrappedValue.drivers.isEmpty {
                 Text("Sin pilotos")
                     .font(BBNTypography.caption)
                     .foregroundStyle(BBNColors.textMuted)
             } else {
-                ForEach(Array(team.drivers.enumerated()), id: \.element.id) { driverIdx, driver in
-                    driverRow(teamIndex: teamIndex, driverIndex: driverIdx, driver: driver)
+                ForEach(team.drivers) { $driver in
+                    driverRow(driver: $driver, teamId: teamId)
                 }
             }
         }
         .padding(.top, 4)
     }
 
-    private func driverRow(teamIndex: Int, driverIndex: Int, driver: TeamDriver) -> some View {
-        HStack(spacing: 10) {
-            TextField("Nombre del piloto",
-                      text: driverNameBinding(teamIndex: teamIndex, driverIndex: driverIndex))
+    private func driverRow(driver: Binding<TeamDriver>, teamId: UUID) -> some View {
+        let driverValue = driver.wrappedValue
+        return HStack(spacing: 10) {
+            TextField("Nombre del piloto", text: driver.driverName)
                 .textFieldStyle(.roundedBorder)
                 .font(BBNTypography.body)
 
-            Stepper(value: driverDiffBinding(teamIndex: teamIndex, driverIndex: driverIndex),
+            Stepper(value: driver.differentialMs,
                     in: -60_000...60_000,
                     step: 100) {
-                Text("\(driver.differentialMs) ms")
+                Text("\(driverValue.differentialMs) ms")
                     .font(BBNTypography.body)
                     .monospacedDigit()
-                    .foregroundStyle(driverDiffColor(driver.differentialMs))
+                    .foregroundStyle(driverDiffColor(driverValue.differentialMs))
                     .frame(minWidth: 90, alignment: .trailing)
             }
             .labelsHidden()
             .frame(width: 200)
 
             Button {
-                removeDriver(teamIndex: teamIndex, driverIndex: driverIndex)
+                removeDriver(teamId: teamId, driverId: driverValue.id)
             } label: {
                 Image(systemName: "minus.circle.fill")
                     .foregroundStyle(BBNColors.danger)
@@ -228,7 +235,7 @@ struct TeamsView: View {
             .accessibilityLabel("Eliminar piloto")
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Piloto \(driver.driverName.isEmpty ? "sin nombre" : driver.driverName), diferencial \(driver.differentialMs) milisegundos")
+        .accessibilityLabel(driverA11yLabel(driverValue))
     }
 
     private func driverDiffColor(_ ms: Int) -> Color {
@@ -237,48 +244,35 @@ struct TeamsView: View {
         return BBNColors.textMuted
     }
 
-    // MARK: - Bindings
+    // MARK: - Accessibility helpers
 
-    private func kartBinding(_ index: Int) -> Binding<Int> {
-        Binding(
-            get: { draft[index].kart },
-            set: { draft[index].kart = $0 }
-        )
+    private func teamA11yLabel(_ team: Team) -> String {
+        var parts: [String] = []
+        parts.append("Equipo posición \(team.position)")
+        parts.append("nombre \(team.teamName.isEmpty ? "—" : team.teamName)")
+        parts.append("kart \(team.kart == 0 ? "sin asignar" : "\(team.kart)")")
+        parts.append(team.drivers.count == 1 ? "1 piloto" : "\(team.drivers.count) pilotos")
+        return parts.joined(separator: ", ")
     }
 
-    private func nameBinding(_ index: Int) -> Binding<String> {
-        Binding(
-            get: { draft[index].teamName },
-            set: { draft[index].teamName = $0 }
-        )
-    }
-
-    private func driverNameBinding(teamIndex: Int, driverIndex: Int) -> Binding<String> {
-        Binding(
-            get: { draft[teamIndex].drivers[driverIndex].driverName },
-            set: { draft[teamIndex].drivers[driverIndex].driverName = $0 }
-        )
-    }
-
-    private func driverDiffBinding(teamIndex: Int, driverIndex: Int) -> Binding<Int> {
-        Binding(
-            get: { draft[teamIndex].drivers[driverIndex].differentialMs },
-            set: { draft[teamIndex].drivers[driverIndex].differentialMs = $0 }
-        )
+    private func driverA11yLabel(_ driver: TeamDriver) -> String {
+        var parts: [String] = []
+        parts.append("Piloto \(driver.driverName.isEmpty ? "—" : driver.driverName)")
+        parts.append("diferencial \(driver.differentialMs) milisegundos")
+        return parts.joined(separator: ", ")
     }
 
     // MARK: - Mutations
 
     private func addTeam() {
-        let nextPosition = (draft.map(\.position).max() ?? 0) + 1
-        let team = Team(position: nextPosition, kart: 0, teamName: "", drivers: [])
+        let team = Team(position: draft.count + 1, kart: 0, teamName: "", drivers: [])
         draft.append(team)
         expanded.insert(team.id)
         renumber()
     }
 
-    private func removeTeam(at index: Int) {
-        let id = draft[index].id
+    private func removeTeam(id: UUID) {
+        guard let index = draft.firstIndex(where: { $0.id == id }) else { return }
         draft.remove(at: index)
         expanded.remove(id)
         renumber()
@@ -304,11 +298,14 @@ struct TeamsView: View {
         }
     }
 
-    private func addDriver(teamIndex: Int) {
-        draft[teamIndex].drivers.append(TeamDriver(driverName: "", differentialMs: 0))
+    private func addDriver(teamId: UUID) {
+        guard let index = draft.firstIndex(where: { $0.id == teamId }) else { return }
+        draft[index].drivers.append(TeamDriver(driverName: "", differentialMs: 0))
     }
 
-    private func removeDriver(teamIndex: Int, driverIndex: Int) {
+    private func removeDriver(teamId: UUID, driverId: UUID) {
+        guard let teamIndex = draft.firstIndex(where: { $0.id == teamId }) else { return }
+        guard let driverIndex = draft[teamIndex].drivers.firstIndex(where: { $0.id == driverId }) else { return }
         draft[teamIndex].drivers.remove(at: driverIndex)
     }
 
@@ -329,9 +326,14 @@ struct TeamsView: View {
         if app.config.activeSession == nil {
             await app.config.reloadActiveSession()
         }
-        guard app.config.activeSession != nil else { return }
+        guard app.config.activeSession != nil else {
+            draft = []
+            expanded = []
+            return
+        }
         await app.config.reloadTeams()
         draft = app.config.teams
+        expanded = []
         renumber()
     }
 
@@ -340,9 +342,22 @@ struct TeamsView: View {
         saving = true
         defer { saving = false }
         renumber()
+
+        // Server returns new UUIDs on every decode, so `expanded: Set<UUID>` goes
+        // stale after `draft = app.config.teams`. Capture the positions of the
+        // expanded cards now, then re-anchor expansion to the new UUIDs at the
+        // matching positions — the server preserves insertion order, so position
+        // is a stable bridge across the round-trip.
+        let expandedPositions: Set<Int> = Set(
+            draft.compactMap { expanded.contains($0.id) ? $0.position : nil }
+        )
+
         if await app.config.saveTeams(draft) {
             draft = app.config.teams
             renumber()
+            expanded = Set(
+                draft.compactMap { expandedPositions.contains($0.position) ? $0.id : nil }
+            )
         }
     }
 }
