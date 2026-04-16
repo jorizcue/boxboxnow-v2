@@ -46,7 +46,7 @@ struct AdminPlatformView: View {
         } else if settings.isEmpty {
             BBNEmptyState(
                 icon: "gearshape",
-                title: "Sin configuracion",
+                title: "Sin configuración",
                 subtitle: "No se pudieron cargar los ajustes de plataforma",
                 action: .init(title: "Reintentar") {
                     Task { await store?.loadPlatformSettings() }
@@ -74,9 +74,9 @@ struct AdminPlatformView: View {
                     .font(BBNTypography.title3)
                     .foregroundColor(BBNColors.textPrimary)
 
-                settingRow(label: "Dias de prueba", key: "trial_days", icon: "calendar")
-                settingRow(label: "Dias banner aviso", key: "trial_banner_days", icon: "exclamationmark.bubble")
-                settingRow(label: "Dias email aviso", key: "trial_email_days", icon: "envelope.badge")
+                settingRow(label: "Días de prueba", key: "trial_days", icon: "calendar")
+                settingRow(label: "Días banner aviso", key: "trial_banner_days", icon: "exclamationmark.bubble")
+                settingRow(label: "Días email aviso", key: "trial_email_days", icon: "envelope.badge")
             }
         }
     }
@@ -101,7 +101,7 @@ struct AdminPlatformView: View {
     private var trialTabsSection: some View {
         BBNCard {
             VStack(alignment: .leading, spacing: 12) {
-                Label("Pestanas por defecto", systemImage: "rectangle.grid.1x2")
+                Label("Pestañas por defecto", systemImage: "rectangle.grid.1x2")
                     .font(BBNTypography.title3)
                     .foregroundColor(BBNColors.textPrimary)
 
@@ -167,7 +167,7 @@ private struct WrappingHStack: View {
     let tabs: [String]
 
     var body: some View {
-        FlowLayoutView(spacing: 6) {
+        BBNFlowLayout(spacing: 6) {
             ForEach(tabs, id: \.self) { tab in
                 Text(tab)
                     .font(BBNTypography.caption)
@@ -179,40 +179,5 @@ private struct WrappingHStack: View {
                     .overlay(Capsule().stroke(BBNColors.border, lineWidth: 1))
             }
         }
-    }
-}
-
-private struct FlowLayoutView: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        arrange(proposal: proposal, subviews: subviews).size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = arrange(proposal: proposal, subviews: subviews)
-        for (i, pos) in result.positions.enumerated() {
-            subviews[i].place(at: CGPoint(x: bounds.minX + pos.x, y: bounds.minY + pos.y),
-                              proposal: .unspecified)
-        }
-    }
-
-    private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> (positions: [CGPoint], size: CGSize) {
-        let maxW = proposal.width ?? .infinity
-        var positions: [CGPoint] = []
-        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0
-        var totalW: CGFloat = 0
-
-        for sub in subviews {
-            let s = sub.sizeThatFits(.unspecified)
-            if x + s.width > maxW && x > 0 {
-                x = 0; y += rowH + spacing; rowH = 0
-            }
-            positions.append(CGPoint(x: x, y: y))
-            rowH = max(rowH, s.height)
-            x += s.width + spacing
-            totalW = max(totalW, x - spacing)
-        }
-        return (positions, CGSize(width: totalW, height: y + rowH))
     }
 }

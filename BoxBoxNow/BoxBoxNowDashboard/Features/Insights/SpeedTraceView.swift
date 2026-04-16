@@ -5,7 +5,6 @@ import Charts
 struct SpeedTraceView: View {
     let distances: [Double]
     let speeds: [Double]
-    let timestamps: [Double]
 
     private var hasData: Bool { !distances.isEmpty && !speeds.isEmpty }
 

@@ -72,7 +72,7 @@ struct UserDetailSheet: View {
                 Button("Eliminar", role: .destructive) { Task { await deleteUser() } }
                 Button("Cancelar", role: .cancel) {}
             } message: {
-                Text("Esta accion no se puede deshacer. Se eliminara el usuario \(user.username) permanentemente.")
+                Text("Esta acción no se puede deshacer. Se eliminará el usuario \(user.username) permanentemente.")
             }
         }
     }
@@ -82,7 +82,7 @@ struct UserDetailSheet: View {
     private var userInfoSection: some View {
         BBNCard {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Informacion del usuario")
+                Text("Información del usuario")
                     .font(BBNTypography.title3)
                     .foregroundColor(BBNColors.textPrimary)
 
@@ -197,7 +197,7 @@ struct UserDetailSheet: View {
         BBNCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text("Acceso a pestanas")
+                    Text("Acceso a pestañas")
                         .font(BBNTypography.title3)
                         .foregroundColor(BBNColors.textPrimary)
                     Spacer()

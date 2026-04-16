@@ -87,9 +87,9 @@ struct AdminHubView: View {
 
                 // Stats row
                 HStack(spacing: 16) {
-                    statPill(icon: "person.2", value: "\(status.subscribers)", label: "Suscriptores")
-                    statPill(icon: "message", value: "\(status.messages)", label: "Mensajes")
-                    statPill(icon: "link", value: status.wsUrl, label: "WS URL")
+                    statPill(icon: "person.2", value: "\(status.subscribers)")
+                    statPill(icon: "message", value: "\(status.messages)")
+                    statPill(icon: "link", value: status.wsUrl)
                 }
 
                 // Connected users
@@ -99,7 +99,7 @@ struct AdminHubView: View {
                             .font(BBNTypography.caption)
                             .foregroundColor(BBNColors.textDim)
 
-                        FlowLayout(spacing: 6) {
+                        BBNFlowLayout(spacing: 6) {
                             ForEach(status.connectedUsers) { user in
                                 Text(user.username)
                                     .font(BBNTypography.caption)
@@ -143,7 +143,7 @@ struct AdminHubView: View {
         }
     }
 
-    private func statPill(icon: String, value: String, label: String) -> some View {
+    private func statPill(icon: String, value: String) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.caption2)
@@ -153,56 +153,5 @@ struct AdminHubView: View {
                 .foregroundColor(BBNColors.textMuted)
                 .lineLimit(1)
         }
-    }
-}
-
-// MARK: - FlowLayout
-
-/// Simple horizontal wrapping layout for tag-like content.
-private struct FlowLayout: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = arrange(proposal: proposal, subviews: subviews)
-        return result.size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = arrange(proposal: proposal, subviews: subviews)
-        for (index, position) in result.positions.enumerated() {
-            subviews[index].place(at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y),
-                                  proposal: .unspecified)
-        }
-    }
-
-    private struct ArrangeResult {
-        var positions: [CGPoint]
-        var size: CGSize
-    }
-
-    private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> ArrangeResult {
-        let maxWidth = proposal.width ?? .infinity
-        var positions: [CGPoint] = []
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var totalHeight: CGFloat = 0
-        var totalWidth: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x + size.width > maxWidth && x > 0 {
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            positions.append(CGPoint(x: x, y: y))
-            rowHeight = max(rowHeight, size.height)
-            x += size.width + spacing
-            totalWidth = max(totalWidth, x - spacing)
-            totalHeight = y + rowHeight
-        }
-
-        return ArrangeResult(positions: positions, size: CGSize(width: totalWidth, height: totalHeight))
     }
 }

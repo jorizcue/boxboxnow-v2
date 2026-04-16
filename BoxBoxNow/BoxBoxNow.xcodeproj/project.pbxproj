@@ -120,6 +120,7 @@
 		CB0CB311F82FEAE1122DD805 /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B74567B1346431031C47C91 /* AppStore.swift */; };
 		CB1D64C602D5657B1FF35820 /* ReplayStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B90C3ED619AF3D1D37664C /* ReplayStore.swift */; };
 		CBBB2BEF2618E7FBCE668035 /* KartDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7BD3E54B75379ED5907AB35 /* KartDetailSheet.swift */; };
+		CC9B9B0412EF33089A415227 /* BBNFlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B5A2F519FE31E4E030C49AB /* BBNFlowLayout.swift */; };
 		CD14BF6FED632E8C71986863 /* InsightsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C82799D789A30726072A6469 /* InsightsStore.swift */; };
 		D22DC275C13259018461EDFA /* ClassificationHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBE0E9216A31CA9B65677C04 /* ClassificationHeader.swift */; };
 		D2DCF4BAFD6F221BD38A9BC9 /* AdminCircuitsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D67B82F132534E90134A6DE /* AdminCircuitsView.swift */; };
@@ -194,6 +195,7 @@
 		25EBE6983A792542D270F6D6 /* RaceFormatters.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceFormatters.swift; sourceTree = "<group>"; };
 		2937B4F8F45299E1ED888A6F /* ReplayControlsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayControlsView.swift; sourceTree = "<group>"; };
 		2A9A5C399A2BCCDAF140E6B3 /* BoxCallOverlay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoxCallOverlay.swift; sourceTree = "<group>"; };
+		2B5A2F519FE31E4E030C49AB /* BBNFlowLayout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNFlowLayout.swift; sourceTree = "<group>"; };
 		2BD72A620151DBF945560B96 /* fifo_update.json */ = {isa = PBXFileReference; includeInIndex = 1; path = fifo_update.json; sourceTree = "<group>"; };
 		315BDF0479C21A9D439694BD /* TeamsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeamsView.swift; sourceTree = "<group>"; };
 		34193E933EE80922D8F736A4 /* AdminPlatformView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminPlatformView.swift; sourceTree = "<group>"; };
@@ -387,6 +389,7 @@
 				F12229FCE4736357FC38AC5D /* BBNToast.swift */,
 				B419B4157B3624BFD1D53DD8 /* KartNumberBadge.swift */,
 				CB82689DA21993AA5A90FF11 /* BBNStatCard.swift */,
+				2B5A2F519FE31E4E030C49AB /* BBNFlowLayout.swift */,
 			);
 			name = Components;
 			path = Components;
@@ -1179,6 +1182,7 @@
 				A372B514DDEE9609A10A9A11 /* GForceScatterView.swift in Sources */,
 				2BBDC5D71BC9B05D0824B30E /* AdminHubModels.swift in Sources */,
 				0ABD889D1A1DFE574943A54A /* UserDetailSheet.swift in Sources */,
+				CC9B9B0412EF33089A415227 /* BBNFlowLayout.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -242,8 +242,7 @@ struct InsightsView: View {
 
                 SpeedTraceView(
                     distances: detail.distances ?? [],
-                    speeds: detail.speeds ?? [],
-                    timestamps: detail.timestamps ?? []
+                    speeds: detail.speeds ?? []
                 )
 
                 GForceScatterView(
