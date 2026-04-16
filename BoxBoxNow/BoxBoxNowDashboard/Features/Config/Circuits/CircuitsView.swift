@@ -129,6 +129,13 @@ struct CircuitsView: View {
     }
 
     private func coordinateText(lat: Double?, lon: Double?) -> String {
+        // `(0, 0)` is used as a sentinel for "unset" by the backend and the
+        // web admin form — a circuit's finish-line coordinates are only
+        // meaningful when the admin has actually recorded them. A real
+        // karting track will never sit on the Null Island intersection of
+        // the equator and prime meridian, so collapsing that pair into an
+        // em-dash is safe in practice and matches what the web dashboard
+        // shows in the same spot.
         guard let lat, let lon, !(lat == 0 && lon == 0) else { return "—" }
         return String(format: "%.5f, %.5f", lat, lon)
     }
