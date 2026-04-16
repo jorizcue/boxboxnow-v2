@@ -6,7 +6,16 @@ import Combine
 /// Narrates: last lap time, delta vs previous, position, box score, laps to max stint.
 /// Uses AVSpeechSynthesizer with Spanish voice.
 final class DriverSpeechService: NSObject, ObservableObject {
-    @Published var enabled = false
+    /// Initial value is seeded from UserDefaults so a previously-saved choice
+    /// (from the menu toggle or from `applyPreset`) survives app restarts.
+    @Published var enabled: Bool = {
+        let defaults = UserDefaults.standard
+        // If the key has never been set, default to false (backwards-compat).
+        guard defaults.object(forKey: Constants.Keys.audioEnabled) != nil else {
+            return false
+        }
+        return defaults.bool(forKey: Constants.Keys.audioEnabled)
+    }()
     @Published var supported = true
 
     private let synthesizer = AVSpeechSynthesizer()

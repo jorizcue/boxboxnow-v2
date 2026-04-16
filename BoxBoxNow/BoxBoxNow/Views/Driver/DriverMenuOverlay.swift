@@ -92,16 +92,26 @@ struct DriverMenuOverlay: View {
                         }
 
                         // Audio narration toggle
-                        Toggle(isOn: $speech.enabled) {
+                        // Binds to driverVM.audioEnabled (the single source of
+                        // truth) instead of speech.enabled. DriverView observes
+                        // driverVM.audioEnabled and propagates changes to the
+                        // speech service, so the toggle still controls playback
+                        // while also persisting the choice and surviving preset
+                        // reloads.
+                        Toggle(isOn: $driverVM.audioEnabled) {
                             HStack(spacing: 8) {
-                                Image(systemName: speech.enabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                                    .foregroundColor(speech.enabled ? .accentColor : .gray)
+                                Image(systemName: driverVM.audioEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                                    .foregroundColor(driverVM.audioEnabled ? .accentColor : .gray)
                                 Text("Audio")
                                     .font(.subheadline)
                                     .foregroundColor(.white)
                             }
                         }
                         .tint(.accentColor)
+                        .onChange(of: driverVM.audioEnabled) { _, _ in
+                            // Persist immediately so the choice survives restarts.
+                            driverVM.saveConfig()
+                        }
 
                         // Exit button
                         Button(action: {

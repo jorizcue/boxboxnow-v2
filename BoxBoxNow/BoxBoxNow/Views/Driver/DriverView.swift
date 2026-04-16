@@ -133,7 +133,7 @@ struct DriverView: View {
                         VStack {
                             HStack {
                                 // Audio indicator
-                                if speech.enabled {
+                                if driverVM.audioEnabled {
                                     Image(systemName: "speaker.wave.2.fill")
                                         .font(.system(size: 12))
                                         .foregroundColor(.accentColor)
@@ -231,6 +231,11 @@ struct DriverView: View {
             UIApplication.shared.isIdleTimerDisabled = true
             // Apply orientation lock chosen by the user
             OrientationManager.shared.apply(driverVM.orientationLock)
+            // Seed speech service from the viewModel's persisted audio choice
+            // so opening the driver view immediately reflects the preset/user
+            // preference (the toggle in DriverMenuOverlay writes back to
+            // driverVM.audioEnabled, which we mirror here).
+            speech.enabled = driverVM.audioEnabled
             // Fetch presets and auto-apply the default one if the user
             // marked one as "predefinida" (from web or from the iOS
             // presets screen). This runs every time the driver view is
@@ -251,6 +256,12 @@ struct DriverView: View {
         }
         .onChange(of: driverVM.orientationLock) { _, newValue in
             OrientationManager.shared.apply(newValue)
+        }
+        // Keep the speech service in sync with the viewModel's audio flag.
+        // This fires whenever applyPreset() sets audioEnabled from a preset,
+        // or when the menu toggle writes back to driverVM.audioEnabled.
+        .onChange(of: driverVM.audioEnabled) { _, newValue in
+            speech.enabled = newValue
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // Re-sync state when returning from background (may have missed
