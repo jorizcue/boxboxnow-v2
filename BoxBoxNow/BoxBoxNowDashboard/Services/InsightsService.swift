@@ -22,4 +22,9 @@ struct InsightsService {
         if let cid = circuitId { query.append(URLQueryItem(name: "circuit_id", value: "\(cid)")) }
         return try await api.getJSON("/gps/stats", query: query)
     }
+
+    /// Delete a lap permanently. Matches web `api.deleteGpsLap(lapId)`.
+    func deleteLap(lapId: Int) async throws {
+        try await api.deleteJSON("/gps/laps/\(lapId)")
+    }
 }

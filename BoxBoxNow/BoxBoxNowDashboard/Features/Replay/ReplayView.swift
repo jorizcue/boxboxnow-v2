@@ -9,6 +9,18 @@ struct ReplayView: View {
     @State private var dateFrom: Date = Calendar.current.date(byAdding: .day, value: -7, to: .now) ?? .now
     @State private var dateTo: Date = Date.now
 
+    /// Sheet payload for the race-start "Play" modal. Set when the user
+    /// taps a race marker; cleared on Play or Cancel.
+    @State private var modalSelection: RaceStartSelection?
+
+    private struct RaceStartSelection: Identifiable {
+        let id = UUID()
+        let marker: RaceStartMarker
+        let filename: String
+        let circuitDir: String
+        let date: String
+    }
+
     private var dateFromString: String { Self.dateFormatter.string(from: dateFrom) }
     private var dateToString: String { Self.dateFormatter.string(from: dateTo) }
 
@@ -66,6 +78,73 @@ struct ReplayView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Replay de grabaciones")
+        .sheet(item: $modalSelection) { sel in
+            raceStartModal(for: sel)
+        }
+    }
+
+    /// Session modal shown when the user taps a race-start marker. Matches
+    /// the web's "Comenzar desde" modal: shows circuit / date / title and
+    /// gives a big Play button. Admins would also see Download here in the
+    /// web; we omit it for now because the download API isn't exposed on
+    /// the iPad service layer yet.
+    private func raceStartModal(for sel: RaceStartSelection) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(sel.marker.title)
+                    .font(BBNTypography.title2)
+                    .foregroundStyle(BBNColors.textPrimary)
+                Text("\(sel.date) · bloque \(sel.marker.block)")
+                    .font(BBNTypography.caption)
+                    .foregroundStyle(BBNColors.textDim)
+                Text(sel.marker.timestamp)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(BBNColors.textDim)
+            }
+            .padding(.top, 24)
+            .padding(.horizontal, 20)
+
+            Spacer()
+
+            HStack(spacing: 12) {
+                Button {
+                    modalSelection = nil
+                } label: {
+                    Text("Cancelar")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(BBNColors.textMuted)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(BBNColors.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    Task {
+                        await app.replay.startReplay(
+                            filename: sel.filename,
+                            circuitDir: sel.circuitDir,
+                            startBlock: sel.marker.block
+                        )
+                        modalSelection = nil
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.fill")
+                        Text("Iniciar replay").font(.system(size: 14, weight: .bold))
+                    }
+                    .foregroundStyle(Color.black)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(BBNColors.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
+        }
+        .frame(minWidth: 420, minHeight: 220)
+        .background(BBNColors.background)
     }
 
     // MARK: - Header
@@ -205,8 +284,8 @@ struct ReplayView: View {
 
     private func dayRow(_ day: DayAnalysis, circuitDir: String) -> some View {
         BBNCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
                     Text(day.date)
                         .font(BBNTypography.bodyBold)
                         .foregroundStyle(BBNColors.textPrimary)
@@ -216,9 +295,22 @@ struct ReplayView: View {
                             .tint(BBNColors.accent)
                             .controlSize(.small)
                     } else if let analysis = day.analysis {
-                        Text("\(analysis.raceStarts.count) carrera\(analysis.raceStarts.count == 1 ? "" : "s")")
+                        // Block count + end time, matching web per-day header
+                        Text("\(analysis.totalBlocks) bloques")
                             .font(BBNTypography.caption)
                             .foregroundStyle(BBNColors.textDim)
+                        if let endTime = analysis.endTime {
+                            Text("fin \(Self.timeOnly(endTime))")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(BBNColors.textDim)
+                        }
+                        Text("\(analysis.raceStarts.count) carrera\(analysis.raceStarts.count == 1 ? "" : "s")")
+                            .font(BBNTypography.caption)
+                            .foregroundStyle(BBNColors.accent)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(BBNColors.accent.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
                 }
 
@@ -227,13 +319,20 @@ struct ReplayView: View {
                         .font(BBNTypography.caption)
                         .foregroundStyle(BBNColors.textDim)
                 } else if let analysis = day.analysis {
+                    // Timeline bar with race-start markers at their progress
+                    // positions. Mirrors the web's per-day "timeline with
+                    // green dots" visual.
+                    if analysis.totalBlocks > 0 {
+                        timelineBar(analysis: analysis)
+                    }
+
                     if analysis.raceStarts.isEmpty {
                         Text("Sin carreras detectadas")
                             .font(BBNTypography.caption)
                             .foregroundStyle(BBNColors.textDim)
                     } else {
                         ForEach(analysis.raceStarts) { marker in
-                            raceStartRow(marker, filename: day.filename, circuitDir: circuitDir)
+                            raceStartRow(marker, filename: day.filename, circuitDir: circuitDir, date: day.date)
                         }
                     }
                 }
@@ -241,15 +340,44 @@ struct ReplayView: View {
         }
     }
 
-    private func raceStartRow(_ marker: RaceStartMarker, filename: String, circuitDir: String) -> some View {
+    /// Mini horizontal timeline showing the recording's span with each
+    /// race-start marker rendered as an accent dot at its `progress`
+    /// position. Visual-only; interaction lives on the rows below.
+    private func timelineBar(analysis: LogAnalysis) -> some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(BBNColors.surface)
+                    .frame(height: 4)
+                ForEach(analysis.raceStarts) { marker in
+                    Circle()
+                        .fill(BBNColors.accent)
+                        .frame(width: 8, height: 8)
+                        .offset(x: geo.size.width * marker.progress - 4, y: 0)
+                }
+            }
+            .frame(maxHeight: .infinity, alignment: .center)
+        }
+        .frame(height: 12)
+    }
+
+    private func raceStartRow(_ marker: RaceStartMarker, filename: String, circuitDir: String, date: String) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(marker.title)
                     .font(BBNTypography.body)
                     .foregroundStyle(BBNColors.textPrimary)
-                Text(marker.timestamp)
-                    .font(BBNTypography.caption)
-                    .foregroundStyle(BBNColors.textDim)
+                HStack(spacing: 8) {
+                    Text(Self.timeOnly(marker.timestamp))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(BBNColors.textDim)
+                    Text("bloque \(marker.block)")
+                        .font(BBNTypography.caption)
+                        .foregroundStyle(BBNColors.textDim)
+                    Text("\(Int(marker.progress * 100))%")
+                        .font(BBNTypography.caption)
+                        .foregroundStyle(BBNColors.textDim)
+                }
             }
             Spacer()
             Image(systemName: "play.circle.fill")
@@ -259,15 +387,24 @@ struct ReplayView: View {
         .padding(.vertical, 4)
         .contentShape(Rectangle())
         .onTapGesture {
-            Task {
-                await app.replay.startReplay(
-                    filename: filename,
-                    circuitDir: circuitDir,
-                    startBlock: marker.block
-                )
-            }
+            modalSelection = RaceStartSelection(
+                marker: marker, filename: filename, circuitDir: circuitDir, date: date
+            )
         }
         .accessibilityLabel("Iniciar replay: \(marker.title)")
+    }
+
+    /// Extract "HH:MM:SS" from an ISO8601 string; fall back to the raw
+    /// string when parsing fails so something useful renders.
+    private static func timeOnly(_ iso: String) -> String {
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = parser.date(from: iso) ?? ISO8601DateFormatter().date(from: iso) {
+            let f = DateFormatter()
+            f.dateFormat = "HH:mm:ss"
+            return f.string(from: d)
+        }
+        return iso
     }
 
     // MARK: - Helpers
