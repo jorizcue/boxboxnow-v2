@@ -3,6 +3,12 @@ import SwiftUI
 struct RaceRowView: View {
     let kart: KartStateFull
     let config: RaceConfig?
+    /// Live-ticking stint seconds derived from the race clock. The parent
+    /// (`RaceView`) reads the `RaceStore`'s `interpolatedCountdownMs` once
+    /// per frame and passes the per-kart value here so every row stays in
+    /// sync. Falls back to `base.stintDurationS` when the parent didn't
+    /// provide one (e.g. previews).
+    var liveStintSec: Double? = nil
     let onTap: () -> Void
 
     var body: some View {
@@ -65,20 +71,17 @@ struct RaceRowView: View {
                     .monospacedDigit()
                     .frame(width: 52, alignment: .trailing)
 
-                // Pit count
-                Text("\(kart.base.pitCount)")
-                    .font(BBNTypography.body)
-                    .foregroundStyle(BBNColors.textPrimary)
-                    .monospacedDigit()
-                    .frame(width: 36, alignment: .trailing)
+                // Pit count — show "X/Y" while pits are pending (matches web)
+                pitCell
+                    .frame(width: 56, alignment: .trailing)
 
-                // Tier score badge
+                // Tier score badge — wider so "100" never truncates
                 BBNTierBadge(score: kart.base.tierScore)
-                    .frame(width: 44, alignment: .center)
+                    .frame(width: 56, alignment: .center)
 
                 // Stint time + laps
                 stintCell
-                    .frame(width: 90, alignment: .trailing)
+                    .frame(width: 110, alignment: .trailing)
 
                 // Pit status dot
                 pitStatusDot
@@ -86,7 +89,15 @@ struct RaceRowView: View {
             }
             .padding(.vertical, 7)
             .padding(.horizontal, 8)
-            .background(kart.base.isInPit ? BBNColors.danger.opacity(0.06) : BBNColors.background)
+            .background(rowBackground)
+            .overlay(alignment: .leading) {
+                // Left accent stripe for "our kart"
+                if isOurKart {
+                    Rectangle()
+                        .fill(BBNColors.accent)
+                        .frame(width: 3)
+                }
+            }
             .overlay(
                 Rectangle().fill(BBNColors.border.opacity(0.5)).frame(height: 0.5),
                 alignment: .bottom
@@ -100,10 +111,42 @@ struct RaceRowView: View {
         .accessibilityAddTraits(.isButton)
     }
 
+    // MARK: - Our-kart highlight
+
+    private var isOurKart: Bool {
+        guard let num = config?.ourKartNumber, num > 0 else { return false }
+        return kart.base.kartNumber == num
+    }
+
+    private var rowBackground: Color {
+        if isOurKart { return BBNColors.accent.opacity(0.10) }
+        if kart.base.isInPit { return BBNColors.danger.opacity(0.06) }
+        return BBNColors.background
+    }
+
+    // MARK: - Pit cell (X/Y format matching web)
+
+    @ViewBuilder
+    private var pitCell: some View {
+        let minPits = config?.minPits ?? 0
+        let pending = max(0, minPits - kart.base.pitCount)
+        HStack(spacing: 2) {
+            Text("\(kart.base.pitCount)")
+                .font(BBNTypography.body)
+                .foregroundStyle(pending > 0 ? BBNColors.tier25 : BBNColors.textPrimary)
+                .monospacedDigit()
+            if pending > 0 {
+                Text("/\(minPits)")
+                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                    .foregroundStyle(BBNColors.textDim)
+            }
+        }
+    }
+
     // MARK: - Stint
 
     private var stintCell: some View {
-        let durationS = kart.base.stintDurationS
+        let durationS = liveStintSec ?? kart.base.stintDurationS
         let stintColor = RaceFormatters.stintColor(durationS: durationS, config: config)
         let text = RaceFormatters.stintWithLaps(
             durationS: durationS,

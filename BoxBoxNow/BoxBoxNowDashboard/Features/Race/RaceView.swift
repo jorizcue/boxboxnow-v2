@@ -6,9 +6,10 @@ struct RaceView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if app.race.raceStarted {
-                RaceInfoPanel()
-            }
+            // Always render the info panel (matches web). Cards show "—" when
+            // there's no data yet rather than the whole row disappearing, so
+            // the layout doesn't jump on the first snapshot.
+            RaceInfoPanel()
             RaceTableHeader()
             if app.race.karts.isEmpty {
                 PlaceholderView(text: "Esperando datos de la carrera…")
@@ -19,6 +20,7 @@ struct RaceView: View {
                             RaceRowView(
                                 kart: kart,
                                 config: app.race.config,
+                                liveStintSec: stintSeconds(for: kart),
                                 onTap: { selected = kart }
                             )
                         }
@@ -32,7 +34,25 @@ struct RaceView: View {
         }
     }
 
+    /// Sort by MED.20 (avgLapMs) ascending — matches the web `RaceTable`
+    /// default ordering. Karts with no recorded average sort to the end via
+    /// `Double.infinity`.
     private var sortedKarts: [KartStateFull] {
-        app.race.karts.sorted { $0.base.position < $1.base.position }
+        app.race.karts.sorted { a, b in
+            let av = (a.base.avgLapMs ?? 0) > 0 ? a.base.avgLapMs! : .infinity
+            let bv = (b.base.avgLapMs ?? 0) > 0 ? b.base.avgLapMs! : .infinity
+            if av == bv { return a.base.position < b.base.position }
+            return av < bv
+        }
+    }
+
+    /// Live-ticking stint seconds for a given kart — reads the same
+    /// interpolated race clock the info panel uses, so every row advances
+    /// every second between server snapshots.
+    private func stintSeconds(for kart: KartStateFull) -> Double {
+        let clock = app.race.interpolatedCountdownMs
+        if clock <= 0 || app.race.raceFinished { return 0 }
+        let start = kart.base.stintStartCountdownMs ?? (app.race.durationMs > 0 ? app.race.durationMs : clock)
+        return max(0, (start - clock) / 1000)
     }
 }

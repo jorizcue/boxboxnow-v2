@@ -16,6 +16,15 @@ final class RaceStore {
     var durationMs: Double = 0
     var trackName: String = ""
 
+    /// Locally interpolated race clock. The server sends `countdownMs` on
+    /// every snapshot (~30s apart). Without interpolation the header timer
+    /// and per-kart stint calculation would only advance on snapshot boundaries.
+    /// This field ticks every second between snapshots, mirroring the web
+    /// `useRaceClock` hook. Reset whenever `countdownMs` is reassigned.
+    var interpolatedCountdownMs: Double = 0
+    private var lastCountdownSnapshotAt: Date = .distantPast
+    private var clockTickTask: Task<Void, Never>?
+
     var karts: [KartStateFull] = []
     var fifo: FifoState = .empty
     var classification: [ClassificationEntry] = []
@@ -38,6 +47,28 @@ final class RaceStore {
         self.wsClient = wsClient
         self.boxCallTimeout = boxCallTimeout
         startObservingClient()
+        startClockTick()
+    }
+
+    /// 1 Hz ticker that advances `interpolatedCountdownMs` between snapshots.
+    /// Subtracts wall-clock elapsed since the last server update from the
+    /// snapshot value — same math as the web `useRaceClock` hook.
+    private func startClockTick() {
+        clockTickTask?.cancel()
+        clockTickTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                await MainActor.run {
+                    guard let self else { return }
+                    guard self.countdownMs > 0 else {
+                        self.interpolatedCountdownMs = self.countdownMs
+                        return
+                    }
+                    let elapsed = Date().timeIntervalSince(self.lastCountdownSnapshotAt) * 1000
+                    self.interpolatedCountdownMs = max(0, self.countdownMs - elapsed)
+                }
+            }
+        }
     }
 
     // Note: no `deinit` cleanup — Task<Void, Never> holds only a `[weak self]`
@@ -91,7 +122,12 @@ final class RaceStore {
         guard let data else { return }
         self.raceStarted  = data.raceStarted ?? false
         self.raceFinished = data.raceFinished ?? false
-        self.countdownMs  = data.countdownMs ?? 0
+        let newCountdown = data.countdownMs ?? 0
+        if newCountdown != self.countdownMs {
+            self.lastCountdownSnapshotAt = Date()
+        }
+        self.countdownMs  = newCountdown
+        self.interpolatedCountdownMs = newCountdown
         self.durationMs   = data.durationMs ?? 0
         self.trackName    = data.trackName ?? ""
         self.karts        = data.karts ?? []
@@ -156,6 +192,8 @@ final class RaceStore {
         raceStarted = false
         raceFinished = false
         countdownMs = 0
+        interpolatedCountdownMs = 0
+        lastCountdownSnapshotAt = .distantPast
         durationMs = 0
         trackName = ""
         karts = []

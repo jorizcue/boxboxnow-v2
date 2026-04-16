@@ -11,9 +11,9 @@ struct RaceTableHeader: View {
             cell("Última", width: 76, align: .trailing)
             cell("Mejor", width: 76, align: .trailing)
             cell("Vueltas", width: 52, align: .trailing)
-            cell("Pits", width: 36, align: .trailing)
-            cell("Tier", width: 44, align: .center)
-            cell("Stint", width: 90, align: .trailing)
+            cell("Pits", width: 56, align: .trailing)
+            cell("Tier", width: 56, align: .center)
+            cell("Stint", width: 110, align: .trailing)
             cell("", width: 28, align: .center) // pit status dot
         }
         .font(BBNTypography.caption)

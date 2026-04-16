@@ -26,15 +26,29 @@ enum RaceFormatters {
         return String(format: "%d:%02d", total / 60, total % 60)
     }
 
-    /// Formats stint duration (seconds) with lap count, e.g. "12:30 (5v)".
+    /// Formats stint duration (seconds) with lap count, e.g. "12:30.45 (5v)".
+    /// Matches the web `secondsToStint` format — 2-digit hundredths after the
+    /// seconds so the UI ticks every frame rather than jumping every second.
     static func stintWithLaps(durationS: Double?, laps: Int?) -> String {
         guard let durationS, durationS >= 0 else { return "—" }
-        let total = Int(durationS)
-        let timeStr = String(format: "%d:%02d", total / 60, total % 60)
+        let minutes = Int(durationS) / 60
+        let wholeSec = Int(durationS) % 60
+        let hundredths = Int((durationS - floor(durationS)) * 100)
+        let timeStr = String(format: "%d:%02d.%02d", minutes, wholeSec, hundredths)
         if let laps, laps > 0 {
             return "\(timeStr) (\(laps)v)"
         }
         return timeStr
+    }
+
+    /// Formats seconds as `HH:MM:SS` (like web `secondsToHMS`).
+    /// Always zero-padded so the info cards line up vertically.
+    static func hhmmss(seconds: Double) -> String {
+        let total = max(0, Int(seconds))
+        let h = total / 3600
+        let m = (total % 3600) / 60
+        let s = total % 60
+        return String(format: "%02d:%02d:%02d", h, m, s)
     }
 
     /// Color for stint time based on race config thresholds.
