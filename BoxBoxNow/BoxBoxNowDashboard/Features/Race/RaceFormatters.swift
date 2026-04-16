@@ -30,7 +30,7 @@ enum RaceFormatters {
     /// negative. Returns "—" for nil, zero, or non-finite values.
     static func gap(ms: Double?) -> String {
         guard let ms, ms.isFinite, ms != 0 else { return "—" }
-        let sign = ms > 0 ? "+" : ""
+        let sign = ms > 0 ? "+" : "-"
         let totalMs = Int(abs(ms).rounded())
         let seconds = totalMs / 1000
         let millis = totalMs % 1000

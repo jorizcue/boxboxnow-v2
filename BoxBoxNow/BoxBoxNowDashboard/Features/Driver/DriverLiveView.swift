@@ -77,7 +77,8 @@ struct DriverLiveView: View {
               !prefs.cardOrder.isEmpty else {
             return DriverCardCatalog.allIds
         }
-        return prefs.cardOrder.filter { prefs.visibleCards[$0] == true }
+        let filtered = prefs.cardOrder.filter { prefs.visibleCards[$0] == true }
+        return filtered.isEmpty ? DriverCardCatalog.allIds : filtered
     }
 
     // MARK: - Our kart lookup
@@ -103,6 +104,10 @@ struct DriverLiveView: View {
     /// smoothly between server snapshots (~30s apart). Stores the last known
     /// server value and the wall-clock time it arrived, then subtracts
     /// elapsed wall-clock time. Resets when the server sends a new value.
+    ///
+    /// If no new server value arrives in 60s (race paused or WS stalled),
+    /// the display freezes at the last interpolated value instead of
+    /// continuing to subtract wall time — prevents unbounded drift.
     private func tickCountdown() async {
         var lastServerValue = app.race.countdownMs
         var lastServerTime = Date()
@@ -116,6 +121,15 @@ struct DriverLiveView: View {
                 // Server sent a new snapshot — recalibrate
                 lastServerValue = currentServer
                 lastServerTime = Date()
+            } else if Date().timeIntervalSince(lastServerTime) > 60 {
+                // No server update in 60s — likely paused. Freeze display.
+                interpolatedCountdown = max(0, lastServerValue)
+                continue
+            }
+
+            if currentServer == 0 {
+                interpolatedCountdown = 0
+                continue
             }
 
             let wallElapsed = Date().timeIntervalSince(lastServerTime) * 1000
