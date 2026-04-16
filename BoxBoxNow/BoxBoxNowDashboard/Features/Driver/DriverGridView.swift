@@ -9,6 +9,13 @@ struct DriverGridView: View {
     let cardIds: [String]
     let kart: KartStateFull?
     let countdownMs: Double
+    // Contextual data passed through to individual cards so per-card values
+    // (boxScore, pitCount "X/Y", currentPit timer) can render without each
+    // card having to reach into the store.
+    var fifoScore: Double = 0
+    var minPits: Int = 0
+    var pitTimeS: Double = 0
+    var durationMs: Double = 0
 
     var body: some View {
         GeometryReader { geo in
@@ -28,7 +35,11 @@ struct DriverGridView: View {
                                 cardId: cardId,
                                 kart: kart,
                                 countdownMs: countdownMs,
-                                height: cardHeight
+                                height: cardHeight,
+                                fifoScore: fifoScore,
+                                minPits: minPits,
+                                pitTimeS: pitTimeS,
+                                durationMs: durationMs
                             )
                         }
                         // Fill remaining space in incomplete rows

@@ -2,6 +2,43 @@ import Foundation
 
 struct LiveTimingURLResponse: Codable { let url: String }
 
+/// Response from `GET /race/live-teams`. Mirrors the web
+/// `api.getLiveTeams()` shape. Teams come in snake_case (server payload)
+/// and are remapped into the iPad's `Team` shape before being returned.
+struct LiveTeamsResponse: Codable {
+    let teams: [LiveTeam]
+    let hasDrivers: Bool
+    let kartCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case teams
+        case hasDrivers = "has_drivers"
+        case kartCount = "kart_count"
+    }
+}
+
+struct LiveTeam: Codable {
+    let position: Int
+    let kart: Int
+    let teamName: String
+    let drivers: [LiveDriver]
+
+    enum CodingKeys: String, CodingKey {
+        case position, kart, drivers
+        case teamName = "team_name"
+    }
+}
+
+struct LiveDriver: Codable {
+    let driverName: String
+    let differentialMs: Int
+
+    enum CodingKeys: String, CodingKey {
+        case driverName = "driver_name"
+        case differentialMs = "differential_ms"
+    }
+}
+
 struct ConfigService {
     let api = APIClient.shared
 
@@ -70,5 +107,12 @@ struct ConfigService {
     /// body, so the caller must send the complete desired state.
     func saveTeams(_ teams: [Team]) async throws -> [Team] {
         try await api.putJSON("/config/teams", body: teams)
+    }
+
+    /// GET `/race/live-teams` — returns the current Apex-derived team/driver
+    /// list for the active session. Used by the "Cargar Live" button to
+    /// seed the editor from whatever the timing system last reported.
+    func liveTeams() async throws -> LiveTeamsResponse {
+        try await api.getJSON("/race/live-teams")
     }
 }

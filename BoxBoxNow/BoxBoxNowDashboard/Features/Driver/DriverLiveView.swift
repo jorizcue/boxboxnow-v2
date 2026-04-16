@@ -27,7 +27,11 @@ struct DriverLiveView: View {
                 DriverGridView(
                     cardIds: visibleCardIds,
                     kart: ourKart,
-                    countdownMs: interpolatedCountdown
+                    countdownMs: interpolatedCountdown,
+                    fifoScore: app.race.fifo.score,
+                    minPits: app.race.config?.minPits ?? 0,
+                    pitTimeS: app.race.config?.pitTimeS ?? 0,
+                    durationMs: app.race.durationMs
                 )
             }
 

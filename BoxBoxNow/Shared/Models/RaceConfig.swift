@@ -19,6 +19,12 @@ struct RaceSession: Codable {
     var ourKartNumber: Int
     var refreshIntervalS: Int
     var isActive: Bool
+    /// When true, the server re-pushes team data on every race init; the
+    /// team editor watches `teams_updated` WS events and reloads the form.
+    /// Optional so older clients / payloads without the field still decode;
+    /// default `nil` also keeps existing memberwise initializer call sites
+    /// working without requiring explicit values.
+    var autoLoadTeams: Bool? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, name, rain
@@ -37,6 +43,7 @@ struct RaceSession: Codable {
         case ourKartNumber = "our_kart_number"
         case refreshIntervalS = "refresh_interval_s"
         case isActive = "is_active"
+        case autoLoadTeams = "auto_load_teams"
     }
 
     static let empty = RaceSession(
@@ -44,7 +51,8 @@ struct RaceSession: Codable {
         durationMin: 60, minStintMin: 5, maxStintMin: 35, minPits: 2,
         pitTimeS: 180, minDriverTimeMin: 60, rain: false,
         pitClosedStartMin: 5, pitClosedEndMin: 5, boxLines: 1, boxKarts: 1,
-        ourKartNumber: 1, refreshIntervalS: 3, isActive: false
+        ourKartNumber: 1, refreshIntervalS: 3, isActive: false,
+        autoLoadTeams: false
     )
 }
 
