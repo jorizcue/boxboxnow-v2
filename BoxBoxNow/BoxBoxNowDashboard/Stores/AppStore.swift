@@ -9,6 +9,7 @@ final class AppStore {
     let config: ConfigStore
     let replay: ReplayStore
     let analytics: AnalyticsStore
+    let insights: InsightsStore
     var admin: AdminStore?
 
     // Phase A: busy-poll to observe cross-store transitions. Phase B will
@@ -32,6 +33,7 @@ final class AppStore {
         self.config = ConfigStore()
         self.replay = ReplayStore()
         self.analytics = AnalyticsStore()
+        self.insights = InsightsStore()
         self.admin = nil
 
         bootstrap()
@@ -75,6 +77,7 @@ final class AppStore {
                         self.config.reset()
                         self.replay.reset()
                         self.analytics.reset()
+                        self.insights.reset()
                         self.admin = nil
                     default: break
                     }

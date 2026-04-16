@@ -16,6 +16,7 @@
 		108A1079BB932315AE85174F /* replay_status.json in Resources */ = {isa = PBXBuildFile; fileRef = B37F20E81BB1582179DFDA9B /* replay_status.json */; };
 		10D9431A4248D41C2156DB51 /* RaceStore+TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ACE79CD368311DA6FB2542D /* RaceStore+TestHelpers.swift */; };
 		11636BFF83B325BDD662F6FA /* PublicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F0761AFE0F86F8EA9447381 /* PublicService.swift */; };
+		116B76865DD97DD12F8AD9EF /* InsightsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C5D03A80E1CA2F9908F3AE /* InsightsService.swift */; };
 		1281F19C6B136469DA86ED3F /* ReplayService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E2ED4790C4E076FB86B80B7 /* ReplayService.swift */; };
 		140684EF36EE17EF914B3C4E /* BoxBoxNowDashboardApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC2AB5820A74FC7D77F31256 /* BoxBoxNowDashboardApp.swift */; };
 		14EC50FDD516249F4AAD47EF /* RaceFormattersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D840B33E3FF748BA4E2D2992 /* RaceFormattersTests.swift */; };
@@ -47,6 +48,7 @@
 		4F8993BE8C39E12AABA1FFBC /* WsMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6119E6C3C7B8C120381BC458 /* WsMessage.swift */; };
 		5393D5A06D0E3A8E8C14F0F5 /* FifoQueueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3367624A2930C80D0C82300 /* FifoQueueView.swift */; };
 		556996700F809C4F4DCA0D23 /* DetailRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C35FC7D573120DBC35E7BA93 /* DetailRouter.swift */; };
+		58E1C0C879B8D4EEA873B7EA /* TrajectoryMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D22CA3C6A6C32006BC55B1BC /* TrajectoryMapView.swift */; };
 		5A79AE48FDA736229E3D7CD2 /* AdminService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC4353D02B94C87B0136798F /* AdminService.swift */; };
 		5C5957F052E5D9C74ADBCA5B /* KartAnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCA66F6BE6FA42C45673659A /* KartAnalyticsView.swift */; };
 		5E60E50BDE546299494CA626 /* FifoEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 835130EAF2454A3C8D55C1A1 /* FifoEntry.swift */; };
@@ -87,8 +89,10 @@
 		9ACC87C64B0B9BFBD25BC818 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
 		A2821609E7D7D5D10A89F78E /* BBNColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 003B0EE2019A297341BE3956 /* BBNColors.swift */; };
 		A2A869E1C58AFBAE82B876B0 /* AuthFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABABB34C05F49051365BAEB0 /* AuthFlowView.swift */; };
+		A372B514DDEE9609A10A9A11 /* GForceScatterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81AA45AEF2A95C092E390B3D /* GForceScatterView.swift */; };
 		A6546C6D3887C213BB363E69 /* OrderableCardList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6745FFF5BA35699AD9276BE4 /* OrderableCardList.swift */; };
 		A6D44B5BA43504D9202B02E9 /* DeviceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A3BD6BD01F9F40B0AD06A31 /* DeviceSession.swift */; };
+		A7D7BA6A0EABAC9625B1BA97 /* GPSInsightModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88BBF321798E4D67E39EA2FE /* GPSInsightModels.swift */; };
 		A7EA8935429FA5467CE5A285 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C59CBF0B27A03B35E925A98 /* AuthService.swift */; };
 		AC0AEDB26882D3FE32FED1A9 /* BBNSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E569E3B298818FA60DE45660 /* BBNSection.swift */; };
 		AC3D0AE39C6B8185CE796FFE /* UserListItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5F5056B5407DAD1552A229 /* UserListItem.swift */; };
@@ -112,6 +116,7 @@
 		CB0CB311F82FEAE1122DD805 /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B74567B1346431031C47C91 /* AppStore.swift */; };
 		CB1D64C602D5657B1FF35820 /* ReplayStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B90C3ED619AF3D1D37664C /* ReplayStore.swift */; };
 		CBBB2BEF2618E7FBCE668035 /* KartDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7BD3E54B75379ED5907AB35 /* KartDetailSheet.swift */; };
+		CD14BF6FED632E8C71986863 /* InsightsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C82799D789A30726072A6469 /* InsightsStore.swift */; };
 		D22DC275C13259018461EDFA /* ClassificationHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBE0E9216A31CA9B65677C04 /* ClassificationHeader.swift */; };
 		D2DCF4BAFD6F221BD38A9BC9 /* AdminCircuitsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D67B82F132534E90134A6DE /* AdminCircuitsView.swift */; };
 		D3176DA7E4B042103217B8A1 /* DecodeFixturesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD90191EE4504727D0DC9F2D /* DecodeFixturesTests.swift */; };
@@ -120,6 +125,7 @@
 		D7F20CAE8348BF030B4465B1 /* RaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7826E17ED74C1A408F110B1D /* RaceStore.swift */; };
 		D80825F3FE728BD27450FFC1 /* LiveWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC5D3173109E19A2D14A6AB8 /* LiveWebView.swift */; };
 		D982C51F6B58A36147A13779 /* MockRaceWebSocketClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C7CEE6557A432E12F92C4C1 /* MockRaceWebSocketClient.swift */; };
+		DA393C84E467064548030DAE /* SpeedTraceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5693892C50857851C7263E68 /* SpeedTraceView.swift */; };
 		DCEF1D89165A2B67E2FD8CB9 /* MockKeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39360E9737FD8F36A30DA8DF /* MockKeychainHelper.swift */; };
 		DEA06B00B322BB15633AA7E2 /* GoogleOAuthFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 483E97C925E47FED7D0FF29D /* GoogleOAuthFlow.swift */; };
 		DF09184E8110D255BFE8A3D7 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F391A3DB026BCE89A9FA51B7 /* AnalyticsService.swift */; };
@@ -168,6 +174,7 @@
 		11FF2A2767E16F4B71E59B7A /* BBNTypography.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNTypography.swift; sourceTree = "<group>"; };
 		15B90C3ED619AF3D1D37664C /* ReplayStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayStore.swift; sourceTree = "<group>"; };
 		16ADD04E208136B7F7652CFB /* BBNStatusDot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNStatusDot.swift; sourceTree = "<group>"; };
+		16C5D03A80E1CA2F9908F3AE /* InsightsService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InsightsService.swift; sourceTree = "<group>"; };
 		18291C7AD173DE089C25688D /* AdminHubView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminHubView.swift; sourceTree = "<group>"; };
 		184D52FEB1D2562F8F47BD6E /* DriverCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DriverCardView.swift; sourceTree = "<group>"; };
 		19AB82D71D21F2C68C0F05AD /* BBNLoadingOverlay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNLoadingOverlay.swift; sourceTree = "<group>"; };
@@ -200,6 +207,7 @@
 		50AC16025237E1E494C9D5A0 /* WsUpdateEvent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WsUpdateEvent.swift; sourceTree = "<group>"; };
 		52B74EEA0A4E029DB828ACDC /* PlaceholderView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaceholderView.swift; sourceTree = "<group>"; };
 		53D95657E1ADF2BB1647C14F /* BoxBoxNowDashboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BoxBoxNowDashboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5693892C50857851C7263E68 /* SpeedTraceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpeedTraceView.swift; sourceTree = "<group>"; };
 		5915D0E8058F4E5A39739E57 /* DriverRanking.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DriverRanking.swift; sourceTree = "<group>"; };
 		59229E2D110C6F146EBCEC97 /* JSONValue.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JSONValue.swift; sourceTree = "<group>"; };
 		5A2BD764B4C6A8A7EEE66A8B /* BBNEmptyState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNEmptyState.swift; sourceTree = "<group>"; };
@@ -224,7 +232,9 @@
 		7844F19F8942C3D6CE90EF7F /* KartAnalyticsDetailSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KartAnalyticsDetailSheet.swift; sourceTree = "<group>"; };
 		79E30CAE14869C40E9C22A70 /* SharedModelExtensionsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedModelExtensionsTests.swift; sourceTree = "<group>"; };
 		7FF543B259C0AF62F8317293 /* RaceStoreWebSocketIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceStoreWebSocketIntegrationTests.swift; sourceTree = "<group>"; };
+		81AA45AEF2A95C092E390B3D /* GForceScatterView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GForceScatterView.swift; sourceTree = "<group>"; };
 		835130EAF2454A3C8D55C1A1 /* FifoEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoEntry.swift; sourceTree = "<group>"; };
+		88BBF321798E4D67E39EA2FE /* GPSInsightModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GPSInsightModels.swift; sourceTree = "<group>"; };
 		8B27F23A1CCCF192DCDFC293 /* KeychainProtocol.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainProtocol.swift; sourceTree = "<group>"; };
 		8BF158687F42CFCEA2E2ECDD /* PitView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PitView.swift; sourceTree = "<group>"; };
 		8EFC9404A05CBE447F1270EA /* AdminUsersView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminUsersView.swift; sourceTree = "<group>"; };
@@ -252,9 +262,11 @@
 		C35FC7D573120DBC35E7BA93 /* DetailRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DetailRouter.swift; sourceTree = "<group>"; };
 		C374CEFB5AF135DFBA1B7B17 /* AdjustedClassificationView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdjustedClassificationView.swift; sourceTree = "<group>"; };
 		C5C978D3BC578AC4BF0A3167 /* ConfigService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfigService.swift; sourceTree = "<group>"; };
+		C82799D789A30726072A6469 /* InsightsStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InsightsStore.swift; sourceTree = "<group>"; };
 		CB82689DA21993AA5A90FF11 /* BBNStatCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNStatCard.swift; sourceTree = "<group>"; };
 		CFCE66BB3867BF7253532A8E /* ErrorMessages.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ErrorMessages.swift; sourceTree = "<group>"; };
 		D1CA6753BFC24B438229FD56 /* PitHistoryListView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PitHistoryListView.swift; sourceTree = "<group>"; };
+		D22CA3C6A6C32006BC55B1BC /* TrajectoryMapView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrajectoryMapView.swift; sourceTree = "<group>"; };
 		D41CC5B26F70B3489AE2E8AD /* PlatformMetrics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlatformMetrics.swift; sourceTree = "<group>"; };
 		D4D0BC5623AC1BB7C474B769 /* KartState+Dashboard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "KartState+Dashboard.swift"; sourceTree = "<group>"; };
 		D840B33E3FF748BA4E2D2992 /* RaceFormattersTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceFormattersTests.swift; sourceTree = "<group>"; };
@@ -504,6 +516,7 @@
 				9B74567B1346431031C47C91 /* AppStore.swift */,
 				15B90C3ED619AF3D1D37664C /* ReplayStore.swift */,
 				B316275B4279829C43AE2145 /* AnalyticsStore.swift */,
+				C82799D789A30726072A6469 /* InsightsStore.swift */,
 			);
 			name = Stores;
 			path = Stores;
@@ -586,6 +599,9 @@
 			isa = PBXGroup;
 			children = (
 				6010CB2B472179C638AA9E17 /* InsightsView.swift */,
+				D22CA3C6A6C32006BC55B1BC /* TrajectoryMapView.swift */,
+				5693892C50857851C7263E68 /* SpeedTraceView.swift */,
+				81AA45AEF2A95C092E390B3D /* GForceScatterView.swift */,
 			);
 			name = Insights;
 			path = Insights;
@@ -720,6 +736,7 @@
 				483E97C925E47FED7D0FF29D /* GoogleOAuthFlow.swift */,
 				5E2ED4790C4E076FB86B80B7 /* ReplayService.swift */,
 				F391A3DB026BCE89A9FA51B7 /* AnalyticsService.swift */,
+				16C5D03A80E1CA2F9908F3AE /* InsightsService.swift */,
 			);
 			name = Services;
 			path = Services;
@@ -755,6 +772,7 @@
 				5AC42898762A1A9E098F571B /* DriverCardCatalog.swift */,
 				DA7E2BD854CBFA9DC469883B /* ReplayModels.swift */,
 				AF20CC97B40E834008D5808F /* AnalyticsModels.swift */,
+				88BBF321798E4D67E39EA2FE /* GPSInsightModels.swift */,
 			);
 			name = Models;
 			path = Models;
@@ -1121,6 +1139,12 @@
 				DF09184E8110D255BFE8A3D7 /* AnalyticsService.swift in Sources */,
 				03040F5F4BD5A3811B526BD5 /* AnalyticsStore.swift in Sources */,
 				C9929FB0EAF4CE132964BC23 /* KartAnalyticsDetailSheet.swift in Sources */,
+				A7D7BA6A0EABAC9625B1BA97 /* GPSInsightModels.swift in Sources */,
+				116B76865DD97DD12F8AD9EF /* InsightsService.swift in Sources */,
+				CD14BF6FED632E8C71986863 /* InsightsStore.swift in Sources */,
+				58E1C0C879B8D4EEA873B7EA /* TrajectoryMapView.swift in Sources */,
+				DA393C84E467064548030DAE /* SpeedTraceView.swift in Sources */,
+				A372B514DDEE9609A10A9A11 /* GForceScatterView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
