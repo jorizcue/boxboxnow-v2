@@ -11,6 +11,7 @@
 		01C6FB8BF0F29CFCC4D4F582 /* snapshot.json in Resources */ = {isa = PBXBuildFile; fileRef = FF9191539843FAF88AD2810E /* snapshot.json */; };
 		024D8DBEE10FB2698F35DCF3 /* ClassificationEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CAB0D3FBBB6BF2C7A7386F /* ClassificationEntry.swift */; };
 		02B69F066118A744D5CBFE04 /* RaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFAD0DB2B2D79155CA0AA1F9 /* RaceView.swift */; };
+		03040F5F4BD5A3811B526BD5 /* AnalyticsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B316275B4279829C43AE2145 /* AnalyticsStore.swift */; };
 		0E147B464DA9F610B925E0A7 /* PreviewGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C6A38596924D82FDDA74E5C /* PreviewGridView.swift */; };
 		108A1079BB932315AE85174F /* replay_status.json in Resources */ = {isa = PBXBuildFile; fileRef = B37F20E81BB1582179DFDA9B /* replay_status.json */; };
 		10D9431A4248D41C2156DB51 /* RaceStore+TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ACE79CD368311DA6FB2542D /* RaceStore+TestHelpers.swift */; };
@@ -21,6 +22,7 @@
 		14F39ADD76EF4713167440ED /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37F8EE72AFB45E05639450FE /* PreferencesView.swift */; };
 		152F197498E3285BA362AE71 /* FifoState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91DEE2D48BD5F5C1C9E1D07 /* FifoState.swift */; };
 		188765FB1A4BED5827DC57C6 /* PlatformMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D41CC5B26F70B3489AE2E8AD /* PlatformMetrics.swift */; };
+		19A7F48C0E929136DD80F34B /* AnalyticsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF20CC97B40E834008D5808F /* AnalyticsModels.swift */; };
 		1A40A5D449E1B2308B404D70 /* APIClientDashboardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE9B41368B3473E19EEEE5CE /* APIClientDashboardTests.swift */; };
 		1CA18F6940832DEE70895997 /* RaceSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4A8BF665A9FAAAD621DCD4 /* RaceSnapshot.swift */; };
 		1D0D179E0535E0D16F07EA59 /* RaceWebSocketClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4502BAB3CE61EC1C3DE376 /* RaceWebSocketClientTests.swift */; };
@@ -104,6 +106,7 @@
 		C09A0180B782AFB81ABE4C2A /* DriverGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00406B55FE239E879AC8601 /* DriverGridView.swift */; };
 		C4BEB02FBD94EFF88B830694 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
 		C6199147F3F488B0061D21FD /* ReplayModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA7E2BD854CBFA9DC469883B /* ReplayModels.swift */; };
+		C9929FB0EAF4CE132964BC23 /* KartAnalyticsDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7844F19F8942C3D6CE90EF7F /* KartAnalyticsDetailSheet.swift */; };
 		CA1EB85F530AF5DE08484D52 /* ConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B76FDAA343695CB38541957 /* ConfigStore.swift */; };
 		CA24B295C83006D2F2AE881F /* BBNStatusDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16ADD04E208136B7F7652CFB /* BBNStatusDot.swift */; };
 		CB0CB311F82FEAE1122DD805 /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B74567B1346431031C47C91 /* AppStore.swift */; };
@@ -119,6 +122,7 @@
 		D982C51F6B58A36147A13779 /* MockRaceWebSocketClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C7CEE6557A432E12F92C4C1 /* MockRaceWebSocketClient.swift */; };
 		DCEF1D89165A2B67E2FD8CB9 /* MockKeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39360E9737FD8F36A30DA8DF /* MockKeychainHelper.swift */; };
 		DEA06B00B322BB15633AA7E2 /* GoogleOAuthFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 483E97C925E47FED7D0FF29D /* GoogleOAuthFlow.swift */; };
+		DF09184E8110D255BFE8A3D7 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F391A3DB026BCE89A9FA51B7 /* AnalyticsService.swift */; };
 		E15680155663A52D76787AA0 /* PitRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED03ED34CD17D732029ADE58 /* PitRecord.swift */; };
 		E5636489B335E0A6D27C41DD /* kart_state_extended.json in Resources */ = {isa = PBXBuildFile; fileRef = F205186513E7161023210D38 /* kart_state_extended.json */; };
 		E684D0DFAB392A16C766A928 /* MFASetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21392B7494C9541A5A6EE41C /* MFASetupView.swift */; };
@@ -217,6 +221,7 @@
 		6DFEE1E2E80BCB61D4D15B11 /* WsUpdateEventTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WsUpdateEventTests.swift; sourceTree = "<group>"; };
 		76B3B035F178CA970A225F27 /* ConfigView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfigView.swift; sourceTree = "<group>"; };
 		7826E17ED74C1A408F110B1D /* RaceStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceStore.swift; sourceTree = "<group>"; };
+		7844F19F8942C3D6CE90EF7F /* KartAnalyticsDetailSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KartAnalyticsDetailSheet.swift; sourceTree = "<group>"; };
 		79E30CAE14869C40E9C22A70 /* SharedModelExtensionsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedModelExtensionsTests.swift; sourceTree = "<group>"; };
 		7FF543B259C0AF62F8317293 /* RaceStoreWebSocketIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceStoreWebSocketIntegrationTests.swift; sourceTree = "<group>"; };
 		835130EAF2454A3C8D55C1A1 /* FifoEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoEntry.swift; sourceTree = "<group>"; };
@@ -233,7 +238,9 @@
 		AB4502BAB3CE61EC1C3DE376 /* RaceWebSocketClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceWebSocketClientTests.swift; sourceTree = "<group>"; };
 		ABABB34C05F49051365BAEB0 /* AuthFlowView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthFlowView.swift; sourceTree = "<group>"; };
 		AE9B41368B3473E19EEEE5CE /* APIClientDashboardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClientDashboardTests.swift; sourceTree = "<group>"; };
+		AF20CC97B40E834008D5808F /* AnalyticsModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AnalyticsModels.swift; sourceTree = "<group>"; };
 		AFAD0DB2B2D79155CA0AA1F9 /* RaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceView.swift; sourceTree = "<group>"; };
+		B316275B4279829C43AE2145 /* AnalyticsStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AnalyticsStore.swift; sourceTree = "<group>"; };
 		B37F20E81BB1582179DFDA9B /* replay_status.json */ = {isa = PBXFileReference; includeInIndex = 1; path = replay_status.json; sourceTree = "<group>"; };
 		B419B4157B3624BFD1D53DD8 /* KartNumberBadge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KartNumberBadge.swift; sourceTree = "<group>"; };
 		B978CAD275F81D34EC842DD0 /* BoxBoxNowDashboardUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = BoxBoxNowDashboardUITests.xctest; path = .xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -274,6 +281,7 @@
 		F169E4E49CAEF6665E8F9482 /* MFACodeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MFACodeView.swift; sourceTree = "<group>"; };
 		F205186513E7161023210D38 /* kart_state_extended.json */ = {isa = PBXFileReference; includeInIndex = 1; path = kart_state_extended.json; sourceTree = "<group>"; };
 		F26D9D1C4A0C580FF84AF5CA /* JSONValueTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JSONValueTests.swift; sourceTree = "<group>"; };
+		F391A3DB026BCE89A9FA51B7 /* AnalyticsService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AnalyticsService.swift; sourceTree = "<group>"; };
 		F7BD3E54B75379ED5907AB35 /* KartDetailSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KartDetailSheet.swift; sourceTree = "<group>"; };
 		F849B0990A9D5D86DFF48538 /* RaceStoreReducerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceStoreReducerTests.swift; sourceTree = "<group>"; };
 		FCA66F6BE6FA42C45673659A /* KartAnalyticsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KartAnalyticsView.swift; sourceTree = "<group>"; };
@@ -495,6 +503,7 @@
 				25E7735976C6A9E5B5F723AD /* AdminStore.swift */,
 				9B74567B1346431031C47C91 /* AppStore.swift */,
 				15B90C3ED619AF3D1D37664C /* ReplayStore.swift */,
+				B316275B4279829C43AE2145 /* AnalyticsStore.swift */,
 			);
 			name = Stores;
 			path = Stores;
@@ -586,6 +595,7 @@
 			isa = PBXGroup;
 			children = (
 				FCA66F6BE6FA42C45673659A /* KartAnalyticsView.swift */,
+				7844F19F8942C3D6CE90EF7F /* KartAnalyticsDetailSheet.swift */,
 			);
 			name = Analytics;
 			path = Analytics;
@@ -709,6 +719,7 @@
 				CFCE66BB3867BF7253532A8E /* ErrorMessages.swift */,
 				483E97C925E47FED7D0FF29D /* GoogleOAuthFlow.swift */,
 				5E2ED4790C4E076FB86B80B7 /* ReplayService.swift */,
+				F391A3DB026BCE89A9FA51B7 /* AnalyticsService.swift */,
 			);
 			name = Services;
 			path = Services;
@@ -743,6 +754,7 @@
 				D41CC5B26F70B3489AE2E8AD /* PlatformMetrics.swift */,
 				5AC42898762A1A9E098F571B /* DriverCardCatalog.swift */,
 				DA7E2BD854CBFA9DC469883B /* ReplayModels.swift */,
+				AF20CC97B40E834008D5808F /* AnalyticsModels.swift */,
 			);
 			name = Models;
 			path = Models;
@@ -1105,6 +1117,10 @@
 				1281F19C6B136469DA86ED3F /* ReplayService.swift in Sources */,
 				CB1D64C602D5657B1FF35820 /* ReplayStore.swift in Sources */,
 				3978760BE15627A469D3B4D0 /* ReplayControlsView.swift in Sources */,
+				19A7F48C0E929136DD80F34B /* AnalyticsModels.swift in Sources */,
+				DF09184E8110D255BFE8A3D7 /* AnalyticsService.swift in Sources */,
+				03040F5F4BD5A3811B526BD5 /* AnalyticsStore.swift in Sources */,
+				C9929FB0EAF4CE132964BC23 /* KartAnalyticsDetailSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

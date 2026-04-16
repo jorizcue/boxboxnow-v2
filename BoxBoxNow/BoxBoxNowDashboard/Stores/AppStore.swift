@@ -8,6 +8,7 @@ final class AppStore {
     let race: RaceStore
     let config: ConfigStore
     let replay: ReplayStore
+    let analytics: AnalyticsStore
     var admin: AdminStore?
 
     // Phase A: busy-poll to observe cross-store transitions. Phase B will
@@ -30,6 +31,7 @@ final class AppStore {
         self.race = RaceStore()
         self.config = ConfigStore()
         self.replay = ReplayStore()
+        self.analytics = AnalyticsStore()
         self.admin = nil
 
         bootstrap()
@@ -72,6 +74,7 @@ final class AppStore {
                         self.race.reset()
                         self.config.reset()
                         self.replay.reset()
+                        self.analytics.reset()
                         self.admin = nil
                     default: break
                     }
