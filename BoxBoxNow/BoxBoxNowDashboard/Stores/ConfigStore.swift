@@ -119,6 +119,78 @@ final class ConfigStore {
         }
     }
 
+    // MARK: - Presets
+
+    /// Fetches the current user's preset list. Replaces `presets` on success;
+    /// records `lastError` on failure and leaves the old list in place.
+    func reloadPresets() async {
+        do {
+            presets = try await configService.presets()
+        } catch {
+            lastError = ErrorMessages.userFacing(error)
+        }
+    }
+
+    /// Creates or updates a preset. `draft.id == 0` means "create new"; any other
+    /// id triggers a PATCH. Reloads the full preset list on success so cascading
+    /// `is_default` updates (the server unsets the flag on any sibling preset
+    /// when a new default is picked) are visible immediately. Returns the saved
+    /// preset, or `nil` on failure.
+    func savePreset(_ draft: DriverConfigPreset) async -> DriverConfigPreset? {
+        do {
+            let saved: DriverConfigPreset
+            if draft.id == 0 {
+                saved = try await configService.createPreset(draft)
+            } else {
+                saved = try await configService.updatePreset(draft)
+            }
+            await reloadPresets()
+            return saved
+        } catch {
+            lastError = ErrorMessages.userFacing(error)
+            return nil
+        }
+    }
+
+    /// Deletes a preset by id and reloads the list. Returns true on success.
+    @discardableResult
+    func deletePreset(id: Int) async -> Bool {
+        do {
+            try await configService.deletePreset(id: id)
+            await reloadPresets()
+            return true
+        } catch {
+            lastError = ErrorMessages.userFacing(error)
+            return false
+        }
+    }
+
+    // MARK: - Preferences
+
+    /// Fetches the driver-view preferences. An empty preferences record
+    /// (`visibleCards: [:]`, `cardOrder: []`) is a valid response the server
+    /// returns for users who have never saved preferences.
+    func reloadPreferences() async {
+        do {
+            preferences = try await configService.preferences()
+        } catch {
+            lastError = ErrorMessages.userFacing(error)
+        }
+    }
+
+    /// Persists a new preferences record. The server returns the authoritative
+    /// copy so the store updates itself before returning. Returns true on success.
+    @discardableResult
+    func savePreferences(_ draft: DriverPreferences) async -> Bool {
+        do {
+            preferences = try await configService.updatePreferences(draft)
+            return true
+        } catch {
+            lastError = ErrorMessages.userFacing(error)
+            return false
+        }
+    }
+
     /// Clears all observable state back to initial values. Called on logout
     /// so a subsequent login on the same AppStore instance doesn't briefly
     /// flash the previous user's config at the new user.

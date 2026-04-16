@@ -16,8 +16,8 @@ struct ConfigView: View {
                 case .sessions:    SessionsView()
                 case .teams:       TeamsView()
                 case .circuits:    CircuitsView()
-                case .presets:     PlaceholderView(text: "Presets — Fase B")
-                case .preferences: PlaceholderView(text: "Preferencias — Fase B")
+                case .presets:     PresetsView()
+                case .preferences: PreferencesView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
