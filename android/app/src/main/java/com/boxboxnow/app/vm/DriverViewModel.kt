@@ -59,6 +59,9 @@ class DriverViewModel @Inject constructor(
     private val _orientationLock = MutableStateFlow(OrientationLock.FREE)
     val orientationLock = _orientationLock.asStateFlow()
 
+    private val _audioEnabled = MutableStateFlow(true)
+    val audioEnabled = _audioEnabled.asStateFlow()
+
     private val _gpsData = MutableStateFlow<GPSSample?>(null)
     val gpsData = _gpsData.asStateFlow()
 
@@ -73,6 +76,9 @@ class DriverViewModel @Inject constructor(
             _brightness.value = prefs.getDouble(Constants.Keys.BRIGHTNESS)
         }
         _orientationLock.value = OrientationLock.from(prefs.getString(Constants.Keys.ORIENTATION))
+        if (prefs.contains(Constants.Keys.AUDIO_ENABLED)) {
+            _audioEnabled.value = prefs.getBoolean(Constants.Keys.AUDIO_ENABLED, true)
+        }
 
         // Migrate newly-added cards into the cached order/visible maps
         val allKeys = DriverCard.entries.map { it.key }
@@ -98,6 +104,12 @@ class DriverViewModel @Inject constructor(
         prefs.putStringList(Constants.Keys.CARD_ORDER, _cardOrder.value)
         prefs.putDouble(Constants.Keys.BRIGHTNESS, _brightness.value)
         prefs.putString(Constants.Keys.ORIENTATION, _orientationLock.value.raw)
+        prefs.putBoolean(Constants.Keys.AUDIO_ENABLED, _audioEnabled.value)
+    }
+
+    fun setAudioEnabled(enabled: Boolean) {
+        _audioEnabled.value = enabled
+        saveConfig()
     }
 
     fun setBrightness(v: Double) {
@@ -137,6 +149,7 @@ class DriverViewModel @Inject constructor(
         _selectedPresetId.value = preset.id
         preset.contrast?.let { _brightness.value = it }
         preset.orientation?.let { _orientationLock.value = OrientationLock.from(it) }
+        preset.audioEnabled?.let { _audioEnabled.value = it }
         saveConfig()
     }
 

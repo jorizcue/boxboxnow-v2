@@ -418,6 +418,9 @@ def _preset_to_out(p: DriverConfigPreset) -> PresetOut:
         visible_cards=json.loads(p.visible_cards) if p.visible_cards else {},
         card_order=json.loads(p.card_order) if p.card_order else [],
         is_default=bool(getattr(p, "is_default", False)),
+        contrast=getattr(p, "contrast", None),
+        orientation=getattr(p, "orientation", None),
+        audio_enabled=getattr(p, "audio_enabled", None),
     )
 
 
@@ -496,6 +499,9 @@ async def create_preset(
         visible_cards=json.dumps(data.visible_cards),
         card_order=json.dumps(data.card_order),
         is_default=want_default,
+        contrast=data.contrast,
+        orientation=data.orientation,
+        audio_enabled=data.audio_enabled,
     )
     db.add(preset)
     await db.commit()
@@ -543,6 +549,12 @@ async def update_preset(
         preset.visible_cards = json.dumps(update["visible_cards"])
     if "card_order" in update:
         preset.card_order = json.dumps(update["card_order"])
+    if "contrast" in update:
+        preset.contrast = update["contrast"]
+    if "orientation" in update:
+        preset.orientation = update["orientation"]
+    if "audio_enabled" in update:
+        preset.audio_enabled = update["audio_enabled"]
 
     default_toggled = False
     new_default_id: int | None = None

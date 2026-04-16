@@ -386,6 +386,19 @@ async def init_db():
         except Exception:
             pass
 
+        # Add display-option columns (contrast / orientation / audio_enabled)
+        # to driver_config_presets so the template wizard step 4 persists.
+        # Each ALTER is wrapped separately because SQLite aborts on any failure.
+        for ddl in (
+            "ALTER TABLE driver_config_presets ADD COLUMN contrast FLOAT",
+            "ALTER TABLE driver_config_presets ADD COLUMN orientation VARCHAR(16)",
+            "ALTER TABLE driver_config_presets ADD COLUMN audio_enabled BOOLEAN",
+        ):
+            try:
+                await conn.execute(text(ddl))
+            except Exception:
+                pass
+
 async def get_db():
     async with async_session() as session:
         yield session

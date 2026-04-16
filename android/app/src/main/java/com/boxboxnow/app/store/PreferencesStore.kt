@@ -23,6 +23,10 @@ class PreferencesStore @Inject constructor(context: Context) {
         return java.lang.Double.longBitsToDouble(prefs.getLong(key, 0L))
     }
 
+    fun putBoolean(key: String, value: Boolean) = prefs.edit { putBoolean(key, value) }
+    fun getBoolean(key: String, default: Boolean = false): Boolean =
+        prefs.getBoolean(key, default)
+
     fun putStringList(key: String, value: List<String>) = prefs.edit {
         putString(key, value.joinToString("\u0001"))
     }

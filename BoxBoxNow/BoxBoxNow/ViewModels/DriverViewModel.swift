@@ -22,6 +22,7 @@ final class DriverViewModel: ObservableObject {
     @Published var selectedPresetId: Int?
     @Published var brightness: Double = 0.0  // 0 = normal, 1 = max contrast boost
     @Published var orientationLock: OrientationLock = .free
+    @Published var audioEnabled: Bool = true
 
     // GPS-derived data
     @Published var gpsData: GPSSample?
@@ -47,6 +48,9 @@ final class DriverViewModel: ObservableObject {
         }
         let lockStr = defaults.string(forKey: Constants.Keys.orientation) ?? "free"
         orientationLock = OrientationLock(rawValue: lockStr) ?? .free
+        if defaults.object(forKey: Constants.Keys.audioEnabled) != nil {
+            audioEnabled = defaults.bool(forKey: Constants.Keys.audioEnabled)
+        }
 
         // Migrate cached config: ensure any newly-added DriverCard cases
         // (e.g. pitCount, currentPit) are appended to cardOrder and visibleCards
@@ -93,6 +97,7 @@ final class DriverViewModel: ObservableObject {
         defaults.set(cardOrder, forKey: Constants.Keys.cardOrder)
         defaults.set(brightness, forKey: Constants.Keys.brightness)
         defaults.set(orientationLock.rawValue, forKey: Constants.Keys.orientation)
+        defaults.set(audioEnabled, forKey: Constants.Keys.audioEnabled)
     }
 
     func loadPresets(autoApplyDefault: Bool = false) async {
@@ -122,6 +127,7 @@ final class DriverViewModel: ObservableObject {
         if let o = preset.orientation, let lock = OrientationLock(rawValue: o) {
             orientationLock = lock
         }
+        if let a = preset.audioEnabled { audioEnabled = a }
         saveConfig()
     }
 

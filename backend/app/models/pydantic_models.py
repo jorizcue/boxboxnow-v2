@@ -335,6 +335,9 @@ class PresetCreate(BaseModel):
     visible_cards: dict[str, bool]
     card_order: list[str]
     is_default: bool | None = None
+    contrast: float | None = None
+    orientation: str | None = None
+    audio_enabled: bool | None = None
 
 class PresetOut(BaseModel):
     id: int
@@ -342,6 +345,9 @@ class PresetOut(BaseModel):
     visible_cards: dict[str, bool]
     card_order: list[str]
     is_default: bool = False
+    contrast: float | None = None
+    orientation: str | None = None
+    audio_enabled: bool | None = None
 
     model_config = {"from_attributes": True}
 
@@ -350,6 +356,9 @@ class PresetUpdate(BaseModel):
     visible_cards: dict[str, bool] | None = None
     card_order: list[str] | None = None
     is_default: bool | None = None
+    contrast: float | None = None
+    orientation: str | None = None
+    audio_enabled: bool | None = None
 
 
 # --- Team Positions + Drivers ---

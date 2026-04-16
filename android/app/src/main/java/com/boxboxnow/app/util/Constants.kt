@@ -23,6 +23,7 @@ object Constants {
         const val SESSION_NAME = "session_name"
         const val ORIENTATION = "orientation_lock"
         const val BRIGHTNESS = "driver_brightness"
+        const val AUDIO_ENABLED = "driver_audio_enabled"
         const val FINISH_LINE = "bbn_finish_line"
     }
 }

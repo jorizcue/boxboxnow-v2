@@ -108,6 +108,11 @@ class DriverConfigPreset(Base):
     # Only one preset per user should have is_default=True. Enforced in application
     # code (config_routes.py) since SQLite lacks partial unique indexes in a portable way.
     is_default = Column(Boolean, default=False, nullable=False)
+    # Display options applied when this preset is selected in DriverView.
+    # All three are optional — None means "keep whatever the user has now".
+    contrast = Column(Float, nullable=True)          # 0.0..1.0
+    orientation = Column(String(16), nullable=True)  # "free" | "portrait" | "landscape"
+    audio_enabled = Column(Boolean, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
     user = relationship("User", back_populates="config_presets")

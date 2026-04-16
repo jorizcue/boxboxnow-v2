@@ -26,5 +26,6 @@ enum Constants {
         static let sessionName  = "session_name"
         static let orientation  = "orientation_lock"
         static let brightness   = "driver_brightness"
+        static let audioEnabled = "driver_audio_enabled"
     }
 }
