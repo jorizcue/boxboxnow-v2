@@ -2,6 +2,7 @@ package com.boxboxnow.app.vm
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.boxboxnow.app.audio.DriverSpeechService
 import com.boxboxnow.app.lap.LapTracker
 import com.boxboxnow.app.models.DriverCard
 import com.boxboxnow.app.models.DriverConfigPreset
@@ -34,6 +35,7 @@ enum class OrientationLock(val raw: String, val display: String) {
 class DriverViewModel @Inject constructor(
     private val api: ApiClient,
     private val prefs: PreferencesStore,
+    private val speech: DriverSpeechService,
 ) : ViewModel() {
     val lapTracker: LapTracker by lazy {
         LapTracker(api, prefs, viewModelScope).also { it.loadFinishLine() }
@@ -79,6 +81,9 @@ class DriverViewModel @Inject constructor(
         if (prefs.contains(Constants.Keys.AUDIO_ENABLED)) {
             _audioEnabled.value = prefs.getBoolean(Constants.Keys.AUDIO_ENABLED, true)
         }
+        // Keep the TTS service in sync with the persisted/preset flag so the
+        // pilot hears narration the moment a preset with audio=true is applied.
+        speech.enabled = _audioEnabled.value
 
         // Migrate newly-added cards into the cached order/visible maps
         val allKeys = DriverCard.entries.map { it.key }
@@ -109,7 +114,33 @@ class DriverViewModel @Inject constructor(
 
     fun setAudioEnabled(enabled: Boolean) {
         _audioEnabled.value = enabled
+        speech.enabled = enabled
         saveConfig()
+    }
+
+    /**
+     * Called by DriverScreen whenever a new lap is detected (lastLapMs changes).
+     * Delegates to `DriverSpeechService` which internally checks `enabled` + dedupes
+     * on lap ms, so repeated calls with the same lap are safe.
+     */
+    fun speakLapData(
+        lastLapMs: Double,
+        prevLapMs: Double,
+        lapDelta: String?,
+        realPosition: Int?,
+        totalKarts: Int?,
+        boxScore: Double,
+        lapsToMaxStint: Double?,
+    ) {
+        speech.speakLapData(
+            lastLapMs = lastLapMs,
+            prevLapMs = prevLapMs,
+            lapDelta = lapDelta,
+            realPosition = realPosition,
+            totalKarts = totalKarts,
+            boxScore = boxScore,
+            lapsToMaxStint = lapsToMaxStint,
+        )
     }
 
     fun setBrightness(v: Double) {
@@ -149,7 +180,10 @@ class DriverViewModel @Inject constructor(
         _selectedPresetId.value = preset.id
         preset.contrast?.let { _brightness.value = it }
         preset.orientation?.let { _orientationLock.value = OrientationLock.from(it) }
-        preset.audioEnabled?.let { _audioEnabled.value = it }
+        preset.audioEnabled?.let {
+            _audioEnabled.value = it
+            speech.enabled = it
+        }
         saveConfig()
     }
 
