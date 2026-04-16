@@ -379,6 +379,11 @@ class ReplayEngine:
         self._filename = None
         self._progress = 0.0
         self._blocks = []
+        # Emit a final "active: false" so subscribers clear their UI state.
+        try:
+            await self.on_events([])
+        except Exception as e:
+            logger.warning(f"Final replay_status broadcast on stop failed: {e}")
         logger.info("Replay stopped")
 
     async def pause(self):
@@ -400,6 +405,10 @@ class ReplayEngine:
         if not blocks:
             logger.warning("No message blocks to replay")
             self._active = False
+            try:
+                await self.on_events([])
+            except Exception as e:
+                logger.warning(f"replay_status broadcast (empty blocks) failed: {e}")
             return
 
         logger.info(f"Replaying {len(blocks)} blocks starting from {start_block}")
@@ -469,6 +478,14 @@ class ReplayEngine:
 
         self._active = False
         self._progress = 1.0
+        # Notify listeners that the replay has ended — otherwise the last
+        # broadcast they saw had active=true and the frontend indicator stays
+        # stuck. on_events([]) re-uses the existing replay_status broadcast
+        # path which now reads _active=False.
+        try:
+            await self.on_events([])
+        except Exception as e:
+            logger.warning(f"Final replay_status broadcast failed: {e}")
         logger.info("Replay completed")
 
     def _open_log_file(self, filepath: str):

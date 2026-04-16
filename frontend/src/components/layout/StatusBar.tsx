@@ -90,6 +90,31 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
     return () => clearInterval(id);
   }, []);
 
+  // Safety net: reconcile replay state against the server on mount and
+  // every 5s while the header thinks a replay is active. This recovers from
+  // stale `replayActive=true` state left over from a prior session where the
+  // backend never emitted a final `active: false` message (e.g. on hard
+  // reload, replay natural completion before the fix, admin switching users).
+  useEffect(() => {
+    let cancelled = false;
+    const reconcile = async () => {
+      try {
+        const st = await api.getReplayStatus();
+        if (cancelled) return;
+        setReplayStatus(
+          st.active, st.paused, st.filename || "",
+          st.progress || 0, st.currentTime || "",
+          st.speed, st.totalBlocks || 0,
+        );
+      } catch {}
+    };
+    // Reconcile once on mount regardless, then keep polling only while active.
+    reconcile();
+    if (!replayActive) return () => { cancelled = true; };
+    const id = setInterval(reconcile, 5000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [replayActive, setReplayStatus]);
+
   const handleLogout = async () => {
     try { await api.logout(); } catch {}
     logout();
