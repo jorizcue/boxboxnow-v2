@@ -131,7 +131,7 @@ struct RaceInfoPanel: View {
                     lapDelta == .faster ? BBNColors.success :
                     lapDelta == .slower ? BBNColors.warning : BBNColors.textPrimary
                 )
-                .font(.system(size: 18, weight: .black, design: .monospaced))
+                .font(.system(size: 16, weight: .black, design: .monospaced))
             )
         )
     }
@@ -141,7 +141,7 @@ struct RaceInfoPanel: View {
             label: "MEDIA 20V",
             valueView: AnyView(
                 Text(RaceFormatters.lapTime(ms: ourKart?.base.avgLapMs))
-                    .font(.system(size: 18, weight: .black, design: .monospaced))
+                    .font(.system(size: 16, weight: .black, design: .monospaced))
                     .foregroundStyle(BBNColors.textPrimary)
             )
         )
@@ -155,7 +155,7 @@ struct RaceInfoPanel: View {
             label: "POSICION POR MEDIA",
             valueView: AnyView(
                 Text(ourAvgPosition > 0 ? "\(ourAvgPosition)/\(total)" : "—")
-                    .font(.system(size: 18, weight: .black, design: .monospaced))
+                    .font(.system(size: 16, weight: .black, design: .monospaced))
                     .foregroundStyle(color)
             )
         )
@@ -172,7 +172,7 @@ struct RaceInfoPanel: View {
             label: "STINT EN CURSO",
             valueView: AnyView(
                 Text(RaceFormatters.hhmmss(seconds: ourStintSec))
-                    .font(.system(size: 18, weight: .black, design: .monospaced))
+                    .font(.system(size: 16, weight: .black, design: .monospaced))
                     .foregroundStyle(color)
             )
         )
@@ -188,7 +188,7 @@ struct RaceInfoPanel: View {
             label: "TIEMPO HASTA STINT MAXIMO",
             valueView: AnyView(
                 Text(RaceFormatters.hhmmss(seconds: timeToMaxStintSec))
-                    .font(.system(size: 18, weight: .black, design: .monospaced))
+                    .font(.system(size: 16, weight: .black, design: .monospaced))
                     .foregroundStyle(color)
             )
         )
@@ -204,7 +204,7 @@ struct RaceInfoPanel: View {
             label: "VUELTAS HASTA STINT MAXIMO",
             valueView: AnyView(
                 Text(lapsToMaxStint > 0 ? String(format: "%.1f", lapsToMaxStint) : "0")
-                    .font(.system(size: 18, weight: .black, design: .monospaced))
+                    .font(.system(size: 16, weight: .black, design: .monospaced))
                     .foregroundStyle(color)
             )
         )
@@ -217,7 +217,7 @@ struct RaceInfoPanel: View {
             label: "KARTS CERCA DE PIT",
             valueView: AnyView(
                 Text("\(count)")
-                    .font(.system(size: 18, weight: .black, design: .monospaced))
+                    .font(.system(size: 16, weight: .black, design: .monospaced))
                     .foregroundStyle(color)
             )
         )
@@ -277,18 +277,26 @@ private struct MetricCard: View {
             Text(label)
                 .font(.system(size: 8, weight: .bold))
                 .foregroundStyle(BBNColors.textMuted)
-                .tracking(1)
+                .tracking(0.6)
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
             if let accessory = accessoryBelowLabel {
                 accessory
             }
+            // Force single-line values with aggressive auto-shrink. Without
+            // this SwiftUI breaks long values like "00:00:00" at the `:` and
+            // wraps to two lines on the narrower cards (STINT EN CURSO,
+            // TIEMPO HASTA STINT MAXIMO) — which is exactly the iPad layout
+            // bug we just saw in the Pit tab.
             valueView
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+                .allowsTightening(true)
         }
         .frame(maxWidth: .infinity, minHeight: 64)
         .padding(.vertical, 6)
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 4)
         .background(BBNColors.card)
         .overlay(
             RoundedRectangle(cornerRadius: 10)

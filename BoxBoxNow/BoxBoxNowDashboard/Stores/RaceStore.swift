@@ -41,6 +41,7 @@ final class RaceStore {
     private var messagesTask: Task<Void, Never>?
     private var statesTask: Task<Void, Never>?
     private var boxCallClearTask: Task<Void, Never>?
+    private var snapshotRefreshTask: Task<Void, Never>?
     private var boxCallGeneration: UInt64 = 0
 
     init(wsClient: RaceWebSocketClientProtocol = RaceWebSocketClient(), boxCallTimeout: TimeInterval = 10) {
@@ -48,6 +49,28 @@ final class RaceStore {
         self.boxCallTimeout = boxCallTimeout
         startObservingClient()
         startClockTick()
+        startSnapshotRefresh()
+    }
+
+    /// Re-requests a fresh snapshot from the server every 20 seconds while
+    /// connected. Why: during a replay the server only emits ONE snapshot at
+    /// connect time and then `update` + `analytics` frames that don't carry
+    /// `countdownMs`. The initial snapshot's `countdownMs` can be up to ~30s
+    /// stale (Apex timing systems send countdown updates sparsely), so the
+    /// iPad's local interpolation drifts off the web over time (visible as
+    /// STINT EN CURSO being off by ~8s between the two devices). Requesting
+    /// a fresh snapshot periodically bounds the drift to <20s.
+    private func startSnapshotRefresh() {
+        snapshotRefreshTask?.cancel()
+        snapshotRefreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 20 * 1_000_000_000)
+                guard let self else { return }
+                let connected = await MainActor.run { self.isConnected }
+                guard connected else { continue }
+                try? await self.wsClient.send("{\"type\":\"requestSnapshot\"}")
+            }
+        }
     }
 
     /// 1 Hz ticker that advances `interpolatedCountdownMs` between snapshots.
