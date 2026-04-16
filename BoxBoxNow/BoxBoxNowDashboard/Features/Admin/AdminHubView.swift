@@ -1,5 +1,208 @@
 import SwiftUI
 
 struct AdminHubView: View {
-    var body: some View { PlaceholderView(text: "Circuit Hub — en construcción") }
+    @Environment(AppStore.self) private var app
+
+    private var store: AdminStore? { app.admin }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+            content
+        }
+        .background(BBNColors.background)
+        .task { await store?.loadHubStatus() }
+    }
+
+    // MARK: - Header
+
+    private var header: some View {
+        HStack {
+            Text("Circuit Hub")
+                .font(BBNTypography.title2)
+                .foregroundColor(BBNColors.textPrimary)
+            Spacer()
+            if store?.isLoadingHub == true {
+                ProgressView()
+                    .tint(BBNColors.accent)
+                    .scaleEffect(0.8)
+            }
+            Button {
+                Task { await store?.loadHubStatus() }
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .foregroundColor(BBNColors.textMuted)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+    }
+
+    // MARK: - Content
+
+    @ViewBuilder
+    private var content: some View {
+        if store?.isLoadingHub == true && (store?.hubStatuses.isEmpty ?? true) {
+            ProgressView()
+                .tint(BBNColors.accent)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if store?.hubStatuses.isEmpty ?? true {
+            BBNEmptyState(
+                icon: "antenna.radiowaves.left.and.right.slash",
+                title: "Sin conexiones",
+                subtitle: "No hay circuitos conectados al hub"
+            )
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(store?.hubStatuses ?? []) { status in
+                        hubCard(status)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
+            }
+        }
+    }
+
+    // MARK: - Hub Card
+
+    private func hubCard(_ status: HubCircuitStatus) -> some View {
+        BBNCard {
+            VStack(alignment: .leading, spacing: 12) {
+                // Header row
+                HStack {
+                    BBNStatusDot(
+                        isOn: status.connected,
+                        label: status.connected ? "Conectado" : "Desconectado"
+                    )
+                    Spacer()
+                    Text(status.circuitName)
+                        .font(BBNTypography.bodyBold)
+                        .foregroundColor(BBNColors.textPrimary)
+                    Spacer()
+                    toggleButton(status)
+                }
+
+                // Stats row
+                HStack(spacing: 16) {
+                    statPill(icon: "person.2", value: "\(status.subscribers)", label: "Suscriptores")
+                    statPill(icon: "message", value: "\(status.messages)", label: "Mensajes")
+                    statPill(icon: "link", value: status.wsUrl, label: "WS URL")
+                }
+
+                // Connected users
+                if !status.connectedUsers.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Usuarios conectados")
+                            .font(BBNTypography.caption)
+                            .foregroundColor(BBNColors.textDim)
+
+                        FlowLayout(spacing: 6) {
+                            ForEach(status.connectedUsers) { user in
+                                Text(user.username)
+                                    .font(BBNTypography.caption)
+                                    .foregroundColor(BBNColors.textPrimary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(BBNColors.surface)
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(BBNColors.border, lineWidth: 1))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func toggleButton(_ status: HubCircuitStatus) -> some View {
+        Button {
+            Task {
+                if status.connected {
+                    await store?.hubStop(circuitId: status.circuitId)
+                } else {
+                    await store?.hubStart(circuitId: status.circuitId)
+                }
+            }
+        } label: {
+            Text(status.connected ? "Detener" : "Iniciar")
+                .font(BBNTypography.caption)
+                .foregroundColor(status.connected ? BBNColors.danger : BBNColors.success)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(BBNColors.surface)
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule().stroke(
+                        status.connected ? BBNColors.danger.opacity(0.4) : BBNColors.success.opacity(0.4),
+                        lineWidth: 1
+                    )
+                )
+        }
+    }
+
+    private func statPill(icon: String, value: String, label: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.caption2)
+                .foregroundColor(BBNColors.textDim)
+            Text(value)
+                .font(BBNTypography.caption)
+                .foregroundColor(BBNColors.textMuted)
+                .lineLimit(1)
+        }
+    }
+}
+
+// MARK: - FlowLayout
+
+/// Simple horizontal wrapping layout for tag-like content.
+private struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = arrange(proposal: proposal, subviews: subviews)
+        return result.size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrange(proposal: proposal, subviews: subviews)
+        for (index, position) in result.positions.enumerated() {
+            subviews[index].place(at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y),
+                                  proposal: .unspecified)
+        }
+    }
+
+    private struct ArrangeResult {
+        var positions: [CGPoint]
+        var size: CGSize
+    }
+
+    private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> ArrangeResult {
+        let maxWidth = proposal.width ?? .infinity
+        var positions: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var totalHeight: CGFloat = 0
+        var totalWidth: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth && x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            positions.append(CGPoint(x: x, y: y))
+            rowHeight = max(rowHeight, size.height)
+            x += size.width + spacing
+            totalWidth = max(totalWidth, x - spacing)
+            totalHeight = y + rowHeight
+        }
+
+        return ArrangeResult(positions: positions, size: CGSize(width: totalWidth, height: totalHeight))
+    }
 }

@@ -12,6 +12,7 @@
 		024D8DBEE10FB2698F35DCF3 /* ClassificationEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CAB0D3FBBB6BF2C7A7386F /* ClassificationEntry.swift */; };
 		02B69F066118A744D5CBFE04 /* RaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFAD0DB2B2D79155CA0AA1F9 /* RaceView.swift */; };
 		03040F5F4BD5A3811B526BD5 /* AnalyticsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B316275B4279829C43AE2145 /* AnalyticsStore.swift */; };
+		0ABD889D1A1DFE574943A54A /* UserDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCFF9DF7BC9FE102F2BCD2C1 /* UserDetailSheet.swift */; };
 		0E147B464DA9F610B925E0A7 /* PreviewGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C6A38596924D82FDDA74E5C /* PreviewGridView.swift */; };
 		108A1079BB932315AE85174F /* replay_status.json in Resources */ = {isa = PBXBuildFile; fileRef = B37F20E81BB1582179DFDA9B /* replay_status.json */; };
 		10D9431A4248D41C2156DB51 /* RaceStore+TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ACE79CD368311DA6FB2542D /* RaceStore+TestHelpers.swift */; };
@@ -34,6 +35,7 @@
 		288C62711DB7C967FDC98EFD /* CircuitsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 481362AA4F28A4F271D39D3F /* CircuitsView.swift */; };
 		291DFB0EFA081CA4709978AF /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6450E4BD57F2989352AFB301 /* AuthStore.swift */; };
 		2B3BC1FB1BEAD5CCA9DDF228 /* PitHistoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1CA6753BFC24B438229FD56 /* PitHistoryListView.swift */; };
+		2BBDC5D71BC9B05D0824B30E /* AdminHubModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 884187EE66E1C5A4437A7B6B /* AdminHubModels.swift */; };
 		2DE6A83752A10AF7CBF04EAB /* BBNToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = F12229FCE4736357FC38AC5D /* BBNToast.swift */; };
 		32370AE437BF27AA40BAEFD6 /* BBNCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA50485A6E7EDADD652C23E9 /* BBNCard.swift */; };
 		33B68322DA07AEED6F7B515A /* JSONValueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26D9D1C4A0C580FF84AF5CA /* JSONValueTests.swift */; };
@@ -234,6 +236,7 @@
 		7FF543B259C0AF62F8317293 /* RaceStoreWebSocketIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceStoreWebSocketIntegrationTests.swift; sourceTree = "<group>"; };
 		81AA45AEF2A95C092E390B3D /* GForceScatterView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GForceScatterView.swift; sourceTree = "<group>"; };
 		835130EAF2454A3C8D55C1A1 /* FifoEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoEntry.swift; sourceTree = "<group>"; };
+		884187EE66E1C5A4437A7B6B /* AdminHubModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminHubModels.swift; sourceTree = "<group>"; };
 		88BBF321798E4D67E39EA2FE /* GPSInsightModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GPSInsightModels.swift; sourceTree = "<group>"; };
 		8B27F23A1CCCF192DCDFC293 /* KeychainProtocol.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainProtocol.swift; sourceTree = "<group>"; };
 		8BF158687F42CFCEA2E2ECDD /* PitView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PitView.swift; sourceTree = "<group>"; };
@@ -264,6 +267,7 @@
 		C5C978D3BC578AC4BF0A3167 /* ConfigService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfigService.swift; sourceTree = "<group>"; };
 		C82799D789A30726072A6469 /* InsightsStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InsightsStore.swift; sourceTree = "<group>"; };
 		CB82689DA21993AA5A90FF11 /* BBNStatCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNStatCard.swift; sourceTree = "<group>"; };
+		CCFF9DF7BC9FE102F2BCD2C1 /* UserDetailSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserDetailSheet.swift; sourceTree = "<group>"; };
 		CFCE66BB3867BF7253532A8E /* ErrorMessages.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ErrorMessages.swift; sourceTree = "<group>"; };
 		D1CA6753BFC24B438229FD56 /* PitHistoryListView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PitHistoryListView.swift; sourceTree = "<group>"; };
 		D22CA3C6A6C32006BC55B1BC /* TrajectoryMapView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrajectoryMapView.swift; sourceTree = "<group>"; };
@@ -436,6 +440,7 @@
 				5D67B82F132534E90134A6DE /* AdminCircuitsView.swift */,
 				18291C7AD173DE089C25688D /* AdminHubView.swift */,
 				34193E933EE80922D8F736A4 /* AdminPlatformView.swift */,
+				756D73E0DC6288850E2CC854 /* Users */,
 			);
 			name = Admin;
 			path = Admin;
@@ -540,6 +545,15 @@
 				9ABAB475B30569560153F162 /* iOS */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		756D73E0DC6288850E2CC854 /* Users */ = {
+			isa = PBXGroup;
+			children = (
+				CCFF9DF7BC9FE102F2BCD2C1 /* UserDetailSheet.swift */,
+			);
+			name = Users;
+			path = Users;
 			sourceTree = "<group>";
 		};
 		79151AA7EC142F3FA42398AE /* BoxBoxNowDashboard */ = {
@@ -773,6 +787,7 @@
 				DA7E2BD854CBFA9DC469883B /* ReplayModels.swift */,
 				AF20CC97B40E834008D5808F /* AnalyticsModels.swift */,
 				88BBF321798E4D67E39EA2FE /* GPSInsightModels.swift */,
+				884187EE66E1C5A4437A7B6B /* AdminHubModels.swift */,
 			);
 			name = Models;
 			path = Models;
@@ -1145,6 +1160,8 @@
 				58E1C0C879B8D4EEA873B7EA /* TrajectoryMapView.swift in Sources */,
 				DA393C84E467064548030DAE /* SpeedTraceView.swift in Sources */,
 				A372B514DDEE9609A10A9A11 /* GForceScatterView.swift in Sources */,
+				2BBDC5D71BC9B05D0824B30E /* AdminHubModels.swift in Sources */,
+				0ABD889D1A1DFE574943A54A /* UserDetailSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
