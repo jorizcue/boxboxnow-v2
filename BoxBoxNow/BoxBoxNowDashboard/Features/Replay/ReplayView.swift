@@ -51,7 +51,19 @@ struct ReplayView: View {
             }
         }
         .background(BBNColors.background)
-        .task { await app.replay.loadRecordings() }
+        .task {
+            if app.replay.circuits.isEmpty {
+                await app.replay.loadRecordings()
+            }
+        }
+        .alert("Error", isPresented: Binding(
+            get: { app.replay.lastError != nil },
+            set: { if !$0 { app.replay.lastError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(app.replay.lastError ?? "")
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Replay de grabaciones")
     }
@@ -117,7 +129,7 @@ struct ReplayView: View {
     // MARK: - Circuit List
 
     private var circuitListSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        LazyVStack(alignment: .leading, spacing: 12) {
             Text("Grabaciones")
                 .font(BBNTypography.title3)
                 .foregroundStyle(BBNColors.textPrimary)
@@ -170,6 +182,8 @@ struct ReplayView: View {
                     }
                 }
             }
+            .accessibilityLabel("\(circuit.circuitName), \(datesInRange.count) días en rango")
+            .accessibilityHint(isSelected ? "Contraer grabaciones" : "Expandir grabaciones")
 
             if isSelected {
                 dayAnalysesSection(circuitDir: circuit.circuitDir)

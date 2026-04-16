@@ -15,7 +15,8 @@ struct ReplayService {
     }
 
     func analyzeLog(filename: String, circuitDir: String) async throws -> LogAnalysis {
-        try await api.getJSON("/replay/analyze/\(filename)", query: [
+        let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? filename
+        return try await api.getJSON("/replay/analyze/\(encoded)", query: [
             URLQueryItem(name: "circuit_dir", value: circuitDir)
         ])
     }

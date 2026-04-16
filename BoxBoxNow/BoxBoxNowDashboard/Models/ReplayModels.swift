@@ -18,18 +18,13 @@ struct RecordingCircuit: Codable, Identifiable, Hashable {
 }
 
 /// Analysis of a single log file: total blocks and race-start positions.
+/// Note: the backend sends camelCase keys (totalBlocks, raceStarts, etc.)
+/// which already match Swift's property names — no CodingKeys needed.
 struct LogAnalysis: Codable, Hashable {
     let totalBlocks: Int
     let raceStarts: [RaceStartMarker]
     let startTime: String?
     let endTime: String?
-
-    enum CodingKeys: String, CodingKey {
-        case totalBlocks = "total_blocks"
-        case raceStarts = "race_starts"
-        case startTime = "start_time"
-        case endTime = "end_time"
-    }
 }
 
 /// A detected race-start point within a log file.
