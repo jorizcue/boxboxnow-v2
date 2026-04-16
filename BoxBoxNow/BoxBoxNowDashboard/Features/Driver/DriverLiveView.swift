@@ -1,17 +1,19 @@
 import SwiftUI
 
-/// Full-screen driver live view — a responsive card grid showing real-time
-/// race data for "our kart" (the kart configured in the active session).
+/// Full-screen driver live view — always renders the configured card grid,
+/// mirroring the web `DriverView` which shows empty cards (value = "—")
+/// when the session has no karts yet instead of a "waiting for data"
+/// placeholder.
 ///
-/// Card selection comes from the user's `DriverPreferences` stored on
-/// `ConfigStore.preferences`. If preferences are empty (new user), all
-/// cards in `DriverCardCatalog`'s canonical order are shown.
+/// Card selection comes from the user's `DriverPreferences`; if those are
+/// empty, the whole canonical catalog is shown. A box-call overlay flashes
+/// when `RaceStore.boxCallActive` is true, matching the web's full-screen
+/// "BOX BOX BOX" notification. `countdownMs` is interpolated client-side
+/// between server snapshots (~30s apart) so the race timer ticks smoothly.
 ///
-/// A box-call overlay flashes when `RaceStore.boxCallActive` is true,
-/// matching the web's full-screen "BOX BOX BOX" notification.
-///
-/// The view interpolates `countdownMs` client-side between server snapshots
-/// (which arrive every ~30s) so the race timer ticks smoothly.
+/// A small header strip shows the configured kart number ("K1", "K7", …)
+/// so the user always knows which kart's data they're looking at, same as
+/// the web's "K{n}" header in the pilot view.
 struct DriverLiveView: View {
     @Environment(AppStore.self) private var app
     @State private var interpolatedCountdown: Double = 0
@@ -20,33 +22,53 @@ struct DriverLiveView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            if let kart = ourKart {
+            VStack(spacing: 0) {
+                headerBar
                 DriverGridView(
                     cardIds: visibleCardIds,
-                    kart: kart,
+                    kart: ourKart,
                     countdownMs: interpolatedCountdown
                 )
-            } else {
-                VStack(spacing: 16) {
-                    Image(systemName: "car.side")
-                        .font(.system(size: 48))
-                        .foregroundStyle(BBNColors.textMuted)
-                    Text(noKartMessage)
-                        .font(BBNTypography.body)
-                        .foregroundStyle(BBNColors.textMuted)
-                        .multilineTextAlignment(.center)
-                }
             }
 
-            // Box-call overlay
+            // Box-call overlay (flashes full-screen on BOX event)
             if app.race.boxCallActive {
                 boxCallOverlay
             }
         }
-        .ignoresSafeArea(edges: .all)
+        .ignoresSafeArea(edges: .bottom)
         .task { await tickCountdown() }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Vista en vivo del piloto")
+    }
+
+    // MARK: - Header
+
+    private var headerBar: some View {
+        HStack(spacing: 10) {
+            // Small status dot + kart label, echoing web's "K{n}" chip
+            Circle()
+                .fill(app.race.isConnected ? BBNColors.success : BBNColors.danger)
+                .frame(width: 8, height: 8)
+            Spacer()
+            Text(kartLabel)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(BBNColors.textMuted)
+            Spacer()
+            // Right-side spacer so the kart label stays centered even with
+            // the status dot on the left.
+            Color.clear.frame(width: 8, height: 8)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 6)
+    }
+
+    private var kartLabel: String {
+        if let num = app.race.config?.ourKartNumber, num > 0 {
+            return "K\(num)"
+        }
+        return "—"
     }
 
     // MARK: - Box-call overlay
@@ -71,7 +93,7 @@ struct DriverLiveView: View {
 
     /// Returns the list of card IDs the user has configured as visible,
     /// in their chosen order. Falls back to the full canonical catalog
-    /// when preferences are empty or absent.
+    /// when preferences are empty or absent (matches web fallback).
     private var visibleCardIds: [String] {
         guard let prefs = app.config.preferences,
               !prefs.cardOrder.isEmpty else {
@@ -83,19 +105,12 @@ struct DriverLiveView: View {
 
     // MARK: - Our kart lookup
 
+    /// The kart matching the user's configured kart number, or nil when
+    /// none is configured / the race hasn't started. `DriverCardView`
+    /// handles nil by rendering "—" placeholders, matching the web.
     private var ourKart: KartStateFull? {
         guard let num = app.race.config?.ourKartNumber, num > 0 else { return nil }
         return app.race.karts.first { $0.base.kartNumber == num }
-    }
-
-    private var noKartMessage: String {
-        if app.race.karts.isEmpty {
-            return "Esperando datos de carrera…\nConecta al WebSocket para empezar."
-        }
-        if app.race.config?.ourKartNumber == nil || app.race.config?.ourKartNumber == 0 {
-            return "No tienes un kart asignado.\nConfigura tu nº de kart en la sesión."
-        }
-        return "Tu kart no aparece en la carrera actual."
     }
 
     // MARK: - Countdown interpolation
@@ -118,11 +133,9 @@ struct DriverLiveView: View {
 
             let currentServer = app.race.countdownMs
             if currentServer != lastServerValue {
-                // Server sent a new snapshot — recalibrate
                 lastServerValue = currentServer
                 lastServerTime = Date()
             } else if Date().timeIntervalSince(lastServerTime) > 60 {
-                // No server update in 60s — likely paused. Freeze display.
                 interpolatedCountdown = max(0, lastServerValue)
                 continue
             }
