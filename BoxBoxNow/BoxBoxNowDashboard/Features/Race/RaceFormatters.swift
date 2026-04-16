@@ -24,4 +24,16 @@ enum RaceFormatters {
         let total = Int(elapsedMs / 1000)
         return String(format: "%d:%02d", total / 60, total % 60)
     }
+
+    /// Formats a gap/interval in ms as `±s.mmm`. Sign is included so the
+    /// driver sees at a glance whether the differential is positive or
+    /// negative. Returns "—" for nil, zero, or non-finite values.
+    static func gap(ms: Double?) -> String {
+        guard let ms, ms.isFinite, ms != 0 else { return "—" }
+        let sign = ms > 0 ? "+" : ""
+        let totalMs = Int(abs(ms).rounded())
+        let seconds = totalMs / 1000
+        let millis = totalMs % 1000
+        return String(format: "%@%d.%03d", sign, seconds, millis)
+    }
 }

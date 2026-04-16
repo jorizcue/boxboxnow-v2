@@ -97,6 +97,7 @@
 		B86CE21F588C093F229E82B2 /* MFACodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F169E4E49CAEF6665E8F9482 /* MFACodeView.swift */; };
 		B95EA2593974CC92C6649394 /* FifoSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96B3268BFEF3AF7F2526CBD8 /* FifoSnapshot.swift */; };
 		BAB4F70E8A8C5F5D7E7573F4 /* AdminUsersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EFC9404A05CBE447F1270EA /* AdminUsersView.swift */; };
+		C09A0180B782AFB81ABE4C2A /* DriverGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00406B55FE239E879AC8601 /* DriverGridView.swift */; };
 		C4BEB02FBD94EFF88B830694 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
 		CA1EB85F530AF5DE08484D52 /* ConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B76FDAA343695CB38541957 /* ConfigStore.swift */; };
 		CA24B295C83006D2F2AE881F /* BBNStatusDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16ADD04E208136B7F7652CFB /* BBNStatusDot.swift */; };
@@ -105,6 +106,7 @@
 		D22DC275C13259018461EDFA /* ClassificationHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBE0E9216A31CA9B65677C04 /* ClassificationHeader.swift */; };
 		D2DCF4BAFD6F221BD38A9BC9 /* AdminCircuitsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D67B82F132534E90134A6DE /* AdminCircuitsView.swift */; };
 		D3176DA7E4B042103217B8A1 /* DecodeFixturesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD90191EE4504727D0DC9F2D /* DecodeFixturesTests.swift */; };
+		D4166614824F0926DD5B4F27 /* DriverCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 184D52FEB1D2562F8F47BD6E /* DriverCardView.swift */; };
 		D68179B669973F68BB55BD91 /* DriverConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E0C2E608723CF8FBD0CA128 /* DriverConfigView.swift */; };
 		D7F20CAE8348BF030B4465B1 /* RaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7826E17ED74C1A408F110B1D /* RaceStore.swift */; };
 		D80825F3FE728BD27450FFC1 /* LiveWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC5D3173109E19A2D14A6AB8 /* LiveWebView.swift */; };
@@ -155,6 +157,7 @@
 		11FF2A2767E16F4B71E59B7A /* BBNTypography.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNTypography.swift; sourceTree = "<group>"; };
 		16ADD04E208136B7F7652CFB /* BBNStatusDot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNStatusDot.swift; sourceTree = "<group>"; };
 		18291C7AD173DE089C25688D /* AdminHubView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminHubView.swift; sourceTree = "<group>"; };
+		184D52FEB1D2562F8F47BD6E /* DriverCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DriverCardView.swift; sourceTree = "<group>"; };
 		19AB82D71D21F2C68C0F05AD /* BBNLoadingOverlay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNLoadingOverlay.swift; sourceTree = "<group>"; };
 		1F5AA6F0090B7356B269CA5A /* InPitListView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InPitListView.swift; sourceTree = "<group>"; };
 		21043E9C4531429CD721FB8D /* DriverRankingRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DriverRankingRow.swift; sourceTree = "<group>"; };
@@ -253,6 +256,7 @@
 		ED03ED34CD17D732029ADE58 /* PitRecord.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PitRecord.swift; sourceTree = "<group>"; };
 		ED146384A5BA8F1E0D35F350 /* RaceTableHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceTableHeader.swift; sourceTree = "<group>"; };
 		EE2A0F478A02471DD29E87D5 /* ReplayView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayView.swift; sourceTree = "<group>"; };
+		F00406B55FE239E879AC8601 /* DriverGridView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DriverGridView.swift; sourceTree = "<group>"; };
 		F076C7DDFF8222620E3532C6 /* SidebarItem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SidebarItem.swift; sourceTree = "<group>"; };
 		F12229FCE4736357FC38AC5D /* BBNToast.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNToast.swift; sourceTree = "<group>"; };
 		F169E4E49CAEF6665E8F9482 /* MFACodeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MFACodeView.swift; sourceTree = "<group>"; };
@@ -659,6 +663,8 @@
 			isa = PBXGroup;
 			children = (
 				4067D63C254A19BA7907E198 /* DriverLiveView.swift */,
+				184D52FEB1D2562F8F47BD6E /* DriverCardView.swift */,
+				F00406B55FE239E879AC8601 /* DriverGridView.swift */,
 			);
 			name = Driver;
 			path = Driver;
@@ -1073,6 +1079,8 @@
 				73B8AD95BC375439927A6AF7 /* PresetsView.swift in Sources */,
 				8C5D425F7FBC06612C5570EB /* PresetFormView.swift in Sources */,
 				14F39ADD76EF4713167440ED /* PreferencesView.swift in Sources */,
+				D4166614824F0926DD5B4F27 /* DriverCardView.swift in Sources */,
+				C09A0180B782AFB81ABE4C2A /* DriverGridView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
