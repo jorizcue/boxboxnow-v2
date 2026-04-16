@@ -58,13 +58,24 @@ struct RaceSession: Codable {
 
 struct Circuit: Codable, Identifiable, Hashable {
     let id: Int
-    let name: String
-    let lengthM: Int?
+    var name: String
+    var lengthM: Int?
     var finishLat1: Double?
     var finishLon1: Double?
     var finishLat2: Double?
     var finishLon2: Double?
     var isActive: Bool?
+    // Admin-only fields (returned by /admin/circuits). All optional so
+    // non-admin snapshots that omit them still decode cleanly.
+    var pitTimeS: Int?
+    var wsPort: Int?
+    var wsPortData: Int?
+    var phpApiPort: Int?
+    var lapsDiscard: Int?
+    var lapDifferential: Int?
+    var phpApiUrl: String?
+    var liveTimingUrl: String?
+    var retentionDays: Int?
 
     enum CodingKeys: String, CodingKey {
         case id, name
@@ -74,6 +85,15 @@ struct Circuit: Codable, Identifiable, Hashable {
         case finishLat2 = "finish_lat_2"
         case finishLon2 = "finish_lon_2"
         case isActive   = "is_active"
+        case pitTimeS = "pit_time_s"
+        case wsPort = "ws_port"
+        case wsPortData = "ws_port_data"
+        case phpApiPort = "php_api_port"
+        case lapsDiscard = "laps_discard"
+        case lapDifferential = "lap_differential"
+        case phpApiUrl = "php_api_url"
+        case liveTimingUrl = "live_timing_url"
+        case retentionDays = "retention_days"
     }
 }
 

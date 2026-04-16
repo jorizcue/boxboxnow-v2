@@ -64,6 +64,23 @@ final class AdminStore {
         users.removeAll { $0.id == id }
     }
 
+    /// Creates a new user and refreshes the list on success.
+    @discardableResult
+    func createUser(username: String, password: String, email: String?, isAdmin: Bool, maxDevices: Int) async -> UserListItem? {
+        do {
+            let body = AdminService.CreateUserBody(
+                username: username, password: password, email: email,
+                isAdmin: isAdmin, maxDevices: maxDevices
+            )
+            let created = try await service.createUser(body)
+            await refreshUsers()
+            return created
+        } catch {
+            self.lastError = ErrorMessages.userFacing(error)
+            return nil
+        }
+    }
+
     // MARK: - Circuits
 
     func refreshCircuits() async {
@@ -71,6 +88,24 @@ final class AdminStore {
             self.circuits = try await service.listCircuits()
         } catch {
             self.lastError = ErrorMessages.userFacing(error)
+        }
+    }
+
+    @discardableResult
+    func saveCircuit(_ circuit: Circuit, isNew: Bool) async -> Circuit? {
+        do {
+            let saved: Circuit = isNew
+                ? try await service.createCircuit(circuit)
+                : try await service.updateCircuit(circuit)
+            if let idx = circuits.firstIndex(where: { $0.id == saved.id }) {
+                circuits[idx] = saved
+            } else {
+                circuits.append(saved)
+            }
+            return saved
+        } catch {
+            self.lastError = ErrorMessages.userFacing(error)
+            return nil
         }
     }
 

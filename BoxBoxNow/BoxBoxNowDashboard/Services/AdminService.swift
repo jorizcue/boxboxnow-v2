@@ -8,6 +8,21 @@ struct AdminService {
     func listUsers() async throws -> [UserListItem] {
         try await api.getJSON("/admin/users")
     }
+    struct CreateUserBody: Encodable {
+        let username: String
+        let password: String
+        let email: String?
+        let isAdmin: Bool
+        let maxDevices: Int
+        enum CodingKeys: String, CodingKey {
+            case username, password, email
+            case isAdmin = "is_admin"
+            case maxDevices = "max_devices"
+        }
+    }
+    func createUser(_ body: CreateUserBody) async throws -> UserListItem {
+        try await api.postJSON("/admin/users", body: body)
+    }
     func updateUser(id: Int, fields: [String: JSONValue]) async throws -> UserListItem {
         try await api.patchJSON("/admin/users/\(id)", body: fields)
     }

@@ -5,13 +5,26 @@ struct AdminHubView: View {
 
     private var store: AdminStore? { app.admin }
 
+    /// Matches the web `CircuitHubManager` behaviour: it re-fetches the
+    /// hub status every 5 seconds while the tab is visible so connected
+    /// users / messages counters update live. The task is cancelled on
+    /// view disappear via the structured-concurrency lifecycle.
+    private static let autoRefreshSeconds: UInt64 = 5
+
     var body: some View {
         VStack(spacing: 0) {
             header
             content
         }
         .background(BBNColors.background)
-        .task { await store?.loadHubStatus() }
+        .task {
+            await store?.loadHubStatus()
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: Self.autoRefreshSeconds * 1_000_000_000)
+                if Task.isCancelled { break }
+                await store?.loadHubStatus()
+            }
+        }
     }
 
     // MARK: - Header
