@@ -135,6 +135,8 @@ class DriverViewModel @Inject constructor(
         _visibleCards.value = preset.visibleCards
         _cardOrder.value = preset.cardOrder
         _selectedPresetId.value = preset.id
+        preset.contrast?.let { _brightness.value = it }
+        preset.orientation?.let { _orientationLock.value = OrientationLock.from(it) }
         saveConfig()
     }
 
@@ -153,6 +155,43 @@ class DriverViewModel @Inject constructor(
             }.onSuccess { created ->
                 _presets.value = _presets.value + created
                 _selectedPresetId.value = created.id
+            }.onFailure(onError)
+        }
+    }
+
+    /**
+     * Saves a new preset with full display options (from the template wizard).
+     */
+    fun saveAsPresetWithOptions(
+        name: String,
+        visibleCards: Map<String, Boolean>,
+        cardOrder: List<String>,
+        contrast: Double,
+        orientation: String,
+        audioEnabled: Boolean,
+        onSuccess: () -> Unit = {},
+        onError: (Throwable) -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                api.createPreset(
+                    name = name,
+                    visibleCards = visibleCards,
+                    cardOrder = cardOrder,
+                    contrast = contrast,
+                    orientation = orientation,
+                    audioEnabled = audioEnabled,
+                )
+            }.onSuccess { created ->
+                _presets.value = _presets.value + created
+                _selectedPresetId.value = created.id
+                // Also apply locally
+                _visibleCards.value = visibleCards
+                _cardOrder.value = cardOrder
+                _brightness.value = contrast
+                _orientationLock.value = OrientationLock.from(orientation)
+                saveConfig()
+                onSuccess()
             }.onFailure(onError)
         }
     }

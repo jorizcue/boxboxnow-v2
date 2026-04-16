@@ -114,12 +114,18 @@ class ApiClient @Inject constructor(
         visibleCards: Map<String, Boolean>,
         cardOrder: List<String>,
         isDefault: Boolean = false,
+        contrast: Double? = null,
+        orientation: String? = null,
+        audioEnabled: Boolean? = null,
     ): DriverConfigPreset {
         val body = buildJsonObject {
             put("name", name)
             put("visible_cards", visibleCards.toJsonElement())
             put("card_order", cardOrder.toJsonElement())
             if (isDefault) put("is_default", true)
+            contrast?.let { put("contrast", it) }
+            orientation?.let { put("orientation", it) }
+            audioEnabled?.let { put("audio_enabled", it) }
         }
         return postJson("/config/presets", body)
     }

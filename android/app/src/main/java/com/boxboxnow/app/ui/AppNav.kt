@@ -7,12 +7,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.boxboxnow.app.ui.config.CardOrderPreviewScreen
-import com.boxboxnow.app.ui.config.CardVisibilityScreen
 import com.boxboxnow.app.ui.config.ConfigScreen
 import com.boxboxnow.app.ui.config.GpsConfigScreen
 import com.boxboxnow.app.ui.config.PresetsScreen
 import com.boxboxnow.app.ui.config.SessionConfigScreen
+import com.boxboxnow.app.ui.config.TemplateWizardScreen
 import com.boxboxnow.app.ui.driver.DriverScreen
 import com.boxboxnow.app.ui.home.HomeScreen
 import com.boxboxnow.app.ui.login.LoginScreen
@@ -23,9 +22,9 @@ object Routes {
     const val HOME = "home"
     const val CONFIG = "config"
     const val SESSION_CONFIG = "config/session"
-    const val CARD_VISIBILITY = "config/card-visibility"
-    const val CARD_ORDER = "config/card-order"
     const val PRESETS = "config/presets"
+    const val TEMPLATE_WIZARD = "config/template-wizard"
+    const val BOX_CONFIG = "config/box"
     const val GPS_CONFIG = "config/gps"
     const val DRIVER = "driver"
 }
@@ -50,22 +49,29 @@ fun AppNav(onStartGoogleSso: () -> Unit = {}) {
                 authVM = authVM,
                 onOpenConfig = { nav.navigate(Routes.CONFIG) },
                 onOpenDriver = { nav.navigate(Routes.DRIVER) },
+                onOpenSession = { nav.navigate(Routes.SESSION_CONFIG) },
             )
         }
         composable(Routes.CONFIG) {
             ConfigScreen(
                 onBack = { nav.popBackStack() },
                 onOpenSession = { nav.navigate(Routes.SESSION_CONFIG) },
-                onOpenCardVisibility = { nav.navigate(Routes.CARD_VISIBILITY) },
-                onOpenCardOrder = { nav.navigate(Routes.CARD_ORDER) },
+                onOpenBox = { nav.navigate(Routes.BOX_CONFIG) },
                 onOpenPresets = { nav.navigate(Routes.PRESETS) },
                 onOpenGps = { nav.navigate(Routes.GPS_CONFIG) },
             )
         }
         composable(Routes.SESSION_CONFIG) { SessionConfigScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.CARD_VISIBILITY) { CardVisibilityScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.CARD_ORDER) { CardOrderPreviewScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.PRESETS) { PresetsScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.BOX_CONFIG) { BoxConfigScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.PRESETS) {
+            PresetsScreen(
+                onBack = { nav.popBackStack() },
+                onCreateNew = { nav.navigate(Routes.TEMPLATE_WIZARD) },
+            )
+        }
+        composable(Routes.TEMPLATE_WIZARD) {
+            TemplateWizardScreen(onBack = { nav.popBackStack() })
+        }
         composable(Routes.GPS_CONFIG) { GpsConfigScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.DRIVER) { DriverScreen(onBack = { nav.popBackStack() }) }
     }

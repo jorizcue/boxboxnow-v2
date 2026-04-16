@@ -39,6 +39,9 @@ data class DriverConfigPreset(
     @SerialName("visible_cards") val visibleCards: Map<String, Boolean>,
     @SerialName("card_order") val cardOrder: List<String>,
     @SerialName("is_default") val isDefault: Boolean = false,
+    val contrast: Double? = null,
+    val orientation: String? = null,
+    @SerialName("audio_enabled") val audioEnabled: Boolean? = null,
 )
 
 @Serializable

@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -29,8 +28,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,7 +45,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -67,13 +63,14 @@ private const val MAX_PRESETS = 10
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PresetsScreen(onBack: () -> Unit) {
+fun PresetsScreen(
+    onBack: () -> Unit,
+    onCreateNew: () -> Unit = {},
+) {
     val driverVM: DriverViewModel = hiltViewModel()
     val presets by driverVM.presets.collectAsState()
     val selectedId by driverVM.selectedPresetId.collectAsState()
 
-    var showSaveDialog by remember { mutableStateOf(false) }
-    var presetName by remember { mutableStateOf("") }
     var confirmDelete by remember { mutableStateOf<DriverConfigPreset?>(null) }
 
     LaunchedEffect(Unit) { driverVM.loadPresets() }
@@ -139,7 +136,7 @@ fun PresetsScreen(onBack: () -> Unit) {
 
             item {
                 Button(
-                    onClick = { showSaveDialog = true },
+                    onClick = onCreateNew,
                     enabled = presets.size < MAX_PRESETS,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = BoxBoxNowColors.Accent,
@@ -153,62 +150,10 @@ fun PresetsScreen(onBack: () -> Unit) {
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Guardar configuracion actual", fontWeight = FontWeight.SemiBold)
+                    Text("Crear nueva plantilla", fontWeight = FontWeight.SemiBold)
                 }
             }
         }
-    }
-
-    // Save dialog
-    if (showSaveDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showSaveDialog = false
-                presetName = ""
-            },
-            containerColor = BoxBoxNowColors.SystemGray6,
-            titleContentColor = Color.White,
-            textContentColor = Color.White,
-            title = { Text("Guardar plantilla") },
-            text = {
-                OutlinedTextField(
-                    value = presetName,
-                    onValueChange = { presetName = it },
-                    label = { Text("Nombre") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = BoxBoxNowColors.Accent,
-                        unfocusedBorderColor = BoxBoxNowColors.SystemGray4,
-                        focusedLabelColor = BoxBoxNowColors.Accent,
-                        unfocusedLabelColor = BoxBoxNowColors.SystemGray,
-                        cursorColor = BoxBoxNowColors.Accent,
-                    ),
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val trimmed = presetName.trim()
-                        if (trimmed.isNotEmpty()) {
-                            driverVM.saveAsPreset(trimmed)
-                            presetName = ""
-                            showSaveDialog = false
-                        }
-                    },
-                ) { Text("Guardar", color = BoxBoxNowColors.Accent) }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        presetName = ""
-                        showSaveDialog = false
-                    },
-                ) { Text("Cancelar", color = BoxBoxNowColors.SystemGray) }
-            },
-        )
     }
 
     // Delete confirmation

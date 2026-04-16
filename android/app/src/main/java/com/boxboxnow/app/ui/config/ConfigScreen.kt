@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,11 +15,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Reorder
-import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,11 +40,10 @@ import androidx.compose.ui.unit.sp
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 
 /**
- * Top-level configuration screen. Mirrors iOS `ConfigView` with 5 links:
+ * Top-level configuration screen. Mirrors iOS `ConfigView` with links:
  *   - Sesion
- *   - Tarjetas visibles
- *   - Orden y vista previa
- *   - Plantillas
+ *   - Box
+ *   - Plantillas (includes wizard for card visibility + order + display options)
  *   - GPS / RaceBox
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,8 +51,7 @@ import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 fun ConfigScreen(
     onBack: () -> Unit,
     onOpenSession: () -> Unit,
-    onOpenCardVisibility: () -> Unit,
-    onOpenCardOrder: () -> Unit,
+    onOpenBox: () -> Unit = {},
     onOpenPresets: () -> Unit,
     onOpenGps: () -> Unit,
 ) {
@@ -92,16 +88,10 @@ fun ConfigScreen(
                 onClick = onOpenSession,
             )
             ConfigRow(
-                label = "Tarjetas visibles",
-                subtitle = "Que tarjetas ves en carrera",
-                icon = Icons.Filled.Visibility,
-                onClick = onOpenCardVisibility,
-            )
-            ConfigRow(
-                label = "Orden y vista previa",
-                subtitle = "Reordenar y previsualizar",
-                icon = Icons.Filled.Reorder,
-                onClick = onOpenCardOrder,
+                label = "Box",
+                subtitle = "Equipos y pilotos",
+                icon = Icons.Filled.Build,
+                onClick = onOpenBox,
             )
             ConfigRow(
                 label = "Plantillas",
