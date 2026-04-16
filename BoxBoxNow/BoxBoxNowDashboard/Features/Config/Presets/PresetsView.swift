@@ -48,12 +48,9 @@ struct PresetsView: View {
                 .foregroundStyle(BBNColors.textPrimary)
 
             Text("\(app.config.presets.count)")
-                .font(BBNTypography.caption)
+                .font(BBNTypography.title3)
+                .monospacedDigit()
                 .foregroundStyle(BBNColors.textMuted)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(BBNColors.accent.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
                 .accessibilityLabel("\(app.config.presets.count) presets")
 
             Spacer()

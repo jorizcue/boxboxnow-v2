@@ -61,17 +61,20 @@ enum DriverCardCatalog {
     /// card until the user trims them.
     static var allIds: [String] { all.map(\.id) }
 
+    /// Pre-computed id → label lookup. Built once at static init time so
+    /// `label(for:)` is O(1) regardless of catalog size.
+    private static let labelById: [String: String] =
+        Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0.label) })
+
     /// Human label for a given card id. Unknown ids fall back to the raw id
     /// so the UI still renders something meaningful instead of a blank row.
     static func label(for id: String) -> String {
-        all.first(where: { $0.id == id })?.label ?? id
+        labelById[id] ?? id
     }
 
     /// Cards grouped by bucket, preserving `all`'s order inside each group.
     /// Iteration-friendly for `ForEach` over a `Section` per group.
-    static var grouped: [(Group, [Card])] {
-        Group.allCases.map { group in
-            (group, all.filter { $0.group == group })
-        }
+    static let grouped: [(Group, [Card])] = Group.allCases.map { group in
+        (group, all.filter { $0.group == group })
     }
 }

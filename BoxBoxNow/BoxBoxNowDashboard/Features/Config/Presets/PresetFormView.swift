@@ -181,7 +181,10 @@ struct PresetFormView: View {
         if let initial {
             name = initial.name
             visibleCards = initial.visibleCards
-            cardOrder = initial.cardOrder
+            // Deduplicate server-side cardOrder to prevent SwiftUI identity
+            // collisions in the ForEach over the reorder list.
+            var seen = Set<String>()
+            cardOrder = initial.cardOrder.filter { seen.insert($0).inserted }
             isDefault = initial.isDefault
         } else {
             name = ""
