@@ -25,6 +25,7 @@
 		1FB3D7DAD8A0EB3E24B7CA78 /* APIClient+Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E485FA80390A19423F682CF /* APIClient+Dashboard.swift */; };
 		227BA39D131C28977A71EEE9 /* InPitListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F5AA6F0090B7356B269CA5A /* InPitListView.swift */; };
 		26400F3AEB640F29C722C63C /* AdminStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25E7735976C6A9E5B5F723AD /* AdminStore.swift */; };
+		288C62711DB7C967FDC98EFD /* CircuitsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 481362AA4F28A4F271D39D3F /* CircuitsView.swift */; };
 		291DFB0EFA081CA4709978AF /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6450E4BD57F2989352AFB301 /* AuthStore.swift */; };
 		2B3BC1FB1BEAD5CCA9DDF228 /* PitHistoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1CA6753BFC24B438229FD56 /* PitHistoryListView.swift */; };
 		2DE6A83752A10AF7CBF04EAB /* BBNToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = F12229FCE4736357FC38AC5D /* BBNToast.swift */; };
@@ -169,6 +170,7 @@
 		3E485FA80390A19423F682CF /* APIClient+Dashboard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "APIClient+Dashboard.swift"; sourceTree = "<group>"; };
 		4067D63C254A19BA7907E198 /* DriverLiveView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DriverLiveView.swift; sourceTree = "<group>"; };
 		4132D5E13DE7435DACF4F43C /* BoxBoxNowDashboardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = BoxBoxNowDashboardTests.xctest; path = BoxBoxNowDashboardTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		481362AA4F28A4F271D39D3F /* CircuitsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CircuitsView.swift; sourceTree = "<group>"; };
 		483E97C925E47FED7D0FF29D /* GoogleOAuthFlow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GoogleOAuthFlow.swift; sourceTree = "<group>"; };
 		49FA1337C4CA7FADA768B59A /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		4A4A8BF665A9FAAAD621DCD4 /* RaceSnapshot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceSnapshot.swift; sourceTree = "<group>"; };
@@ -617,6 +619,15 @@
 			path = Design;
 			sourceTree = "<group>";
 		};
+		D2CD9FF81323C8A70D8A2B23 /* Circuits */ = {
+			isa = PBXGroup;
+			children = (
+				481362AA4F28A4F271D39D3F /* CircuitsView.swift */,
+			);
+			name = Circuits;
+			path = Circuits;
+			sourceTree = "<group>";
+		};
 		D409E39B4702A8681D346665 /* Driver */ = {
 			isa = PBXGroup;
 			children = (
@@ -738,6 +749,7 @@
 				FFD7E48FD590CE285BE71F91 /* ConfigSidebar.swift */,
 				C371B5349E0C256432A89257 /* Sessions */,
 				2D8F24E51BE635F41CF635D0 /* Teams */,
+				D2CD9FF81323C8A70D8A2B23 /* Circuits */,
 			);
 			name = Config;
 			path = Config;
@@ -1026,6 +1038,7 @@
 				B0C904E7E4C8C6533352E9CE /* ConfigSidebar.swift in Sources */,
 				6506030C90803B0858BAD3F7 /* SessionsView.swift in Sources */,
 				3615305F0F4DD5F2533CB7E9 /* TeamsView.swift in Sources */,
+				288C62711DB7C967FDC98EFD /* CircuitsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
