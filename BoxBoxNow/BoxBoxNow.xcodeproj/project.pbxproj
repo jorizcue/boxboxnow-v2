@@ -15,6 +15,7 @@
 		108A1079BB932315AE85174F /* replay_status.json in Resources */ = {isa = PBXBuildFile; fileRef = B37F20E81BB1582179DFDA9B /* replay_status.json */; };
 		10D9431A4248D41C2156DB51 /* RaceStore+TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ACE79CD368311DA6FB2542D /* RaceStore+TestHelpers.swift */; };
 		11636BFF83B325BDD662F6FA /* PublicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F0761AFE0F86F8EA9447381 /* PublicService.swift */; };
+		1281F19C6B136469DA86ED3F /* ReplayService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E2ED4790C4E076FB86B80B7 /* ReplayService.swift */; };
 		140684EF36EE17EF914B3C4E /* BoxBoxNowDashboardApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC2AB5820A74FC7D77F31256 /* BoxBoxNowDashboardApp.swift */; };
 		14EC50FDD516249F4AAD47EF /* RaceFormattersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D840B33E3FF748BA4E2D2992 /* RaceFormattersTests.swift */; };
 		14F39ADD76EF4713167440ED /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37F8EE72AFB45E05639450FE /* PreferencesView.swift */; };
@@ -35,6 +36,7 @@
 		33B68322DA07AEED6F7B515A /* JSONValueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26D9D1C4A0C580FF84AF5CA /* JSONValueTests.swift */; };
 		351FC61755922A47675080D9 /* DriverRankingRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21043E9C4531429CD721FB8D /* DriverRankingRow.swift */; };
 		3615305F0F4DD5F2533CB7E9 /* TeamsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 315BDF0479C21A9D439694BD /* TeamsView.swift */; };
+		3978760BE15627A469D3B4D0 /* ReplayControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2937B4F8F45299E1ED888A6F /* ReplayControlsView.swift */; };
 		3A124CBF4612CD4ADB090D6F /* RaceTableHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED146384A5BA8F1E0D35F350 /* RaceTableHeader.swift */; };
 		470E821102349844D4948ED1 /* BBNEmptyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A2BD764B4C6A8A7EEE66A8B /* BBNEmptyState.swift */; };
 		4B35F6A4BA0C446321AEB084 /* AdjustedClassificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C374CEFB5AF135DFBA1B7B17 /* AdjustedClassificationView.swift */; };
@@ -101,9 +103,11 @@
 		BAB4F70E8A8C5F5D7E7573F4 /* AdminUsersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EFC9404A05CBE447F1270EA /* AdminUsersView.swift */; };
 		C09A0180B782AFB81ABE4C2A /* DriverGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00406B55FE239E879AC8601 /* DriverGridView.swift */; };
 		C4BEB02FBD94EFF88B830694 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C533B2DA82843B7A10971F /* Foundation.framework */; };
+		C6199147F3F488B0061D21FD /* ReplayModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA7E2BD854CBFA9DC469883B /* ReplayModels.swift */; };
 		CA1EB85F530AF5DE08484D52 /* ConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B76FDAA343695CB38541957 /* ConfigStore.swift */; };
 		CA24B295C83006D2F2AE881F /* BBNStatusDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16ADD04E208136B7F7652CFB /* BBNStatusDot.swift */; };
 		CB0CB311F82FEAE1122DD805 /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B74567B1346431031C47C91 /* AppStore.swift */; };
+		CB1D64C602D5657B1FF35820 /* ReplayStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B90C3ED619AF3D1D37664C /* ReplayStore.swift */; };
 		CBBB2BEF2618E7FBCE668035 /* KartDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7BD3E54B75379ED5907AB35 /* KartDetailSheet.swift */; };
 		D22DC275C13259018461EDFA /* ClassificationHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBE0E9216A31CA9B65677C04 /* ClassificationHeader.swift */; };
 		D2DCF4BAFD6F221BD38A9BC9 /* AdminCircuitsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D67B82F132534E90134A6DE /* AdminCircuitsView.swift */; };
@@ -158,6 +162,7 @@
 		0C87B55B13B78A1D126F7C8C /* BBNSecondaryButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNSecondaryButton.swift; sourceTree = "<group>"; };
 		1116FD77F954B7536C37E496 /* PresetFormView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PresetFormView.swift; sourceTree = "<group>"; };
 		11FF2A2767E16F4B71E59B7A /* BBNTypography.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNTypography.swift; sourceTree = "<group>"; };
+		15B90C3ED619AF3D1D37664C /* ReplayStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayStore.swift; sourceTree = "<group>"; };
 		16ADD04E208136B7F7652CFB /* BBNStatusDot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNStatusDot.swift; sourceTree = "<group>"; };
 		18291C7AD173DE089C25688D /* AdminHubView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminHubView.swift; sourceTree = "<group>"; };
 		184D52FEB1D2562F8F47BD6E /* DriverCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DriverCardView.swift; sourceTree = "<group>"; };
@@ -171,6 +176,7 @@
 		244C0A812F8D3A2A0047102F /* BoxBoxNow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BoxBoxNow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		25E7735976C6A9E5B5F723AD /* AdminStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminStore.swift; sourceTree = "<group>"; };
 		25EBE6983A792542D270F6D6 /* RaceFormatters.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceFormatters.swift; sourceTree = "<group>"; };
+		2937B4F8F45299E1ED888A6F /* ReplayControlsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayControlsView.swift; sourceTree = "<group>"; };
 		2A9A5C399A2BCCDAF140E6B3 /* BoxCallOverlay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoxCallOverlay.swift; sourceTree = "<group>"; };
 		2BD72A620151DBF945560B96 /* fifo_update.json */ = {isa = PBXFileReference; includeInIndex = 1; path = fifo_update.json; sourceTree = "<group>"; };
 		315BDF0479C21A9D439694BD /* TeamsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeamsView.swift; sourceTree = "<group>"; };
@@ -199,6 +205,7 @@
 		5C5F5056B5407DAD1552A229 /* UserListItem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserListItem.swift; sourceTree = "<group>"; };
 		5D67B82F132534E90134A6DE /* AdminCircuitsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminCircuitsView.swift; sourceTree = "<group>"; };
 		5DF5ACFDAE7C9C80EF8A9E39 /* AsyncTestHelpers.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AsyncTestHelpers.swift; sourceTree = "<group>"; };
+		5E2ED4790C4E076FB86B80B7 /* ReplayService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayService.swift; sourceTree = "<group>"; };
 		5EF849D96B812EF5AE75AA99 /* RaceWebSocketClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceWebSocketClient.swift; sourceTree = "<group>"; };
 		6010CB2B472179C638AA9E17 /* InsightsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InsightsView.swift; sourceTree = "<group>"; };
 		60846C94F559502132745197 /* BiometricLoginView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BiometricLoginView.swift; sourceTree = "<group>"; };
@@ -249,6 +256,7 @@
 		DA26C19EF0F2C2B515CCF221 /* LiveDashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveDashboardView.swift; sourceTree = "<group>"; };
 		DA2D09A378A0D150AB8E38F6 /* SessionsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionsView.swift; sourceTree = "<group>"; };
 		DA50485A6E7EDADD652C23E9 /* BBNCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNCard.swift; sourceTree = "<group>"; };
+		DA7E2BD854CBFA9DC469883B /* ReplayModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayModels.swift; sourceTree = "<group>"; };
 		DBE0E9216A31CA9B65677C04 /* ClassificationHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClassificationHeader.swift; sourceTree = "<group>"; };
 		DC2AB5820A74FC7D77F31256 /* BoxBoxNowDashboardApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoxBoxNowDashboardApp.swift; sourceTree = "<group>"; };
 		DC4353D02B94C87B0136798F /* AdminService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminService.swift; sourceTree = "<group>"; };
@@ -426,6 +434,7 @@
 			isa = PBXGroup;
 			children = (
 				EE2A0F478A02471DD29E87D5 /* ReplayView.swift */,
+				2937B4F8F45299E1ED888A6F /* ReplayControlsView.swift */,
 			);
 			name = Replay;
 			path = Replay;
@@ -485,6 +494,7 @@
 				3B76FDAA343695CB38541957 /* ConfigStore.swift */,
 				25E7735976C6A9E5B5F723AD /* AdminStore.swift */,
 				9B74567B1346431031C47C91 /* AppStore.swift */,
+				15B90C3ED619AF3D1D37664C /* ReplayStore.swift */,
 			);
 			name = Stores;
 			path = Stores;
@@ -698,6 +708,7 @@
 				8B27F23A1CCCF192DCDFC293 /* KeychainProtocol.swift */,
 				CFCE66BB3867BF7253532A8E /* ErrorMessages.swift */,
 				483E97C925E47FED7D0FF29D /* GoogleOAuthFlow.swift */,
+				5E2ED4790C4E076FB86B80B7 /* ReplayService.swift */,
 			);
 			name = Services;
 			path = Services;
@@ -731,6 +742,7 @@
 				5C5F5056B5407DAD1552A229 /* UserListItem.swift */,
 				D41CC5B26F70B3489AE2E8AD /* PlatformMetrics.swift */,
 				5AC42898762A1A9E098F571B /* DriverCardCatalog.swift */,
+				DA7E2BD854CBFA9DC469883B /* ReplayModels.swift */,
 			);
 			name = Models;
 			path = Models;
@@ -1089,6 +1101,10 @@
 				C09A0180B782AFB81ABE4C2A /* DriverGridView.swift in Sources */,
 				A6546C6D3887C213BB363E69 /* OrderableCardList.swift in Sources */,
 				0E147B464DA9F610B925E0A7 /* PreviewGridView.swift in Sources */,
+				C6199147F3F488B0061D21FD /* ReplayModels.swift in Sources */,
+				1281F19C6B136469DA86ED3F /* ReplayService.swift in Sources */,
+				CB1D64C602D5657B1FF35820 /* ReplayStore.swift in Sources */,
+				3978760BE15627A469D3B4D0 /* ReplayControlsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
