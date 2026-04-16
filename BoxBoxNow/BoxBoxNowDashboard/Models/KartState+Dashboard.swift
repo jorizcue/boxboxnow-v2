@@ -45,4 +45,45 @@ struct KartStateFull: Codable, Identifiable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case pitHistory, driverTotalMs, driverAvgLapMs, recentLaps
     }
+
+    // Memberwise init for preview/testing — the custom Decoder init blocks
+    // the compiler-synthesized memberwise init.
+    init(base: KartState, pitHistory: [PitRecord] = [], driverTotalMs: [String: Double] = [:], driverAvgLapMs: [String: Double] = [:], recentLaps: [KartState.RecentLap] = []) {
+        self.base = base
+        self.pitHistory = pitHistory
+        self.driverTotalMs = driverTotalMs
+        self.driverAvgLapMs = driverAvgLapMs
+        self.recentLaps = recentLaps
+    }
+
+    #if DEBUG
+    static var preview: KartStateFull {
+        KartStateFull(
+            base: KartState(
+                rowId: "preview-1",
+                kartNumber: 7,
+                position: 3,
+                totalLaps: 24,
+                lastLapMs: 52345,
+                bestLapMs: 51123,
+                avgLapMs: 52500,
+                bestAvgMs: 51800,
+                bestStintLapMs: 51123,
+                gap: "1.234",
+                interval: "0.456",
+                pitCount: 2,
+                pitStatus: "out",
+                stintLapsCount: 12,
+                stintDurationS: 720,
+                stintElapsedMs: 540000,
+                stintStartCountdownMs: nil,
+                stintStartTime: nil,
+                tierScore: 82.0,
+                driverName: "Demo",
+                teamName: "Demo Team",
+                driverDifferentialMs: 234
+            )
+        )
+    }
+    #endif
 }
