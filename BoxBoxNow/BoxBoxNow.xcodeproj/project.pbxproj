@@ -31,6 +31,7 @@
 		32370AE437BF27AA40BAEFD6 /* BBNCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA50485A6E7EDADD652C23E9 /* BBNCard.swift */; };
 		33B68322DA07AEED6F7B515A /* JSONValueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26D9D1C4A0C580FF84AF5CA /* JSONValueTests.swift */; };
 		351FC61755922A47675080D9 /* DriverRankingRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21043E9C4531429CD721FB8D /* DriverRankingRow.swift */; };
+		3615305F0F4DD5F2533CB7E9 /* TeamsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 315BDF0479C21A9D439694BD /* TeamsView.swift */; };
 		3A124CBF4612CD4ADB090D6F /* RaceTableHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED146384A5BA8F1E0D35F350 /* RaceTableHeader.swift */; };
 		470E821102349844D4948ED1 /* BBNEmptyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A2BD764B4C6A8A7EEE66A8B /* BBNEmptyState.swift */; };
 		4B35F6A4BA0C446321AEB084 /* AdjustedClassificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C374CEFB5AF135DFBA1B7B17 /* AdjustedClassificationView.swift */; };
@@ -160,6 +161,7 @@
 		25EBE6983A792542D270F6D6 /* RaceFormatters.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceFormatters.swift; sourceTree = "<group>"; };
 		2A9A5C399A2BCCDAF140E6B3 /* BoxCallOverlay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoxCallOverlay.swift; sourceTree = "<group>"; };
 		2BD72A620151DBF945560B96 /* fifo_update.json */ = {isa = PBXFileReference; includeInIndex = 1; path = fifo_update.json; sourceTree = "<group>"; };
+		315BDF0479C21A9D439694BD /* TeamsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeamsView.swift; sourceTree = "<group>"; };
 		34193E933EE80922D8F736A4 /* AdminPlatformView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminPlatformView.swift; sourceTree = "<group>"; };
 		39360E9737FD8F36A30DA8DF /* MockKeychainHelper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MockKeychainHelper.swift; sourceTree = "<group>"; };
 		3B76FDAA343695CB38541957 /* ConfigStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfigStore.swift; sourceTree = "<group>"; };
@@ -381,6 +383,15 @@
 			);
 			name = Admin;
 			path = Admin;
+			sourceTree = "<group>";
+		};
+		2D8F24E51BE635F41CF635D0 /* Teams */ = {
+			isa = PBXGroup;
+			children = (
+				315BDF0479C21A9D439694BD /* TeamsView.swift */,
+			);
+			name = Teams;
+			path = Teams;
 			sourceTree = "<group>";
 		};
 		39A2B90F2C6486CFC95E3B09 /* Replay */ = {
@@ -726,6 +737,7 @@
 				9B14A4D3236B9EB6C7F5E4FD /* ConfigSubTab.swift */,
 				FFD7E48FD590CE285BE71F91 /* ConfigSidebar.swift */,
 				C371B5349E0C256432A89257 /* Sessions */,
+				2D8F24E51BE635F41CF635D0 /* Teams */,
 			);
 			name = Config;
 			path = Config;
@@ -1013,6 +1025,7 @@
 				B52952C1700C4498D5C91F71 /* ConfigSubTab.swift in Sources */,
 				B0C904E7E4C8C6533352E9CE /* ConfigSidebar.swift in Sources */,
 				6506030C90803B0858BAD3F7 /* SessionsView.swift in Sources */,
+				3615305F0F4DD5F2533CB7E9 /* TeamsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

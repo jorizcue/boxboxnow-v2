@@ -10,8 +10,10 @@ final class ConfigStore {
     var presets: [DriverConfigPreset] = []
     var preferences: DriverPreferences?
     var activeSession: RaceSession?
+    var teams: [Team] = []
     var isLoading: Bool = false
     var isLoadingSession: Bool = false
+    var isLoadingTeams: Bool = false
     var lastError: String?
 
     private let configService: ConfigService
@@ -87,6 +89,36 @@ final class ConfigStore {
         }
     }
 
+    /// Fetches the full team-positions list for the active session. Returns
+    /// to an empty list and records `lastError` on failure (including the 404
+    /// the server returns when there is no active session).
+    func reloadTeams() async {
+        isLoadingTeams = true
+        defer { isLoadingTeams = false }
+        do {
+            teams = try await configService.teams()
+        } catch {
+            lastError = ErrorMessages.userFacing(error)
+        }
+    }
+
+    /// Bulk-saves the draft list back to the server. On success, replaces
+    /// `teams` with the server's authoritative response (which contains the
+    /// new ids and final positions) and returns `true`. Returns `false` on
+    /// failure; the caller should inspect `lastError` for the message.
+    @discardableResult
+    func saveTeams(_ draft: [Team]) async -> Bool {
+        isLoadingTeams = true
+        defer { isLoadingTeams = false }
+        do {
+            teams = try await configService.saveTeams(draft)
+            return true
+        } catch {
+            lastError = ErrorMessages.userFacing(error)
+            return false
+        }
+    }
+
     /// Clears all observable state back to initial values. Called on logout
     /// so a subsequent login on the same AppStore instance doesn't briefly
     /// flash the previous user's config at the new user.
@@ -97,8 +129,10 @@ final class ConfigStore {
         presets = []
         preferences = nil
         activeSession = nil
+        teams = []
         isLoading = false
         isLoadingSession = false
+        isLoadingTeams = false
         lastError = nil
     }
 }

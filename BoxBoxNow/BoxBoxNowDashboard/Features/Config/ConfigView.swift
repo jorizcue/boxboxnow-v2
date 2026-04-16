@@ -14,7 +14,7 @@ struct ConfigView: View {
             Group {
                 switch selection {
                 case .sessions:    SessionsView()
-                case .teams:       PlaceholderView(text: "Equipos — Fase B")
+                case .teams:       TeamsView()
                 case .circuits:    PlaceholderView(text: "Circuitos — Fase B")
                 case .presets:     PlaceholderView(text: "Presets — Fase B")
                 case .preferences: PlaceholderView(text: "Preferencias — Fase B")

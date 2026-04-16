@@ -68,6 +68,12 @@ extension APIClient {
         return try await executeJSON(req)
     }
 
+    func putJSON<Body: Encodable, T: Decodable>(_ path: String, body: Body) async throws -> T {
+        let data = try Self.jsonEncoder.encode(body)
+        let req = try buildDashboardRequest(path, method: "PUT", query: nil, body: data)
+        return try await executeJSON(req)
+    }
+
     func deleteJSON(_ path: String) async throws {
         let req = try buildDashboardRequest(path, method: "DELETE", query: nil, body: nil)
         let (_, response) = try await effectiveSession.data(for: req)

@@ -55,4 +55,20 @@ struct ConfigService {
     func updateSession(_ session: RaceSession) async throws -> RaceSession {
         try await api.patchJSON("/config/session", body: session)
     }
+
+    // MARK: - Team Positions (bulk replace)
+
+    /// GET `/config/teams` — returns all teams for the user's active session.
+    /// If there is no active session the server 404s; the store surfaces that
+    /// as a user-facing error.
+    func teams() async throws -> [Team] {
+        try await api.getJSON("/config/teams")
+    }
+
+    /// PUT `/config/teams` — bulk-replaces the team list on the active
+    /// session. Server deletes all existing rows and re-creates from the
+    /// body, so the caller must send the complete desired state.
+    func saveTeams(_ teams: [Team]) async throws -> [Team] {
+        try await api.putJSON("/config/teams", body: teams)
+    }
 }
