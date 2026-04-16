@@ -37,20 +37,31 @@ struct DriverConfigPreset: Codable, Identifiable {
     let visibleCards: [String: Bool]
     let cardOrder: [String]
     let isDefault: Bool
+    let contrast: Double?
+    let orientation: String?
+    let audioEnabled: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, name
         case visibleCards = "visible_cards"
         case cardOrder = "card_order"
         case isDefault = "is_default"
+        case contrast
+        case orientation
+        case audioEnabled = "audio_enabled"
     }
 
-    init(id: Int, name: String, visibleCards: [String: Bool], cardOrder: [String], isDefault: Bool = false) {
+    init(id: Int, name: String, visibleCards: [String: Bool], cardOrder: [String],
+         isDefault: Bool = false, contrast: Double? = nil, orientation: String? = nil,
+         audioEnabled: Bool? = nil) {
         self.id = id
         self.name = name
         self.visibleCards = visibleCards
         self.cardOrder = cardOrder
         self.isDefault = isDefault
+        self.contrast = contrast
+        self.orientation = orientation
+        self.audioEnabled = audioEnabled
     }
 
     init(from decoder: Decoder) throws {
@@ -60,6 +71,9 @@ struct DriverConfigPreset: Codable, Identifiable {
         self.visibleCards = try c.decode([String: Bool].self, forKey: .visibleCards)
         self.cardOrder = try c.decode([String].self, forKey: .cardOrder)
         self.isDefault = (try? c.decode(Bool.self, forKey: .isDefault)) ?? false
+        self.contrast = try? c.decode(Double.self, forKey: .contrast)
+        self.orientation = try? c.decode(String.self, forKey: .orientation)
+        self.audioEnabled = try? c.decode(Bool.self, forKey: .audioEnabled)
     }
 }
 

@@ -31,9 +31,14 @@ final class APIClient {
         return try await get("/config/presets")
     }
 
-    func createPreset(name: String, visibleCards: [String: Bool], cardOrder: [String], isDefault: Bool = false) async throws -> DriverConfigPreset {
+    func createPreset(name: String, visibleCards: [String: Bool], cardOrder: [String],
+                      isDefault: Bool = false, contrast: Double? = nil,
+                      orientation: String? = nil, audioEnabled: Bool? = nil) async throws -> DriverConfigPreset {
         var body: [String: Any] = ["name": name, "visible_cards": visibleCards, "card_order": cardOrder]
         if isDefault { body["is_default"] = true }
+        if let contrast { body["contrast"] = contrast }
+        if let orientation { body["orientation"] = orientation }
+        if let audioEnabled { body["audio_enabled"] = audioEnabled }
         return try await post("/config/presets", body: body)
     }
 

@@ -32,6 +32,7 @@
 		1FB3D7DAD8A0EB3E24B7CA78 /* APIClient+Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E485FA80390A19423F682CF /* APIClient+Dashboard.swift */; };
 		227BA39D131C28977A71EEE9 /* InPitListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F5AA6F0090B7356B269CA5A /* InPitListView.swift */; };
 		26400F3AEB640F29C722C63C /* AdminStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25E7735976C6A9E5B5F723AD /* AdminStore.swift */; };
+		283C55FAA1045E473E80DE6C /* TemplateWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 860D0E4D002830EFD61AD88F /* TemplateWizardView.swift */; };
 		288C62711DB7C967FDC98EFD /* CircuitsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 481362AA4F28A4F271D39D3F /* CircuitsView.swift */; };
 		291DFB0EFA081CA4709978AF /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6450E4BD57F2989352AFB301 /* AuthStore.swift */; };
 		2B3BC1FB1BEAD5CCA9DDF228 /* PitHistoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1CA6753BFC24B438229FD56 /* PitHistoryListView.swift */; };
@@ -138,6 +139,7 @@
 		E5636489B335E0A6D27C41DD /* kart_state_extended.json in Resources */ = {isa = PBXBuildFile; fileRef = F205186513E7161023210D38 /* kart_state_extended.json */; };
 		E684D0DFAB392A16C766A928 /* MFASetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21392B7494C9541A5A6EE41C /* MFASetupView.swift */; };
 		E6D2650DDDCB21BF8428FC90 /* SidebarItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F076C7DDFF8222620E3532C6 /* SidebarItem.swift */; };
+		E7DEF6BE5CAA87D11285386C /* RaceInfoPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8673F105C2BA24365EF231E4 /* RaceInfoPanel.swift */; };
 		E86B51C329ABB526A9662FC7 /* AdminPlatformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34193E933EE80922D8F736A4 /* AdminPlatformView.swift */; };
 		E938A0BB87913D93115DB2FE /* update.json in Resources */ = {isa = PBXBuildFile; fileRef = 236D0520DA0FEFD14CD4AEF5 /* update.json */; };
 		EA2E2291D48C6F840085A699 /* ReplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE2A0F478A02471DD29E87D5 /* ReplayView.swift */; };
@@ -187,7 +189,7 @@
 		21043E9C4531429CD721FB8D /* DriverRankingRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DriverRankingRow.swift; sourceTree = "<group>"; };
 		21392B7494C9541A5A6EE41C /* MFASetupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MFASetupView.swift; sourceTree = "<group>"; };
 		21E87C931E6632A670F6FCD3 /* NewModuleModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewModuleModelTests.swift; sourceTree = "<group>"; };
-		236D0520DA0FEFD14CD4AEF5 /* update.json */ = {isa = PBXFileReference; includeInIndex = 1; path = update.json; sourceTree = "<group>"; };
+		236D0520DA0FEFD14CD4AEF5 /* update.json */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.json; path = update.json; sourceTree = "<group>"; };
 		237109830CC151188A561377 /* LoginView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		23CAB0D3FBBB6BF2C7A7386F /* ClassificationEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClassificationEntry.swift; sourceTree = "<group>"; };
 		244C0A812F8D3A2A0047102F /* BoxBoxNow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BoxBoxNow.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -196,7 +198,7 @@
 		2937B4F8F45299E1ED888A6F /* ReplayControlsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayControlsView.swift; sourceTree = "<group>"; };
 		2A9A5C399A2BCCDAF140E6B3 /* BoxCallOverlay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoxCallOverlay.swift; sourceTree = "<group>"; };
 		2B5A2F519FE31E4E030C49AB /* BBNFlowLayout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNFlowLayout.swift; sourceTree = "<group>"; };
-		2BD72A620151DBF945560B96 /* fifo_update.json */ = {isa = PBXFileReference; includeInIndex = 1; path = fifo_update.json; sourceTree = "<group>"; };
+		2BD72A620151DBF945560B96 /* fifo_update.json */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.json; path = fifo_update.json; sourceTree = "<group>"; };
 		315BDF0479C21A9D439694BD /* TeamsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeamsView.swift; sourceTree = "<group>"; };
 		34193E933EE80922D8F736A4 /* AdminPlatformView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminPlatformView.swift; sourceTree = "<group>"; };
 		37F8EE72AFB45E05639450FE /* PreferencesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
@@ -205,7 +207,7 @@
 		3E34F3AC93FC3FE75EB9179E /* RaceService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceService.swift; sourceTree = "<group>"; };
 		3E485FA80390A19423F682CF /* APIClient+Dashboard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "APIClient+Dashboard.swift"; sourceTree = "<group>"; };
 		4067D63C254A19BA7907E198 /* DriverLiveView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DriverLiveView.swift; sourceTree = "<group>"; };
-		4132D5E13DE7435DACF4F43C /* BoxBoxNowDashboardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = BoxBoxNowDashboardTests.xctest; path = BoxBoxNowDashboardTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4132D5E13DE7435DACF4F43C /* BoxBoxNowDashboardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BoxBoxNowDashboardTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		481362AA4F28A4F271D39D3F /* CircuitsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CircuitsView.swift; sourceTree = "<group>"; };
 		483E97C925E47FED7D0FF29D /* GoogleOAuthFlow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GoogleOAuthFlow.swift; sourceTree = "<group>"; };
 		49FA1337C4CA7FADA768B59A /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -242,6 +244,8 @@
 		7FF543B259C0AF62F8317293 /* RaceStoreWebSocketIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceStoreWebSocketIntegrationTests.swift; sourceTree = "<group>"; };
 		81AA45AEF2A95C092E390B3D /* GForceScatterView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GForceScatterView.swift; sourceTree = "<group>"; };
 		835130EAF2454A3C8D55C1A1 /* FifoEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FifoEntry.swift; sourceTree = "<group>"; };
+		860D0E4D002830EFD61AD88F /* TemplateWizardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TemplateWizardView.swift; sourceTree = "<group>"; };
+		8673F105C2BA24365EF231E4 /* RaceInfoPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceInfoPanel.swift; sourceTree = "<group>"; };
 		884187EE66E1C5A4437A7B6B /* AdminHubModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdminHubModels.swift; sourceTree = "<group>"; };
 		88BBF321798E4D67E39EA2FE /* GPSInsightModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GPSInsightModels.swift; sourceTree = "<group>"; };
 		8B27F23A1CCCF192DCDFC293 /* KeychainProtocol.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainProtocol.swift; sourceTree = "<group>"; };
@@ -260,7 +264,7 @@
 		AF20CC97B40E834008D5808F /* AnalyticsModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AnalyticsModels.swift; sourceTree = "<group>"; };
 		AFAD0DB2B2D79155CA0AA1F9 /* RaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceView.swift; sourceTree = "<group>"; };
 		B316275B4279829C43AE2145 /* AnalyticsStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AnalyticsStore.swift; sourceTree = "<group>"; };
-		B37F20E81BB1582179DFDA9B /* replay_status.json */ = {isa = PBXFileReference; includeInIndex = 1; path = replay_status.json; sourceTree = "<group>"; };
+		B37F20E81BB1582179DFDA9B /* replay_status.json */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.json; path = replay_status.json; sourceTree = "<group>"; };
 		B419B4157B3624BFD1D53DD8 /* KartNumberBadge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KartNumberBadge.swift; sourceTree = "<group>"; };
 		B978CAD275F81D34EC842DD0 /* BoxBoxNowDashboardUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = BoxBoxNowDashboardUITests.xctest; path = .xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC97D4B59A8484A2E32DE90A /* BBNTierBadge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNTierBadge.swift; sourceTree = "<group>"; };
@@ -301,13 +305,13 @@
 		F076C7DDFF8222620E3532C6 /* SidebarItem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SidebarItem.swift; sourceTree = "<group>"; };
 		F12229FCE4736357FC38AC5D /* BBNToast.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BBNToast.swift; sourceTree = "<group>"; };
 		F169E4E49CAEF6665E8F9482 /* MFACodeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MFACodeView.swift; sourceTree = "<group>"; };
-		F205186513E7161023210D38 /* kart_state_extended.json */ = {isa = PBXFileReference; includeInIndex = 1; path = kart_state_extended.json; sourceTree = "<group>"; };
+		F205186513E7161023210D38 /* kart_state_extended.json */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.json; path = kart_state_extended.json; sourceTree = "<group>"; };
 		F26D9D1C4A0C580FF84AF5CA /* JSONValueTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JSONValueTests.swift; sourceTree = "<group>"; };
 		F391A3DB026BCE89A9FA51B7 /* AnalyticsService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AnalyticsService.swift; sourceTree = "<group>"; };
 		F7BD3E54B75379ED5907AB35 /* KartDetailSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KartDetailSheet.swift; sourceTree = "<group>"; };
 		F849B0990A9D5D86DFF48538 /* RaceStoreReducerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RaceStoreReducerTests.swift; sourceTree = "<group>"; };
 		FCA66F6BE6FA42C45673659A /* KartAnalyticsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KartAnalyticsView.swift; sourceTree = "<group>"; };
-		FF9191539843FAF88AD2810E /* snapshot.json */ = {isa = PBXFileReference; includeInIndex = 1; path = snapshot.json; sourceTree = "<group>"; };
+		FF9191539843FAF88AD2810E /* snapshot.json */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.json; path = snapshot.json; sourceTree = "<group>"; };
 		FFD7E48FD590CE285BE71F91 /* ConfigSidebar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfigSidebar.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -391,7 +395,6 @@
 				CB82689DA21993AA5A90FF11 /* BBNStatCard.swift */,
 				2B5A2F519FE31E4E030C49AB /* BBNFlowLayout.swift */,
 			);
-			name = Components;
 			path = Components;
 			sourceTree = "<group>";
 		};
@@ -403,8 +406,16 @@
 				1F5AA6F0090B7356B269CA5A /* InPitListView.swift */,
 				D1CA6753BFC24B438229FD56 /* PitHistoryListView.swift */,
 			);
-			name = Pit;
 			path = Pit;
+			sourceTree = "<group>";
+		};
+		213C835E7BFA3A06D8BF9C18 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				860D0E4D002830EFD61AD88F /* TemplateWizardView.swift */,
+			);
+			name = Config;
+			path = Config;
 			sourceTree = "<group>";
 		};
 		2150ECB544B0FECA2572E241 /* Presets */ = {
@@ -413,7 +424,6 @@
 				9C6F83774AA67E03DC0C730E /* PresetsView.swift */,
 				1116FD77F954B7536C37E496 /* PresetFormView.swift */,
 			);
-			name = Presets;
 			path = Presets;
 			sourceTree = "<group>";
 		};
@@ -427,6 +437,7 @@
 				14C1079D210221371A8FA163 /* Shared */,
 				3CC268C9A5A02F9BBAB1C276 /* BoxBoxNowDashboardTests */,
 				B2290A3264797E27865EF189 /* BoxBoxNowDashboardUITests */,
+				8E25BFD1998C24950999A98A /* BoxBoxNow */,
 			);
 			sourceTree = "<group>";
 		};
@@ -450,7 +461,6 @@
 				34193E933EE80922D8F736A4 /* AdminPlatformView.swift */,
 				756D73E0DC6288850E2CC854 /* Users */,
 			);
-			name = Admin;
 			path = Admin;
 			sourceTree = "<group>";
 		};
@@ -459,7 +469,6 @@
 			children = (
 				315BDF0479C21A9D439694BD /* TeamsView.swift */,
 			);
-			name = Teams;
 			path = Teams;
 			sourceTree = "<group>";
 		};
@@ -469,7 +478,6 @@
 				EE2A0F478A02471DD29E87D5 /* ReplayView.swift */,
 				2937B4F8F45299E1ED888A6F /* ReplayControlsView.swift */,
 			);
-			name = Replay;
 			path = Replay;
 			sourceTree = "<group>";
 		};
@@ -483,7 +491,6 @@
 				C0799A27CA19969AD9077E64 /* Stores */,
 				43E0D42C4547F1D3977A8B27 /* Features */,
 			);
-			name = BoxBoxNowDashboardTests;
 			path = BoxBoxNowDashboardTests;
 			sourceTree = "<group>";
 		};
@@ -492,7 +499,6 @@
 			children = (
 				37F8EE72AFB45E05639450FE /* PreferencesView.swift */,
 			);
-			name = Preferences;
 			path = Preferences;
 			sourceTree = "<group>";
 		};
@@ -501,7 +507,6 @@
 			children = (
 				8FAA4892231F3C21098444BB /* Race */,
 			);
-			name = Features;
 			path = Features;
 			sourceTree = "<group>";
 		};
@@ -515,7 +520,6 @@
 				39360E9737FD8F36A30DA8DF /* MockKeychainHelper.swift */,
 				5DF5ACFDAE7C9C80EF8A9E39 /* AsyncTestHelpers.swift */,
 			);
-			name = Helpers;
 			path = Helpers;
 			sourceTree = "<group>";
 		};
@@ -531,7 +535,6 @@
 				B316275B4279829C43AE2145 /* AnalyticsStore.swift */,
 				C82799D789A30726072A6469 /* InsightsStore.swift */,
 			);
-			name = Stores;
 			path = Stores;
 			sourceTree = "<group>";
 		};
@@ -544,7 +547,6 @@
 				BD90191EE4504727D0DC9F2D /* DecodeFixturesTests.swift */,
 				21E87C931E6632A670F6FCD3 /* NewModuleModelTests.swift */,
 			);
-			name = Models;
 			path = Models;
 			sourceTree = "<group>";
 		};
@@ -561,7 +563,6 @@
 			children = (
 				CCFF9DF7BC9FE102F2BCD2C1 /* UserDetailSheet.swift */,
 			);
-			name = Users;
 			path = Users;
 			sourceTree = "<group>";
 		};
@@ -575,7 +576,6 @@
 				4E5E297ABEF5039AC38C4B23 /* Stores */,
 				F799F1921EDBF482E43003F7 /* Features */,
 			);
-			name = BoxBoxNowDashboard;
 			path = BoxBoxNowDashboard;
 			sourceTree = "<group>";
 		};
@@ -584,7 +584,6 @@
 			children = (
 				DC2AB5820A74FC7D77F31256 /* BoxBoxNowDashboardApp.swift */,
 			);
-			name = App;
 			path = App;
 			sourceTree = "<group>";
 		};
@@ -597,8 +596,16 @@
 				60846C94F559502132745197 /* BiometricLoginView.swift */,
 				ABABB34C05F49051365BAEB0 /* AuthFlowView.swift */,
 			);
-			name = Auth;
 			path = Auth;
+			sourceTree = "<group>";
+		};
+		8E25BFD1998C24950999A98A /* BoxBoxNow */ = {
+			isa = PBXGroup;
+			children = (
+				B75D0F5BECBE29232ACB739F /* Views */,
+			);
+			name = BoxBoxNow;
+			path = BoxBoxNow;
 			sourceTree = "<group>";
 		};
 		8FAA4892231F3C21098444BB /* Race */ = {
@@ -606,7 +613,6 @@
 			children = (
 				D840B33E3FF748BA4E2D2992 /* RaceFormattersTests.swift */,
 			);
-			name = Race;
 			path = Race;
 			sourceTree = "<group>";
 		};
@@ -626,7 +632,6 @@
 				5693892C50857851C7263E68 /* SpeedTraceView.swift */,
 				81AA45AEF2A95C092E390B3D /* GForceScatterView.swift */,
 			);
-			name = Insights;
 			path = Insights;
 			sourceTree = "<group>";
 		};
@@ -636,7 +641,6 @@
 				FCA66F6BE6FA42C45673659A /* KartAnalyticsView.swift */,
 				7844F19F8942C3D6CE90EF7F /* KartAnalyticsDetailSheet.swift */,
 			);
-			name = Analytics;
 			path = Analytics;
 			sourceTree = "<group>";
 		};
@@ -645,8 +649,16 @@
 			children = (
 				7D0E10F82251013E005E679D /* BoxBoxNowDashboardUITests.swift */,
 			);
-			name = BoxBoxNowDashboardUITests;
 			path = BoxBoxNowDashboardUITests;
+			sourceTree = "<group>";
+		};
+		B75D0F5BECBE29232ACB739F /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				213C835E7BFA3A06D8BF9C18 /* Config */,
+			);
+			name = Views;
+			path = Views;
 			sourceTree = "<group>";
 		};
 		BA9A9A034E73357F4C9641A3 /* Shell */ = {
@@ -660,7 +672,6 @@
 				49FA1337C4CA7FADA768B59A /* RootView.swift */,
 				52B74EEA0A4E029DB828ACDC /* PlaceholderView.swift */,
 			);
-			name = Shell;
 			path = Shell;
 			sourceTree = "<group>";
 		};
@@ -673,7 +684,6 @@
 				2BD72A620151DBF945560B96 /* fifo_update.json */,
 				B37F20E81BB1582179DFDA9B /* replay_status.json */,
 			);
-			name = Fixtures;
 			path = Fixtures;
 			sourceTree = "<group>";
 		};
@@ -685,7 +695,6 @@
 				0ACE79CD368311DA6FB2542D /* RaceStore+TestHelpers.swift */,
 				7FF543B259C0AF62F8317293 /* RaceStoreWebSocketIntegrationTests.swift */,
 			);
-			name = Stores;
 			path = Stores;
 			sourceTree = "<group>";
 		};
@@ -694,7 +703,6 @@
 			children = (
 				DA2D09A378A0D150AB8E38F6 /* SessionsView.swift */,
 			);
-			name = Sessions;
 			path = Sessions;
 			sourceTree = "<group>";
 		};
@@ -706,8 +714,8 @@
 				ED146384A5BA8F1E0D35F350 /* RaceTableHeader.swift */,
 				E7856AF9152E00BC79E39E70 /* RaceRowView.swift */,
 				F7BD3E54B75379ED5907AB35 /* KartDetailSheet.swift */,
+				8673F105C2BA24365EF231E4 /* RaceInfoPanel.swift */,
 			);
-			name = Race;
 			path = Race;
 			sourceTree = "<group>";
 		};
@@ -718,7 +726,6 @@
 				11FF2A2767E16F4B71E59B7A /* BBNTypography.swift */,
 				1F6040C68E2D19B409DBA909 /* Components */,
 			);
-			name = Design;
 			path = Design;
 			sourceTree = "<group>";
 		};
@@ -727,7 +734,6 @@
 			children = (
 				481362AA4F28A4F271D39D3F /* CircuitsView.swift */,
 			);
-			name = Circuits;
 			path = Circuits;
 			sourceTree = "<group>";
 		};
@@ -738,7 +744,6 @@
 				184D52FEB1D2562F8F47BD6E /* DriverCardView.swift */,
 				F00406B55FE239E879AC8601 /* DriverGridView.swift */,
 			);
-			name = Driver;
 			path = Driver;
 			sourceTree = "<group>";
 		};
@@ -749,7 +754,6 @@
 				6745FFF5BA35699AD9276BE4 /* OrderableCardList.swift */,
 				0C6A38596924D82FDDA74E5C /* PreviewGridView.swift */,
 			);
-			name = DriverConfig;
 			path = DriverConfig;
 			sourceTree = "<group>";
 		};
@@ -770,7 +774,6 @@
 				F391A3DB026BCE89A9FA51B7 /* AnalyticsService.swift */,
 				16C5D03A80E1CA2F9908F3AE /* InsightsService.swift */,
 			);
-			name = Services;
 			path = Services;
 			sourceTree = "<group>";
 		};
@@ -780,7 +783,6 @@
 				AE9B41368B3473E19EEEE5CE /* APIClientDashboardTests.swift */,
 				AB4502BAB3CE61EC1C3DE376 /* RaceWebSocketClientTests.swift */,
 			);
-			name = Services;
 			path = Services;
 			sourceTree = "<group>";
 		};
@@ -807,7 +809,6 @@
 				88BBF321798E4D67E39EA2FE /* GPSInsightModels.swift */,
 				884187EE66E1C5A4437A7B6B /* AdminHubModels.swift */,
 			);
-			name = Models;
 			path = Models;
 			sourceTree = "<group>";
 		};
@@ -821,7 +822,6 @@
 				5915D0E8058F4E5A39739E57 /* DriverRanking.swift */,
 				21043E9C4531429CD721FB8D /* DriverRankingRow.swift */,
 			);
-			name = Adjusted;
 			path = Adjusted;
 			sourceTree = "<group>";
 		};
@@ -842,7 +842,6 @@
 				AC68B93325511CCA871B416D /* Insights */,
 				25E24DC043EEEDAD176999D5 /* Admin */,
 			);
-			name = Features;
 			path = Features;
 			sourceTree = "<group>";
 		};
@@ -852,7 +851,6 @@
 				DA26C19EF0F2C2B515CCF221 /* LiveDashboardView.swift */,
 				DC5D3173109E19A2D14A6AB8 /* LiveWebView.swift */,
 			);
-			name = Live;
 			path = Live;
 			sourceTree = "<group>";
 		};
@@ -868,7 +866,6 @@
 				2150ECB544B0FECA2572E241 /* Presets */,
 				3F3F5F4725E2F080ED1D6FCD /* Preferences */,
 			);
-			name = Config;
 			path = Config;
 			sourceTree = "<group>";
 		};
@@ -926,8 +923,8 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				244C0A832F8D3A2A0047102F /* BoxBoxNow */,
 				14C1079D210221371A8FA163 /* Shared */,
+				244C0A832F8D3A2A0047102F /* BoxBoxNow */,
 			);
 			name = BoxBoxNow;
 			productName = BoxBoxNow;
@@ -1038,6 +1035,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				283C55FAA1045E473E80DE6C /* TemplateWizardView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1183,6 +1181,7 @@
 				2BBDC5D71BC9B05D0824B30E /* AdminHubModels.swift in Sources */,
 				0ABD889D1A1DFE574943A54A /* UserDetailSheet.swift in Sources */,
 				CC9B9B0412EF33089A415227 /* BBNFlowLayout.swift in Sources */,
+				E7DEF6BE5CAA87D11285386C /* RaceInfoPanel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1225,7 +1224,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = BoxBoxNowDashboard/BoxBoxNowDashboard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "$(DEVELOPMENT_TEAM)";
+				DEVELOPMENT_TEAM = 8HBXJXJC68;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BoxBoxNowDashboard/Info.plist;
@@ -1250,7 +1249,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = BoxBoxNowDashboard/BoxBoxNowDashboard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "$(DEVELOPMENT_TEAM)";
+				DEVELOPMENT_TEAM = 8HBXJXJC68;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BoxBoxNowDashboard/Info.plist;

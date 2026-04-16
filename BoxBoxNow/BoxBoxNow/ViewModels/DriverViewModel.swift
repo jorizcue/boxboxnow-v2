@@ -118,6 +118,10 @@ final class DriverViewModel: ObservableObject {
         visibleCards = preset.visibleCards
         cardOrder = preset.cardOrder
         selectedPresetId = preset.id
+        if let c = preset.contrast { brightness = c }
+        if let o = preset.orientation, let lock = OrientationLock(rawValue: o) {
+            orientationLock = lock
+        }
         saveConfig()
     }
 
@@ -126,7 +130,27 @@ final class DriverViewModel: ObservableObject {
             name: name, visibleCards: visibleCards, cardOrder: cardOrder, isDefault: isDefault)
         await MainActor.run {
             if isDefault {
-                // Server already unset any previous default; mirror that locally.
+                self.presets = self.presets.map { p in
+                    DriverConfigPreset(
+                        id: p.id, name: p.name,
+                        visibleCards: p.visibleCards, cardOrder: p.cardOrder,
+                        isDefault: false
+                    )
+                }
+            }
+            self.presets.append(preset)
+        }
+    }
+
+    func saveAsPreset(name: String, visibleCards: [String: Bool], cardOrder: [String],
+                      contrast: Double, orientation: String, audioEnabled: Bool,
+                      isDefault: Bool = false) async throws {
+        let preset = try await APIClient.shared.createPreset(
+            name: name, visibleCards: visibleCards, cardOrder: cardOrder,
+            isDefault: isDefault, contrast: contrast, orientation: orientation,
+            audioEnabled: audioEnabled)
+        await MainActor.run {
+            if isDefault {
                 self.presets = self.presets.map { p in
                     DriverConfigPreset(
                         id: p.id, name: p.name,

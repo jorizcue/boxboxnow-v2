@@ -37,15 +37,7 @@ struct ConfigView: View {
                     Label("Box", systemImage: "wrench.and.screwdriver")
                 }
             }
-            if canAccess("app-config-visualizacion") {
-                NavigationLink(destination: CardVisibilityView()) {
-                    Label("Visualización — Tarjetas", systemImage: "eye")
-                }
-                NavigationLink(destination: CardOrderPreviewView()) {
-                    Label("Visualización — Orden", systemImage: "arrow.up.arrow.down")
-                }
-            }
-            if canAccess("app-config-plantillas") {
+            if canAccess("app-config-plantillas") || canAccess("app-config-visualizacion") {
                 NavigationLink(destination: PresetsView()) {
                     Label("Plantillas", systemImage: "doc.on.doc")
                 }

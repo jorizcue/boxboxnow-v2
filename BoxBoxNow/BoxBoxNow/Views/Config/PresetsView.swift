@@ -3,10 +3,9 @@ import SwiftUI
 struct PresetsView: View {
     @EnvironmentObject var driverVM: DriverViewModel
     @EnvironmentObject var toast: ToastManager
-    @State private var showSaveSheet = false
-    @State private var presetName = ""
+    @EnvironmentObject var auth: AuthViewModel
+    @State private var showWizard = false
     @State private var isLoading = true
-    @State private var isSaving = false
     @State private var presetToDelete: DriverConfigPreset?
 
     var body: some View {
@@ -84,18 +83,12 @@ struct PresetsView: View {
             }
 
             Section {
-                Button(action: { showSaveSheet = true }) {
-                    HStack {
-                        Label("Guardar configuracion actual", systemImage: "square.and.arrow.down")
-                        if isSaving {
-                            Spacer()
-                            ProgressView()
-                        }
-                    }
-                    .frame(minHeight: 44)
+                Button(action: { showWizard = true }) {
+                    Label("Nueva plantilla", systemImage: "plus.circle.fill")
+                        .frame(minHeight: 44)
                 }
-                .disabled(driverVM.presets.count >= Constants.maxPresets || isSaving)
-                .accessibilityLabel("Guardar configuracion actual como plantilla")
+                .disabled(driverVM.presets.count >= Constants.maxPresets)
+                .accessibilityLabel("Crear nueva plantilla con asistente")
             }
         }
         .navigationTitle("Plantillas")
@@ -103,10 +96,14 @@ struct PresetsView: View {
             await driverVM.loadPresets()
             isLoading = false
         }
-        .alert("Guardar plantilla", isPresented: $showSaveSheet) {
-            TextField("Nombre", text: $presetName)
-            Button("Guardar") { savePreset() }
-            Button("Cancelar", role: .cancel) { presetName = "" }
+        .sheet(isPresented: $showWizard) {
+            TemplateWizardView()
+                .environmentObject(driverVM)
+                .environmentObject(auth)
+                .environmentObject(toast)
+                .onDisappear {
+                    Task { await driverVM.loadPresets() }
+                }
         }
         .alert("Eliminar plantilla", isPresented: .init(
             get: { presetToDelete != nil },
@@ -119,26 +116,6 @@ struct PresetsView: View {
         } message: {
             if let preset = presetToDelete {
                 Text("Se eliminara la plantilla \"\(preset.name)\". Esta accion no se puede deshacer.")
-            }
-        }
-    }
-
-    private func savePreset() {
-        guard !presetName.isEmpty else { return }
-        isSaving = true
-        Task {
-            do {
-                try await driverVM.saveAsPreset(name: presetName)
-                await MainActor.run {
-                    toast.success("Plantilla \"\(presetName)\" guardada")
-                    presetName = ""
-                    isSaving = false
-                }
-            } catch {
-                await MainActor.run {
-                    toast.error("Error al guardar: \(error.localizedDescription)")
-                    isSaving = false
-                }
             }
         }
     }
