@@ -188,7 +188,11 @@ struct SessionsView: View {
     // MARK: - IO
 
     private func loadFromServer() async {
-        if app.config.circuits.isEmpty && app.config.activeSession == nil && app.config.lastError == nil {
+        // Circuits are needed to render the picker regardless of whether a
+        // session exists. Re-navigating to the tab after a transient error
+        // (e.g. the user hit a 500 on first load) should transparently retry —
+        // refresh() is idempotent, and lastError should not gate the retry.
+        if app.config.circuits.isEmpty {
             await app.config.refresh()
         }
         await app.config.reloadActiveSession()
@@ -239,9 +243,8 @@ struct SessionsView: View {
             refreshIntervalS: refreshIntervalS,
             isActive: true
         )
-        _ = await app.config.saveSession(draft)
-        if let s = app.config.activeSession {
-            apply(s)
+        if let saved = await app.config.saveSession(draft) {
+            apply(saved)
         }
     }
 }

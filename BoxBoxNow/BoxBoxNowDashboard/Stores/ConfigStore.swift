@@ -63,8 +63,13 @@ final class ConfigStore {
     /// Persists the form's RaceSession. If there is no active session yet,
     /// POSTs to create a new one; otherwise PATCHes the existing one. On
     /// success, replaces `activeSession` with the server's authoritative
-    /// response. Returns `true` on success for the UI to dismiss spinners.
-    func saveSession(_ draft: RaceSession) async -> Bool {
+    /// response and returns it so callers can apply the persisted state
+    /// directly without re-reading the store (the store mutation and the
+    /// caller's reaction are then on the same execution tick, which avoids
+    /// a transient nil-activeSession flash on the form). Returns `nil` on
+    /// failure; callers should inspect `lastError` for the user-facing
+    /// message.
+    func saveSession(_ draft: RaceSession) async -> RaceSession? {
         isLoadingSession = true
         defer { isLoadingSession = false }
         do {
@@ -75,10 +80,10 @@ final class ConfigStore {
                 saved = try await configService.updateSession(draft)
             }
             activeSession = saved
-            return true
+            return saved
         } catch {
             lastError = ErrorMessages.userFacing(error)
-            return false
+            return nil
         }
     }
 
