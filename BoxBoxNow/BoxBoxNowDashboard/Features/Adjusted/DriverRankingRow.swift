@@ -16,7 +16,7 @@ struct DriverRankingRow: View {
             KartNumberBadge(number: ranking.kartNumber, size: 36)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(ranking.driverName)
+                Text(ranking.driverName.isEmpty ? "—" : ranking.driverName)
                     .font(BBNTypography.body)
                     .foregroundStyle(BBNColors.textPrimary)
                 if !ranking.teamName.isEmpty {
@@ -27,23 +27,12 @@ struct DriverRankingRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text(RaceFormatters.lapTime(ms: ranking.avgLapMs))
-                .font(BBNTypography.body)
-                .monospacedDigit()
-                .foregroundStyle(BBNColors.accent)
-                .frame(width: 100, alignment: .trailing)
-
-            Text(RaceFormatters.lapTime(ms: ranking.totalMs))
-                .font(BBNTypography.body)
-                .monospacedDigit()
-                .foregroundStyle(BBNColors.textPrimary)
-                .frame(width: 110, alignment: .trailing)
-
-            Text("\(ranking.totalLaps)")
-                .font(BBNTypography.body)
-                .monospacedDigit()
-                .foregroundStyle(BBNColors.textMuted)
-                .frame(width: 64, alignment: .trailing)
+            cell(RaceFormatters.lapTime(ms: ranking.avgLapMs),
+                 width: 100, align: .trailing, color: BBNColors.accent)
+            cell(RaceFormatters.lapTime(ms: ranking.totalMs),
+                 width: 110, align: .trailing)
+            cell("\(ranking.totalLaps)", width: 64, align: .trailing,
+                 color: BBNColors.textMuted)
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 12)
@@ -53,6 +42,28 @@ struct DriverRankingRow: View {
             alignment: .bottom
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Posición \(ranking.position), kart \(ranking.kartNumber), \(ranking.driverName), promedio \(RaceFormatters.lapTime(ms: ranking.avgLapMs)), total \(RaceFormatters.lapTime(ms: ranking.totalMs))")
+        .accessibilityLabel(a11yLabel)
+    }
+
+    @ViewBuilder
+    private func cell(_ text: String, width: CGFloat, align: Alignment,
+                      color: Color = BBNColors.textPrimary) -> some View {
+        Text(text)
+            .font(BBNTypography.body)
+            .foregroundStyle(color)
+            .monospacedDigit()
+            .frame(width: width, alignment: align)
+    }
+
+    private var a11yLabel: String {
+        var parts: [String] = []
+        parts.append("Posición \(ranking.position)")
+        parts.append("kart \(ranking.kartNumber)")
+        if !ranking.driverName.isEmpty { parts.append(ranking.driverName) }
+        if !ranking.teamName.isEmpty { parts.append("equipo \(ranking.teamName)") }
+        parts.append("promedio \(RaceFormatters.lapTime(ms: ranking.avgLapMs))")
+        parts.append("total \(RaceFormatters.lapTime(ms: ranking.totalMs))")
+        parts.append("\(ranking.totalLaps) vueltas")
+        return parts.joined(separator: ", ")
     }
 }

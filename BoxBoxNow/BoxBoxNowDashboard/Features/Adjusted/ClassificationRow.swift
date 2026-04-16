@@ -17,7 +17,7 @@ struct ClassificationRow: View {
             KartNumberBadge(number: entry.kartNumber, size: 36)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(entry.driverName)
+                Text(entry.driverName.isEmpty ? "—" : entry.driverName)
                     .font(BBNTypography.body)
                     .foregroundStyle(BBNColors.textPrimary)
                 if !entry.teamName.isEmpty {
@@ -28,29 +28,13 @@ struct ClassificationRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text(RaceFormatters.lapTime(ms: entry.avgLapMs))
-                .font(BBNTypography.body)
-                .monospacedDigit()
-                .foregroundStyle(BBNColors.accent)
-                .frame(width: 100, alignment: .trailing)
-
-            Text(entry.gap.isEmpty ? "—" : entry.gap)
-                .font(BBNTypography.body)
-                .monospacedDigit()
-                .foregroundStyle(BBNColors.textPrimary)
-                .frame(width: 80, alignment: .trailing)
-
-            Text("\(entry.totalLaps)")
-                .font(BBNTypography.body)
-                .monospacedDigit()
-                .foregroundStyle(BBNColors.textMuted)
-                .frame(width: 64, alignment: .trailing)
-
-            Text("\(entry.pitCount)")
-                .font(BBNTypography.body)
-                .monospacedDigit()
-                .foregroundStyle(BBNColors.textMuted)
-                .frame(width: 48, alignment: .trailing)
+            cell(RaceFormatters.lapTime(ms: entry.avgLapMs),
+                 width: 100, align: .trailing, color: BBNColors.accent)
+            cell(entry.gap.isEmpty ? "—" : entry.gap, width: 80, align: .trailing)
+            cell("\(entry.totalLaps)", width: 64, align: .trailing,
+                 color: BBNColors.textMuted)
+            cell("\(entry.pitCount)", width: 48, align: .trailing,
+                 color: BBNColors.textMuted)
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 12)
@@ -63,11 +47,21 @@ struct ClassificationRow: View {
         .accessibilityLabel(a11yLabel)
     }
 
+    @ViewBuilder
+    private func cell(_ text: String, width: CGFloat, align: Alignment,
+                      color: Color = BBNColors.textPrimary) -> some View {
+        Text(text)
+            .font(BBNTypography.body)
+            .foregroundStyle(color)
+            .monospacedDigit()
+            .frame(width: width, alignment: align)
+    }
+
     private var a11yLabel: String {
         var parts: [String] = []
         parts.append("Posición \(entry.position)")
         parts.append("kart \(entry.kartNumber)")
-        parts.append(entry.driverName)
+        if !entry.driverName.isEmpty { parts.append(entry.driverName) }
         if !entry.teamName.isEmpty { parts.append("equipo \(entry.teamName)") }
         parts.append("promedio \(RaceFormatters.lapTime(ms: entry.avgLapMs))")
         if !entry.gap.isEmpty { parts.append("gap \(entry.gap)") }

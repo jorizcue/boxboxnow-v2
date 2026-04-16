@@ -5,7 +5,7 @@ import SwiftUI
 /// means the column flexes to fill remaining space.
 struct ClassificationHeader: View {
     struct Column: Identifiable {
-        let id = UUID()
+        var id: String { title }
         let title: String
         let width: CGFloat?
         let align: Alignment
