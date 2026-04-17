@@ -104,6 +104,10 @@ function UsersManager() {
   const [showCreate, setShowCreate] = useState(false);
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  // Per-user password reset state (admin action on the user detail panel).
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetPasswordSaving, setResetPasswordSaving] = useState(false);
+  const [resetPasswordFeedback, setResetPasswordFeedback] = useState<string | null>(null);
   const [newIsAdmin, setNewIsAdmin] = useState(false);
   const [newMaxDevices, setNewMaxDevices] = useState(1);
   const [newTabs, setNewTabs] = useState<string[]>(ALL_TAB_OPTIONS.map(([k]) => k));
@@ -414,6 +418,65 @@ function UsersManager() {
                 </h4>
                 <button onClick={() => setSelectedUser(null)} className="text-neutral-500 hover:text-white text-lg leading-none transition-colors">&times;</button>
               </div>
+
+              {/* Reset password — admin-only action, mirrors the backend
+                  PATCH /admin/users/{id} with {password}. Validates the
+                  new password matches the server's UserUpdate rules
+                  (>=8 chars, 1 uppercase, 1 number) before sending. */}
+              {(() => {
+                const su = users.find((u) => u.id === selectedUser);
+                if (!su) return null;
+                const valid =
+                  resetPassword.length >= 8 &&
+                  /[A-Z]/.test(resetPassword) &&
+                  /[0-9]/.test(resetPassword);
+                return (
+                  <div>
+                    <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">
+                      Resetear contraseña
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={resetPassword}
+                        onChange={(e) => {
+                          setResetPassword(e.target.value);
+                          setResetPasswordFeedback(null);
+                        }}
+                        placeholder="Nueva contraseña (min 8 car, 1 mayus, 1 numero)"
+                        className="flex-1 bg-black border border-border rounded-lg px-3 py-1.5 text-sm"
+                      />
+                      <button
+                        disabled={!valid || resetPasswordSaving}
+                        onClick={async () => {
+                          setResetPasswordSaving(true);
+                          setResetPasswordFeedback(null);
+                          try {
+                            await api.updateUser(su.id, { password: resetPassword });
+                            setResetPassword("");
+                            setResetPasswordFeedback("Contraseña actualizada");
+                            setTimeout(() => setResetPasswordFeedback(null), 3000);
+                          } catch (e: any) {
+                            setResetPasswordFeedback(
+                              e?.message || "Error al resetear contraseña"
+                            );
+                          } finally {
+                            setResetPasswordSaving(false);
+                          }
+                        }}
+                        className="bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold px-3 py-1.5 rounded-lg text-sm"
+                      >
+                        {resetPasswordSaving ? "..." : "Guardar"}
+                      </button>
+                    </div>
+                    {resetPasswordFeedback && (
+                      <p className={`text-[11px] mt-1 ${resetPasswordFeedback === "Contraseña actualizada" ? "text-accent" : "text-red-400"}`}>
+                        {resetPasswordFeedback}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Tab access for selected user */}
               {(() => {

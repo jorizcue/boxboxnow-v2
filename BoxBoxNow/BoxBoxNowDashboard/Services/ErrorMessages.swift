@@ -11,11 +11,21 @@ import Foundation
 enum ErrorMessages {
     static func userFacing(_ error: Error) -> String {
         if let apiError = error as? APIError {
+            // When the server supplied a detail message, prefer it — it's
+            // almost always more specific than our generic fallback
+            // (e.g. "Invalid credentials", "Max devices reached…").
+            // APIError.errorDescription already handles this logic, so we
+            // delegate to it and only override when the error has no
+            // server message and we want a different default.
             switch apiError {
-            case .unauthorized:
-                return "Your session has expired. Please sign in again."
-            case .requestFailed:
-                return "Couldn't reach the server. Check your connection and try again."
+            case .unauthorized(let msg):
+                return msg ?? "Your session has expired. Please sign in again."
+            case .requestFailed(let msg):
+                return msg ?? "Couldn't reach the server. Check your connection and try again."
+            case .rateLimited(let msg):
+                return msg ?? "Too many attempts. Please try again in a few minutes."
+            case .conflict(let msg):
+                return msg ?? "Device limit reached. Close an existing session to continue."
             case .invalidURL:
                 return "Invalid request. Please contact support."
             case .decodingError:
