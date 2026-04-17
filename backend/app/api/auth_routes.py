@@ -288,6 +288,8 @@ def _user_out(user: User) -> UserOut:
         email=getattr(user, 'email', None),
         is_admin=user.is_admin,
         max_devices=user.max_devices,
+        concurrency_web=getattr(user, 'concurrency_web', None),
+        concurrency_mobile=getattr(user, 'concurrency_mobile', None),
         mfa_enabled=user.mfa_enabled or False,
         mfa_required=user.mfa_required or False,
         has_password=getattr(user, 'has_custom_password', True),
@@ -324,19 +326,28 @@ async def _cleanup_stale_sessions(db: AsyncSession, user_id: int):
 
 async def _resolve_kind_limit(db: AsyncSession, user: User, client_kind: str) -> int | None:
     """
-    Look up the per-kind concurrency limit (web or mobile) for a user from
-    their active subscription's `ProductTabConfig`. Returns the highest
-    limit across all active subscriptions, or None if there is no
-    subscription-based limit configured (the caller should fall back to
-    `user.max_devices` in that case).
+    Resolve the per-kind concurrency limit for a user, in priority order:
 
-    Mirrors the logic in `app.ws.server` so HTTP login enforces the same
-    per-kind limits as WebSocket connections do — without this, a user
-    with a Pro plan (e.g. 2 web + 4 mobile) would still be blocked on the
-    mobile login once their single legacy `max_devices` counter was full.
+      1. Per-user override on `User.concurrency_{web,mobile}` (when set) —
+         lets admins pin a specific value that beats both plan and legacy
+         max_devices. Used from the admin user detail panel.
+      2. Highest `ProductTabConfig.concurrency_{web,mobile}` across the
+         user's active subscriptions (web or mobile depending on kind).
+      3. None → caller falls back to the legacy `user.max_devices`.
+
+    Admins bypass all of these and return None (i.e. unlimited here; the
+    WS endpoint also lets admins through without limit).
     """
     if user.is_admin:
         return None
+
+    # 1. Per-user override
+    if client_kind == "mobile":
+        override = getattr(user, "concurrency_mobile", None)
+    else:
+        override = getattr(user, "concurrency_web", None)
+    if override is not None and override > 0:
+        return override
     sub_rows = await db.execute(
         select(Subscription.stripe_price_id, Subscription.plan_type).where(
             Subscription.user_id == user.id,

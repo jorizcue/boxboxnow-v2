@@ -12,6 +12,12 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
     max_devices = Column(Integer, default=1, nullable=False)
+    # Per-user concurrency overrides. When set, they take priority over the
+    # subscription plan's ProductTabConfig.concurrency_{web,mobile} and over
+    # the legacy `max_devices`. When NULL, the resolver falls back to the
+    # plan value, then to max_devices. Admins bypass all of these.
+    concurrency_web = Column(Integer, nullable=True)
+    concurrency_mobile = Column(Integer, nullable=True)
     mfa_secret = Column(String, nullable=True)
     mfa_enabled = Column(Boolean, default=False)
     mfa_required = Column(Boolean, default=False)  # Admin forces user to enable MFA

@@ -412,6 +412,19 @@ async def init_db():
         except Exception:
             pass
 
+        # Per-user concurrency overrides. Both optional — NULL means "fall
+        # through to the subscription plan's ProductTabConfig.concurrency_*
+        # and then to the legacy max_devices". Wrapped separately so one
+        # failure (e.g. column already exists) doesn't abort the other.
+        for ddl in (
+            "ALTER TABLE users ADD COLUMN concurrency_web INTEGER",
+            "ALTER TABLE users ADD COLUMN concurrency_mobile INTEGER",
+        ):
+            try:
+                await conn.execute(text(ddl))
+            except Exception:
+                pass
+
 async def get_db():
     async with async_session() as session:
         yield session

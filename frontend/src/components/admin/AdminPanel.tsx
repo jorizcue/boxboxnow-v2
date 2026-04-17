@@ -13,6 +13,12 @@ interface UserRow {
   username: string;
   is_admin: boolean;
   max_devices: number;
+  // Per-user concurrency overrides. When null, the backend falls back to the
+  // subscription plan's ProductTabConfig.concurrency_{web,mobile}, then to
+  // max_devices. Rendered as editable inputs in the user-detail panel so the
+  // admin can pin a specific limit.
+  concurrency_web: number | null;
+  concurrency_mobile: number | null;
   mfa_enabled: boolean;
   mfa_required: boolean;
   tab_access: string[];
@@ -443,27 +449,86 @@ function UsersManager() {
                 );
               })()}
 
-              {/* Devices */}
+              {/* Devices — max total (legacy) + per-kind concurrency
+                  overrides (web / mobile). Per-kind values win over max
+                  when set; an empty input clears the override. */}
               {(() => {
                 const su = users.find((u) => u.id === selectedUser);
                 if (!su) return null;
                 return (
-                  <div>
-                    <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("admin.devicesTitle")}</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={su.max_devices}
-                      onChange={async (e) => {
-                        const val = Math.max(1, Math.min(10, Number(e.target.value)));
-                        try {
-                          await api.updateUser(su.id, { max_devices: val });
-                          loadUsers();
-                        } catch {}
-                      }}
-                      className="w-20 bg-black border border-border rounded-lg px-3 py-1.5 text-sm text-center font-mono"
-                    />
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">
+                        {t("admin.devicesTitle")}
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={su.max_devices}
+                        onChange={async (e) => {
+                          const val = Math.max(1, Math.min(20, Number(e.target.value)));
+                          try {
+                            await api.updateUser(su.id, { max_devices: val });
+                            loadUsers();
+                          } catch {}
+                        }}
+                        className="w-full bg-black border border-border rounded-lg px-3 py-1.5 text-sm text-center font-mono"
+                      />
+                      <p className="text-[9px] text-neutral-600 mt-1 leading-tight">
+                        Fallback si no hay override.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">
+                        Concurrencia web
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={20}
+                        value={su.concurrency_web ?? ""}
+                        placeholder="—"
+                        onChange={async (e) => {
+                          const raw = e.target.value.trim();
+                          const val = raw === "" ? null : Math.max(0, Math.min(20, Number(raw)));
+                          try {
+                            await api.updateUser(su.id, { concurrency_web: val });
+                            loadUsers();
+                          } catch {}
+                        }}
+                        className="w-full bg-black border border-border rounded-lg px-3 py-1.5 text-sm text-center font-mono"
+                      />
+                      <p className="text-[9px] text-neutral-600 mt-1 leading-tight">
+                        Vacio = plan o fallback.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">
+                        Concurrencia app
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={20}
+                        value={su.concurrency_mobile ?? ""}
+                        placeholder="—"
+                        onChange={async (e) => {
+                          const raw = e.target.value.trim();
+                          const val = raw === "" ? null : Math.max(0, Math.min(20, Number(raw)));
+                          try {
+                            await api.updateUser(su.id, { concurrency_mobile: val });
+                            loadUsers();
+                          } catch {}
+                        }}
+                        className="w-full bg-black border border-border rounded-lg px-3 py-1.5 text-sm text-center font-mono"
+                      />
+                      <p className="text-[9px] text-neutral-600 mt-1 leading-tight">
+                        Vacio = plan o fallback.
+                      </p>
+                    </div>
                   </div>
                 );
               })()}

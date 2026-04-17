@@ -80,6 +80,16 @@ async def update_user(user_id: int, data: UserUpdate, admin: User = Depends(requ
         user.is_admin = data.is_admin
     if data.mfa_required is not None:
         user.mfa_required = data.mfa_required
+    # For the concurrency overrides, we intentionally use model_fields_set
+    # (not `is not None`) so sending `null` explicitly CLEARS the override
+    # (falls back to plan). Omitting the field leaves it untouched.
+    fields_set = data.model_fields_set
+    if "concurrency_web" in fields_set:
+        val = data.concurrency_web
+        user.concurrency_web = val if (val is not None and val > 0) else None
+    if "concurrency_mobile" in fields_set:
+        val = data.concurrency_mobile
+        user.concurrency_mobile = val if (val is not None and val > 0) else None
 
     await db.commit()
 

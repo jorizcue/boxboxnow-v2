@@ -23,6 +23,10 @@ class UserOut(BaseModel):
     email: str | None = None
     is_admin: bool
     max_devices: int = 1
+    # Per-user concurrency overrides. None means "fall back to the plan /
+    # max_devices". Exposed in the admin panel for manual tweaking.
+    concurrency_web: int | None = None
+    concurrency_mobile: int | None = None
     mfa_enabled: bool = False
     mfa_required: bool = False
     tab_access: list[str] = []
@@ -130,6 +134,10 @@ class UserUpdate(BaseModel):
     password: str | None = None
     is_admin: bool | None = None
     max_devices: int | None = None
+    # Optional per-user concurrency overrides. Clients can send 0 or null to
+    # clear the override (fall back to plan), or a positive int to pin.
+    concurrency_web: int | None = None
+    concurrency_mobile: int | None = None
     mfa_required: bool | None = None
 
     @field_validator("password")

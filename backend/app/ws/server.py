@@ -168,18 +168,27 @@ async def race_websocket(
     # Driver view gets +1 extra slot on top of the per-kind limit (mobile only).
     async with async_session() as db:
         u_row = await db.execute(
-            select(User.max_devices, User.is_admin).where(User.id == user_id)
+            select(
+                User.max_devices,
+                User.is_admin,
+                User.concurrency_web,
+                User.concurrency_mobile,
+            ).where(User.id == user_id)
         )
         u_val = u_row.first()
         fallback_max = (u_val[0] if u_val else 1) or 1
         is_admin_user = bool(u_val[1]) if u_val else False
+        user_c_web = u_val[2] if u_val else None
+        user_c_mobile = u_val[3] if u_val else None
 
-        # Resolve per-kind limits from the user's active subscription product
-        # config. Join Subscription.stripe_price_id -> ProductTabConfig to get
-        # the exact row (plan_type is no longer unique). Fall back to matching
-        # by plan_type for subscriptions that predate the price_id backfill.
+        # Priority: (1) per-user override, (2) subscription plan config,
+        # (3) fallback_max (legacy user.max_devices).
         kind_limit: int | None = None
         if not is_admin_user:
+            override = user_c_mobile if client_kind == "mobile" else user_c_web
+            if override is not None and override > 0:
+                kind_limit = override
+        if kind_limit is None and not is_admin_user:
             sub_row = await db.execute(
                 select(Subscription.stripe_price_id, Subscription.plan_type).where(
                     Subscription.user_id == user_id,
