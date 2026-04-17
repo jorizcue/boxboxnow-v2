@@ -72,9 +72,9 @@ final class APIClient {
     func getActiveSession() async throws -> RaceSession? {
         let req = try buildRequest("/config/session", method: "GET")
         let (data, response) = try await URLSession.shared.data(for: req)
-        guard let http = response as? HTTPURLResponse else { throw APIError.requestFailed }
-        if http.statusCode == 401 { KeychainHelper.deleteToken(); throw APIError.unauthorized }
-        guard (200...299).contains(http.statusCode) else { throw APIError.requestFailed }
+        guard let http = response as? HTTPURLResponse else { throw APIError.requestFailed() }
+        if http.statusCode == 401 { KeychainHelper.deleteToken(); throw APIError.unauthorized() }
+        guard (200...299).contains(http.statusCode) else { throw APIError.requestFailed() }
 
         // Empty body or literal "null" → no active session yet.
         if data.isEmpty { return nil }
@@ -97,7 +97,7 @@ final class APIClient {
     /// the full RaceSession values we want to persist.
     func createSession(_ session: RaceSession) async throws -> RaceSession {
         guard let circuitId = session.circuitId else {
-            throw APIError.requestFailed
+            throw APIError.requestFailed()
         }
         let body: [String: Any] = [
             "circuit_id": circuitId,
@@ -126,7 +126,7 @@ final class APIClient {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let (_, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw APIError.requestFailed
+            throw APIError.requestFailed()
         }
     }
 
@@ -144,7 +144,7 @@ final class APIClient {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let (_, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw APIError.requestFailed
+            throw APIError.requestFailed()
         }
     }
 
@@ -168,7 +168,7 @@ final class APIClient {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let (_, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw APIError.requestFailed
+            throw APIError.requestFailed()
         }
     }
 
@@ -208,7 +208,7 @@ final class APIClient {
         let req = try buildRequest(path, method: "DELETE")
         let (_, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw APIError.requestFailed
+            throw APIError.requestFailed()
         }
     }
 
@@ -224,21 +224,77 @@ final class APIClient {
 
     private func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw APIError.requestFailed }
-        if http.statusCode == 401 { KeychainHelper.deleteToken(); throw APIError.unauthorized }
-        guard (200...299).contains(http.statusCode) else { throw APIError.requestFailed }
+        guard let http = response as? HTTPURLResponse else { throw APIError.requestFailed() }
+        if http.statusCode == 401 {
+            KeychainHelper.deleteToken()
+            // Try to extract the server-supplied detail message (e.g.
+            // "Invalid credentials" vs "Session terminated") so the user
+            // sees why it failed instead of a generic "Sesion expirada".
+            throw APIError.unauthorized(serverMessage: Self.extractDetail(data))
+        }
+        if http.statusCode == 429 {
+            throw APIError.rateLimited(serverMessage: Self.extractDetail(data))
+        }
+        if http.statusCode == 409 {
+            throw APIError.conflict(serverMessage: Self.extractDetail(data))
+        }
+        guard (200...299).contains(http.statusCode) else {
+            throw APIError.requestFailed(serverMessage: Self.extractDetail(data))
+        }
         return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    /// Best-effort extractor for FastAPI's `{"detail": "..."}` error
+    /// payloads. Returns nil when the body isn't JSON or doesn't have a
+    /// string detail. `detail` can also be a dict (e.g. the login device
+    /// limit response) — in that case we reach into `detail.message`.
+    private static func extractDetail(_ data: Data) -> String? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        if let s = json["detail"] as? String { return s }
+        if let nested = json["detail"] as? [String: Any],
+           let msg = nested["message"] as? String {
+            return msg
+        }
+        return nil
     }
 }
 
 enum APIError: Error, LocalizedError {
-    case invalidURL, requestFailed, unauthorized, decodingError
+    case invalidURL
+    case decodingError
+    case requestFailed(serverMessage: String? = nil)
+    case unauthorized(serverMessage: String? = nil)
+    case rateLimited(serverMessage: String? = nil)
+    case conflict(serverMessage: String? = nil)
+
     var errorDescription: String? {
         switch self {
-        case .invalidURL: return "URL invalida"
-        case .requestFailed: return "Error de conexion"
-        case .unauthorized: return "Sesion expirada"
-        case .decodingError: return "Error procesando datos"
+        case .invalidURL:
+            return "URL invalida"
+        case .decodingError:
+            return "Error procesando datos"
+        case .requestFailed(let msg):
+            return msg ?? "Error de conexion"
+        case .unauthorized(let msg):
+            // Server's message is almost always more accurate than the
+            // generic "Sesion expirada" — "Invalid credentials" vs
+            // "Session terminated" mean different things to the user.
+            if let msg {
+                if msg.localizedCaseInsensitiveContains("invalid credentials") {
+                    return "Usuario o contraseña incorrectos"
+                }
+                if msg.localizedCaseInsensitiveContains("session terminated") {
+                    return "Tu sesion se ha cerrado desde otro dispositivo"
+                }
+                return msg
+            }
+            return "Sesion expirada"
+        case .rateLimited(let msg):
+            return msg ?? "Demasiados intentos fallidos. Espera unos minutos e inténtalo de nuevo."
+        case .conflict(let msg):
+            return msg ?? "Se ha alcanzado el limite de dispositivos. Cierra una sesion existente."
         }
     }
 }

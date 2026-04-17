@@ -68,7 +68,7 @@ final class AuthStoreStateMachineTests: XCTestCase {
 
     func testLoginFailureSetsLoginFailed() async throws {
         let mock = MockAuthService()
-        mock.loginHandler = { _, _ in throw APIError.unauthorized }
+        mock.loginHandler = { _, _ in throw APIError.unauthorized() }
         let store = AuthStore(service: mock, keychain: MockKeychainHelper())
         await store.login(email: "a@b.c", password: "bad")
         if case .loginFailed(let msg) = store.authState {
@@ -105,7 +105,7 @@ final class AuthStoreStateMachineTests: XCTestCase {
 
     func testLoginFailureWithUnauthorizedGetsUserFacingMessage() async throws {
         let mock = MockAuthService()
-        mock.loginHandler = { _, _ in throw APIError.unauthorized }
+        mock.loginHandler = { _, _ in throw APIError.unauthorized() }
         let store = AuthStore(service: mock, keychain: MockKeychainHelper())
         await store.login(email: "a@b.c", password: "bad")
         if case .loginFailed(let msg) = store.authState {

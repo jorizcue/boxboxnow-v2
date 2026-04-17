@@ -100,27 +100,63 @@ async def get_trial_config(db: AsyncSession = Depends(get_db)):
 
 
 class RateLimiter:
-    """Simple in-memory rate limiter: max_attempts per window_seconds per IP."""
+    """Failure-counting in-memory rate limiter.
 
-    def __init__(self, max_attempts: int = 5, window_seconds: int = 60):
+    Tracks FAILED login attempts per IP over a rolling window and blocks
+    further attempts once the threshold is reached. Successful logins
+    reset the counter so users who simply typed their password wrong a
+    few times don't stay locked out after finally getting it right.
+
+    Two-step API:
+        limiter.check(ip)   → raises 429 if over the limit
+        limiter.record_failure(ip) → call ONLY when credentials failed
+        limiter.reset(ip)   → call on successful login
+
+    This behavior replaces the old "count every request" approach that
+    made legitimate testing painful: a user who logged in successfully,
+    logged out, and tried to log in again 4 times was being blocked on
+    the 6th request even though only 1 had failed.
+    """
+
+    def __init__(self, max_attempts: int = 10, window_seconds: int = 300):
         self.max_attempts = max_attempts
         self.window_seconds = window_seconds
-        self._attempts: dict[str, list[float]] = {}
+        # Maps ip → list of monotonic timestamps of failed attempts.
+        self._failures: dict[str, list[float]] = {}
+
+    def _prune(self, ip: str) -> list[float]:
+        now = time.monotonic()
+        timestamps = [
+            t for t in self._failures.get(ip, [])
+            if now - t < self.window_seconds
+        ]
+        self._failures[ip] = timestamps
+        return timestamps
 
     def check(self, ip: str) -> None:
-        now = time.monotonic()
-        timestamps = self._attempts.get(ip, [])
-        timestamps = [t for t in timestamps if now - t < self.window_seconds]
+        timestamps = self._prune(ip)
         if len(timestamps) >= self.max_attempts:
+            retry_after = int(self.window_seconds - (time.monotonic() - timestamps[0]))
             raise HTTPException(
                 status_code=429,
-                detail="Too many attempts. Please try again later.",
+                detail=(
+                    f"Demasiados intentos fallidos. Vuelve a intentarlo en "
+                    f"{max(retry_after, 1)} segundos."
+                ),
+                headers={"Retry-After": str(max(retry_after, 1))},
             )
-        timestamps.append(now)
-        self._attempts[ip] = timestamps
+
+    def record_failure(self, ip: str) -> None:
+        self._prune(ip)
+        self._failures.setdefault(ip, []).append(time.monotonic())
+
+    def reset(self, ip: str) -> None:
+        self._failures.pop(ip, None)
 
 
-login_limiter = RateLimiter(max_attempts=5, window_seconds=60)
+# 10 failed attempts per 5 minutes per IP. More lenient than the previous
+# 5/60s window now that we only count failures.
+login_limiter = RateLimiter(max_attempts=10, window_seconds=300)
 
 
 def hash_password(password: str) -> str:
@@ -501,7 +537,8 @@ async def login(
       2. Fall back to the legacy `user.max_devices` if no subscription
          config is found (preserves existing behavior for trial/free users).
     """
-    login_limiter.check(request.client.host if request.client else "unknown")
+    ip = request.client.host if request.client else "unknown"
+    login_limiter.check(ip)
     client_kind = "mobile" if device == "mobile" else "web"
 
     # Validate credentials — accept username OR email
@@ -517,6 +554,8 @@ async def login(
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(data.password, user.password_hash):
+        # Record the failure against the IP so repeated typos throttle.
+        login_limiter.record_failure(ip)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
 
     # MFA check
@@ -530,7 +569,14 @@ async def login(
         import pyotp
         totp = pyotp.TOTP(user.mfa_secret)
         if not totp.verify(data.mfa_code, valid_window=1):
+            # A wrong MFA code is also a credential-class failure.
+            login_limiter.record_failure(ip)
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid MFA code")
+
+    # Credentials (and MFA if applicable) valid → clear any previous
+    # failure streak for this IP so a future typo doesn't start already
+    # halfway into the throttle window.
+    login_limiter.reset(ip)
     # Note: if mfa_required but not mfa_enabled, we let login succeed.
     # The frontend will show a mandatory MFA setup screen based on
     # user.mfa_required && !user.mfa_enabled in the response.
