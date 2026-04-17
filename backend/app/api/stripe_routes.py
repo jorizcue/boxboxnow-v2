@@ -649,11 +649,25 @@ async def _apply_config_to_user(user_id: int, config: ProductTabConfig, db: Asyn
     capabilities. ProductTabConfig is the source of truth — no fallback
     to hardcoded defaults.
 
-    Upgrade-only semantics (consistent with how `max_devices` is applied):
-    if the user already has a higher value on a field, we keep the higher
-    one so a user who was manually granted extra capacity via the admin
-    panel doesn't get downgraded when their subscription renews or when
-    they purchase an additional plan on top.
+    Concurrency semantics (matches the product requirement):
+      * User's concurrency_web / concurrency_mobile are re-derived from
+        the union of all ACTIVE subscriptions' plan configs (plus the
+        config being applied right now, in case its Subscription row
+        isn't committed yet).
+      * "Don't downgrade" only applies when another active subscription
+        still provides the higher value. If a user used to have a higher
+        value from a plan that is no longer active (expired / cancelled)
+        — or that was set manually in the admin panel without a backing
+        plan — the new plan's value wins.
+      * NULL on the plan means "that plan doesn't care about this kind";
+        the value is simply excluded from the max calculation.
+      * If NO active plan defines a concurrency for a kind, the user's
+        field is set back to NULL so the resolver falls through to
+        max_devices (no stale value).
+
+    `max_devices` keeps its upgrade-only semantics for now — it's the
+    legacy single-field limit and lots of admin flows set it manually;
+    we don't want subscription events to clobber a manual bump on it.
     """
     import json as _json
     from app.models.schemas import UserTabAccess
@@ -674,19 +688,71 @@ async def _apply_config_to_user(user_id: int, config: ProductTabConfig, db: Asyn
     if not user:
         return
 
+    # max_devices: upgrade-only (see docstring).
     user.max_devices = max(user.max_devices, max_devices)
 
-    # Copy per-kind concurrency from the plan config, using max() so an
-    # existing higher override on the user is preserved. NULL on the plan
-    # is treated as "don't change", not "clear": the plan simply doesn't
-    # care about that kind of limit and the user's existing value (or the
-    # global resolver fallback) keeps applying.
+    # Recompute per-kind concurrency from all active subs + this config.
+    # Use `db.flush()` first so the Subscription row that the caller just
+    # added becomes visible in this session's SELECTs.
+    try:
+        await db.flush()
+    except Exception:
+        # If the caller already flushed / failed, don't crash — we'll
+        # just fall back to whatever the session currently sees.
+        pass
+
+    sub_rows = await db.execute(
+        select(Subscription.stripe_price_id, Subscription.plan_type).where(
+            Subscription.user_id == user_id,
+            Subscription.status.in_(("active", "trialing")),
+        )
+    )
+    active_keys = sub_rows.all()
+
+    webs: list[int] = []
+    mobiles: list[int] = []
+
+    # Include the config being applied right now (covers the case where
+    # the Subscription row was just staged but not yet visible, and the
+    # case where an admin manually triggered a config apply outside the
+    # normal subscribe flow).
     if config.concurrency_web is not None and config.concurrency_web > 0:
-        current = user.concurrency_web or 0
-        user.concurrency_web = max(current, config.concurrency_web)
+        webs.append(config.concurrency_web)
     if config.concurrency_mobile is not None and config.concurrency_mobile > 0:
-        current = user.concurrency_mobile or 0
-        user.concurrency_mobile = max(current, config.concurrency_mobile)
+        mobiles.append(config.concurrency_mobile)
+
+    for price_id, plan_type in active_keys:
+        plan_cfg = None
+        if price_id:
+            row = await db.execute(
+                select(
+                    ProductTabConfig.concurrency_web,
+                    ProductTabConfig.concurrency_mobile,
+                ).where(ProductTabConfig.stripe_price_id == price_id)
+            )
+            plan_cfg = row.first()
+        if not plan_cfg and plan_type:
+            row = await db.execute(
+                select(
+                    ProductTabConfig.concurrency_web,
+                    ProductTabConfig.concurrency_mobile,
+                ).where(ProductTabConfig.plan_type == plan_type)
+                .order_by(ProductTabConfig.id)
+                .limit(1)
+            )
+            plan_cfg = row.first()
+        if not plan_cfg:
+            continue
+        cw, cm = plan_cfg
+        if cw is not None and cw > 0:
+            webs.append(cw)
+        if cm is not None and cm > 0:
+            mobiles.append(cm)
+
+    # Set to the max across all active plans, or None when no plan
+    # provides a value (so the resolver falls back to max_devices).
+    user.concurrency_web = max(webs) if webs else None
+    user.concurrency_mobile = max(mobiles) if mobiles else None
 
     # Add tabs (don't remove existing — users accumulate access across plans)
     for tab in tabs:
