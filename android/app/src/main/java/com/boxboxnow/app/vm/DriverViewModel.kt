@@ -232,11 +232,17 @@ class DriverViewModel @Inject constructor(
             }.onSuccess { created ->
                 _presets.value = _presets.value + created
                 _selectedPresetId.value = created.id
-                // Also apply locally
+                // Also apply locally so the pilot view picks the new
+                // options up immediately. audioEnabled was missing from
+                // the previous implementation, which kept the saved
+                // "audio=on" flag from propagating to the speech service
+                // until the next preset reload.
                 _visibleCards.value = visibleCards
                 _cardOrder.value = cardOrder
                 _brightness.value = contrast
                 _orientationLock.value = OrientationLock.from(orientation)
+                _audioEnabled.value = audioEnabled
+                speech.enabled = audioEnabled
                 saveConfig()
                 onSuccess()
             }.onFailure(onError)

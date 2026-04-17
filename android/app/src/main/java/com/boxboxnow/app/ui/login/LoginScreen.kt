@@ -14,6 +14,9 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mail
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -146,13 +149,16 @@ private fun LoginForm(authVM: AuthViewModel, onStartGoogleSso: () -> Unit) {
             keyboardType = KeyboardType.Email,
         )
         Spacer(Modifier.height(14.dp))
+        var passwordVisible by remember { mutableStateOf(false) }
         InputField(
             value = password,
             onChange = { password = it },
             placeholder = "Contraseña",
             icon = Icons.Default.Lock,
             keyboardType = KeyboardType.Password,
-            secure = true,
+            secure = !passwordVisible,
+            trailingIcon = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+            onTrailingClick = { passwordVisible = !passwordVisible },
         )
 
         error?.let {
@@ -248,6 +254,8 @@ private fun InputField(
     icon: ImageVector,
     keyboardType: KeyboardType = KeyboardType.Text,
     secure: Boolean = false,
+    trailingIcon: ImageVector? = null,
+    onTrailingClick: (() -> Unit)? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     Row(
@@ -273,6 +281,20 @@ private fun InputField(
             onFocusChange = { focused = it },
             modifier = Modifier.weight(1f),
         )
+        if (trailingIcon != null && onTrailingClick != null) {
+            Spacer(Modifier.width(8.dp))
+            IconButton(
+                onClick = onTrailingClick,
+                modifier = Modifier.size(28.dp),
+            ) {
+                Icon(
+                    trailingIcon,
+                    contentDescription = null,
+                    tint = BoxBoxNowColors.SystemGray3,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
     }
 }
 

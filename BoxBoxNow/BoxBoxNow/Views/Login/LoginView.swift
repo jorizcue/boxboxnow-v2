@@ -4,6 +4,7 @@ struct LoginView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @State private var email = ""
     @State private var password = ""
+    @State private var showPassword = false
     @FocusState private var focusedField: Field?
 
     private enum Field { case email, password }
@@ -150,21 +151,42 @@ struct LoginView: View {
             )
             .accessibilityLabel("Email")
 
-            // Custom styled password field
+            // Custom styled password field with show/hide toggle
             HStack(spacing: 12) {
                 Image(systemName: "lock")
                     .foregroundColor(Color(.systemGray3))
                     .frame(width: 20)
-                SecureField("Contrasena", text: $password)
-                    .textContentType(.password)
-                    .focused($focusedField, equals: .password)
-                    .submitLabel(.go)
-                    .onSubmit {
-                        if !email.isEmpty && !password.isEmpty {
-                            authVM.login(email: email, password: password)
-                        }
+                Group {
+                    // SwiftUI's SecureField can't be toggled to a visible
+                    // TextField in place, so we swap the actual field based
+                    // on showPassword. Both share the same $password binding
+                    // + keyboard behaviour.
+                    if showPassword {
+                        TextField("Contrasena", text: $password)
+                            .textContentType(.password)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    } else {
+                        SecureField("Contrasena", text: $password)
+                            .textContentType(.password)
                     }
-                    .foregroundColor(.white)
+                }
+                .focused($focusedField, equals: .password)
+                .submitLabel(.go)
+                .onSubmit {
+                    if !email.isEmpty && !password.isEmpty {
+                        authVM.login(email: email, password: password)
+                    }
+                }
+                .foregroundColor(.white)
+
+                Button { showPassword.toggle() } label: {
+                    Image(systemName: showPassword ? "eye.slash" : "eye")
+                        .foregroundColor(Color(.systemGray3))
+                        .frame(width: 20)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(showPassword ? "Ocultar contraseña" : "Mostrar contraseña")
             }
             .padding(14)
             .background(Color(.systemGray6))

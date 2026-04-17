@@ -99,11 +99,19 @@ class AuthViewModel @Inject constructor(
         _biometricPending.value = false
     }
 
-    /** Full sign-out — wipes token and biometric opt-in. */
+    /**
+     * Full sign-out — wipes token and biometric opt-in AND tells the
+     * server to delete the DeviceSession row so it stops appearing in
+     * the admin panel's "Sesiones activas" list. The server call is
+     * fire-and-forget — local state is cleaned up even if it fails.
+     */
     fun fullSignOut() {
-        tokenStore.deleteToken()
-        biometric.disable()
-        logout()
+        viewModelScope.launch {
+            runCatching { api.serverLogout() }
+            tokenStore.deleteToken()
+            biometric.disable()
+            logout()
+        }
     }
 
     private fun checkExistingSession() {
@@ -129,11 +137,34 @@ class AuthViewModel @Inject constructor(
         runCatching { _user.value = api.getMe() }
     }
 
+    /**
+     * Biometric unlock flow. Validates the stored token against the
+     * server before flipping `isAuthenticated = true` so a user whose
+     * account was deleted / session killed (common after a DB reset)
+     * can't get into the app with a stale token. On token rejection we
+     * wipe Keychain + biometric opt-in and send the user back to login.
+     */
     fun authenticateWithBiometric(activity: FragmentActivity) {
         viewModelScope.launch {
             val ok = biometric.authenticate(activity)
-            _biometricPending.value = false
-            if (ok) _isAuthenticated.value = true
+            if (!ok) {
+                _biometricPending.value = false
+                return@launch
+            }
+            val serverCheck = runCatching { api.getMe() }
+            if (serverCheck.isSuccess) {
+                _user.value = serverCheck.getOrNull()
+                _biometricPending.value = false
+                _isAuthenticated.value = true
+            } else {
+                // Token rejected — clean everything locally.
+                tokenStore.deleteToken()
+                biometric.disable()
+                _biometricPending.value = false
+                _isAuthenticated.value = false
+                _user.value = null
+                _errorMessage.value = "La sesion ya no es valida. Inicia sesion de nuevo."
+            }
         }
     }
 

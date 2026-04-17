@@ -100,7 +100,9 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
         session.start()
     }
 
-    /// Normal logout: keeps token + biometric so user can re-enter with Face ID
+    /// Normal logout: flips local state but keeps the token + biometric
+    /// so the user can re-enter with Face ID. The server-side DeviceSession
+    /// is kept alive (matches the "soft lock" semantics the product wants).
     func logout() {
         isAuthenticated = false
         user = nil
@@ -108,11 +110,24 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
         // Token stays in Keychain for biometric re-login
     }
 
-    /// Full sign-out: wipes everything including biometric preference
+    /// Full sign-out: wipes local token + biometric AND tells the server
+    /// to delete the DeviceSession so it no longer appears under "Sesiones
+    /// activas" in the admin panel. The server call is fire-and-forget —
+    /// if the network is flaky or the token already expired, local state
+    /// is cleaned up regardless.
     func fullSignOut() {
-        KeychainHelper.deleteToken()
-        BiometricService.disable()
-        logout()
+        Task {
+            do {
+                try await APIClient.shared.serverLogout()
+            } catch {
+                // Swallow — local cleanup below still happens.
+            }
+            await MainActor.run {
+                KeychainHelper.deleteToken()
+                BiometricService.disable()
+                logout()
+            }
+        }
     }
 
     private func checkExistingSession() {
@@ -152,15 +167,41 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
     }
 
-    /// Attempt biometric auth; on success grant access, on failure show login form
+    /// Attempt biometric auth; on success, VALIDATE the token against the
+    /// server before granting access so we don't let the user into an
+    /// account that was deleted or whose session was killed while the
+    /// token sat locally. If the server rejects the token, we wipe the
+    /// keychain + biometric flag so the next launch shows the login form.
     func authenticateWithBiometric() async {
         let success = await BiometricService.authenticate()
-        await MainActor.run {
-            biometricPending = false
-            if success {
-                isAuthenticated = true
+        guard success else {
+            await MainActor.run {
+                biometricPending = false
+                // Failed biometric — user stays on login screen with token
+                // still in keychain so they can retry.
             }
-            // If failed, user stays on login screen with token still in keychain
+            return
+        }
+        // Face/Touch ID succeeded — check the token is still valid.
+        do {
+            let me = try await APIClient.shared.getMe()
+            await MainActor.run {
+                self.user = me
+                self.biometricPending = false
+                self.isAuthenticated = true
+            }
+        } catch {
+            // Token is invalid (user deleted, session killed, DB reset).
+            // APIClient already nuked the token on 401 — also wipe
+            // biometric preference and send the user back to login.
+            await MainActor.run {
+                KeychainHelper.deleteToken()
+                BiometricService.disable()
+                self.biometricPending = false
+                self.isAuthenticated = false
+                self.user = nil
+                self.errorMessage = "La sesion ya no es valida. Inicia sesion de nuevo."
+            }
         }
     }
 

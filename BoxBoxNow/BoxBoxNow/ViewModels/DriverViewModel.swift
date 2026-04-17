@@ -157,11 +157,20 @@ final class DriverViewModel: ObservableObject {
             audioEnabled: audioEnabled)
         await MainActor.run {
             if isDefault {
+                // Flip ONLY is_default on the other presets. The previous
+                // rebuild omitted contrast/orientation/audioEnabled, so
+                // those fields got silently nuked in the local copy —
+                // the next time the user applied one of those presets
+                // the driver view fell back to defaults. Fix: preserve
+                // every field and only toggle isDefault.
                 self.presets = self.presets.map { p in
                     DriverConfigPreset(
                         id: p.id, name: p.name,
                         visibleCards: p.visibleCards, cardOrder: p.cardOrder,
-                        isDefault: false
+                        isDefault: false,
+                        contrast: p.contrast,
+                        orientation: p.orientation,
+                        audioEnabled: p.audioEnabled
                     )
                 }
             }
@@ -176,12 +185,16 @@ final class DriverViewModel: ObservableObject {
         await MainActor.run {
             self.presets = self.presets.map { p in
                 if p.id == updated.id { return updated }
-                // Enforce single-default client-side too
+                // Enforce single-default client-side too — preserving
+                // every other field (see note in saveAsPreset).
                 if isDefault {
                     return DriverConfigPreset(
                         id: p.id, name: p.name,
                         visibleCards: p.visibleCards, cardOrder: p.cardOrder,
-                        isDefault: false
+                        isDefault: false,
+                        contrast: p.contrast,
+                        orientation: p.orientation,
+                        audioEnabled: p.audioEnabled
                     )
                 }
                 return p

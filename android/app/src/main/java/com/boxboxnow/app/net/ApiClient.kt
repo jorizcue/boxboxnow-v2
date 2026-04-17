@@ -110,6 +110,15 @@ class ApiClient @Inject constructor(
 
     suspend fun getMe(): User = getJson("/auth/me")
 
+    /**
+     * Tells the server to delete the current DeviceSession. Fire-and-forget
+     * from the caller's point of view — failure shouldn't block local
+     * sign-out. Mirrors the iOS APIClient.serverLogout helper.
+     */
+    suspend fun serverLogout() {
+        postJson<JsonObject>("/auth/logout", buildJsonObject {})
+    }
+
     // ── Presets ──
 
     suspend fun fetchPresets(): List<DriverConfigPreset> = getJson("/config/presets")

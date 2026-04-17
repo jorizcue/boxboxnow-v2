@@ -24,6 +24,21 @@ final class APIClient {
         return try await post("/auth/verify-mfa?device=mobile", body: body)
     }
 
+    /// Tells the server to delete the current DeviceSession row so it
+    /// stops showing up under "Sesiones activas" in the admin panel and
+    /// invalidates the token for any other device using it. Callers
+    /// should swallow errors — this is best-effort cleanup layered on
+    /// top of the local token deletion.
+    func serverLogout() async throws {
+        var req = try buildRequest("/auth/logout", method: "POST")
+        req.httpBody = try JSONSerialization.data(withJSONObject: [String: Any]())
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let (_, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw APIError.requestFailed()
+        }
+    }
+
     /// Fetch the current user from /auth/me (used after token hydration on app launch,
     /// since JWT payload doesn't contain all User fields like is_admin, tab_access, ...)
     func getMe() async throws -> User {

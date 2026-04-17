@@ -476,7 +476,8 @@ async def create_preset(
     count_result = await db.execute(
         select(DriverConfigPreset.id).where(DriverConfigPreset.user_id == user.id)
     )
-    if len(count_result.all()) >= MAX_PRESETS_PER_USER:
+    existing_count = len(count_result.all())
+    if existing_count >= MAX_PRESETS_PER_USER:
         raise HTTPException(400, f"Máximo {MAX_PRESETS_PER_USER} plantillas permitidas")
 
     # Check duplicate name
@@ -489,7 +490,12 @@ async def create_preset(
     if dup.scalar_one_or_none():
         raise HTTPException(409, "Ya existe una plantilla con ese nombre")
 
-    want_default = bool(data.is_default)
+    # If this is the user's first preset, auto-mark it as default so the
+    # driver view picks it up automatically on next launch. Clients can
+    # still pass is_default=false explicitly and we honor that, but the
+    # common case of "first template I create" no longer requires an
+    # extra step to mark it as the predefined one.
+    want_default = bool(data.is_default) or existing_count == 0
     if want_default:
         await _clear_default_presets(db, user.id)
 
