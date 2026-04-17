@@ -88,17 +88,22 @@ class ApiClient @Inject constructor(
 
     // ── Auth ──
 
+    // `?device=mobile` on each auth endpoint tells the backend to count
+    // this session under the mobile concurrency bucket
+    // (ProductTabConfig.concurrency_mobile) instead of the combined
+    // legacy max_devices limit — matches the Shared iOS driver client.
+
     suspend fun login(email: String, password: String): AuthResponse =
-        postJson("/auth/login", buildJsonObject {
+        postJson("/auth/login?device=mobile", buildJsonObject {
             put("username", email)
             put("password", password)
         })
 
     suspend fun loginGoogle(idToken: String): AuthResponse =
-        postJson("/auth/google/mobile", buildJsonObject { put("id_token", idToken) })
+        postJson("/auth/google/mobile?device=mobile", buildJsonObject { put("id_token", idToken) })
 
     suspend fun verifyMfa(tempToken: String, code: String): AuthResponse =
-        postJson("/auth/verify-mfa", buildJsonObject {
+        postJson("/auth/verify-mfa?device=mobile", buildJsonObject {
             put("temp_token", tempToken)
             put("code", code)
         })

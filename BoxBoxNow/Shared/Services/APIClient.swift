@@ -8,17 +8,20 @@ final class APIClient {
 
     func login(email: String, password: String) async throws -> AuthResponse {
         let body: [String: Any] = ["username": email, "password": password]
-        return try await post("/auth/login", body: body)
+        // `?device=mobile` tells the backend to apply the per-kind
+        // concurrency limit (ProductTabConfig.concurrency_mobile) instead
+        // of lumping this login into the single legacy max_devices bucket.
+        return try await post("/auth/login?device=mobile", body: body)
     }
 
     func loginGoogle(idToken: String) async throws -> AuthResponse {
         let body: [String: Any] = ["id_token": idToken]
-        return try await post("/auth/google/mobile", body: body)
+        return try await post("/auth/google/mobile?device=mobile", body: body)
     }
 
     func verifyMfa(tempToken: String, code: String) async throws -> AuthResponse {
         let body: [String: Any] = ["temp_token": tempToken, "code": code]
-        return try await post("/auth/verify-mfa", body: body)
+        return try await post("/auth/verify-mfa?device=mobile", body: body)
     }
 
     /// Fetch the current user from /auth/me (used after token hydration on app launch,

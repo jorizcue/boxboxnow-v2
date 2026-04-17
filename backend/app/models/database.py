@@ -399,6 +399,19 @@ async def init_db():
             except Exception:
                 pass
 
+        # Add client_kind to device_sessions so the login endpoint can enforce
+        # per-kind concurrency limits (web / mobile) the same way the WS
+        # endpoint does. Existing rows are backfilled to 'web' — the safer
+        # default because the legacy behavior treated every session as a
+        # web session for limit purposes.
+        try:
+            await conn.execute(text(
+                "ALTER TABLE device_sessions ADD COLUMN client_kind VARCHAR(16) "
+                "NOT NULL DEFAULT 'web'"
+            ))
+        except Exception:
+            pass
+
 async def get_db():
     async with async_session() as session:
         yield session

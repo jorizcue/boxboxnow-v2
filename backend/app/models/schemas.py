@@ -324,6 +324,11 @@ class DeviceSession(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     device_name = Column(String(200), default="")
     ip_address = Column(String(45), default="")
+    # Tags each session as web or mobile so the login endpoint can enforce
+    # per-kind device limits (ProductTabConfig.concurrency_web /
+    # concurrency_mobile) the same way the WebSocket endpoint does. Old rows
+    # default to 'web' via the migration in database.py.
+    client_kind = Column(String(16), nullable=False, default="web", server_default="web")
     created_at = Column(DateTime, server_default=func.now())
     last_active = Column(DateTime, server_default=func.now())
 

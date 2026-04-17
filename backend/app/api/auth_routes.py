@@ -30,7 +30,7 @@ from sqlalchemy import select, func, delete
 
 from app.config import get_settings
 from app.models.database import get_db
-from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess, Subscription, Circuit, AppSetting
+from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess, Subscription, Circuit, AppSetting, ProductTabConfig
 from sqlalchemy.orm import selectinload
 from app.models.pydantic_models import (
     LoginRequest, LoginResponse, UserOut, DeviceSessionOut,
@@ -322,6 +322,57 @@ async def _cleanup_stale_sessions(db: AsyncSession, user_id: int):
     await db.commit()
 
 
+async def _resolve_kind_limit(db: AsyncSession, user: User, client_kind: str) -> int | None:
+    """
+    Look up the per-kind concurrency limit (web or mobile) for a user from
+    their active subscription's `ProductTabConfig`. Returns the highest
+    limit across all active subscriptions, or None if there is no
+    subscription-based limit configured (the caller should fall back to
+    `user.max_devices` in that case).
+
+    Mirrors the logic in `app.ws.server` so HTTP login enforces the same
+    per-kind limits as WebSocket connections do — without this, a user
+    with a Pro plan (e.g. 2 web + 4 mobile) would still be blocked on the
+    mobile login once their single legacy `max_devices` counter was full.
+    """
+    if user.is_admin:
+        return None
+    sub_rows = await db.execute(
+        select(Subscription.stripe_price_id, Subscription.plan_type).where(
+            Subscription.user_id == user.id,
+            Subscription.status.in_(("active", "trialing")),
+        )
+    )
+    kind_limit: int | None = None
+    for price_id, plan_type in sub_rows.all():
+        cfg = None
+        if price_id:
+            row = await db.execute(
+                select(
+                    ProductTabConfig.concurrency_web,
+                    ProductTabConfig.concurrency_mobile,
+                ).where(ProductTabConfig.stripe_price_id == price_id)
+            )
+            cfg = row.first()
+        if not cfg and plan_type:
+            row = await db.execute(
+                select(
+                    ProductTabConfig.concurrency_web,
+                    ProductTabConfig.concurrency_mobile,
+                ).where(ProductTabConfig.plan_type == plan_type)
+                .order_by(ProductTabConfig.id)
+                .limit(1)
+            )
+            cfg = row.first()
+        if not cfg:
+            continue
+        cw, cm = cfg
+        val = cm if client_kind == "mobile" else cw
+        if val is not None:
+            kind_limit = val if kind_limit is None else max(kind_limit, val)
+    return kind_limit
+
+
 # --- Registration ---
 
 @router.post("/register", response_model=LoginResponse)
@@ -417,8 +468,31 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
 # --- Login ---
 
 @router.post("/login", response_model=LoginResponse)
-async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def login(
+    data: LoginRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    device: str = "",
+):
+    """
+    Login endpoint with per-kind concurrency control.
+
+    The `device` query param (matching the `/ws/race` WebSocket endpoint)
+    tags the created DeviceSession as 'web' or 'mobile' and — crucially —
+    counts only sessions of the SAME kind against the user's limit. This
+    fixes the historical bug where a Pro user with `concurrency_mobile=4`
+    couldn't open a mobile session because a single web session had
+    already filled the legacy `max_devices=1` bucket.
+
+    Limit resolution (for non-admins, same as the WS endpoint):
+      1. Try `ProductTabConfig.concurrency_{web|mobile}` for the user's
+         active subscription plan.
+      2. Fall back to the legacy `user.max_devices` if no subscription
+         config is found (preserves existing behavior for trial/free users).
+    """
     login_limiter.check(request.client.host if request.client else "unknown")
+    client_kind = "mobile" if device == "mobile" else "web"
+
     # Validate credentials — accept username OR email
     identifier = data.username.strip()
     if "@" in identifier:
@@ -450,9 +524,6 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
     # The frontend will show a mandatory MFA setup screen based on
     # user.mfa_required && !user.mfa_enabled in the response.
 
-    # Circuit access check removed: subscription gate is handled in the frontend.
-    # All authenticated users can login regardless of circuit access.
-
     # Cleanup stale sessions first
     await _cleanup_stale_sessions(db, user.id)
 
@@ -470,41 +541,61 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
                 await db.delete(old)
             await db.commit()
     else:
-        # Count active sessions for non-admin users
+        # Count active sessions of the SAME kind (web vs mobile) so the
+        # per-kind plan limits can be enforced independently.
         count_result = await db.execute(
-            select(func.count(DeviceSession.id)).where(DeviceSession.user_id == user.id)
+            select(func.count(DeviceSession.id)).where(
+                DeviceSession.user_id == user.id,
+                DeviceSession.client_kind == client_kind,
+            )
         )
-        active_count = count_result.scalar() or 0
+        same_kind_count = count_result.scalar() or 0
 
-    if not user.is_admin and active_count >= user.max_devices:
-        # Return active sessions so the user can decide which to kill
-        sessions_result = await db.execute(
-            select(DeviceSession)
-            .where(DeviceSession.user_id == user.id)
-            .order_by(DeviceSession.last_active.desc())
-        )
-        sessions = sessions_result.scalars().all()
+        # Resolve the effective limit from the subscription plan, falling
+        # back to the legacy single-field `user.max_devices` when no plan
+        # config is available.
+        kind_limit = await _resolve_kind_limit(db, user, client_kind)
+        effective_max = kind_limit if kind_limit is not None else user.max_devices
 
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            detail={
-                "message": f"Has alcanzado el limite de {user.max_devices} dispositivo(s) conectado(s). "
-                           "Cierra una sesion existente para continuar.",
-                "max_devices": user.max_devices,
-                "active_sessions": [
-                    {
-                        "id": s.id,
-                        "device_name": s.device_name,
-                        "ip_address": s.ip_address,
-                        "created_at": s.created_at.isoformat() if s.created_at else None,
-                        "last_active": s.last_active.isoformat() if s.last_active else None,
-                    }
-                    for s in sessions
-                ],
-            }
-        )
+        if same_kind_count >= effective_max:
+            # Return only sessions of the same kind — the client can kill
+            # one of those to free a slot and retry.
+            sessions_result = await db.execute(
+                select(DeviceSession)
+                .where(
+                    DeviceSession.user_id == user.id,
+                    DeviceSession.client_kind == client_kind,
+                )
+                .order_by(DeviceSession.last_active.desc())
+            )
+            sessions = sessions_result.scalars().all()
 
-    # Create device session
+            kind_label = "móvil" if client_kind == "mobile" else "web"
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail={
+                    "message": (
+                        f"Has alcanzado el limite de {effective_max} dispositivo(s) "
+                        f"{kind_label} conectado(s). Cierra una sesion existente "
+                        "para continuar."
+                    ),
+                    "max_devices": effective_max,
+                    "client_kind": client_kind,
+                    "active_sessions": [
+                        {
+                            "id": s.id,
+                            "device_name": s.device_name,
+                            "ip_address": s.ip_address,
+                            "client_kind": s.client_kind,
+                            "created_at": s.created_at.isoformat() if s.created_at else None,
+                            "last_active": s.last_active.isoformat() if s.last_active else None,
+                        }
+                        for s in sessions
+                    ],
+                }
+            )
+
+    # Create device session, tagged with its kind.
     device_name, ip_address = _extract_device_info(request)
     session_token = secrets.token_hex(32)
 
@@ -513,6 +604,7 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
         user_id=user.id,
         device_name=device_name,
         ip_address=ip_address,
+        client_kind=client_kind,
     )
     db.add(device_session)
     await db.commit()
