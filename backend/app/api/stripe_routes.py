@@ -642,11 +642,18 @@ async def _handle_subscription_deleted(sub_data: dict, db: AsyncSession):
 
 
 async def _apply_config_to_user(user_id: int, config: ProductTabConfig, db: AsyncSession):
-    """Apply a ProductTabConfig row to a user: tab access + max_devices.
+    """Apply a ProductTabConfig row to a user: tab access + max_devices +
+    per-kind concurrency (concurrency_web / concurrency_mobile).
 
     This is the single entry point for turning a paid plan into user
     capabilities. ProductTabConfig is the source of truth — no fallback
     to hardcoded defaults.
+
+    Upgrade-only semantics (consistent with how `max_devices` is applied):
+    if the user already has a higher value on a field, we keep the higher
+    one so a user who was manually granted extra capacity via the admin
+    panel doesn't get downgraded when their subscription renews or when
+    they purchase an additional plan on top.
     """
     import json as _json
     from app.models.schemas import UserTabAccess
@@ -668,6 +675,18 @@ async def _apply_config_to_user(user_id: int, config: ProductTabConfig, db: Asyn
         return
 
     user.max_devices = max(user.max_devices, max_devices)
+
+    # Copy per-kind concurrency from the plan config, using max() so an
+    # existing higher override on the user is preserved. NULL on the plan
+    # is treated as "don't change", not "clear": the plan simply doesn't
+    # care about that kind of limit and the user's existing value (or the
+    # global resolver fallback) keeps applying.
+    if config.concurrency_web is not None and config.concurrency_web > 0:
+        current = user.concurrency_web or 0
+        user.concurrency_web = max(current, config.concurrency_web)
+    if config.concurrency_mobile is not None and config.concurrency_mobile > 0:
+        current = user.concurrency_mobile or 0
+        user.concurrency_mobile = max(current, config.concurrency_mobile)
 
     # Add tabs (don't remove existing — users accumulate access across plans)
     for tab in tabs:
