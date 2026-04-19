@@ -40,6 +40,24 @@ class UserSession:
                 row_id: kart.pit_status
                 for row_id, kart in self.state.karts.items()
             }
+
+            # A fresh `INIT init` means Apex is starting a new session / race.
+            # `state.handle_events` will wipe karts + race flags from the
+            # RaceStateManager, but the FIFO manager (which lives on the
+            # UserSession, not on the state) keeps its internal deque and
+            # history from the previous session — so the Box tab kept
+            # showing kart entries from the prior race until enough pit-ins
+            # in the new one pushed them out of the deque. Reset the fifo
+            # and mirror the cleared snapshot into state.fifo_queue BEFORE
+            # handle_events runs, so the snapshot it broadcasts after the
+            # INIT already reflects the clean box.
+            has_init_reset = any(
+                e.type == EventType.INIT and e.value == "init" for e in events
+            )
+            if has_init_reset:
+                self.fifo.reset(self.state.box_karts, self.state.box_lines)
+                self.fifo.apply_to_state(self.state)
+
             await self.state.handle_events(events)
 
             # Detect init kart batch -> trigger driver loading from PHP API
