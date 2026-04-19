@@ -89,7 +89,14 @@ fun HomeScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black),
                 actions = {
-                    TextButton(onClick = { authVM.logout() }) {
+                    // Full sign-out wipes the local token + biometric AND
+                    // tells the server to delete the DeviceSession so the
+                    // admin "Sesiones activas" panel reflects the exit.
+                    // Previously this called `logout()`, which only reset
+                    // in-memory state and left the server session alive —
+                    // users reported stale mobile sessions lingering after
+                    // they closed the app.
+                    TextButton(onClick = { authVM.fullSignOut() }) {
                         Text("Salir", color = BoxBoxNowColors.ErrorRed, fontWeight = FontWeight.SemiBold)
                     }
                 },

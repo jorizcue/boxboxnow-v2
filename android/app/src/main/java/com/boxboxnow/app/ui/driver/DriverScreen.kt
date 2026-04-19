@@ -43,7 +43,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -51,8 +53,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.boxboxnow.app.models.DriverCard
+import com.boxboxnow.app.models.FinishLine
+import com.boxboxnow.app.models.GeoPoint
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.vm.AuthViewModel
+import com.boxboxnow.app.vm.ConfigViewModel
 import com.boxboxnow.app.vm.DriverViewModel
 import com.boxboxnow.app.vm.GpsViewModel
 import com.boxboxnow.app.vm.OrientationLock
@@ -75,6 +80,7 @@ fun DriverScreen(onBack: () -> Unit) {
     val raceVM: RaceViewModel = hiltViewModel()
     val gpsVM: GpsViewModel = hiltViewModel()
     val authVM: AuthViewModel = hiltViewModel()
+    val configVM: ConfigViewModel = hiltViewModel()
 
     val visible by driverVM.visibleCards.collectAsState()
     val order by driverVM.cardOrder.collectAsState()
@@ -89,6 +95,7 @@ fun DriverScreen(onBack: () -> Unit) {
     val deltaBest by driverVM.lapTracker.deltaBestMs.collectAsState()
     val orientation by driverVM.orientationLock.collectAsState()
     val audioEnabled by driverVM.audioEnabled.collectAsState()
+    val brightness by driverVM.brightness.collectAsState()
     val user by authVM.user.collectAsState()
 
     // Clock tick every 100ms for smooth race timer updates
@@ -96,9 +103,37 @@ fun DriverScreen(onBack: () -> Unit) {
     LaunchedEffect(Unit) {
         raceVM.connect()
         driverVM.applyDefaultPresetIfAny()
+        // Re-fetch the user's circuits so any admin-side edit to the GPS
+        // finish-line (finish_lat1/lon1/lat2/lon2) is picked up without
+        // having to kill the app. Mirrors the iOS DriverView.task flow.
+        configVM.loadSession()
+        configVM.loadCircuits()
         while (true) {
             clockMs = raceVM.interpolatedClockMs()
             delay(100)
+        }
+    }
+
+    // Apply the active circuit's GPS finish line to the LapTracker whenever
+    // the circuits list or the active circuit id changes. Keyed on both so
+    // an admin update (new list) or a session switch (new id) re-binds.
+    val circuits by configVM.circuits.collectAsState()
+    val session by configVM.session.collectAsState()
+    LaunchedEffect(circuits, session.circuitId) {
+        val circuitId = session.circuitId ?: return@LaunchedEffect
+        val circuit = circuits.firstOrNull { it.id == circuitId } ?: return@LaunchedEffect
+        val lat1 = circuit.finishLat1
+        val lon1 = circuit.finishLon1
+        val lat2 = circuit.finishLat2
+        val lon2 = circuit.finishLon2
+        if (lat1 != null && lon1 != null && lat2 != null && lon2 != null) {
+            driverVM.lapTracker.setFinishLine(
+                FinishLine(p1 = GeoPoint(lat1, lon1), p2 = GeoPoint(lat2, lon2))
+            )
+        } else {
+            // Admin removed the GPS points — drop the cached line so we
+            // don't keep detecting crossings at the wrong place.
+            driverVM.lapTracker.clearFinishLine()
         }
     }
 
@@ -200,17 +235,24 @@ fun DriverScreen(onBack: () -> Unit) {
         // rendered a full-screen spinner here when `karts.isEmpty()`, but the
         // reconnect flow would leave the user stuck on that screen whenever
         // the backend reaped an idle connection.
-        CardsGrid(
-            cards = cards,
-            ourKart = ourKart,
-            raceVM = raceVM,
-            raceClockMs = clockMs,
-            lastLapMs = lastLap,
-            bestLapMs = bestLap,
-            deltaBestMs = deltaBest,
-            gps = gps,
-            boxScore = boxScore.toInt(),
-        )
+        //
+        // The `contrastFilterModifier` mirrors iOS's
+        // `.brightness / .contrast / .saturation` stack — when the user
+        // drags the contrast slider in the menu, we run the cards through a
+        // ColorMatrix-backed paint so the view pops in direct sunlight.
+        Box(modifier = Modifier.fillMaxSize().then(contrastFilterModifier(brightness))) {
+            CardsGrid(
+                cards = cards,
+                ourKart = ourKart,
+                raceVM = raceVM,
+                raceClockMs = clockMs,
+                lastLapMs = lastLap,
+                bestLapMs = bestLap,
+                deltaBestMs = deltaBest,
+                gps = gps,
+                boxScore = boxScore.toInt(),
+            )
+        }
 
         // Menu handle — small dots on the right edge
         AnimatedVisibility(
@@ -413,5 +455,48 @@ private fun CardsGrid(
                 }
             }
         }
+    }
+}
+
+/**
+ * Mirrors iOS `DriverView`'s `.brightness / .contrast / .saturation` stack.
+ *
+ * The slider value (`brightness`) runs 0.0..1.0 where 0 is "normal" and 1 is
+ * "max contrast boost". We combine:
+ *   - saturation: 1.0 + brightness * 0.5
+ *   - contrast:   1.0 + brightness * 0.8
+ *   - brightness: brightness * 0.15 (added to each channel in 0..255 space)
+ *
+ * When `brightness == 0.0` we return `Modifier` unchanged so we don't pay the
+ * cost of an offscreen layer for no visible effect.
+ */
+private fun contrastFilterModifier(brightness: Double): Modifier {
+    if (brightness <= 0.0) return Modifier
+    val b = brightness.toFloat()
+    val saturation = 1f + b * 0.5f
+    val contrast = 1f + b * 0.8f
+    val brightnessOffset = b * 0.15f * 255f
+
+    val satMatrix = android.graphics.ColorMatrix().apply { setSaturation(saturation) }
+    val bcMatrix = android.graphics.ColorMatrix(
+        floatArrayOf(
+            contrast, 0f, 0f, 0f, brightnessOffset + (1f - contrast) * 127.5f,
+            0f, contrast, 0f, 0f, brightnessOffset + (1f - contrast) * 127.5f,
+            0f, 0f, contrast, 0f, brightnessOffset + (1f - contrast) * 127.5f,
+            0f, 0f, 0f, 1f, 0f,
+        ),
+    )
+    val combined = android.graphics.ColorMatrix().apply {
+        postConcat(satMatrix)
+        postConcat(bcMatrix)
+    }
+    val paint = android.graphics.Paint().apply {
+        colorFilter = android.graphics.ColorMatrixColorFilter(combined)
+    }
+    return Modifier.drawWithContent {
+        val canvas = drawContext.canvas.nativeCanvas
+        val layerId = canvas.saveLayer(null, paint)
+        drawContent()
+        canvas.restoreToCount(layerId)
     }
 }

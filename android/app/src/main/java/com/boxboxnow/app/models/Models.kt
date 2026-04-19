@@ -84,6 +84,14 @@ data class Circuit(
     val id: Int,
     val name: String,
     @SerialName("length_m") val lengthM: Int? = null,
+    // GPS finish-line reference points set by the admin (two points defining
+    // a segment the pilot crosses to complete a lap). All four must be
+    // non-null for the line to be usable; the mobile driver view wires
+    // these into LapTracker.setFinishLine on load / refresh.
+    @SerialName("finish_lat_1") val finishLat1: Double? = null,
+    @SerialName("finish_lon_1") val finishLon1: Double? = null,
+    @SerialName("finish_lat_2") val finishLat2: Double? = null,
+    @SerialName("finish_lon_2") val finishLon2: Double? = null,
 )
 
 // ───────────────────────── Kart State ─────────────────────────

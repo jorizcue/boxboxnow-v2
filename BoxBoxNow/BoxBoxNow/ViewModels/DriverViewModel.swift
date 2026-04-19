@@ -105,8 +105,18 @@ final class DriverViewModel: ObservableObject {
             let result = try await APIClient.shared.fetchPresets()
             await MainActor.run {
                 self.presets = result
-                if autoApplyDefault, let def = result.first(where: { $0.isDefault }) {
-                    self.applyPreset(def)
+                if autoApplyDefault {
+                    // Prefer an explicit default, but fall back to the user's
+                    // sole preset if they only have one and it isn't flagged —
+                    // existing pilots who created their first template before
+                    // the auto-default-on-create logic shipped would otherwise
+                    // land on a blank driver view with no contrast /
+                    // orientation / audio applied.
+                    if let def = result.first(where: { $0.isDefault }) {
+                        self.applyPreset(def)
+                    } else if result.count == 1, let only = result.first {
+                        self.applyPreset(only)
+                    }
                 }
             }
         } catch { /* silently fail */ }

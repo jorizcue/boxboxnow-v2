@@ -57,12 +57,17 @@ final class LapTracker: ObservableObject {
     private static let finishLineKey = "bbn_finish_line"
 
     func setFinishLine(_ fl: FinishLine) {
+        // Only wipe lap state if the new line is actually different from the
+        // currently-applied one. Otherwise a routine circuit refresh (e.g.
+        // DriverView re-reading circuits on appear) would clobber a pilot's
+        // in-progress session — even though the admin hasn't changed a thing.
+        let changed = (finishLine != fl)
         finishLine = fl
         // Persist to UserDefaults
         if let data = try? JSONEncoder().encode(fl) {
             UserDefaults.standard.set(data, forKey: Self.finishLineKey)
         }
-        reset()
+        if changed { reset() }
     }
 
     func loadFinishLine() {

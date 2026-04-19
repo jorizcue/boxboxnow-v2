@@ -219,6 +219,13 @@ struct DriverView: View {
         .ignoresSafeArea()
         .task {
             await configVM.loadSession()
+            // Re-fetch the user's accessible circuits so any admin-side
+            // edit to the finish-line GPS points (finish_lat1/lon1/lat2/lon2)
+            // is picked up without having to quit the app. The helper below
+            // is a no-op if the circuit has no GPS configured.
+            await configVM.loadCircuits()
+            applyCircuitFinishLine()
+
             if raceVM.ourKartNumber == 0 {
                 raceVM.ourKartNumber = configVM.session.ourKartNumber
             }
@@ -257,6 +264,16 @@ struct DriverView: View {
         .onChange(of: driverVM.orientationLock) { _, newValue in
             OrientationManager.shared.apply(newValue)
         }
+        // Re-bind the finish line if the user switches circuit mid-session.
+        .onChange(of: configVM.session.circuitId) { _, _ in
+            applyCircuitFinishLine()
+        }
+        // Re-bind when the circuits list itself changes — catches the case
+        // where admin updates GPS points on the active circuit and the app
+        // re-fetches the circuits (e.g. coming back to the foreground).
+        .onChange(of: configVM.circuits) { _, _ in
+            applyCircuitFinishLine()
+        }
         // Keep the speech service in sync with the viewModel's audio flag.
         // This fires whenever applyPreset() sets audioEnabled from a preset,
         // or when the menu toggle writes back to driverVM.audioEnabled.
@@ -267,6 +284,12 @@ struct DriverView: View {
             // Re-sync state when returning from background (may have missed
             // replay start, box calls, or race updates while suspended)
             raceVM.requestSnapshot()
+            // Also re-fetch circuits so any admin-side change to the GPS
+            // finish line applied while we were backgrounded is picked up.
+            Task {
+                await configVM.loadCircuits()
+                await MainActor.run { applyCircuitFinishLine() }
+            }
         }
         .onChange(of: myKart?.lastLapMs) {
             detectLapDelta()
@@ -391,6 +414,30 @@ struct DriverView: View {
         if raceVM.maxStintMin == 0 { raceVM.maxStintMin = Double(s.maxStintMin) }
         if raceVM.minStintMin == 0 { raceVM.minStintMin = Double(s.minStintMin) }
         if raceVM.minDriverTimeMin == 0 { raceVM.minDriverTimeMin = Double(s.minDriverTimeMin) }
+    }
+
+    /// Sync the GPS finish line into the lap tracker from the active
+    /// circuit's `finish_lat1/lon1/finish_lat2/lon2`. Called after the
+    /// circuit list loads / refreshes so a pilot picks up admin-side
+    /// changes without quitting the app. If the circuit hasn't been
+    /// configured with GPS points yet this stays a no-op and the
+    /// LapTracker keeps whatever it already had cached.
+    private func applyCircuitFinishLine() {
+        guard let circuitId = configVM.session.circuitId,
+              let circuit = configVM.circuits.first(where: { $0.id == circuitId }) else {
+            return
+        }
+        if let lat1 = circuit.finishLat1, let lon1 = circuit.finishLon1,
+           let lat2 = circuit.finishLat2, let lon2 = circuit.finishLon2 {
+            driverVM.lapTracker.setFinishLine(FinishLine(
+                p1: GeoPoint(lat: lat1, lon: lon1),
+                p2: GeoPoint(lat: lat2, lon: lon2)
+            ))
+        } else {
+            // Admin removed the GPS points — drop the cached line so we
+            // don't keep detecting crossings at the wrong place.
+            driverVM.lapTracker.clearFinishLine()
+        }
     }
 
     private func detectLapDelta() {

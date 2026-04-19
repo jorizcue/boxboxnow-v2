@@ -124,7 +124,14 @@ struct HomeView: View {
                         .frame(width: 8, height: 8)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Salir") { authVM.logout() }
+                    // Full sign-out wipes the local token + biometric AND
+                    // tells the server to delete the DeviceSession so the
+                    // admin "Sesiones activas" panel reflects the exit.
+                    // Previously this called `logout()`, which only reset
+                    // in-memory state and left the server session alive —
+                    // users reported stale mobile sessions lingering after
+                    // they closed the app.
+                    Button("Salir") { authVM.fullSignOut() }
                         .foregroundColor(.red)
                         .frame(minHeight: 44)
                         .accessibilityLabel("Cerrar sesion")

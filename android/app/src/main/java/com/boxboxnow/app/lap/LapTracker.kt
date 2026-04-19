@@ -85,9 +85,14 @@ class LapTracker(
     // ── Finish line persistence ──
 
     fun setFinishLine(fl: FinishLine) {
+        // Only wipe lap state if the new line is actually different from the
+        // currently-applied one. DriverScreen refreshes circuits on appear /
+        // foreground — we don't want a routine refresh to clobber an
+        // in-progress pilot session just because nothing changed.
+        val changed = finishLine != fl
         finishLine = fl
         prefs.putString("bbn_finish_line", json.encodeToString(FinishLine.serializer(), fl))
-        reset()
+        if (changed) reset()
     }
 
     fun loadFinishLine() {

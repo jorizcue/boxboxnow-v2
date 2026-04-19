@@ -167,7 +167,16 @@ class DriverViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { api.fetchPresets() }.onSuccess { list ->
                 _presets.value = list
-                if (autoApplyDefault) list.firstOrNull { it.isDefault }?.let { applyPreset(it) }
+                if (autoApplyDefault) {
+                    // Prefer an explicit default, but fall back to the user's
+                    // sole preset so pilots who created their first template
+                    // before the auto-default-on-create logic shipped still
+                    // land on a pre-configured driver view (otherwise
+                    // contrast / orientation / audio never load).
+                    val target = list.firstOrNull { it.isDefault }
+                        ?: list.singleOrNull()
+                    target?.let { applyPreset(it) }
+                }
             }
         }
     }
