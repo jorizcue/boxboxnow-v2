@@ -721,11 +721,26 @@ class RaceStateManager:
             self._first_countdown_ms = race_start_ms
 
         for kart in self.karts.values():
-            if kart.stint_start_countdown_ms == 0:
-                if kart.pit_count == 0:
-                    kart.stint_start_countdown_ms = race_start_ms
-                else:
-                    kart.stint_start_countdown_ms = self.countdown_ms
+            if kart.pit_count == 0:
+                # First-stint karts: unconditionally pin stint_start to the
+                # race start reference. The previous `if stint_start == 0`
+                # guard left alone karts that were init'd during the pre-race
+                # countdown (Apex often emits a `3:01:00`-ish countdown with
+                # grid in formation before the real start). Those karts kept
+                # a stint_start value HIGHER than race_start_ms, so
+                # `stint_sec = stint_start - current_countdown` came out
+                # inflated by the pre-race offset (~1 min for a 3h session
+                # at Henakart). This propagated to STINT EN CURSO /
+                # TIEMPO HASTA STINT MAXIMO / VUELTAS HASTA STINT MAXIMO
+                # and the analogous DriverView + Box metrics. Pinning to
+                # race_start_ms here mirrors what `_recalibrate_from_countdown`
+                # already does for the green-light-before-countdown path.
+                kart.stint_start_countdown_ms = race_start_ms
+            elif kart.stint_start_countdown_ms == 0:
+                # Kart has already pitted but is missing a stint_start
+                # (typically a DB restore of a mid-race state). Seed with
+                # the current countdown — the best approximation we have.
+                kart.stint_start_countdown_ms = self.countdown_ms
 
         logger.info(f"Race started via {trigger}. countdown_ms={self.countdown_ms}, "
                     f"race_start_ms={race_start_ms}, duration_min={self.duration_min}, "
