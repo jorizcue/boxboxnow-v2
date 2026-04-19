@@ -2,42 +2,10 @@ import Foundation
 
 struct LiveTimingURLResponse: Codable { let url: String }
 
-/// Response from `GET /race/live-teams`. Mirrors the web
-/// `api.getLiveTeams()` shape. Teams come in snake_case (server payload)
-/// and are remapped into the iPad's `Team` shape before being returned.
-struct LiveTeamsResponse: Codable {
-    let teams: [LiveTeam]
-    let hasDrivers: Bool
-    let kartCount: Int
-
-    enum CodingKeys: String, CodingKey {
-        case teams
-        case hasDrivers = "has_drivers"
-        case kartCount = "kart_count"
-    }
-}
-
-struct LiveTeam: Codable {
-    let position: Int
-    let kart: Int
-    let teamName: String
-    let drivers: [LiveDriver]
-
-    enum CodingKeys: String, CodingKey {
-        case position, kart, drivers
-        case teamName = "team_name"
-    }
-}
-
-struct LiveDriver: Codable {
-    let driverName: String
-    let differentialMs: Int
-
-    enum CodingKeys: String, CodingKey {
-        case driverName = "driver_name"
-        case differentialMs = "differential_ms"
-    }
-}
+// NOTE: `LiveTeamsResponse` lives in `Shared/Models/Team.swift` and returns
+// `[Team]` directly (Team already handles snake_case team_name / drivers /
+// driver_name). We reuse that definition here instead of declaring a
+// parallel one.
 
 struct ConfigService {
     let api = APIClient.shared

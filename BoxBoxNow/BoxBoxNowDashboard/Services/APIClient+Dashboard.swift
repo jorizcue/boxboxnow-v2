@@ -106,16 +106,16 @@ extension APIClient {
 
     /// Posts `.authExpired` only when the originating request was authenticated — avoids logging the user out of the login screen itself when bad credentials return 401.
     private func handleStatus(_ response: URLResponse, request: URLRequest) throws {
-        guard let http = response as? HTTPURLResponse else { throw APIError.requestFailed }
+        guard let http = response as? HTTPURLResponse else { throw APIError.requestFailed() }
         if http.statusCode == 401 {
             let wasAuthenticated = request.value(forHTTPHeaderField: "Authorization") != nil
             KeychainHelper.deleteToken()
             if wasAuthenticated {
                 NotificationCenter.default.post(name: .authExpired, object: nil)
             }
-            throw APIError.unauthorized
+            throw APIError.unauthorized()
         }
-        guard (200...299).contains(http.statusCode) else { throw APIError.requestFailed }
+        guard (200...299).contains(http.statusCode) else { throw APIError.requestFailed() }
     }
 }
 

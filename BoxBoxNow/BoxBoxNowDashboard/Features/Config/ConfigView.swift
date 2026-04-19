@@ -721,14 +721,17 @@ private struct TeamsEditor: View {
         do {
             let resp = try await ConfigService().liveTeams()
             // Merge with existing: keep local order and drivers, but update
-            // team name for matching karts; new karts get appended.
+            // team name for matching karts; new karts get appended at the
+            // end. `resp.teams` is `[Team]` (the shared model that already
+            // decodes `team_name` / nested `driver_name` + `differential_ms`).
             var byKart: [Int: Int] = [:]
             for (i, t) in draft.enumerated() { byKart[t.kart] = i }
             var merged = draft
             for live in resp.teams {
                 if let i = byKart[live.kart] {
                     merged[i].teamName = live.teamName.isEmpty ? merged[i].teamName : live.teamName
-                    // Append any new drivers not already present (dedup by lowercase name)
+                    // Append any new drivers not already present (dedup by lowercase name).
+                    // Preserves existing differentials on matching names.
                     let have = Set(merged[i].drivers.map { $0.driverName.lowercased() })
                     for d in live.drivers where !d.driverName.isEmpty && !have.contains(d.driverName.lowercased()) {
                         merged[i].drivers.append(TeamDriver(driverName: d.driverName, differentialMs: 0))
@@ -738,7 +741,9 @@ private struct TeamsEditor: View {
                         position: merged.count + 1,
                         kart: live.kart,
                         teamName: live.teamName,
-                        drivers: live.drivers.map { TeamDriver(driverName: $0.driverName, differentialMs: 0) }
+                        drivers: live.drivers.map {
+                            TeamDriver(driverName: $0.driverName, differentialMs: 0)
+                        }
                     )
                     merged.append(newTeam)
                 }

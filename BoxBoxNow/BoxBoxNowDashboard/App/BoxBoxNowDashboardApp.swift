@@ -11,7 +11,7 @@ struct BoxBoxNowDashboardApp: App {
                     RootView()
                 } else {
                     AuthFlowView()
-                }
+                } 
             }
             .environment(app)
             .preferredColorScheme(.dark)

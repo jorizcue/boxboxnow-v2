@@ -193,21 +193,24 @@ private struct CircuitEditorSheet: View {
     init(circuit: Circuit, isNew: Bool) {
         self.original = circuit
         self.isNew = isNew
+        // Inline closures instead of `.map(String.init)` — `String` has many
+        // initializers and passing `String.init` as a function reference
+        // triggers "Ambiguous use of 'init'" in Xcode 15+.
         _name = State(initialValue: circuit.name)
-        _lengthM = State(initialValue: circuit.lengthM.map(String.init) ?? "")
-        _pitTimeS = State(initialValue: circuit.pitTimeS.map(String.init) ?? "")
-        _wsPort = State(initialValue: circuit.wsPort.map(String.init) ?? "")
-        _wsPortData = State(initialValue: circuit.wsPortData.map(String.init) ?? "")
-        _phpApiPort = State(initialValue: circuit.phpApiPort.map(String.init) ?? "")
-        _lapsDiscard = State(initialValue: circuit.lapsDiscard.map(String.init) ?? "")
-        _lapDifferential = State(initialValue: circuit.lapDifferential.map(String.init) ?? "")
+        _lengthM = State(initialValue: circuit.lengthM.map { "\($0)" } ?? "")
+        _pitTimeS = State(initialValue: circuit.pitTimeS.map { "\($0)" } ?? "")
+        _wsPort = State(initialValue: circuit.wsPort.map { "\($0)" } ?? "")
+        _wsPortData = State(initialValue: circuit.wsPortData.map { "\($0)" } ?? "")
+        _phpApiPort = State(initialValue: circuit.phpApiPort.map { "\($0)" } ?? "")
+        _lapsDiscard = State(initialValue: circuit.lapsDiscard.map { "\($0)" } ?? "")
+        _lapDifferential = State(initialValue: circuit.lapDifferential.map { "\($0)" } ?? "")
         _phpApiUrl = State(initialValue: circuit.phpApiUrl ?? "")
         _liveTimingUrl = State(initialValue: circuit.liveTimingUrl ?? "")
-        _retentionDays = State(initialValue: circuit.retentionDays.map(String.init) ?? "")
-        _finishLat1 = State(initialValue: circuit.finishLat1.map(String.init) ?? "")
-        _finishLon1 = State(initialValue: circuit.finishLon1.map(String.init) ?? "")
-        _finishLat2 = State(initialValue: circuit.finishLat2.map(String.init) ?? "")
-        _finishLon2 = State(initialValue: circuit.finishLon2.map(String.init) ?? "")
+        _retentionDays = State(initialValue: circuit.retentionDays.map { "\($0)" } ?? "")
+        _finishLat1 = State(initialValue: circuit.finishLat1.map { "\($0)" } ?? "")
+        _finishLon1 = State(initialValue: circuit.finishLon1.map { "\($0)" } ?? "")
+        _finishLat2 = State(initialValue: circuit.finishLat2.map { "\($0)" } ?? "")
+        _finishLon2 = State(initialValue: circuit.finishLon2.map { "\($0)" } ?? "")
         _isActive = State(initialValue: circuit.isActive ?? false)
     }
 

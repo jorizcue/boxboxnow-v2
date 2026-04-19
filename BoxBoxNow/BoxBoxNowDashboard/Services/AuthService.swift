@@ -12,9 +12,20 @@ protocol AuthServicing {
 struct LoginResponse: Codable {
     let accessToken: String
     let user: User
-    let mfaRequired: Bool
-    let mfaEnabled: Bool
+    /// Top-level `mfa_required` / `mfa_enabled` fields were present in an
+    /// older backend shape. The current backend nests those flags inside
+    /// `user`, so they're optional here (with a Bool-or-nil helper to keep
+    /// the apply() logic readable). Without this, the iPad login decoder
+    /// used to fail with "The data couldn't be read because it is missing."
+    let mfaRequired: Bool?
+    let mfaEnabled: Bool?
     let mfaSecret: String?
+
+    /// Effective flags: prefer the top-level value when present, otherwise
+    /// fall back to the `user` object's fields. This mirrors the web login
+    /// flow which reads the nested user flags.
+    var effectiveMfaRequired: Bool { mfaRequired ?? user.mfaRequired ?? false }
+    var effectiveMfaEnabled: Bool  { mfaEnabled  ?? user.mfaEnabled  ?? false }
 
     enum CodingKeys: String, CodingKey {
         case user

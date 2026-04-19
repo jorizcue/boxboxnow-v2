@@ -95,6 +95,50 @@ struct Circuit: Codable, Identifiable, Hashable {
         case liveTimingUrl = "live_timing_url"
         case retentionDays = "retention_days"
     }
+
+    /// Explicit memberwise initializer. Declared because Swift's
+    /// synthesized memberwise init can become ambiguous once the struct
+    /// grows many optional parameters — the compiler starts reporting
+    /// "Ambiguous use of 'init'" at call sites that only specify a
+    /// subset of fields. Keeping an explicit init with defaults for all
+    /// optional parameters eliminates that ambiguity.
+    init(
+        id: Int,
+        name: String,
+        lengthM: Int? = nil,
+        finishLat1: Double? = nil,
+        finishLon1: Double? = nil,
+        finishLat2: Double? = nil,
+        finishLon2: Double? = nil,
+        isActive: Bool? = nil,
+        pitTimeS: Int? = nil,
+        wsPort: Int? = nil,
+        wsPortData: Int? = nil,
+        phpApiPort: Int? = nil,
+        lapsDiscard: Int? = nil,
+        lapDifferential: Int? = nil,
+        phpApiUrl: String? = nil,
+        liveTimingUrl: String? = nil,
+        retentionDays: Int? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.lengthM = lengthM
+        self.finishLat1 = finishLat1
+        self.finishLon1 = finishLon1
+        self.finishLat2 = finishLat2
+        self.finishLon2 = finishLon2
+        self.isActive = isActive
+        self.pitTimeS = pitTimeS
+        self.wsPort = wsPort
+        self.wsPortData = wsPortData
+        self.phpApiPort = phpApiPort
+        self.lapsDiscard = lapsDiscard
+        self.lapDifferential = lapDifferential
+        self.phpApiUrl = phpApiUrl
+        self.liveTimingUrl = liveTimingUrl
+        self.retentionDays = retentionDays
+    }
 }
 
 // Dashboard-only race config (wider than the driver's RaceSession).

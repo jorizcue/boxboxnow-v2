@@ -100,12 +100,17 @@ final class AuthStore {
     private func apply(_ resp: LoginResponse) {
         self.user = resp.user
 
-        if resp.mfaRequired && !resp.mfaEnabled {
+        // Read effective flags so we work with either the old top-level
+        // shape or the current shape where mfa flags live inside `user`.
+        let mfaRequired = resp.effectiveMfaRequired
+        let mfaEnabled  = resp.effectiveMfaEnabled
+
+        if mfaRequired && !mfaEnabled {
             let otpURL = resp.mfaSecret ?? ""
             authState = .needsMFASetup(otpAuthURL: otpURL)
             return
         }
-        if resp.mfaEnabled && resp.accessToken.isEmpty {
+        if mfaEnabled && resp.accessToken.isEmpty {
             authState = .needsMFACode
             return
         }
