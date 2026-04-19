@@ -53,6 +53,14 @@ class KartState:
     total_laps: int = 0
     apex_total_laps: int = 0   # Apex c6 (tlp) value — source of truth for lap count
     last_lap_ms: int = 0       # lastLapTime - last valid lap time in ms
+    # Last c7 (llp) value we actually processed. Used to distinguish a real
+    # new lap from a CSS class repaint (Apex re-sends the same last_lap value
+    # with a different class, e.g. "tb" → "tn", when another kart beats the
+    # best). A new c7 is a real new lap if either:
+    #   - the value differs from _last_c7_value, OR
+    #   - apex_total_laps has moved forward since our last recorded lap
+    #     (covers the rare case of two consecutive laps with identical ms).
+    _last_c7_value: int = 0
     best_lap_ms: int = 0
     gap: str = ""
     interval: str = ""
@@ -393,14 +401,29 @@ class RaceStateManager:
             # lap NUMBER in the llp column (e.g. "1" → 1000ms) before the real
             # time. No karting lap is under 15 seconds.
             if lap_ms > 15000 and kart:
-                # Skip CSS class repaints: Apex resends the same lap time with a
-                # different class (e.g. tb→ti when another kart beats the best).
-                # Use apex_total_laps (c6) as the source of truth: if our count
-                # already matches Apex, this c7 update is NOT a new lap.
-                if kart.apex_total_laps > 0 and kart.total_laps >= kart.apex_total_laps:
-                    return None
-                return self._record_lap(kart, row_id, lap_ms,
-                                        event.extra.get("class", "tn"))
+                # A c7 update is a REAL new lap when either:
+                #   - Apex's c6 (apex_total_laps) has advanced beyond our count
+                #     (catches the rare edge case of two consecutive laps with
+                #     identical ms — our value dedup would otherwise drop one).
+                #   - The value differs from the last c7 we actually processed.
+                # Otherwise it's a CSS class repaint (Apex re-sends the same
+                # last_lap value with a different class, e.g. "tb" → "tn" when
+                # another kart beats the best). The previous implementation
+                # used `total_laps >= apex_total_laps` as the skip guard, which
+                # dropped legitimate c7 events that arrived AFTER a phantom
+                # back-fill had already bumped our counter — corrupting every
+                # subsequent lap with stale last_lap_ms values. See Issue #1
+                # in pending_issues.md for the Henakart 3h evidence.
+                c6_advanced = (
+                    kart.apex_total_laps > 0
+                    and kart.apex_total_laps > kart.total_laps
+                )
+                value_changed = lap_ms != kart._last_c7_value
+                if c6_advanced or value_changed:
+                    kart._last_c7_value = lap_ms
+                    return self._record_lap(kart, row_id, lap_ms,
+                                            event.extra.get("class", "tn"))
+                return None
 
         elif event.type == EventType.LAP_MS:
             # The r{id}|*|{ms}| pattern is NOT a lap event.
@@ -497,22 +520,17 @@ class RaceStateManager:
             if new_total <= 0:
                 return None
 
-            # Before updating apex_total_laps, check if previous increment
-            # never got a corresponding LAP (c7). If so, generate the missed
-            # lap(s) now — before the new c6 value overtakes.
-            result = None
-            if (kart.apex_total_laps > 0
-                    and kart.total_laps < kart.apex_total_laps
-                    and kart.last_lap_ms > 0):
-                # Missed lap(s) from previous c6 increment — generate with last known time
-                while kart.total_laps < kart.apex_total_laps:
-                    result = self._record_lap(kart, row_id, kart.last_lap_ms, "tn")
-
+            # Just sync the Apex counter. The previous implementation synthesized
+            # phantom lap records here using `kart.last_lap_ms` whenever c6
+            # arrived before the matching c7 — but that stale value had nothing
+            # to do with the actual new lap, which corrupted every downstream
+            # stat (avg, best, best-stint) in Carrera / Analytics / GPS Insights.
+            # We now rely exclusively on c7 (LAP event) to create lap records;
+            # if we miss a c7 entirely we miss that one lap, which is far less
+            # damaging than polluting the record set with made-up times.
             kart.apex_total_laps = new_total
-            # Always send the Apex total_laps value to frontend so the column
-            # updates even if the LAP event hasn't arrived yet in this block.
-            return result or {"event": "totalLaps", "rowId": row_id,
-                              "value": new_total}
+            return {"event": "totalLaps", "rowId": row_id,
+                    "value": new_total}
 
         elif event.type == EventType.PIT_TIME and kart:
             kart.pit_time = event.value

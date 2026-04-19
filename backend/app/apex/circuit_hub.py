@@ -257,12 +257,25 @@ class CircuitConnection:
                 await self._lap_state.handle_events(events)
 
                 # Detect category/session change (e.g. "70 SILVER - Q1" → "70 GOLD - Q1")
-                # This creates a new race_log without needing a full init reset
+                # Two sub-cases:
+                #  - "upgrade": the old key is a strict subset of the new (e.g.
+                #    only track_name had arrived, then category + session_title
+                #    landed). Same physical session — just rename the existing
+                #    race_log in place so we don't fragment one race into two
+                #    rows (this was happening at Viana / Henakart — see Issue
+                #    #1 evidence in pending_issues.md).
+                #  - real change: the user switched heat or Apex moved on to
+                #    the next grid. Finalize and start a new race_log.
                 new_key = self._build_session_key()
                 if new_key and self._lap_current_session_key and new_key != self._lap_current_session_key:
-                    logger.info(f"[{self.circuit_name}] Session changed: "
-                                f"'{self._lap_current_session_key}' → '{new_key}'")
-                    await self._finalize_lap_race_log(full_reset=False)
+                    if self._is_session_name_upgrade(self._lap_current_session_key, new_key):
+                        logger.info(f"[{self.circuit_name}] Session name upgraded: "
+                                    f"'{self._lap_current_session_key}' → '{new_key}'")
+                        await self._rename_current_race_log(self._current_session_name())
+                    else:
+                        logger.info(f"[{self.circuit_name}] Session changed: "
+                                    f"'{self._lap_current_session_key}' → '{new_key}'")
+                        await self._finalize_lap_race_log(full_reset=False)
                 if new_key:
                     self._lap_current_session_key = new_key
 
@@ -515,6 +528,55 @@ class CircuitConnection:
         ) if p]
         return " | ".join(parts)
 
+    def _current_session_name(self) -> str:
+        """Same components as _build_session_key but formatted for the
+        `session_name` column in race_logs (hyphen-separated, with a fallback
+        when nothing has arrived yet)."""
+        parts = [p for p in (
+            self._lap_state.category,
+            self._lap_state.track_name,
+            self._lap_state.session_title,
+        ) if p]
+        return " - ".join(parts) if parts else f"Auto {self.circuit_name}"
+
+    @staticmethod
+    def _is_session_name_upgrade(old_key: str, new_key: str) -> bool:
+        """Detect the common case where the session name grows because a
+        late-arriving Apex update landed (e.g. initial save with just
+        `track_name`, then `title2` adds the session title and `title1` adds
+        the category). Returns True when every component of `old_key` is
+        also present in `new_key` — i.e. we're describing the same physical
+        session in more detail, not switching heats.
+        """
+        if not old_key or not new_key or old_key == new_key:
+            return False
+        old_parts = {p for p in old_key.split(" | ") if p}
+        new_parts = {p for p in new_key.split(" | ") if p}
+        return bool(old_parts) and old_parts.issubset(new_parts)
+
+    async def _rename_current_race_log(self, new_session_name: str):
+        """Update the `session_name` of the current race_log in place. Used
+        when we detect a name upgrade (same physical session, late-arriving
+        components) so we don't fragment the laps across two rows."""
+        if self._lap_race_log_id is None:
+            return
+        try:
+            from app.models.database import async_session
+            from app.models.schemas import RaceLog
+            from sqlalchemy import update
+
+            async with async_session() as db:
+                await db.execute(
+                    update(RaceLog)
+                    .where(RaceLog.id == self._lap_race_log_id)
+                    .values(session_name=new_session_name)
+                )
+                await db.commit()
+            logger.info(f"[{self.circuit_name}] Renamed race_log "
+                        f"#{self._lap_race_log_id} → '{new_session_name}'")
+        except Exception as e:
+            logger.error(f"[{self.circuit_name}] Rename race_log failed: {e}")
+
     async def _save_circuit_laps(self):
         """Save newly arrived laps to DB (automatic, no user session needed)."""
         try:
@@ -627,12 +689,21 @@ class CircuitConnection:
                 logger.error(f"[{self.circuit_name}] Auto race_log finalize failed: {e}")
 
         self._lap_race_log_id = None
-        self._lap_saved_per_kart.clear()
         self._lap_save_counter = 0
         if full_reset:
             # Reset lap state so next race starts fresh
             self._lap_state.reset()
             self._lap_current_session_key = ""
+            self._lap_saved_per_kart.clear()
+        else:
+            # Session-name changed but we're keeping the in-memory lap state
+            # (same physical race, just category/title arrived late). Mark
+            # every currently-held lap as "already saved" so the next save
+            # loop doesn't re-persist them into the new race_log — that was
+            # producing the duplicate (lap_number, lap_time) rows observed in
+            # race_log 2604 at Henakart (Issue #1 evidence).
+            for kart in self._lap_state.karts.values():
+                self._lap_saved_per_kart[kart.kart_number] = len(kart.all_laps)
 
     async def _restore_from_db(self):
         """Restore live race state from DB on startup (if backend restarted mid-race)."""
