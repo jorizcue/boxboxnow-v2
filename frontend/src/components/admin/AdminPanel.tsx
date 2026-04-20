@@ -1244,6 +1244,7 @@ function PlatformSettingsManager() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     registration: true,
     trial: true,
+    mobile: true,
     products: true,
   });
 
@@ -1579,6 +1580,77 @@ function PlatformSettingsManager() {
                   className="w-24 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50 transition-colors"
                 />
                 <span className="text-xs text-neutral-500">dias antes de expirar</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Section: Mobile app versions */}
+      <div className="bg-surface rounded-xl border border-border">
+        <button
+          onClick={() => toggleSection("mobile")}
+          className="w-full flex items-center justify-between p-5 text-left"
+        >
+          <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
+            Apps móviles — versión mínima
+          </h3>
+          <span className="text-neutral-500 text-xs">{openSections.mobile ? "\u25B2" : "\u25BC"}</span>
+        </button>
+        {openSections.mobile && (
+          <div className="px-5 pb-5 space-y-4">
+            <p className="text-xs text-neutral-500 leading-relaxed">
+              Cuando la app de iOS o Android intenta hacer login, envía su versión
+              en una cabecera <code className="text-accent">X-App-Version</code>. Si es
+              inferior a la mínima configurada aquí, el backend devuelve un error
+              controlado y la app muestra la pantalla de &quot;actualiza para continuar&quot;.
+              Deja el campo vacío para desactivar la comprobación en esa plataforma.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-neutral-400 mb-1.5 uppercase tracking-wider">
+                  iOS — versión mínima
+                </label>
+                <input
+                  type="text"
+                  placeholder="1.4.0"
+                  value={settings.min_ios_version || ""}
+                  onChange={(e) => handleChange("min_ios_version", e.target.value)}
+                  className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-accent/50 transition-colors"
+                />
+                <label className="block text-xs text-neutral-400 mt-3 mb-1.5 uppercase tracking-wider">
+                  iOS — última versión (informativa)
+                </label>
+                <input
+                  type="text"
+                  placeholder="1.5.2"
+                  value={settings.latest_ios_version || ""}
+                  onChange={(e) => handleChange("latest_ios_version", e.target.value)}
+                  className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-accent/50 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-neutral-400 mb-1.5 uppercase tracking-wider">
+                  Android — versión mínima
+                </label>
+                <input
+                  type="text"
+                  placeholder="1.4.0"
+                  value={settings.min_android_version || ""}
+                  onChange={(e) => handleChange("min_android_version", e.target.value)}
+                  className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-accent/50 transition-colors"
+                />
+                <label className="block text-xs text-neutral-400 mt-3 mb-1.5 uppercase tracking-wider">
+                  Android — última versión (informativa)
+                </label>
+                <input
+                  type="text"
+                  placeholder="1.5.2"
+                  value={settings.latest_android_version || ""}
+                  onChange={(e) => handleChange("latest_android_version", e.target.value)}
+                  className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-accent/50 transition-colors"
+                />
               </div>
             </div>
           </div>

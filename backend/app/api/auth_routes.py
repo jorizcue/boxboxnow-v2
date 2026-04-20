@@ -48,6 +48,91 @@ PLATFORM_DEFAULTS = {
 }
 
 
+# ---- Mobile app version gating ----------------------------------------------
+#
+# Admins set `min_ios_version` / `min_android_version` in the platform settings.
+# iOS and Android clients send their app version as `X-App-Version` plus the
+# platform as `X-App-Platform` (`"ios"` or `"android"`) on every login attempt.
+# If the client's version is below the configured minimum we respond 426
+# (Upgrade Required) with a payload describing the mismatch, which the apps
+# catch to render a blocking "update required" screen.
+
+def _parse_semver(v: str) -> tuple[int, ...]:
+    """Parse a semver-ish string into a tuple of ints for comparison.
+
+    Strips any pre-release / build suffix (e.g. `1.4.0-beta.2` -> (1,4,0)).
+    Non-numeric components resolve to 0 so weird inputs don't 500 the login.
+    """
+    if not v:
+        return (0,)
+    core = v.split("-", 1)[0].split("+", 1)[0].strip()
+    parts = []
+    for chunk in core.split("."):
+        digits = re.match(r"\d+", chunk)
+        parts.append(int(digits.group(0)) if digits else 0)
+    return tuple(parts) if parts else (0,)
+
+
+def _version_lt(a: str, b: str) -> bool:
+    """True iff semver(a) < semver(b). Pads shorter side with zeros."""
+    ta, tb = _parse_semver(a), _parse_semver(b)
+    width = max(len(ta), len(tb))
+    ta = ta + (0,) * (width - len(ta))
+    tb = tb + (0,) * (width - len(tb))
+    return ta < tb
+
+
+async def _enforce_min_app_version(request: Request, db: AsyncSession) -> None:
+    """Block the request with HTTP 426 when the client app is below the
+    admin-configured minimum for its platform.
+
+    The check is LENIENT by design:
+      - If the client sends no `X-App-Platform` header (e.g. the web
+        frontend), the gate is skipped — web logins aren't subject to
+        store-release versioning.
+      - If the platform's `min_*_version` setting is unset / empty, we
+        skip (admins haven't turned the gate on yet).
+      - If the client sends no `X-App-Version` header, we treat it as
+        outdated: a mobile build that can't advertise its version should
+        force the user through the upgrade prompt.
+    """
+    platform = (request.headers.get("X-App-Platform") or "").strip().lower()
+    if platform not in {"ios", "android"}:
+        return
+
+    key = "min_ios_version" if platform == "ios" else "min_android_version"
+    result = await db.execute(select(AppSetting).where(AppSetting.key == key))
+    row = result.scalar_one_or_none()
+    min_version = (row.value if row else "").strip()
+    if not min_version:
+        return
+
+    client_version = (request.headers.get("X-App-Version") or "").strip()
+    if client_version and not _version_lt(client_version, min_version):
+        return
+
+    latest_key = "latest_ios_version" if platform == "ios" else "latest_android_version"
+    latest_row = await db.execute(select(AppSetting).where(AppSetting.key == latest_key))
+    latest_row = latest_row.scalar_one_or_none()
+    latest_version = (latest_row.value if latest_row else "").strip() or min_version
+
+    raise HTTPException(
+        status_code=status.HTTP_426_UPGRADE_REQUIRED,
+        detail={
+            "code": "app_update_required",
+            "message": (
+                f"La versión instalada ({client_version or 'desconocida'}) es "
+                f"anterior a la mínima soportada ({min_version}). "
+                "Actualiza la app para continuar."
+            ),
+            "platform": platform,
+            "current_version": client_version,
+            "min_version": min_version,
+            "latest_version": latest_version,
+        },
+    )
+
+
 async def _get_platform_setting(db: AsyncSession, key: str) -> str:
     """Get a platform setting value, returning default if not found."""
     result = await db.execute(select(AppSetting).where(AppSetting.key == key))
@@ -427,6 +512,11 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
     """Public registration. Creates account + auto-login."""
     login_limiter.check(request.client.host if request.client else "unknown")
 
+    # Gate outdated mobile apps the same way `/login` does — otherwise a
+    # stale client could create an account and then hit the upgrade wall
+    # on its next action (confusing UX).
+    await _enforce_min_app_version(request, db)
+
     # Check username uniqueness
     existing = await db.execute(select(User).where(User.username == data.username))
     if existing.scalar_one_or_none():
@@ -540,6 +630,13 @@ async def login(
     ip = request.client.host if request.client else "unknown"
     login_limiter.check(ip)
     client_kind = "mobile" if device == "mobile" else "web"
+
+    # Mobile apps pinned below the admin-configured minimum get rejected
+    # here with HTTP 426 before we even look at the credentials. Keeps
+    # stale clients out (and lets the admin drop a compatibility-breaking
+    # fix remotely without having to reach every device). See
+    # `_enforce_min_app_version` — the gate is a no-op for web logins.
+    await _enforce_min_app_version(request, db)
 
     # Validate credentials — accept username OR email
     identifier = data.username.strip()

@@ -478,6 +478,17 @@ PLATFORM_SETTINGS_KEYS = [
     "default_max_devices",  # Max devices for new users
     "trial_tabs",           # JSON array: tabs granted during trial
     "trial_max_devices",    # Max devices during trial
+    # Mobile app version gating. Empty string = no minimum enforced.
+    # Format: semver-style "MAJOR.MINOR.PATCH" (e.g. "1.4.0"). Login
+    # endpoints compare the `X-App-Version` header against these and
+    # return HTTP 426 when the client is below the minimum — iOS /
+    # Android apps trap that and show an "update required" screen.
+    "min_ios_version",
+    "min_android_version",
+    # Informational: the current latest version in each store. Displayed
+    # in the app for nice "update available" prompts (non-blocking).
+    "latest_ios_version",
+    "latest_android_version",
 ]
 
 PLATFORM_DEFAULTS = {
@@ -488,6 +499,10 @@ PLATFORM_DEFAULTS = {
     "default_max_devices": "2",
     "trial_tabs": '["race","pit","live","config","adjusted","adjusted-beta","driver","driver-config","replay","analytics","insights"]',
     "trial_max_devices": "2",
+    "min_ios_version": "",
+    "min_android_version": "",
+    "latest_ios_version": "",
+    "latest_android_version": "",
 }
 
 
