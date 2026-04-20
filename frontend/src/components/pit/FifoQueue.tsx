@@ -6,6 +6,7 @@ import { useRaceClock } from "@/hooks/useRaceClock";
 import { useSimNow } from "@/hooks/useSimNow";
 import { tierHex, secondsToHMS, msToLapTime } from "@/lib/formatters";
 import { sendBoxCall } from "@/lib/driverChannel";
+import { computeStintMetrics } from "@/lib/stintCalc";
 import { api } from "@/lib/api";
 import type { FifoEntry } from "@/types/race";
 import clsx from "clsx";
@@ -109,10 +110,23 @@ export function FifoQueue() {
 
   const ourStintSec = ourKart ? stintSecondsFor(ourKart) : 0;
   const ourStintMin = ourStintSec / 60;
-  const timeToMaxStint = Math.max(0, config.maxStintMin * 60 - ourStintSec);
-  const lapsToMaxStint = ourKart && ourKart.avgLapMs > 0
-    ? timeToMaxStint / (ourKart.avgLapMs / 1000)
-    : 0;
+
+  // Use the shared stint-metrics helper so Box shows the same ceiling as
+  // Carrera / DriverView: `realMaxStint` reserves time for pending
+  // mandatory pits instead of using `config.maxStintMin` blindly. Before
+  // this, Box could tell the strategist "you still have 30 min of stint"
+  // while Carrera said "only 12 min" because the race was almost over —
+  // now both tabs agree.
+  const stintMetrics = computeStintMetrics(
+    ourKart,
+    config,
+    raceClockMs,
+    durationMs,
+    raceFinished,
+  );
+  const timeToMaxStint = stintMetrics.timeToMaxStintSec;
+  const lapsToMaxStint = stintMetrics.lapsToMaxStint;
+  const realMaxStintMin = stintMetrics.realMaxStintMin;
 
   // Average future stint time calculation
   // Formula: (configuredDuration - elapsed - pitTimePending) / remainingPits
@@ -138,7 +152,8 @@ export function FifoQueue() {
 
   const kartsNearPit = sorted.filter((k) => {
     const stintSec = stintSecondsFor(k);
-    return stintSec / 60 >= config.maxStintMin - 5 && k.pitStatus !== "in_pit";
+    // "Close to pit" = within 5 min of the effective (real) max stint.
+    return stintSec / 60 >= realMaxStintMin - 5 && k.pitStatus !== "in_pit";
   }).length;
 
   const ourAvgPosition = ourKart
@@ -175,11 +190,13 @@ export function FifoQueue() {
     }
   }, [ourLastLapMs]);
 
-  // Stint colors
+  // Stint colors — red when over the effective max (realMax), orange within
+  // 5 min of it, green otherwise. Uses the same ceiling as Carrera so the
+  // colour cue matches across tabs.
   const stintColor = (() => {
     if (ourStintMin < config.minStintMin) return "text-red-400";
-    if (ourStintMin >= config.maxStintMin) return "text-red-400 animate-pulse";
-    if (ourStintMin >= config.maxStintMin - 5) return "text-orange-400";
+    if (ourStintMin >= realMaxStintMin) return "text-red-400 animate-pulse";
+    if (ourStintMin >= realMaxStintMin - 5) return "text-orange-400";
     return "text-green-400";
   })();
 
@@ -266,6 +283,11 @@ export function FifoQueue() {
             <span className={clsx("text-lg sm:text-xl font-mono font-black leading-none", timeToMaxColor)}>
               {secondsToHMS(timeToMaxStint)}
             </span>
+            {realMaxStintMin < config.maxStintMin && (
+              <span className="text-[7px] text-orange-400 font-mono">
+                max {Math.floor(realMaxStintMin)}:{String(Math.round((realMaxStintMin % 1) * 60)).padStart(2, "0")}
+              </span>
+            )}
           </div>
 
           {/* Laps to max stint */}
