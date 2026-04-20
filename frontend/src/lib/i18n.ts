@@ -45,6 +45,7 @@ const translations: Record<string, Record<Language, string>> = {
   "nav.classification": { es: "Clasificacion", en: "Classification", it: "Classifica", de: "Klassifizierung" },
   "nav.config": { es: "Config", en: "Config", it: "Config", de: "Config" },
   "nav.admin": { es: "Admin", en: "Admin", it: "Admin", de: "Admin" },
+  "nav.account": { es: "Mi cuenta", en: "My account", it: "Il mio account", de: "Mein Konto" },
   "nav.adjusted": { es: "Clasif. Real", en: "Real Class.", it: "Class. Reale", de: "Echte Klass." },
   "nav.driver": { es: "Vista Piloto", en: "Driver View", it: "Vista Pilota", de: "Fahreransicht" },
   "nav.driverView": { es: "Vista en vivo", en: "Live View", it: "Vista live", de: "Live-Ansicht" },

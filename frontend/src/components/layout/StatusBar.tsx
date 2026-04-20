@@ -15,10 +15,13 @@ interface StatusBarProps {
   connected: boolean;
   trackName: string;
   countdownMs: number;
-  username: string;
+  /** Kept optional for backwards compatibility but no longer rendered —
+   * the username moved to the pinned account row at the bottom of the
+   * sidebar (Claude Desktop style). */
+  username?: string;
 }
 
-export function StatusBar({ connected, trackName, countdownMs, username }: StatusBarProps) {
+export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps) {
   const t = useT();
   const { lang, setLang } = useLangStore();
   const { logout } = useAuth();
@@ -297,9 +300,9 @@ export function StatusBar({ connected, trackName, countdownMs, username }: Statu
             )}
           </div>
 
-          {/* Right: user + actions */}
+          {/* Right: actions. Username used to live here but moved to
+              the sidebar account row at the bottom. */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <span className="text-[10px] sm:text-xs text-neutral-200 hidden sm:inline">{username}</span>
             <select
               value={lang}
               onChange={(e) => setLang(e.target.value as any)}

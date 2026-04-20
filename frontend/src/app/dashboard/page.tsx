@@ -223,7 +223,6 @@ function Dashboard({
         connected={connected}
         trackName={trackName}
         countdownMs={countdownMs}
-        username={user?.username || ""}
       />
       <TrialBanner />
       <div className="flex flex-1 overflow-hidden">
@@ -232,6 +231,7 @@ function Dashboard({
           onTabChange={setActiveTab}
           isAdmin={user?.is_admin ?? false}
           userTabs={userTabs}
+          username={user?.username || ""}
         />
         <main className="flex-1 overflow-auto p-2 sm:p-3">
           {activeTab === "race" && userTabs.includes("race") && <RaceTable />}

@@ -12,6 +12,10 @@ interface SidebarProps {
   onTabChange: (tab: Tab) => void;
   isAdmin: boolean;
   userTabs: string[];
+  /** Current user's display name. Shown in the pinned account footer at
+   * the bottom of the sidebar (Claude-desktop style) — click opens the
+   * account tab. */
+  username?: string;
 }
 
 const TAB_ICONS: Record<string, JSX.Element> = {
@@ -140,7 +144,7 @@ let _analysisExpanded = true;
 let _driverExpanded = true;
 let _clasificacionExpanded = true;
 
-export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs, username }: SidebarProps) {
   const t = useT();
   const raceStarted = useRaceStore((s) => s.raceStarted);
   const raceFinished = useRaceStore((s) => s.raceFinished);
@@ -496,9 +500,10 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
           </>
         )}
 
-        {/* Account */}
-        <div className="my-2 mx-3 border-t border-border" />
-        {renderTabButton({ id: "account", labelKey: "Mi cuenta" })}
+        {/* "Mi cuenta" used to live here, inline between Analysis and
+            Admin. It now lives at the pinned footer below the nav so
+            it behaves like Claude Desktop's account row — always
+            visible regardless of how the middle nav scrolls. */}
 
         {/* Admin section with sub-menu */}
         {hasAdminTabs && (
@@ -558,6 +563,36 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs }: SidebarPr
           </>
         )}
       </nav>
+
+      {/* Pinned account row at the bottom — Claude Desktop style. Always
+          visible regardless of scroll position. Click opens the account
+          tab. When the sidebar is collapsed we just show the avatar. */}
+      <button
+        type="button"
+        onClick={() => handleTabClick("account")}
+        className={clsx(
+          "shrink-0 flex items-center gap-2 border-t border-border transition-colors relative group",
+          collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2.5",
+          activeTab === "account"
+            ? "text-accent bg-white/[0.03]"
+            : "text-neutral-300 hover:text-white hover:bg-white/[0.03]"
+        )}
+      >
+        <span className="shrink-0 w-7 h-7 rounded-full bg-white/[0.06] flex items-center justify-center text-[11px] font-semibold uppercase">
+          {(username || "?").trim().charAt(0) || "?"}
+        </span>
+        {!collapsed && (
+          <span className="text-sm font-medium truncate flex-1 text-left">
+            {username || t("nav.account")}
+          </span>
+        )}
+        {/* Tooltip on collapsed */}
+        {collapsed && (
+          <span className="absolute left-full ml-2 px-2 py-1 bg-surface border border-border rounded text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+            {username || t("nav.account")}
+          </span>
+        )}
+      </button>
     </div>
   );
 
