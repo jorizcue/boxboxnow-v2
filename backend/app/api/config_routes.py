@@ -112,13 +112,47 @@ async def create_session(
     db.add(session)
     await db.commit()
 
-    # Stop any existing monitoring and auto-start on new circuit
+    # If the user already has a live UserSession on the SAME circuit, keep
+    # it alive and just reconfigure in place — destroying and re-creating it
+    # would blow away every kart's stint_start_countdown_ms, pit_count,
+    # all_laps etc., and the new UserSession would only recover the karts
+    # that arrive via the CircuitHub's cached init block (no stint history,
+    # no lap buffer). See pending_issues.md Issue #4.
     from app.api.race_routes import ensure_monitoring
     registry = request.app.state.registry
     circuit_hub = request.app.state.circuit_hub
-    if registry.get(user.id):
-        await registry.stop_session(user.id, circuit_hub)
-    await ensure_monitoring(request.app.state, user.id)
+    existing = registry.get(user.id)
+    if existing and existing.circuit_id == data.circuit_id:
+        existing.configure(
+            circuit_length_m=c.length_m if c else 1100,
+            pit_time_s=session.pit_time_s,
+            laps_discard=c.laps_discard if c else 3,
+            lap_differential=c.lap_differential if c else 2000,
+            rain=session.rain,
+            our_kart=session.our_kart_number,
+            min_pits=session.min_pits,
+            max_stint_min=session.max_stint_min,
+            min_stint_min=session.min_stint_min,
+            box_lines=session.box_lines,
+            box_karts=session.box_karts,
+            duration_min=session.duration_min,
+            refresh_s=session.refresh_interval_s,
+            min_driver_time_min=session.min_driver_time_min,
+            pit_closed_start_min=session.pit_closed_start_min or 0,
+            pit_closed_end_min=session.pit_closed_end_min or 0,
+            finish_lat1=c.finish_lat1 if c else None,
+            finish_lon1=c.finish_lon1 if c else None,
+            finish_lat2=c.finish_lat2 if c else None,
+            finish_lon2=c.finish_lon2 if c else None,
+        )
+        await existing.broadcast_snapshot()
+        logger.info(f"Reconfigured existing session for user {user.id} (same circuit)")
+    else:
+        # Circuit changed (or no prior session) — full restart is unavoidable
+        # because the CircuitHub subscription moves to another circuit stream.
+        if existing:
+            await registry.stop_session(user.id, circuit_hub)
+        await ensure_monitoring(request.app.state, user.id)
 
     return await _reload_session(user.id, db)
 

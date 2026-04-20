@@ -121,8 +121,16 @@ function RaceSessionEditor() {
     if (!circuitId) return;
     setSaving(true);
     try {
-      const data = {
-        circuit_id: circuitId,
+      // Only send `circuit_id` on PATCH when it actually changed. The
+      // backend's `update_session` triggers a full stop+restart of the
+      // UserSession when `data.circuit_id != user_session.circuit_id`
+      // (config_routes.py:157-162), which would wipe every kart's stint
+      // history, pit count and lap buffer. Omitting the field when it
+      // hasn't changed keeps the guard silent and preserves live race
+      // state across routine parameter saves (min_pits, duration…). See
+      // pending_issues.md Issue #4.
+      const circuitChanged = !session || session.circuit_id !== circuitId;
+      const data: Record<string, unknown> = {
         name,
         duration_min: durationMin,
         min_stint_min: minStint,
@@ -138,12 +146,16 @@ function RaceSessionEditor() {
         our_kart_number: ourKart,
         refresh_interval_s: 1,
       };
+      if (circuitChanged) {
+        data.circuit_id = circuitId;
+      }
 
       let result;
       if (session) {
         result = await api.updateSession(data);
       } else {
-        result = await api.createSession(data);
+        // POST always requires circuit_id for a fresh session row.
+        result = await api.createSession({ ...data, circuit_id: circuitId });
       }
       setSession(result);
 
@@ -167,8 +179,16 @@ function RaceSessionEditor() {
         },
       }));
 
-      // Session saved -> monitoring auto-starts, reconnect WS to pick up new state
-      useRaceStore.getState().requestWsReconnect();
+      // Only force a WS reconnect when the CIRCUIT actually changed —
+      // that's the only case where the backend does stop_session +
+      // ensure_monitoring, which invalidates the current WS's reference
+      // to the old UserSession state. For routine parameter saves
+      // (min_pits, duration, pit_time…) the backend reconfigures in
+      // place and broadcasts a fresh snapshot over the same WS, so
+      // reconnecting would only destroy live state for no gain.
+      if (circuitChanged) {
+        useRaceStore.getState().requestWsReconnect();
+      }
     } catch (e: any) {
       alert("Error: " + e.message);
     }
