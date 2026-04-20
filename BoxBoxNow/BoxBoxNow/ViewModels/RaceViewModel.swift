@@ -6,6 +6,12 @@ extension Notification.Name {
     /// event. DriverViewModel listens for this and re-applies the new
     /// default preset live while the pilot is on track.
     static let presetDefaultChanged = Notification.Name("presetDefaultChanged")
+
+    /// Fired when the admin edits the GPS finish-line of a circuit that
+    /// this device is subscribed to. DriverView listens for this and
+    /// pushes the new coords into LapTracker without waiting for the next
+    /// foreground / restart cycle.
+    static let circuitUpdated = Notification.Name("circuitUpdated")
 }
 
 final class RaceViewModel: ObservableObject {
@@ -353,6 +359,17 @@ final class RaceViewModel: ObservableObject {
                 name: .presetDefaultChanged,
                 object: nil,
                 userInfo: presetId.map { ["preset_id": $0] } ?? [:]
+            )
+
+        case "circuit_updated":
+            // Admin edited the active circuit's GPS finish-line points.
+            // Forward as a NotificationCenter event so DriverView can
+            // re-run applyCircuitFinishLine() without waiting for the
+            // next foreground resume.
+            print("[RaceVM] circuit_updated")
+            let payload = (json["data"] as? [String: Any]) ?? [:]
+            NotificationCenter.default.post(
+                name: .circuitUpdated, object: nil, userInfo: payload
             )
 
         default:

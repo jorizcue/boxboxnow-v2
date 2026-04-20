@@ -225,7 +225,11 @@ async def update_circuit(circuit_id: int, data: CircuitUpdate, request: Request,
     if not circuit:
         raise HTTPException(404, "Circuit not found")
 
-    for key, value in data.model_dump(exclude_unset=True).items():
+    updates = data.model_dump(exclude_unset=True)
+    gps_fields = {"finish_lat1", "finish_lon1", "finish_lat2", "finish_lon2"}
+    gps_changed = any(f in updates for f in gps_fields)
+
+    for key, value in updates.items():
         setattr(circuit, key, value)
 
     await db.commit()
@@ -234,6 +238,24 @@ async def update_circuit(circuit_id: int, data: CircuitUpdate, request: Request,
     # Restart connection in hub with updated config (ports may have changed)
     circuit_hub = request.app.state.circuit_hub
     await circuit_hub.start_connection(circuit.id)
+
+    # If the admin touched any of the GPS finish-line coords, push a
+    # `circuit_updated` event over every active WebSocket of every user
+    # whose session is on this circuit. Mobile driver apps listen for it
+    # and re-run `applyCircuitFinishLine()` so lap detection picks up the
+    # new line without needing a foreground / restart cycle.
+    if gps_changed:
+        from app.ws.server import broadcast_to_circuit
+        await broadcast_to_circuit(circuit.id, {
+            "type": "circuit_updated",
+            "data": {
+                "circuit_id": circuit.id,
+                "finish_lat_1": circuit.finish_lat1,
+                "finish_lon_1": circuit.finish_lon1,
+                "finish_lat_2": circuit.finish_lat2,
+                "finish_lon_2": circuit.finish_lon2,
+            },
+        })
 
     return circuit
 

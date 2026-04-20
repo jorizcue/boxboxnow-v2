@@ -291,6 +291,21 @@ struct DriverView: View {
                 await MainActor.run { applyCircuitFinishLine() }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .circuitUpdated)) { notif in
+            // Admin edited the active circuit's GPS points live. The WS
+            // event already carries the new coords, but `applyCircuitFinishLine`
+            // uses `configVM.circuits` as source of truth — refetch and
+            // re-apply so cached state and LapTracker stay consistent.
+            let info = notif.userInfo ?? [:]
+            let activeId = configVM.session.circuitId
+            if let cid = info["circuit_id"] as? Int, activeId != nil && cid != activeId {
+                return  // update was for a different circuit
+            }
+            Task {
+                await configVM.loadCircuits()
+                await MainActor.run { applyCircuitFinishLine() }
+            }
+        }
         .onChange(of: myKart?.lastLapMs) {
             detectLapDelta()
             // Haptic on new lap

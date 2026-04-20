@@ -9,7 +9,9 @@ import com.boxboxnow.app.util.Constants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -61,6 +63,14 @@ class RaceViewModel @Inject constructor(
 
     private val _boxCallActive = MutableStateFlow(false)
     val boxCallActive = _boxCallActive.asStateFlow()
+
+    /** Emits the circuit_id every time the backend notifies a live admin
+     * edit of the circuit (e.g. new GPS finish-line). DriverScreen
+     * collects it to re-fetch circuits + re-apply the finish line on
+     * the fly. Kept as a SharedFlow (one-shot event) so late collectors
+     * don't trigger on a stale update. */
+    private val _circuitUpdatedEvents = MutableSharedFlow<Int>(extraBufferCapacity = 4)
+    val circuitUpdatedEvents = _circuitUpdatedEvents.asSharedFlow()
 
     private val _boxScore = MutableStateFlow(0.0)
     val boxScore = _boxScore.asStateFlow()
@@ -297,6 +307,16 @@ class RaceViewModel @Inject constructor(
             }
 
             "box_call" -> { _boxCallActive.value = true }
+
+            "circuit_updated" -> {
+                // Admin edited the circuit's GPS finish-line. Broadcast
+                // on the SharedFlow so DriverScreen can re-fetch circuits
+                // and re-apply the finish line. We don't update state
+                // here — the circuits list lives on ConfigViewModel.
+                val cid = (el["data"] as? JsonObject)
+                    ?.get("circuit_id")?.asIntOrNull() ?: -1
+                _circuitUpdatedEvents.tryEmit(cid)
+            }
         }
     }
 

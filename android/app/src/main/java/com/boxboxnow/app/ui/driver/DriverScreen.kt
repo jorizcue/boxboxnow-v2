@@ -142,6 +142,19 @@ fun DriverScreen(onBack: () -> Unit) {
         gpsVM.onSample = { sample -> driverVM.processSample(sample) }
     }
 
+    // React to admin-driven circuit edits pushed over the WebSocket.
+    // Re-fetch the circuits list so the `LaunchedEffect(circuits, ...)`
+    // above picks up the new GPS coords and re-applies the finish line
+    // without the user having to background / foreground the app.
+    LaunchedEffect(Unit) {
+        raceVM.circuitUpdatedEvents.collect { cid ->
+            val activeId = configVM.session.value.circuitId
+            if (activeId == null || cid < 0 || cid == activeId) {
+                configVM.loadCircuits()
+            }
+        }
+    }
+
     // Disconnect on screen exit
     DisposableEffect(Unit) {
         onDispose { raceVM.disconnect() }

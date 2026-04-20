@@ -61,6 +61,19 @@ async def broadcast_to_user(user_id: int, message: dict):
             logger.warning(f"broadcast_to_user failed (user={user_id}): {e}")
 
 
+async def broadcast_to_circuit(circuit_id: int, message: dict):
+    """Send a JSON message to every connected user whose active session is
+    on the given circuit. Used to push admin-driven circuit changes (e.g.
+    finish-line GPS coords updated) so mobile driver apps can re-apply
+    them without waiting for the next app restart / foreground refresh.
+    """
+    targets = [uid for uid, cid in _user_circuits.items() if cid == circuit_id]
+    if not targets:
+        return
+    for uid in targets:
+        await broadcast_to_user(uid, message)
+
+
 async def close_ws_for_session(session_token: str):
     """Close all WebSocket connections for a killed session."""
     ws_set = _ws_by_session.get(session_token)
