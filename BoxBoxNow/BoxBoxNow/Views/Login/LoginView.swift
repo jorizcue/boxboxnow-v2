@@ -40,7 +40,9 @@ struct LoginView: View {
                 .allowsHitTesting(false)
             }
 
-            if authVM.biometricPending {
+            if let info = authVM.upgradeRequired {
+                UpgradeRequiredView(info: info)
+            } else if authVM.biometricPending {
                 biometricWaitingView
             } else {
                 ScrollView {

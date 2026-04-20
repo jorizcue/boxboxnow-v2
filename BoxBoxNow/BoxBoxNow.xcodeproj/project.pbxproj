@@ -328,8 +328,6 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		14C1079D210221371A8FA163 /* Shared */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = Shared;
 			sourceTree = "<group>";
 		};
@@ -414,7 +412,6 @@
 			children = (
 				860D0E4D002830EFD61AD88F /* TemplateWizardView.swift */,
 			);
-			name = Config;
 			path = Config;
 			sourceTree = "<group>";
 		};
@@ -604,7 +601,6 @@
 			children = (
 				B75D0F5BECBE29232ACB739F /* Views */,
 			);
-			name = BoxBoxNow;
 			path = BoxBoxNow;
 			sourceTree = "<group>";
 		};
@@ -657,7 +653,6 @@
 			children = (
 				213C835E7BFA3A06D8BF9C18 /* Config */,
 			);
-			name = Views;
 			path = Views;
 			sourceTree = "<group>";
 		};

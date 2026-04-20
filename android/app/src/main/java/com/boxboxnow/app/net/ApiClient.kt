@@ -1,5 +1,6 @@
 package com.boxboxnow.app.net
 
+import com.boxboxnow.app.BuildConfig
 import com.boxboxnow.app.models.AuthResponse
 import com.boxboxnow.app.models.Circuit
 import com.boxboxnow.app.models.DriverConfigPreset
@@ -47,6 +48,21 @@ class ApiException(val status: Int, message: String) : RuntimeException(message)
     }
 }
 
+/**
+ * Specific signal for HTTP 426 (Upgrade Required) — the backend rejected
+ * this build because it's below the admin-configured minimum version for
+ * the platform. UI layer surfaces a blocking "update required" screen
+ * and offers a Play Store link. Extends ApiException so any code path
+ * that catches the base exception still reacts sensibly.
+ */
+class AppUpgradeRequiredException(
+    val minVersion: String?,
+    val latestVersion: String?,
+    val currentVersion: String?,
+    val platform: String,
+    message: String,
+) : ApiException(426, message)
+
 /** Build a JsonElement from a loosely-typed value (Kotlin primitives, lists, maps). */
 internal fun Any?.toJsonElement(): JsonElement = when (this) {
     null -> JsonNull
@@ -72,18 +88,46 @@ class ApiClient @Inject constructor(
 
     private val client = HttpClient(CIO) {
         install(ContentNegotiation) { json(this@ApiClient.json) }
-        defaultRequest { contentType(ContentType.Application.Json) }
+        defaultRequest {
+            contentType(ContentType.Application.Json)
+            // App-version gating: the backend reads these on /auth/login
+            // and /auth/register and rejects with 426 when the installed
+            // version is below the admin-configured minimum. Attached on
+            // every outgoing request so future endpoints can reuse it.
+            header("X-App-Platform", "android")
+            header("X-App-Version", BuildConfig.VERSION_NAME)
+        }
         HttpResponseValidator {
             validateResponse { resp ->
                 if (resp.status == HttpStatusCode.Unauthorized) {
                     tokenStore.deleteToken()
                     throw ApiException.Unauthorized
                 }
+                if (resp.status.value == 426) {
+                    throw parseUpgradeRequired(resp)
+                }
                 if (resp.status.value !in 200..299) {
                     throw ApiException(resp.status.value, "HTTP ${resp.status.value}")
                 }
             }
         }
+    }
+
+    /** Parse the 426 payload (`{"detail": {"code": "app_update_required", ...}}`)
+     * into a typed exception. Falls back to a generic message if the body
+     * isn't the expected shape. */
+    private suspend fun parseUpgradeRequired(resp: io.ktor.client.statement.HttpResponse): AppUpgradeRequiredException {
+        val fallbackMsg = "Actualiza la app para continuar."
+        val bodyText = runCatching { resp.bodyAsText() }.getOrDefault("")
+        val obj = runCatching { json.parseToJsonElement(bodyText) as? JsonObject }.getOrNull()
+        val detail = obj?.get("detail") as? JsonObject
+        val message = (detail?.get("message") as? JsonPrimitive)?.content ?: fallbackMsg
+        val minV = (detail?.get("min_version") as? JsonPrimitive)?.content
+        val latestV = (detail?.get("latest_version") as? JsonPrimitive)?.content
+        val currentV = (detail?.get("current_version") as? JsonPrimitive)?.content
+            ?: BuildConfig.VERSION_NAME
+        val platform = (detail?.get("platform") as? JsonPrimitive)?.content ?: "android"
+        return AppUpgradeRequiredException(minV, latestV, currentV, platform, message)
     }
 
     // ── Auth ──

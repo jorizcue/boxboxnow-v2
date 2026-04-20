@@ -50,6 +50,7 @@ fun LoginScreen(
 ) {
     val isAuth by authVM.isAuthenticated.collectAsState()
     val biometricPending by authVM.biometricPending.collectAsState()
+    val upgradeRequired by authVM.upgradeRequired.collectAsState()
 
     LaunchedEffect(isAuth) { if (isAuth) onLoggedIn() }
 
@@ -65,6 +66,7 @@ fun LoginScreen(
         GridOverlay()
 
         when {
+            upgradeRequired != null -> UpgradeRequiredScreen(upgradeRequired!!)
             biometricPending -> BiometricWaiting(authVM)
             else -> LoginForm(authVM, onStartGoogleSso)
         }

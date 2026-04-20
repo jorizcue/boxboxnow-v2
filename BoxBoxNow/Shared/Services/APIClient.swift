@@ -234,8 +234,23 @@ final class APIClient {
         if let token = KeychainHelper.loadToken() {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
+        // App-version gating: backend reads these on /auth/login and
+        // /auth/register and responds 426 when the installed version
+        // is below the admin-configured minimum. Sent on every request
+        // so future endpoints that need the same gate (e.g. refresh,
+        // register, etc.) can reuse it without touching the clients.
+        req.setValue("ios", forHTTPHeaderField: "X-App-Platform")
+        if let version = Self.bundleShortVersion {
+            req.setValue(version, forHTTPHeaderField: "X-App-Version")
+        }
         return req
     }
+
+    /// Cached `CFBundleShortVersionString` lookup — read once at first use,
+    /// then reused for every outgoing request.
+    private static let bundleShortVersion: String? = {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+    }()
 
     private func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -247,6 +262,9 @@ final class APIClient {
             // sees why it failed instead of a generic "Sesion expirada".
             throw APIError.unauthorized(serverMessage: Self.extractDetail(data))
         }
+        if http.statusCode == 426 {
+            throw APIError.upgradeRequired(info: Self.extractUpgradeInfo(data))
+        }
         if http.statusCode == 429 {
             throw APIError.rateLimited(serverMessage: Self.extractDetail(data))
         }
@@ -257,6 +275,25 @@ final class APIClient {
             throw APIError.requestFailed(serverMessage: Self.extractDetail(data))
         }
         return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    /// Decode the structured payload the backend sends on HTTP 426:
+    /// `{"detail": {"code": "app_update_required", "message": ..., "min_version": ..., "latest_version": ...}}`.
+    private static func extractUpgradeInfo(_ data: Data) -> UpgradeRequiredInfo {
+        let fallback = UpgradeRequiredInfo(
+            message: "Actualiza la app para continuar.",
+            minVersion: nil, latestVersion: nil, platform: "ios"
+        )
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let detail = json["detail"] as? [String: Any] else {
+            return fallback
+        }
+        return UpgradeRequiredInfo(
+            message: detail["message"] as? String ?? fallback.message,
+            minVersion: detail["min_version"] as? String,
+            latestVersion: detail["latest_version"] as? String,
+            platform: (detail["platform"] as? String) ?? "ios"
+        )
     }
 
     /// Best-effort extractor for FastAPI's `{"detail": "..."}` error
@@ -276,6 +313,17 @@ final class APIClient {
     }
 }
 
+/// Details carried inside `APIError.upgradeRequired`, parsed from the
+/// backend's 426 payload. `latestVersion` is optional and informational;
+/// `minVersion` is always set when the backend is actively enforcing a
+/// floor. The UI can use these to build a nice "update required" screen.
+struct UpgradeRequiredInfo {
+    let message: String
+    let minVersion: String?
+    let latestVersion: String?
+    let platform: String
+}
+
 enum APIError: Error, LocalizedError {
     case invalidURL
     case decodingError
@@ -283,6 +331,7 @@ enum APIError: Error, LocalizedError {
     case unauthorized(serverMessage: String? = nil)
     case rateLimited(serverMessage: String? = nil)
     case conflict(serverMessage: String? = nil)
+    case upgradeRequired(info: UpgradeRequiredInfo)
 
     var errorDescription: String? {
         switch self {
@@ -310,6 +359,8 @@ enum APIError: Error, LocalizedError {
             return msg ?? "Demasiados intentos fallidos. Espera unos minutos e inténtalo de nuevo."
         case .conflict(let msg):
             return msg ?? "Se ha alcanzado el limite de dispositivos. Cierra una sesion existente."
+        case .upgradeRequired(let info):
+            return info.message
         }
     }
 }

@@ -7,6 +7,7 @@ import com.boxboxnow.app.auth.BiometricService
 import com.boxboxnow.app.models.AuthResponse
 import com.boxboxnow.app.models.User
 import com.boxboxnow.app.net.ApiClient
+import com.boxboxnow.app.net.AppUpgradeRequiredException
 import com.boxboxnow.app.store.SecureTokenStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +51,13 @@ class AuthViewModel @Inject constructor(
     private val _showBiometricPrompt = MutableStateFlow(false)
     val showBiometricPrompt = _showBiometricPrompt.asStateFlow()
 
+    /** Non-null while the backend is refusing logins because the installed
+     * build is below the admin-configured minimum. LoginScreen swaps to a
+     * blocking "update required" surface — no retry path except an App
+     * Store / Play Store link. */
+    private val _upgradeRequired = MutableStateFlow<AppUpgradeRequiredException?>(null)
+    val upgradeRequired = _upgradeRequired.asStateFlow()
+
     val biometricAvailable: Boolean get() = biometric.isAvailable
     val biometricEnabled: Boolean get() = biometric.isEnabled
     val hasStoredToken: Boolean get() = tokenStore.loadToken() != null
@@ -66,6 +74,10 @@ class AuthViewModel @Inject constructor(
             try {
                 val resp = api.login(email.trim(), password)
                 handleAuthResponse(resp)
+            } catch (e: AppUpgradeRequiredException) {
+                // Don't surface as a normal error — LoginScreen observes
+                // `upgradeRequired` and shows a blocking update screen.
+                _upgradeRequired.value = e
             } catch (e: Throwable) {
                 _errorMessage.value = e.message ?: "Error de conexion"
             } finally {

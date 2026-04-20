@@ -11,6 +11,12 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var showBiometricPrompt = false  // offer to enable after first login
     @Published var biometricPending = false     // waiting for Face ID on app launch
 
+    /// Set when the backend rejects the client's version with HTTP 426.
+    /// LoginView swaps its whole body for a blocking "update required"
+    /// card while this is non-nil — no retry button, the only way out
+    /// is to update from the App Store.
+    @Published var upgradeRequired: UpgradeRequiredInfo?
+
     // Keep a strong reference so the session isn't deallocated mid-flow
     private var authSession: ASWebAuthenticationSession?
 
@@ -36,6 +42,11 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
                 print("[Auth] Login OK, token: \(resp.accessToken.prefix(20))...")
                 handleAuthResponse(resp)
                 print("[Auth] isAuthenticated = \(isAuthenticated)")
+            } catch let APIError.upgradeRequired(info) {
+                // Don't surface as a regular error — the login UI will
+                // swap itself out for a blocking update-required view.
+                print("[Auth] Upgrade required: min=\(info.minVersion ?? "?")")
+                upgradeRequired = info
             } catch {
                 print("[Auth] Login error: \(error)")
                 errorMessage = error.localizedDescription
