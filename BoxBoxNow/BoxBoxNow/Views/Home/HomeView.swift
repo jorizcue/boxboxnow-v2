@@ -10,6 +10,17 @@ struct HomeView: View {
         configVM.session.ourKartNumber > 0 && configVM.session.durationMin > 0
     }
 
+    /// Displayed version label, e.g. `"v1.4.2 (42)"`. Read once from the
+    /// bundle Info.plist — `CFBundleShortVersionString` is what we send
+    /// as `X-App-Version` to the backend; `CFBundleVersion` is the build
+    /// number (CI increments) which is useful for support tickets.
+    fileprivate static let appVersionLabel: String = {
+        let info = Bundle.main.infoDictionary ?? [:]
+        let shortVersion = info["CFBundleShortVersionString"] as? String ?? "?"
+        let buildNumber = info["CFBundleVersion"] as? String ?? "?"
+        return "v\(shortVersion) (\(buildNumber))"
+    }()
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -112,6 +123,18 @@ struct HomeView: View {
                         }
 
                         Spacer(minLength: 24)
+
+                        // ── App version footer ──
+                        // Shown at the bottom of the home screen so the
+                        // user (and support) can tell at a glance which
+                        // build is installed — matters when we push a
+                        // minimum-version gate from Admin → Plataforma.
+                        Text(Self.appVersionLabel)
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundColor(Color(.systemGray3))
+                            .padding(.top, 8)
+                            .padding(.bottom, 16)
+                            .accessibilityLabel("Versión de la aplicación")
                     }
                     .padding(.horizontal, 24)
                 }

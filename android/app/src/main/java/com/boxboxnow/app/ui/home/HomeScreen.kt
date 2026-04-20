@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.boxboxnow.app.BuildConfig
 import com.boxboxnow.app.models.RaceSession
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.vm.AuthViewModel
@@ -161,6 +162,19 @@ fun HomeScreen(
             )
 
             Spacer(Modifier.height(24.dp))
+
+            // App version footer — helps users / support know which build
+            // is installed, and pairs with the version-gate we enforce on
+            // login from Admin → Plataforma. `versionName` is the public
+            // semver; `versionCode` is the CI build counter.
+            Text(
+                "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = FontFamily.Monospace,
+                color = BoxBoxNowColors.SystemGray3,
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
         }
     }
 }
