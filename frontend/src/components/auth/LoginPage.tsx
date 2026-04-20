@@ -9,6 +9,11 @@ interface ActiveSession {
   id: number;
   device_name: string;
   ip_address: string;
+  /** "ios" / "android" / "ipad" / "" — populated from `X-App-Platform`
+   * header the mobile clients attach. Blank for web sessions. */
+  app_platform?: string;
+  /** Semver string, e.g. "1.4.2". Blank for web sessions. */
+  app_version?: string;
   created_at: string | null;
   last_active: string | null;
 }
@@ -121,7 +126,14 @@ export function LoginPage() {
                 className="flex items-center justify-between bg-black rounded-lg p-3 border border-border"
               >
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-white">{session.device_name}</p>
+                  <p className="text-sm font-medium text-white">
+                    {session.device_name}
+                    {session.app_version && (
+                      <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded bg-accent/10 text-accent text-[10px] font-mono align-middle">
+                        {session.app_platform || "app"} v{session.app_version}
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-neutral-200">
                     IP: {session.ip_address}
                     {session.last_active && (

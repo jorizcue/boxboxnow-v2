@@ -278,6 +278,21 @@ def decode_token(token: str) -> dict:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")
 
 
+def _extract_app_version_info(request: Request) -> tuple[str, str]:
+    """Return `(platform, version)` from the mobile-app headers.
+
+    iOS / Android clients attach `X-App-Platform` (`"ios"` / `"android"`)
+    and `X-App-Version` (semver string). Web doesn't send either, in
+    which case we return `("", "")` and the caller stores blanks.
+
+    Values are trimmed to the column widths (16 / 32) so a malicious
+    client can't overflow. Platform is lowercased for consistency.
+    """
+    platform = (request.headers.get("X-App-Platform") or "").strip().lower()[:16]
+    version = (request.headers.get("X-App-Version") or "").strip()[:32]
+    return platform, version
+
+
 def _extract_device_info(request: Request) -> tuple[str, str]:
     """Extract device name from User-Agent and IP from request."""
     ua = request.headers.get("user-agent", "Unknown device")
@@ -341,8 +356,18 @@ async def get_current_user(
             "Session terminated. Your session was closed from another device."
         )
 
-    # Update last_active
+    # Update last_active — and refresh the recorded app version / platform
+    # whenever the client volunteers fresher values. Mobile apps attach
+    # `X-App-Platform` + `X-App-Version` on every request, so the session
+    # row always reflects the build currently hitting the API. Web clients
+    # don't send these, so we leave the fields untouched for them.
     device_session.last_active = datetime.now(timezone.utc)
+    incoming_platform = (request.headers.get("X-App-Platform") or "").strip().lower()
+    incoming_version = (request.headers.get("X-App-Version") or "").strip()
+    if incoming_platform:
+        device_session.app_platform = incoming_platform[:16]
+    if incoming_version:
+        device_session.app_version = incoming_version[:32]
     await db.commit()
 
     # Get user with tab_access
@@ -575,10 +600,12 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
 
     # Auto-login: create device session
     device_name, ip_address = _extract_device_info(request)
+    app_platform, app_version = _extract_app_version_info(request)
     session_token = secrets.token_hex(32)
     device_session = DeviceSession(
         session_token=session_token, user_id=user.id,
         device_name=device_name, ip_address=ip_address,
+        app_platform=app_platform, app_version=app_version,
     )
     db.add(device_session)
     await db.commit()
@@ -741,6 +768,8 @@ async def login(
                             "device_name": s.device_name,
                             "ip_address": s.ip_address,
                             "client_kind": s.client_kind,
+                            "app_platform": s.app_platform or "",
+                            "app_version": s.app_version or "",
                             "created_at": s.created_at.isoformat() if s.created_at else None,
                             "last_active": s.last_active.isoformat() if s.last_active else None,
                         }
@@ -753,12 +782,15 @@ async def login(
     device_name, ip_address = _extract_device_info(request)
     session_token = secrets.token_hex(32)
 
+    app_platform, app_version = _extract_app_version_info(request)
     device_session = DeviceSession(
         session_token=session_token,
         user_id=user.id,
         device_name=device_name,
         ip_address=ip_address,
         client_kind=client_kind,
+        app_platform=app_platform,
+        app_version=app_version,
     )
     db.add(device_session)
     await db.commit()
@@ -934,10 +966,12 @@ async def google_callback(code: str, request: Request, state: str | None = None,
 
     # Create device session
     device_name, ip_address = _extract_device_info(request)
+    app_platform, app_version = _extract_app_version_info(request)
     session_token = secrets.token_hex(32)
     device_session = DeviceSession(
         session_token=session_token, user_id=user.id,
         device_name=device_name, ip_address=ip_address,
+        app_platform=app_platform, app_version=app_version,
     )
     db.add(device_session)
     await db.commit()
@@ -1050,9 +1084,11 @@ async def google_callback_ios(code: str, request: Request, db: AsyncSession = De
     # Create device session
     device_name, ip_address = _extract_device_info(request)
     session_token = secrets.token_hex(32)
+    app_platform, app_version = _extract_app_version_info(request)
     device_session = DeviceSession(
         session_token=session_token, user_id=user.id,
         device_name=f"iOS: {device_name}", ip_address=ip_address,
+        app_platform=app_platform or "ios", app_version=app_version,
     )
     db.add(device_session)
     await db.commit()
@@ -1133,9 +1169,11 @@ async def google_callback_ipad(code: str, request: Request, db: AsyncSession = D
 
     device_name, ip_address = _extract_device_info(request)
     session_token = secrets.token_hex(32)
+    app_platform, app_version = _extract_app_version_info(request)
     device_session = DeviceSession(
         session_token=session_token, user_id=user.id,
         device_name=f"iPad Dashboard: {device_name}", ip_address=ip_address,
+        app_platform=app_platform or "ipad", app_version=app_version,
     )
     db.add(device_session)
     await db.commit()
@@ -1177,6 +1215,9 @@ async def list_my_sessions(
             session_token=s.session_token[:8] + "...",  # partial for security
             device_name=s.device_name,
             ip_address=s.ip_address,
+            client_kind=s.client_kind or "",
+            app_platform=s.app_platform or "",
+            app_version=s.app_version or "",
             created_at=s.created_at,
             last_active=s.last_active,
             is_current=(s.session_token == current_sid),

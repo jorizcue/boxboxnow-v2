@@ -425,6 +425,21 @@ async def init_db():
             except Exception:
                 pass
 
+        # Record the installed app version + platform for each device
+        # session. Populated from the `X-App-Platform` / `X-App-Version`
+        # request headers (mobile clients only; blank for web). Lets the
+        # Admin → Usuarios panel show which build each device is on so
+        # the operator can decide when to bump the minimum-required
+        # version from Admin → Plataforma.
+        for ddl in (
+            "ALTER TABLE device_sessions ADD COLUMN app_version VARCHAR(32) NOT NULL DEFAULT ''",
+            "ALTER TABLE device_sessions ADD COLUMN app_platform VARCHAR(16) NOT NULL DEFAULT ''",
+        ):
+            try:
+                await conn.execute(text(ddl))
+            except Exception:
+                pass
+
         # Backfill: mark a user's SOLE preset as default when they have
         # exactly one preset and none are marked as default. This fixes
         # existing users who created their first preset before the

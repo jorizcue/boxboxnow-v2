@@ -161,6 +161,13 @@ class DeviceSessionOut(BaseModel):
     session_token: str
     device_name: str
     ip_address: str
+    client_kind: str = ""
+    # Populated from the `X-App-Platform` / `X-App-Version` headers mobile
+    # clients send on every request; blank for web sessions. Exposed to
+    # admin so they can see which build each device is on before bumping
+    # the minimum-required version in the platform settings.
+    app_platform: str = ""
+    app_version: str = ""
     created_at: datetime | None = None
     last_active: datetime | None = None
     is_current: bool = False

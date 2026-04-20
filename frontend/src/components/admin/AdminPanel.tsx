@@ -705,6 +705,16 @@ function UsersManager() {
                       <div className="min-w-0 flex-1">
                         <span className="text-white font-medium">{s.device_name}</span>
                         <span className="text-neutral-500 ml-2">IP: {s.ip_address}</span>
+                        {/* Mobile-app version badge — populated from the
+                            `X-App-Version` header on every authenticated
+                            request, so it reflects the build currently
+                            talking to the API. Hidden for web sessions
+                            (empty string). */}
+                        {s.app_version && (
+                          <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-accent/10 text-accent text-[10px] font-mono">
+                            {s.app_platform ? `${s.app_platform}` : "app"} v{s.app_version}
+                          </span>
+                        )}
                       </div>
                       <span className="text-neutral-600 text-[10px] flex-shrink-0">
                         {s.last_active ? new Date(s.last_active).toLocaleString() : ""}

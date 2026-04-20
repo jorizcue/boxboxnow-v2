@@ -335,6 +335,18 @@ class DeviceSession(Base):
     # concurrency_mobile) the same way the WebSocket endpoint does. Old rows
     # default to 'web' via the migration in database.py.
     client_kind = Column(String(16), nullable=False, default="web", server_default="web")
+    # Platform tag ("ios", "android", "web" or "") derived from the
+    # `X-App-Platform` header at login time — so admin can filter /
+    # report on mobile usage independently of client_kind (which is
+    # purely about concurrency buckets and could conceivably be "web"
+    # for an iPad dashboard running the web UI).
+    app_platform = Column(String(16), default="", server_default="")
+    # Client-reported semver from the `X-App-Version` header. Populated on
+    # login and refreshed on every authenticated request through
+    # `get_current_user`, so the admin panel's "Sesiones activas" list
+    # shows whatever build the device most recently hit the API with.
+    # Blank for web sessions (the header isn't attached there).
+    app_version = Column(String(32), default="", server_default="")
     created_at = Column(DateTime, server_default=func.now())
     last_active = Column(DateTime, server_default=func.now())
 
