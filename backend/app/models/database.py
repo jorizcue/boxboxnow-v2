@@ -425,6 +425,34 @@ async def init_db():
             except Exception:
                 pass
 
+        # Backfill: mark a user's SOLE preset as default when they have
+        # exactly one preset and none are marked as default. This fixes
+        # existing users who created their first preset before the
+        # "auto-default on first preset" create_preset logic shipped —
+        # without this, their driver view never auto-applies contrast /
+        # orientation / audio because the client only applies presets
+        # flagged as default.
+        try:
+            await conn.execute(text(
+                """
+                UPDATE driver_config_presets
+                SET is_default = 1
+                WHERE id IN (
+                    SELECT p.id
+                    FROM driver_config_presets p
+                    WHERE p.user_id IN (
+                        SELECT user_id
+                        FROM driver_config_presets
+                        GROUP BY user_id
+                        HAVING COUNT(*) = 1
+                           AND SUM(CASE WHEN is_default THEN 1 ELSE 0 END) = 0
+                    )
+                )
+                """
+            ))
+        except Exception:
+            pass
+
 async def get_db():
     async with async_session() as session:
         yield session
