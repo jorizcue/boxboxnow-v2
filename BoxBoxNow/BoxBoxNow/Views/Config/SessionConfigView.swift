@@ -213,12 +213,15 @@ struct NumberCard: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 2) {
+                // Reserve space for 2 lines on every card so the grid stays
+                // visually uniform — some titles are 1 line ("NUESTRO KART")
+                // and others are forced to 2 ("PIT CERRADO\nFINAL (MIN)"),
+                // which used to make alternating cards different heights.
                 Text(title)
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(.gray)
                     .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(2, reservesSpace: true)
 
                 if tooltip != nil {
                     Button(action: { showTooltip = true }) {

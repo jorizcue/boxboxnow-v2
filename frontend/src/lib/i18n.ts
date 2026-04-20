@@ -172,6 +172,9 @@ const translations: Record<string, Record<Language, string>> = {
 
   // === Config Panel ===
   "config.raceSession": { es: "Sesion de Carrera", en: "Race Session", it: "Sessione di Gara", de: "Rennsitzung" },
+  "config.sectionRace": { es: "Carrera", en: "Race", it: "Gara", de: "Rennen" },
+  "config.sectionPitStops": { es: "Pit Stops", en: "Pit Stops", it: "Pit Stop", de: "Boxenstopps" },
+  "config.sectionStints": { es: "Stints y Pilotos", en: "Stints & Drivers", it: "Stint e Piloti", de: "Stints & Fahrer" },
   "config.active": { es: "Activa", en: "Active", it: "Attiva", de: "Aktiv" },
   "config.circuit": { es: "Circuito", en: "Circuit", it: "Circuito", de: "Strecke" },
   "config.selectCircuit": { es: "Seleccionar circuito...", en: "Select circuit...", it: "Seleziona circuito...", de: "Strecke auswahlen..." },

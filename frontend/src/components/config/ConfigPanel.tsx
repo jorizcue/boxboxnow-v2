@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { TeamEditor } from "@/components/config/TeamEditor";
@@ -239,18 +239,26 @@ function RaceSessionEditor() {
           )}
         </div>
 
-        {/* Cards grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {/* Grouped field sections — mirrors the iOS / Android layout so
+            the same parameter lives under the same group across platforms
+            (Carrera / Pit Stops / Stints y Pilotos). */}
+        <ConfigSection title={t("config.sectionRace")}>
           <ConfigCard label={t("config.ourKart")} value={ourKart} onChange={setOurKart} highlight />
           <ConfigCard label={t("config.duration")} value={durationMin} onChange={setDurationMin} />
           <ConfigCard label={t("config.minPits")} value={minPits} onChange={setMinPits} />
+        </ConfigSection>
+
+        <ConfigSection title={t("config.sectionPitStops")}>
           <ConfigCard label={t("config.pitTime")} value={pitTime} onChange={setPitTime} />
+          <ConfigCard label={t("config.pitClosedStart")} value={pitClosedStart} onChange={setPitClosedStart} />
+          <ConfigCard label={t("config.pitClosedEnd")} value={pitClosedEnd} onChange={setPitClosedEnd} />
+        </ConfigSection>
+
+        <ConfigSection title={t("config.sectionStints")}>
           <ConfigCard label={t("config.minStint")} value={minStint} onChange={setMinStint} />
           <ConfigCard label={t("config.maxStint")} value={maxStint} onChange={setMaxStint} />
           <ConfigCard label={t("config.minDriverTime")} value={minDriverTime} onChange={setMinDriverTime} />
-          <ConfigCard label={t("config.pitClosedStart")} value={pitClosedStart} onChange={setPitClosedStart} />
-          <ConfigCard label={t("config.pitClosedEnd")} value={pitClosedEnd} onChange={setPitClosedEnd} />
-        </div>
+        </ConfigSection>
 
         {/* Save button */}
         <button
@@ -260,6 +268,25 @@ function RaceSessionEditor() {
         >
           {saving ? t("config.saving") : session ? t("config.updateSession") : t("config.createSession")}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ConfigSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <h3 className="text-[11px] font-semibold text-accent uppercase tracking-widest mb-2">
+        {title}
+      </h3>
+      <div className="grid grid-cols-3 gap-2">
+        {children}
       </div>
     </div>
   );

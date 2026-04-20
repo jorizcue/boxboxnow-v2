@@ -351,6 +351,11 @@ private fun NumberCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
+            // `minLines = 2` reserves two lines of vertical space even for
+            // single-line titles ("NUESTRO KART") so every card in the grid
+            // ends up the same height — without it the rows whose titles
+            // wrap to 2 lines (e.g. "PIT CERRADO\nFINAL (MIN)") were taller
+            // than the rest.
             Text(
                 title,
                 color = BoxBoxNowColors.SystemGray,
@@ -358,6 +363,7 @@ private fun NumberCard(
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
                 lineHeight = 11.sp,
+                minLines = 2,
                 maxLines = 2,
             )
             if (tooltip != null) {
