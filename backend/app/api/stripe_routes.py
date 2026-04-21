@@ -312,6 +312,10 @@ async def create_checkout_session(
         "address": "auto",
         "name": "auto",
     }
+    # Automatic tax calculation — Stripe Tax determines the applicable VAT
+    # rate based on the customer's billing address collected above.
+    # Requires Stripe Tax to be enabled in the dashboard.
+    session_params["automatic_tax"] = {"enabled": True}
 
     checkout_session = s.checkout.Session.create(**session_params)
 
