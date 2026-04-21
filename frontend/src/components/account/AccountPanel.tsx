@@ -6,6 +6,36 @@ import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
 import { PaymentMethodsPanel } from "./PaymentMethodsPanel";
 
+interface BillingAddress {
+  line1: string;
+  line2: string;
+  city: string;
+  postal_code: string;
+  country: string;
+}
+
+interface BillingInfo {
+  name: string;
+  address: BillingAddress;
+  tax_ids: { id: string; type: string; value: string }[];
+}
+
+const EMPTY_ADDRESS: BillingAddress = { line1: "", line2: "", city: "", postal_code: "", country: "ES" };
+const EMPTY_BILLING: BillingInfo = { name: "", address: EMPTY_ADDRESS, tax_ids: [] };
+
+const EU_COUNTRIES = [
+  ["ES", "España"],["DE", "Alemania"],["FR", "Francia"],["IT", "Italia"],["PT", "Portugal"],
+  ["NL", "Países Bajos"],["BE", "Bélgica"],["AT", "Austria"],["PL", "Polonia"],["SE", "Suecia"],
+  ["DK", "Dinamarca"],["FI", "Finlandia"],["IE", "Irlanda"],["GR", "Grecia"],["CZ", "Rep. Checa"],
+  ["RO", "Rumanía"],["HU", "Hungría"],["SK", "Eslovaquia"],["HR", "Croacia"],["GB", "Reino Unido"],
+  ["US", "Estados Unidos"],["MX", "México"],["AR", "Argentina"],["CL", "Chile"],["CO", "Colombia"],
+];
+
+const TAX_ID_TYPES = [
+  ["eu_vat", "NIF-IVA / VAT-UE (ej: ESB12345678)"],
+  ["es_cif", "CIF (empresas españolas)"],
+];
+
 interface Sub {
   id: number;
   plan_type: string;
@@ -101,7 +131,14 @@ export function AccountPanel() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
-  const [tab, setTab] = useState<"subs" | "invoices" | "payment">("subs");
+  const [tab, setTab] = useState<"subs" | "invoices" | "payment" | "billing">("subs");
+  const [billing, setBilling] = useState<BillingInfo>(EMPTY_BILLING);
+  const [billingForm, setBillingForm] = useState<BillingInfo>(EMPTY_BILLING);
+  const [billingTaxType, setBillingTaxType] = useState("");
+  const [billingTaxValue, setBillingTaxValue] = useState("");
+  const [billingSaving, setBillingSaving] = useState(false);
+  const [billingSaved, setBillingSaved] = useState(false);
+  const [billingError, setBillingError] = useState("");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -119,7 +156,21 @@ export function AccountPanel() {
     }
   }, []);
 
+  const loadBillingInfo = useCallback(async () => {
+    try {
+      const data = await api.getBillingInfo();
+      setBilling(data);
+      setBillingForm(data);
+      const firstTaxId = data.tax_ids[0];
+      setBillingTaxType(firstTaxId?.type || "");
+      setBillingTaxValue(firstTaxId?.value || "");
+    } catch {
+      // silent — user may not have a Stripe customer yet
+    }
+  }, []);
+
   useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { if (tab === "billing") loadBillingInfo(); }, [tab, loadBillingInfo]);
 
   const handleCancel = async (subId: number) => {
     const ok = await confirm({
@@ -169,6 +220,27 @@ export function AccountPanel() {
       alert("Error al cambiar el plan");
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleSaveBilling = async () => {
+    setBillingSaving(true);
+    setBillingError("");
+    setBillingSaved(false);
+    try {
+      await api.updateBillingInfo({
+        name: billingForm.name,
+        address: billingForm.address,
+        tax_id_type: billingTaxType || undefined,
+        tax_id_value: billingTaxValue || undefined,
+      });
+      setBillingSaved(true);
+      await loadBillingInfo();
+      setTimeout(() => setBillingSaved(false), 3000);
+    } catch (e: any) {
+      setBillingError(e?.message || "Error al guardar los datos fiscales");
+    } finally {
+      setBillingSaving(false);
     }
   };
 
@@ -232,6 +304,16 @@ export function AccountPanel() {
           }`}
         >
           Métodos de pago
+        </button>
+        <button
+          onClick={() => setTab("billing")}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            tab === "billing"
+              ? "bg-surface text-white"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Facturación
         </button>
       </div>
 
@@ -319,6 +401,140 @@ export function AccountPanel() {
 
       {/* Payment methods */}
       {tab === "payment" && <PaymentMethodsPanel />}
+
+      {/* Billing / fiscal data */}
+      {tab === "billing" && (
+        <div className="bg-surface border border-border rounded-xl p-6 space-y-5">
+          <div>
+            <h3 className="text-sm font-semibold text-white mb-0.5">Datos fiscales</h3>
+            <p className="text-xs text-neutral-500">
+              Estos datos se asocian a tu cliente en Stripe y aparecerán en las facturas generadas a partir de ahora.
+            </p>
+          </div>
+
+          {/* Nombre fiscal */}
+          <div>
+            <label className="block text-xs text-neutral-400 mb-1 uppercase tracking-wider">
+              Nombre / razón social
+            </label>
+            <input
+              type="text"
+              placeholder="Ej: Empresa S.L. o Juan García"
+              value={billingForm.name}
+              onChange={(e) => setBillingForm((p) => ({ ...p, name: e.target.value }))}
+              className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-accent/50"
+            />
+          </div>
+
+          {/* NIF / CIF */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1 uppercase tracking-wider">
+                Tipo de ID fiscal
+              </label>
+              <select
+                value={billingTaxType}
+                onChange={(e) => setBillingTaxType(e.target.value)}
+                className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50"
+              >
+                <option value="">— Sin ID fiscal —</option>
+                {TAX_ID_TYPES.map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1 uppercase tracking-wider">
+                Número NIF / CIF / VAT
+              </label>
+              <input
+                type="text"
+                placeholder={billingTaxType === "eu_vat" ? "ESB12345678" : "A12345678"}
+                value={billingTaxValue}
+                onChange={(e) => setBillingTaxValue(e.target.value.toUpperCase())}
+                disabled={!billingTaxType}
+                className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-accent/50 disabled:opacity-40"
+              />
+            </div>
+          </div>
+
+          {/* Dirección */}
+          <div className="space-y-3">
+            <p className="text-xs text-neutral-400 uppercase tracking-wider">Dirección de facturación</p>
+            <input
+              type="text"
+              placeholder="Calle y número"
+              value={billingForm.address.line1}
+              onChange={(e) => setBillingForm((p) => ({ ...p, address: { ...p.address, line1: e.target.value } }))}
+              className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-accent/50"
+            />
+            <input
+              type="text"
+              placeholder="Piso, puerta, etc. (opcional)"
+              value={billingForm.address.line2}
+              onChange={(e) => setBillingForm((p) => ({ ...p, address: { ...p.address, line2: e.target.value } }))}
+              className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-accent/50"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="text"
+                placeholder="Ciudad"
+                value={billingForm.address.city}
+                onChange={(e) => setBillingForm((p) => ({ ...p, address: { ...p.address, city: e.target.value } }))}
+                className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-accent/50"
+              />
+              <input
+                type="text"
+                placeholder="Código postal"
+                value={billingForm.address.postal_code}
+                onChange={(e) => setBillingForm((p) => ({ ...p, address: { ...p.address, postal_code: e.target.value } }))}
+                className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-accent/50"
+              />
+            </div>
+            <select
+              value={billingForm.address.country}
+              onChange={(e) => setBillingForm((p) => ({ ...p, address: { ...p.address, country: e.target.value } }))}
+              className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50"
+            >
+              {EU_COUNTRIES.map(([code, name]) => (
+                <option key={code} value={code}>{name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Save button */}
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={handleSaveBilling}
+              disabled={billingSaving}
+              className="px-5 py-2 bg-accent hover:bg-accent-hover text-black text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+            >
+              {billingSaving ? "Guardando..." : "Guardar datos fiscales"}
+            </button>
+            {billingSaved && (
+              <span className="text-xs text-green-400">✓ Datos actualizados en Stripe</span>
+            )}
+            {billingError && (
+              <span className="text-xs text-red-400">{billingError}</span>
+            )}
+          </div>
+
+          {/* Current saved tax IDs info */}
+          {billing.tax_ids.length > 0 && (
+            <div className="border-t border-border pt-4">
+              <p className="text-xs text-neutral-500 mb-2">ID fiscal registrado en Stripe:</p>
+              {billing.tax_ids.map((tid) => (
+                <div key={tid.id} className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-accent/10 text-accent border border-accent/20">
+                    {tid.type}
+                  </span>
+                  <span className="text-sm text-white font-mono">{tid.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Invoices */}
       {tab === "invoices" && (

@@ -335,6 +335,22 @@ export const api = {
     fetchApi<{ ok: boolean }>(`/api/stripe/payment-methods/${pmId}/default`, { method: "POST" }),
   deletePaymentMethod: (pmId: string) =>
     fetchApi<{ ok: boolean }>(`/api/stripe/payment-methods/${pmId}`, { method: "DELETE" }),
+  getBillingInfo: () =>
+    fetchApi<{
+      name: string;
+      address: { line1: string; line2: string; city: string; postal_code: string; country: string };
+      tax_ids: { id: string; type: string; value: string }[];
+    }>("/api/stripe/billing-info"),
+  updateBillingInfo: (data: {
+    name?: string;
+    address?: { line1: string; line2: string; city: string; postal_code: string; country: string };
+    tax_id_type?: string;
+    tax_id_value?: string;
+  }) =>
+    fetchApi<{ ok: boolean }>("/api/stripe/billing-info", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
 
   // Platform settings (admin)
   getPlatformSettings: () =>

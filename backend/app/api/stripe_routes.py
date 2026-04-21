@@ -1089,6 +1089,94 @@ async def switch_plan(
     return {"ok": True, "new_plan": new_plan, "pending": True}
 
 
+@router.get("/billing-info")
+async def get_billing_info(
+    user: User = Depends(get_current_user),
+):
+    """Retrieve billing/fiscal info from the user's Stripe customer record."""
+    s = get_stripe()
+    if not user.stripe_customer_id:
+        return {"name": "", "address": {}, "tax_ids": []}
+
+    customer = s.Customer.retrieve(user.stripe_customer_id)
+    tax_ids_raw = s.Customer.list_tax_ids(user.stripe_customer_id, limit=10)
+
+    addr = customer.address
+    tax_ids = [
+        {"id": tid.id, "type": tid.type, "value": tid.value}
+        for tid in tax_ids_raw.data
+    ]
+
+    return {
+        "name": customer.name or "",
+        "address": {
+            "line1": (addr.line1 or "") if addr else "",
+            "line2": (addr.line2 or "") if addr else "",
+            "city": (addr.city or "") if addr else "",
+            "postal_code": (addr.postal_code or "") if addr else "",
+            "country": (addr.country or "ES") if addr else "ES",
+        },
+        "tax_ids": tax_ids,
+    }
+
+
+@router.put("/billing-info")
+async def update_billing_info(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update billing/fiscal info on the user's Stripe customer record."""
+    body = await request.json()
+    s = get_stripe()
+
+    # Create Stripe customer if not yet linked
+    if not user.stripe_customer_id:
+        customer = s.Customer.create(
+            email=user.email or f"{user.username}@boxboxnow.local",
+            name=user.username,
+            metadata={"user_id": str(user.id)},
+        )
+        user.stripe_customer_id = customer.id
+        await db.commit()
+
+    name: str = body.get("name") or ""
+    address: dict = body.get("address") or {}
+    tax_id_type: str = body.get("tax_id_type") or ""
+    tax_id_value: str = body.get("tax_id_value") or ""
+
+    # Build customer update payload
+    update_params: dict = {}
+    if name:
+        update_params["name"] = name
+    if address:
+        update_params["address"] = {
+            "line1": address.get("line1") or "",
+            "line2": address.get("line2") or "",
+            "city": address.get("city") or "",
+            "postal_code": address.get("postal_code") or "",
+            "country": address.get("country") or "ES",
+        }
+    if update_params:
+        s.Customer.modify(user.stripe_customer_id, **update_params)
+
+    # Replace tax IDs: delete existing, then create new one if provided
+    if tax_id_type and tax_id_value:
+        existing = s.Customer.list_tax_ids(user.stripe_customer_id, limit=10)
+        for tid in existing.data:
+            try:
+                s.Customer.delete_tax_id(user.stripe_customer_id, tid.id)
+            except Exception:
+                pass
+        s.Customer.create_tax_id(
+            user.stripe_customer_id,
+            type=tax_id_type,
+            value=tax_id_value,
+        )
+
+    return {"ok": True}
+
+
 @router.get("/invoices")
 async def list_invoices(
     user: User = Depends(get_current_user),
