@@ -122,6 +122,15 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
         val defaultVisible: Map<String, Boolean> =
             entries.associate { it.key to !it.requiresGPS }
 
-        val defaultOrder: List<String> = entries.map { it.key }
+        /** Cards sorted alphabetically within each group (Carrera → BOX → GPS).
+         *  Used for rendering the config checkboxes and as the default card order
+         *  for new presets. */
+        val sortedByGroupAndName: List<DriverCard> = buildList {
+            for (group in DriverCardGroup.entries) {
+                addAll(entries.filter { it.group == group }.sortedBy { it.display })
+            }
+        }
+
+        val defaultOrder: List<String> = sortedByGroupAndName.map { it.key }
     }
 }

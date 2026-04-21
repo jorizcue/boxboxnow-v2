@@ -565,6 +565,7 @@ def _serialize_config(c, _json) -> dict:
         "is_popular": c.is_popular,
         "is_visible": c.is_visible,
         "sort_order": c.sort_order,
+        "email_template": c.email_template or "",
     }
 
 
@@ -611,6 +612,7 @@ async def create_product_config(request: Request, admin: User = Depends(require_
         is_popular=body.get("is_popular", False),
         is_visible=body.get("is_visible", True),
         sort_order=body.get("sort_order", 0),
+        email_template=body.get("email_template") or None,
     )
     db.add(config)
     await db.commit()
@@ -663,6 +665,8 @@ async def update_product_config(config_id: int, request: Request, admin: User = 
     for field in ("is_popular", "is_visible"):
         if field in body:
             setattr(config, field, body[field])
+    if "email_template" in body:
+        config.email_template = body["email_template"] or None
 
     await db.commit()
     return _serialize_config(config, _json)

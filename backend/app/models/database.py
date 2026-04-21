@@ -468,6 +468,15 @@ async def init_db():
         except Exception:
             pass
 
+        # Add email_template to product_tab_config so admins can customise the
+        # subscription-confirmation email body per product from the Platform panel.
+        try:
+            await conn.execute(text(
+                "ALTER TABLE product_tab_config ADD COLUMN email_template TEXT"
+            ))
+        except Exception:
+            pass
+
 async def get_db():
     async with async_session() as session:
         yield session

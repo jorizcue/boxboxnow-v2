@@ -41,30 +41,30 @@ export const ALL_DRIVER_CARDS: {
   requiresGps: boolean;
   group: DriverCardGroup;
 }[] = [
-  // --- Race group ---
-  { id: "raceTimer", label: "Tiempo de carrera", requiresGps: false, group: "race" },
-  { id: "currentLapTime", label: "Vuelta actual (tiempo real)", requiresGps: true, group: "race" },
-  { id: "lastLap", label: "Última vuelta", requiresGps: false, group: "race" },
-  { id: "position", label: "Posición (tiempos medios)", requiresGps: false, group: "race" },
-  { id: "realPos", label: "Posición (clasif. real)", requiresGps: false, group: "race" },
+  // --- Race group (alphabetical by label) ---
   { id: "gapAhead", label: "Gap kart delante", requiresGps: false, group: "race" },
   { id: "gapBehind", label: "Gap kart detrás", requiresGps: false, group: "race" },
-  { id: "avgLap20", label: "Vuelta media (20v)", requiresGps: false, group: "race" },
+  { id: "lastLap", label: "Última vuelta", requiresGps: false, group: "race" },
+  { id: "avgFutureStint", label: "Media stint futuro", requiresGps: false, group: "race" },
   { id: "best3", label: "Mejor 3 (3V)", requiresGps: false, group: "race" },
   { id: "bestStintLap", label: "Mejor vuelta stint", requiresGps: false, group: "race" },
-  { id: "avgFutureStint", label: "Media stint futuro", requiresGps: false, group: "race" },
+  { id: "realPos", label: "Posición (clasif. real)", requiresGps: false, group: "race" },
+  { id: "position", label: "Posición (tiempos medios)", requiresGps: false, group: "race" },
+  { id: "raceTimer", label: "Tiempo de carrera", requiresGps: false, group: "race" },
+  { id: "currentLapTime", label: "Vuelta actual (tiempo real)", requiresGps: true, group: "race" },
+  { id: "avgLap20", label: "Vuelta media (20v)", requiresGps: false, group: "race" },
   { id: "lapsToMaxStint", label: "Vueltas hasta stint máximo", requiresGps: false, group: "race" },
-  // --- BOX group ---
-  { id: "boxScore", label: "Puntuación Box", requiresGps: false, group: "box" },
-  { id: "pitCount", label: "PITS (realizados / mínimos)", requiresGps: false, group: "box" },
+  // --- BOX group (alphabetical by label) ---
   { id: "currentPit", label: "Pit en curso", requiresGps: false, group: "box" },
+  { id: "pitCount", label: "PITS (realizados / mínimos)", requiresGps: false, group: "box" },
+  { id: "boxScore", label: "Puntuación Box", requiresGps: false, group: "box" },
   { id: "pitWindow", label: "Ventana de pit (open/closed)", requiresGps: false, group: "box" },
-  // --- GPS group ---
+  // --- GPS group (alphabetical by label) ---
   { id: "deltaBestLap", label: "Delta vs Best Lap (GPS)", requiresGps: true, group: "gps" },
-  { id: "gForceRadar", label: "G-Force (diana)", requiresGps: true, group: "gps" },
   { id: "gpsLapDelta", label: "Delta vuelta anterior GPS", requiresGps: true, group: "gps" },
-  { id: "gpsSpeed", label: "Velocidad GPS", requiresGps: true, group: "gps" },
+  { id: "gForceRadar", label: "G-Force (diana)", requiresGps: true, group: "gps" },
   { id: "gpsGForce", label: "G-Force (números)", requiresGps: true, group: "gps" },
+  { id: "gpsSpeed", label: "Velocidad GPS", requiresGps: true, group: "gps" },
 ];
 
 export const DRIVER_CARD_GROUPS: { id: DriverCardGroup; label: string }[] = [

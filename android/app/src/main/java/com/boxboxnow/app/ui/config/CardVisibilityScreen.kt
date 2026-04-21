@@ -65,7 +65,8 @@ fun CardVisibilityScreen(onBack: () -> Unit) {
     val grouped: List<Pair<DriverCardGroup, List<DriverCard>>> =
         DriverCardGroup.entries.mapNotNull { group ->
             if (!canShowBox && group == DriverCardGroup.BOX) return@mapNotNull null
-            val cards = DriverCard.entries.filter { it.group == group }
+            // Use sortedByGroupAndName so cards appear alphabetically within each group
+            val cards = DriverCard.sortedByGroupAndName.filter { it.group == group }
             if (cards.isEmpty()) null else group to cards
         }
 

@@ -127,6 +127,7 @@ class AuthViewModel @Inject constructor(
     }
 
     private fun checkExistingSession() {
+        // loadToken() uses the last-saved username to find the right slot.
         val token = tokenStore.loadToken() ?: return
         val payload = tokenStore.decodeJwtPayload(token)
         val exp = payload?.get("exp")?.toString()?.trim('"')?.toDoubleOrNull()
@@ -136,6 +137,7 @@ class AuthViewModel @Inject constructor(
             biometric.disable()
             return
         }
+        // Check biometric for the last-known user (per-user flag in BiometricService).
         if (biometric.isEnabled && biometric.isAvailable) {
             _biometricPending.value = true
             viewModelScope.launch { refreshMe() }
@@ -181,18 +183,27 @@ class AuthViewModel @Inject constructor(
     }
 
     fun enableBiometric() {
-        biometric.isEnabled = true
+        val username = _user.value?.username
+        if (username != null) {
+            biometric.setEnabledForUser(username, true)
+        } else {
+            biometric.isEnabled = true  // fallback to last-username key
+        }
         _showBiometricPrompt.value = false
     }
 
     fun skipBiometric() { _showBiometricPrompt.value = false }
 
     private suspend fun handleAuthResponse(resp: AuthResponse) {
-        tokenStore.saveToken(resp.accessToken)
+        // Save token keyed to this specific user so multiple accounts on
+        // the same device each have their own isolated storage slot.
+        val username = resp.user?.username ?: ""
+        tokenStore.saveToken(resp.accessToken, username)
+        biometric.saveLastUsername(username)  // keep BiometricService in sync
         _user.value = resp.user
         _isAuthenticated.value = true
         refreshMe()
-        if (biometric.isAvailable && !biometric.isEnabled) {
+        if (biometric.isAvailable && !biometric.isEnabledForUser(username)) {
             _showBiometricPrompt.value = true
         }
     }

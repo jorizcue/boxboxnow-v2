@@ -315,6 +315,10 @@ class ProductTabConfig(Base):
     is_popular = Column(Boolean, default=False, nullable=False)
     is_visible = Column(Boolean, default=True, nullable=False)
     sort_order = Column(Integer, default=0, nullable=False)
+    # Optional custom HTML body for the subscription confirmation email.
+    # Supports {username}, {plan_name}, {circuit_name} placeholders.
+    # When null/empty the default template in email_service.py is used.
+    email_template = Column(Text, nullable=True)
 
 
 class DeviceSession(Base):

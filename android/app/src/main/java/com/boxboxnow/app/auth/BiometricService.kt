@@ -32,11 +32,37 @@ class BiometricService @Inject constructor(
             return result == BiometricManager.BIOMETRIC_SUCCESS
         }
 
+    // Per-user biometric opt-in flag. Using a per-username key prevents one
+    // user's biometric setting from bleeding into another user's session when
+    // multiple accounts share the same device.
+
+    private fun enabledKey(username: String) = "biometric_enabled_$username"
+
+    fun isEnabledForUser(username: String): Boolean =
+        prefs.getBoolean(enabledKey(username), false)
+
+    fun setEnabledForUser(username: String, enabled: Boolean) {
+        prefs.edit().putBoolean(enabledKey(username), enabled).apply()
+    }
+
+    // Convenience property using the last-known username (stored by SecureTokenStore).
     var isEnabled: Boolean
-        get() = prefs.getBoolean(KEY_ENABLED, false)
-        set(value) = prefs.edit().putBoolean(KEY_ENABLED, value).apply()
+        get() {
+            val username = prefs.getString(LAST_USERNAME_KEY, null) ?: return false
+            return isEnabledForUser(username)
+        }
+        set(value) {
+            val username = prefs.getString(LAST_USERNAME_KEY, null) ?: return
+            setEnabledForUser(username, value)
+        }
+
+    fun saveLastUsername(username: String) {
+        prefs.edit().putString(LAST_USERNAME_KEY, username).apply()
+    }
 
     fun disable() { isEnabled = false }
+
+    fun disable(username: String) { setEnabledForUser(username, false) }
 
     suspend fun authenticate(activity: FragmentActivity): Boolean = suspendCoroutine { cont ->
         val executor = ContextCompat.getMainExecutor(activity)
@@ -68,6 +94,6 @@ class BiometricService @Inject constructor(
     }
 
     companion object {
-        private const val KEY_ENABLED = "biometric_enabled"
+        private const val LAST_USERNAME_KEY = "bbn_last_username"
     }
 }

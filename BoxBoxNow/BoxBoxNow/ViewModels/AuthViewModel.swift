@@ -142,6 +142,7 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
     }
 
     private func checkExistingSession() {
+        // Load the last-known username to look up the right keychain slot.
         guard let token = KeychainHelper.loadToken() else { return }
         guard let payload = KeychainHelper.decodeJWTPayload(token),
               let exp = payload["exp"] as? TimeInterval,
@@ -154,6 +155,7 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
         // JWT payload only contains {sub, sid, exp, ...} — NOT full User fields.
         // We'll fetch /auth/me below to populate is_admin, tab_access, etc.
 
+        // Check biometric for the user stored in keychain (per-user flag).
         if BiometricService.isEnabled && BiometricService.isAvailable {
             // Require biometric before granting access; fetch user in background
             biometricPending = true
@@ -218,7 +220,12 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
 
     /// Called after a successful login to offer enabling biometric
     func enableBiometric() {
-        BiometricService.isEnabled = true
+        // Enable biometric for the currently logged-in user only
+        if let username = user?.username {
+            BiometricService.setEnabled(true, for: username)
+        } else {
+            BiometricService.isEnabled = true  // fallback to last-username key
+        }
         showBiometricPrompt = false
     }
 
@@ -228,12 +235,15 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
 
     private func handleAuthResponse(_ resp: AuthResponse) {
         if let token = resp.accessToken as String? {
-            KeychainHelper.saveToken(token)
+            // Save token keyed to this specific user so multiple accounts
+            // on the same device each have their own isolated Keychain slot.
+            let username = resp.user?.username ?? ""
+            KeychainHelper.saveToken(token, forUser: username)
             user = resp.user
             isAuthenticated = true
 
-            // Offer biometric setup if available and not already enabled
-            if BiometricService.isAvailable && !BiometricService.isEnabled {
+            // Offer biometric setup if available and not already enabled for this user
+            if BiometricService.isAvailable && !BiometricService.isEnabled(for: username) {
                 showBiometricPrompt = true
             }
         }

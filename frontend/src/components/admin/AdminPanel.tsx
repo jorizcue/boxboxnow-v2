@@ -1338,6 +1338,7 @@ function PlatformSettingsManager() {
     is_popular: false,
     is_visible: true,
     sort_order: 0,
+    email_template: "",
   };
 
   const [configForm, setConfigForm] = useState(emptyConfig);
@@ -1371,6 +1372,7 @@ function PlatformSettingsManager() {
       is_popular: c.is_popular,
       is_visible: c.is_visible,
       sort_order: c.sort_order,
+      email_template: c.email_template || "",
     });
     setFeaturesText((c.features || []).join("\n"));
     setSelectedProduct(null);
@@ -2034,6 +2036,24 @@ function PlatformSettingsManager() {
                         value={configForm.sort_order}
                         onChange={(e) => setConfigForm((p) => ({ ...p, sort_order: parseInt(e.target.value) || 0 }))}
                         className="w-24 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+
+                    {/* Email template editor */}
+                    <div>
+                      <label className="block text-xs text-neutral-400 mb-1 uppercase tracking-wider">
+                        Plantilla de email (HTML)
+                      </label>
+                      <p className="text-[11px] text-neutral-600 mb-2">
+                        Cuerpo del email de confirmación de compra. Soporta <code className="text-neutral-400">{"{username}"}</code>, <code className="text-neutral-400">{"{plan_name}"}</code>, <code className="text-neutral-400">{"{circuit_name}"}</code>. Si está vacío se usa la plantilla por defecto.
+                      </p>
+                      <textarea
+                        value={configForm.email_template}
+                        onChange={(e) => setConfigForm((p) => ({ ...p, email_template: e.target.value }))}
+                        rows={10}
+                        spellCheck={false}
+                        placeholder={`<h2 style="color:#fff;">Gracias, {username}!</h2>\n<p style="color:#e5e5e5;">Tu plan <strong style="color:#9fe556;">{plan_name}</strong> en <strong>{circuit_name}</strong> está activo.</p>`}
+                        className="w-full bg-black border border-border rounded-lg px-3 py-2 text-xs text-neutral-200 font-mono resize-y min-h-[120px]"
                       />
                     </div>
                   </div>

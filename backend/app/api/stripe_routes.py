@@ -300,6 +300,19 @@ async def create_checkout_session(
     session_params.pop("success_url", None)
     session_params.pop("cancel_url", None)
 
+    # Optional tax ID collection so users can request a VAT invoice.
+    # Stripe shows a collapsible "Add billing information" field in the
+    # checkout form — the user fills it only if they want a fiscal receipt.
+    session_params["tax_id_collection"] = {"enabled": True}
+    # Collecting billing address is required for tax ID to work properly.
+    session_params["billing_address_collection"] = "required"
+    # Allow users to update their billing address / tax ID through the
+    # Customer Portal as well (applies retroactively to future invoices).
+    session_params["customer_update"] = {
+        "address": "auto",
+        "name": "auto",
+    }
+
     checkout_session = s.checkout.Session.create(**session_params)
 
     return {"client_secret": checkout_session.client_secret, "session_id": checkout_session.id}
@@ -425,8 +438,10 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
                 from app.services.email_service import send_subscription_confirmation_email
                 import asyncio
                 display_label = config.display_name if config and config.display_name else plan_type
+                email_tpl = config.email_template if config else None
                 asyncio.create_task(send_subscription_confirmation_email(
-                    _user.email, _user.username, display_label, circuit_name))
+                    _user.email, _user.username, display_label, circuit_name,
+                    email_template=email_tpl))
 
     elif session_data.get("mode") == "payment":
         # One-time payment (event)
@@ -496,8 +511,10 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
             from app.services.email_service import send_subscription_confirmation_email
             import asyncio
             display_label = config.display_name if config and config.display_name else (plan_type or "Evento")
+            email_tpl = config.email_template if config else None
             asyncio.create_task(send_subscription_confirmation_email(
-                _user.email, _user.username, display_label, circuit_name))
+                _user.email, _user.username, display_label, circuit_name,
+                email_template=email_tpl))
 
 
 async def _handle_invoice_paid(invoice_data: dict, db: AsyncSession):

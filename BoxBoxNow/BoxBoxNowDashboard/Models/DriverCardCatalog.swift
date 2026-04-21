@@ -30,30 +30,30 @@ enum DriverCardCatalog {
     }
 
     static let all: [Card] = [
-        // --- Race group ---
-        Card(id: "raceTimer",       label: "Tiempo de carrera",            group: .race),
-        Card(id: "currentLapTime",  label: "Vuelta actual (tiempo real)",  group: .race),
-        Card(id: "lastLap",         label: "Última vuelta",                group: .race),
-        Card(id: "position",        label: "Posición (tiempos medios)",    group: .race),
-        Card(id: "realPos",         label: "Posición (clasif. real)",      group: .race),
+        // --- Race group (alphabetical by label) ---
         Card(id: "gapAhead",        label: "Gap kart delante",             group: .race),
         Card(id: "gapBehind",       label: "Gap kart detrás",              group: .race),
-        Card(id: "avgLap20",        label: "Vuelta media (20v)",           group: .race),
+        Card(id: "lastLap",         label: "Última vuelta",                group: .race),
+        Card(id: "avgFutureStint",  label: "Media stint futuro",           group: .race),
         Card(id: "best3",           label: "Mejor 3 (3V)",                 group: .race),
         Card(id: "bestStintLap",    label: "Mejor vuelta stint",           group: .race),
-        Card(id: "avgFutureStint",  label: "Media stint futuro",           group: .race),
+        Card(id: "realPos",         label: "Posición (clasif. real)",      group: .race),
+        Card(id: "position",        label: "Posición (tiempos medios)",    group: .race),
+        Card(id: "raceTimer",       label: "Tiempo de carrera",            group: .race),
+        Card(id: "currentLapTime",  label: "Vuelta actual (tiempo real)",  group: .race),
+        Card(id: "avgLap20",        label: "Vuelta media (20v)",           group: .race),
         Card(id: "lapsToMaxStint",  label: "Vueltas hasta stint máximo",   group: .race),
-        // --- Box group ---
-        Card(id: "boxScore",        label: "Puntuación Box",               group: .box),
-        Card(id: "pitCount",        label: "PITS (realizados / mínimos)",  group: .box),
+        // --- Box group (alphabetical by label) ---
         Card(id: "currentPit",      label: "Pit en curso",                 group: .box),
+        Card(id: "pitCount",        label: "PITS (realizados / mínimos)",  group: .box),
+        Card(id: "boxScore",        label: "Puntuación Box",               group: .box),
         Card(id: "pitWindow",       label: "Ventana de pit",               group: .box),
-        // --- GPS group ---
+        // --- GPS group (alphabetical by label) ---
         Card(id: "deltaBestLap",    label: "Delta vs Best Lap (GPS)",      group: .gps),
-        Card(id: "gForceRadar",     label: "G-Force (diana)",              group: .gps),
         Card(id: "gpsLapDelta",     label: "Delta vuelta anterior GPS",    group: .gps),
-        Card(id: "gpsSpeed",        label: "Velocidad GPS",                group: .gps),
+        Card(id: "gForceRadar",     label: "G-Force (diana)",              group: .gps),
         Card(id: "gpsGForce",       label: "G-Force (números)",            group: .gps),
+        Card(id: "gpsSpeed",        label: "Velocidad GPS",                group: .gps),
     ]
 
     /// All known card ids, in the same canonical order as `all`. Used as the

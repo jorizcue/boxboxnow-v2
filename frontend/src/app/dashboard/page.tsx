@@ -43,17 +43,32 @@ export default function DashboardPage() {
     }
   }, [_hydrated, token, router]);
 
-  // Refresh user data after Stripe checkout success
+  // Refresh user data after Stripe checkout success.
+  // Uses a retry loop because the Stripe webhook that activates the
+  // subscription is asynchronous — a single immediate fetch often races
+  // and returns has_active_subscription=false. We retry up to 6 times
+  // (12 seconds total) until the subscription appears active.
   useEffect(() => {
     if (!_hydrated || !token) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("checkout") === "success") {
-      // Clean URL
+      // Clean URL immediately so a refresh doesn't re-trigger this flow
       window.history.replaceState({}, "", "/dashboard");
-      // Refresh user profile from backend (subscription is now active)
-      import("@/lib/api").then(({ api }) =>
-        api.getMe().then((freshUser) => updateUser(freshUser)).catch(() => {})
-      );
+      let attempts = 0;
+      const maxAttempts = 6;
+      const poll = () => {
+        import("@/lib/api").then(({ api }) =>
+          api.getMe().then((freshUser) => {
+            updateUser(freshUser);
+            attempts++;
+            // Keep polling until subscription is active or we give up
+            if (!freshUser.has_active_subscription && attempts < maxAttempts) {
+              setTimeout(poll, 2000);
+            }
+          }).catch(() => {})
+        );
+      };
+      poll();
     }
   }, [_hydrated, token, updateUser]);
 
