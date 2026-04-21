@@ -57,20 +57,11 @@ struct PresetsView: View {
                                     VStack(alignment: .leading, spacing: 2) {
                                         HStack(spacing: 6) {
                                             Text(preset.name).foregroundColor(.white)
-                                            if preset.isDefault {
-                                                Text("PREDEFINIDA")
-                                                    .font(.system(size: 9, weight: .bold))
-                                                    .foregroundColor(.accentColor)
-                                            }
                                         }
                                         Text("\(preset.visibleCards.filter { $0.value }.count) tarjetas")
                                             .font(.caption).foregroundColor(.gray)
                                     }
                                     Spacer()
-                                    if driverVM.selectedPresetId == preset.id {
-                                        Image(systemName: "checkmark")
-                                            .foregroundColor(.accentColor)
-                                    }
                                 }
                                 .frame(minHeight: 44)
                             }
@@ -79,9 +70,9 @@ struct PresetsView: View {
                             // Edit button
                             Button(action: { editingPreset = preset }) {
                                 Image(systemName: "pencil.circle")
-                                    .font(.system(size: 17))
+                                    .font(.system(size: 22))
                                     .foregroundColor(.accentColor)
-                                    .frame(width: 32, height: 32)
+                                    .frame(width: 36, height: 36)
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)

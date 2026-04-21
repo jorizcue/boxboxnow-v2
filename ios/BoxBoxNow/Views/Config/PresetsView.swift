@@ -18,10 +18,6 @@ struct PresetsView: View {
                                     .font(.caption).foregroundColor(.gray)
                             }
                             Spacer()
-                            if driverVM.selectedPresetId == preset.id {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(.accentColor)
-                            }
                         }
                     }
                 }

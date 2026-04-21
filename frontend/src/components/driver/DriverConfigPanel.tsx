@@ -116,7 +116,8 @@ export function DriverConfigPanel({ onClose }: { onClose: () => void }) {
         <label className="text-[10px] text-neutral-400 uppercase tracking-wider">Tarjetas visibles</label>
         {DRIVER_CARD_GROUPS.map((group) => {
           if (group.id === "box" && !canBox) return null;
-          const groupCards = ALL_DRIVER_CARDS.filter((c) => c.group === group.id);
+          const groupCards = ALL_DRIVER_CARDS.filter((c) => c.group === group.id)
+            .sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
           if (groupCards.length === 0) return null;
           return (
             <div key={group.id} className="space-y-1">

@@ -253,32 +253,12 @@ private fun PresetRow(
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
-                if (preset.isDefault) {
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        "PREDEFINIDA",
-                        color = BoxBoxNowColors.Accent,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
             }
             Text(
                 "$visibleCount tarjetas",
                 color = BoxBoxNowColors.SystemGray,
                 fontSize = 11.sp,
             )
-        }
-
-        // Checkmark when selected/applied
-        if (selected) {
-            Icon(
-                Icons.Filled.Check,
-                contentDescription = "Seleccionado",
-                tint = BoxBoxNowColors.Accent,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(4.dp))
         }
 
         // Edit button
@@ -290,7 +270,7 @@ private fun PresetRow(
                 Icons.Filled.Edit,
                 contentDescription = "Editar",
                 tint = BoxBoxNowColors.Accent,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(24.dp),
             )
         }
 

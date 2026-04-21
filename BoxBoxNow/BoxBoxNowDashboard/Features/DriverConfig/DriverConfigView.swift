@@ -287,6 +287,7 @@ struct DriverConfigView: View {
 
                 ForEach(DriverCardCatalog.Group.allCases) { group in
                     let cards = DriverCardCatalog.all.filter { $0.group == group }
+                        .sorted { $0.label.localizedStandardCompare($1.label) == .orderedAscending }
                     if !cards.isEmpty {
                         groupBlock(group: group, cards: cards)
                     }

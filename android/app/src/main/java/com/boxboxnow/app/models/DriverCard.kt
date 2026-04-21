@@ -126,8 +126,9 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
          *  Used for rendering the config checkboxes and as the default card order
          *  for new presets. */
         val sortedByGroupAndName: List<DriverCard> = buildList {
+            val collator = java.text.Collator.getInstance(java.util.Locale("es"))
             for (group in DriverCardGroup.entries) {
-                addAll(entries.filter { it.group == group }.sortedBy { it.display })
+                addAll(entries.filter { it.group == group }.sortedWith(compareBy(collator) { it.display }))
             }
         }
 

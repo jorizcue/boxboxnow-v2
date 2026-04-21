@@ -266,7 +266,8 @@ export function DriverConfigTab() {
         <p className="text-[11px] text-neutral-500">Selecciona las tarjetas que quieres ver en la vista del piloto.</p>
 
         {visibleGroups.map((group) => {
-          const groupCards = ALL_DRIVER_CARDS.filter((c) => c.group === group.id);
+          const groupCards = ALL_DRIVER_CARDS.filter((c) => c.group === group.id)
+            .sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
           if (groupCards.length === 0) return null;
           const isGps = group.id === "gps";
           return (

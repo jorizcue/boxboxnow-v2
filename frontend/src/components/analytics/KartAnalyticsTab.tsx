@@ -440,6 +440,7 @@ export function KartAnalyticsTab() {
                     <button
                       key={log.id}
                       onClick={() => toggleRaceLog(log.id)}
+                      title={log.session_name || "Sin nombre"}
                       className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] transition-colors border ${
                         selectedRaceLogIds.has(log.id)
                           ? "bg-accent/15 border-accent/40 text-accent"

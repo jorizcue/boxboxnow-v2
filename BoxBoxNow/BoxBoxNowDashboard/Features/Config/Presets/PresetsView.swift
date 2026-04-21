@@ -102,15 +102,6 @@ struct PresetsView: View {
                         Text(preset.name.isEmpty ? "—" : preset.name)
                             .font(BBNTypography.title3)
                             .foregroundStyle(BBNColors.textPrimary)
-                        if preset.isDefault {
-                            Text("POR DEFECTO")
-                                .font(BBNTypography.caption)
-                                .foregroundStyle(BBNColors.accent)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(BBNColors.accent.opacity(0.15))
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
-                        }
                     }
                     Text(metadataText(preset))
                         .font(BBNTypography.caption)
@@ -123,7 +114,7 @@ struct PresetsView: View {
                     editing = preset
                 } label: {
                     Image(systemName: "pencil")
-                        .font(BBNTypography.body)
+                        .font(.title2)
                         .foregroundStyle(BBNColors.accent)
                 }
                 .accessibilityLabel("Editar preset")
