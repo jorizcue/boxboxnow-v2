@@ -6,7 +6,16 @@ import { useAuth } from "./useAuth";
 import { setDriverWsRef } from "@/lib/driverChannel";
 import type { WsMessage } from "@/types/race";
 
-const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/race";
+/** Derive WS base from the browser's current host so it always matches the domain/port in use. */
+function getWsBase(): string {
+  if (typeof window !== "undefined") {
+    const proto = window.location.protocol === "https:" ? "wss" : "ws";
+    return `${proto}://${window.location.host}/ws/race`;
+  }
+  // SSR fallback (never actually used for WS connections)
+  return process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/race";
+}
+const WS_BASE = getWsBase();
 
 /**
  * BroadcastChannel for sharing WS data with the driver view window.
