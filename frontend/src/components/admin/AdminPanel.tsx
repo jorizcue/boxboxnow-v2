@@ -68,6 +68,138 @@ export function AdminPlatformPanel() {
   return <PlatformSettingsManager />;
 }
 
+export function AdminMarketingPanel() {
+  return <WaitlistManager />;
+}
+
+// ─── Waitlist Manager ─────────────────────────────────────────────────────────
+
+interface WaitlistRow {
+  id: number;
+  email: string;
+  name: string | null;
+  source: string;
+  created_at: string | null;
+}
+
+function WaitlistManager() {
+  const [entries, setEntries] = useState<WaitlistRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    fetch("/api/admin/waitlist", {
+      headers: {
+        Authorization: `Bearer ${(() => {
+          try {
+            const s = localStorage.getItem("boxboxnow-auth");
+            return s ? JSON.parse(s)?.state?.token : "";
+          } catch { return ""; }
+        })()}`,
+      },
+    })
+      .then((r) => r.json())
+      .then((data) => { setEntries(data); setLoading(false); })
+      .catch(() => { setError("Error al cargar la lista."); setLoading(false); });
+  }, []);
+
+  const filtered = entries.filter((e) => {
+    const q = search.toLowerCase();
+    return (
+      e.email.toLowerCase().includes(q) ||
+      (e.name || "").toLowerCase().includes(q)
+    );
+  });
+
+  const copyEmails = () => {
+    const text = filtered.map((e) => e.email).join(", ");
+    navigator.clipboard.writeText(text).catch(() => {});
+  };
+
+  const formatDate = (iso: string | null) => {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleDateString("es-ES", {
+      day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+    });
+  };
+
+  return (
+    <div className="p-4 sm:p-6 max-w-4xl">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <div>
+          <h2 className="text-lg font-semibold text-white">Waitlist — Pre-lanzamiento</h2>
+          <p className="text-sm text-neutral-400 mt-0.5">
+            {loading ? "..." : `${entries.length} persona${entries.length !== 1 ? "s" : ""} registrada${entries.length !== 1 ? "s" : ""}`}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Buscar..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-surface border border-border rounded-lg px-3 py-1.5 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-accent w-48"
+          />
+          <button
+            onClick={copyEmails}
+            title="Copiar emails al portapapeles"
+            className="flex items-center gap-1.5 border border-border rounded-lg px-3 py-1.5 text-sm text-neutral-300 hover:text-white hover:border-accent transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+            </svg>
+            Copiar emails
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      {loading ? (
+        <div className="text-neutral-400 text-sm py-12 text-center">Cargando...</div>
+      ) : error ? (
+        <div className="text-red-400 text-sm py-12 text-center">{error}</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-neutral-500 text-sm py-12 text-center">
+          {search ? "Sin resultados para esa búsqueda." : "Nadie en la lista todavía."}
+        </div>
+      ) : (
+        <div className="border border-border rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-white/[0.02]">
+                <th className="text-left px-4 py-2.5 text-neutral-400 font-medium">#</th>
+                <th className="text-left px-4 py-2.5 text-neutral-400 font-medium">Email</th>
+                <th className="text-left px-4 py-2.5 text-neutral-400 font-medium hidden sm:table-cell">Nombre</th>
+                <th className="text-left px-4 py-2.5 text-neutral-400 font-medium hidden md:table-cell">Fuente</th>
+                <th className="text-left px-4 py-2.5 text-neutral-400 font-medium hidden lg:table-cell">Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((e, i) => (
+                <tr
+                  key={e.id}
+                  className="border-b border-border/50 hover:bg-white/[0.02] transition-colors"
+                >
+                  <td className="px-4 py-2.5 text-neutral-500 tabular-nums">{i + 1}</td>
+                  <td className="px-4 py-2.5 text-white font-mono text-xs">{e.email}</td>
+                  <td className="px-4 py-2.5 text-neutral-300 hidden sm:table-cell">{e.name || <span className="text-neutral-600">—</span>}</td>
+                  <td className="px-4 py-2.5 hidden md:table-cell">
+                    <span className="text-xs px-2 py-0.5 rounded bg-white/[0.06] text-neutral-400">{e.source}</span>
+                  </td>
+                  <td className="px-4 py-2.5 text-neutral-500 text-xs hidden lg:table-cell tabular-nums">{formatDate(e.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const STANDARD_TAB_OPTIONS: [string, string][] = [
   ["race", "Carrera"],
   ["pit", "Box"],

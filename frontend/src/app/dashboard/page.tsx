@@ -12,7 +12,7 @@ import { RaceTable } from "@/components/race/RaceTable";
 import { FifoQueue } from "@/components/pit/FifoQueue";
 import { ClassificationTable } from "@/components/classification/ClassificationTable";
 import { ConfigPanel } from "@/components/config/ConfigPanel";
-import { AdminUsersPanel, AdminCircuitsPanel, AdminHubPanel, AdminPlatformPanel } from "@/components/admin/AdminPanel";
+import { AdminUsersPanel, AdminCircuitsPanel, AdminHubPanel, AdminPlatformPanel, AdminMarketingPanel } from "@/components/admin/AdminPanel";
 import { LiveTiming } from "@/components/live/LiveTiming";
 import { AdjustedClassification } from "@/components/classification/AdjustedClassification";
 import { RealClassificationBeta } from "@/components/classification/RealClassificationBeta";
@@ -271,6 +271,7 @@ function Dashboard({
           {activeTab === "admin-circuits" && user?.is_admin && userTabs.includes("admin-circuits") && <AdminCircuitsPanel />}
           {activeTab === "admin-hub" && user?.is_admin && userTabs.includes("admin-hub") && <AdminHubPanel />}
           {activeTab === "admin-platform" && user?.is_admin && <AdminPlatformPanel />}
+          {activeTab === "admin-marketing" && user?.is_admin && <AdminMarketingPanel />}
         </main>
       </div>
     </div>
