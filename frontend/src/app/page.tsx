@@ -82,7 +82,7 @@ function LoginModal({ onClose }: { onClose: () => void }) {
         <button className="bbn-modal-close" onClick={onClose} aria-label="Cerrar">
           ✕
         </button>
-        <div className="bbn-modal-logo">BOXBOXNOW</div>
+        <div className="bbn-modal-logo">BOXBOX<em>NOW</em></div>
         <p className="bbn-modal-subtitle">Acceso exclusivo</p>
 
         <form onSubmit={handleLogin} className="bbn-modal-form">
@@ -255,6 +255,9 @@ export default function ComingSoonPage() {
           font-family: var(--font-display); font-weight: 900; font-size: 18px;
           letter-spacing: 0.1em; color: var(--text);
         }
+        .bbn-nav-logo em {
+          font-style: normal; color: var(--green);
+        }
         .bbn-nav-status {
           font-family: var(--font-mono); font-size: 11px; color: var(--muted);
           letter-spacing: 0.15em; display: flex; align-items: center; gap: 8px;
@@ -416,6 +419,9 @@ export default function ComingSoonPage() {
           font-family: var(--font-display); font-weight: 900; font-size: 20px;
           letter-spacing: 0.1em; color: var(--text); margin-bottom: 4px;
         }
+        .bbn-modal-logo em {
+          font-style: normal; color: var(--green);
+        }
         .bbn-modal-subtitle {
           font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em;
           color: var(--muted); margin-bottom: 32px; text-transform: uppercase;
@@ -456,7 +462,7 @@ export default function ComingSoonPage() {
       <div className="bbn-page">
         {/* Nav */}
         <nav className="bbn-nav">
-          <div className="bbn-nav-logo">BOXBOXNOW</div>
+          <div className="bbn-nav-logo">BOXBOX<em>NOW</em></div>
           <div className="bbn-nav-status">
             <span className="bbn-status-dot" />
             COMING SOON · 18.05.26
