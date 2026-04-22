@@ -449,11 +449,21 @@ export default function ComingSoonPage() {
           padding: 20px 40px;
           border-top: 1px solid var(--border);
           display: flex; align-items: center; justify-content: space-between;
+          flex-wrap: wrap; gap: 12px;
         }
         .bbn-footer-copy {
           font-family: var(--font-mono); font-size: 10px;
           color: rgba(245,245,245,0.2); letter-spacing: 0.1em;
         }
+        .bbn-footer-links {
+          display: flex; align-items: center; gap: 20px;
+        }
+        .bbn-footer-link {
+          font-family: var(--font-mono); font-size: 10px;
+          color: rgba(245,245,245,0.2); letter-spacing: 0.1em;
+          text-decoration: none; transition: color 0.15s;
+        }
+        .bbn-footer-link:hover { color: rgba(245,245,245,0.55); }
       `}</style>
 
       {/* Glow */}
@@ -534,6 +544,10 @@ export default function ComingSoonPage() {
         {/* Footer */}
         <footer className="bbn-footer">
           <span className="bbn-footer-copy">© 2026 BOXBOXNOW</span>
+          <div className="bbn-footer-links">
+            <a href="/privacidad" className="bbn-footer-link">POLÍTICA DE PRIVACIDAD</a>
+            <a href="/cookies" className="bbn-footer-link">POLÍTICA DE COOKIES</a>
+          </div>
           <span className="bbn-footer-copy">LANZAMIENTO 18.05.26</span>
         </footer>
       </div>
