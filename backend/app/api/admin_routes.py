@@ -10,7 +10,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 
 from app.models.database import get_db
-from app.models.schemas import User, Circuit, UserCircuitAccess, AppSetting, UserTabAccess, DeviceSession, Subscription, ProductTabConfig
+from app.models.schemas import User, Circuit, UserCircuitAccess, AppSetting, UserTabAccess, DeviceSession, Subscription, ProductTabConfig, WaitlistEntry
 from sqlalchemy.orm import selectinload  # noqa: duplicate import
 from app.models.pydantic_models import (
     UserOut, UserCreate, UserUpdate,
@@ -719,3 +719,24 @@ async def list_stripe_products(admin: User = Depends(require_admin)):
     except Exception as e:
         logger.error(f"Failed to list Stripe products: {e}")
         raise HTTPException(500, "Failed to fetch Stripe products")
+
+
+# --- Waitlist ---
+
+@router.get("/waitlist")
+async def list_waitlist(admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """Return all waitlist entries ordered by registration date."""
+    result = await db.execute(
+        select(WaitlistEntry).order_by(WaitlistEntry.created_at.desc())
+    )
+    entries = result.scalars().all()
+    return [
+        {
+            "id": e.id,
+            "email": e.email,
+            "name": e.name,
+            "source": e.source,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+        }
+        for e in entries
+    ]

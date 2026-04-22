@@ -477,6 +477,17 @@ async def init_db():
         except Exception:
             pass
 
+        # Waitlist table for pre-launch lead capture
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS waitlist_entry (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE NOT NULL,
+                name TEXT,
+                source TEXT DEFAULT 'landing',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+
 async def get_db():
     async with async_session() as session:
         yield session

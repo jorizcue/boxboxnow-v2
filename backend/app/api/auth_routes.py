@@ -30,7 +30,7 @@ from sqlalchemy import select, func, delete
 
 from app.config import get_settings
 from app.models.database import get_db
-from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess, Subscription, Circuit, AppSetting, ProductTabConfig
+from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess, Subscription, Circuit, AppSetting, ProductTabConfig, WaitlistEntry
 from sqlalchemy.orm import selectinload
 from app.models.pydantic_models import (
     LoginRequest, LoginResponse, UserOut, DeviceSessionOut,
@@ -1472,6 +1472,29 @@ async def set_password(request: Request, user: User = Depends(get_current_user),
     await db.commit()
 
     return {"ok": True, "message": "Contrasena establecida correctamente"}
+
+
+# ---------------------------------------------------------------------------
+# Waitlist (public — no auth required)
+# ---------------------------------------------------------------------------
+
+@router.post("/waitlist")
+async def join_waitlist(request: Request, db: AsyncSession = Depends(get_db)):
+    """Store an interested user's email/name in the pre-launch waitlist."""
+    body = await request.json()
+    email = (body.get("email") or "").strip().lower()
+    name = (body.get("name") or "").strip()
+    if not email or "@" not in email:
+        raise HTTPException(400, "Email inválido")
+
+    existing = await db.execute(select(WaitlistEntry).where(WaitlistEntry.email == email))
+    if existing.scalar_one_or_none():
+        return {"ok": True, "already": True}
+
+    entry = WaitlistEntry(email=email, name=name or None, source="landing")
+    db.add(entry)
+    await db.commit()
+    return {"ok": True, "already": False}
 
 
 # --- Kill session without being logged in (from the 409 screen) ---

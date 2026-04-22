@@ -64,6 +64,13 @@ async function fetchRaw<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  // Waitlist (public)
+  joinWaitlist: (email: string, name?: string) =>
+    fetchRaw<{ ok: boolean; already: boolean }>("/api/auth/waitlist", {
+      method: "POST",
+      body: JSON.stringify({ email, name: name || null }),
+    }),
+
   // Auth
   login: (username: string, password: string, mfaCode?: string) => {
     const body: any = { username, password };
