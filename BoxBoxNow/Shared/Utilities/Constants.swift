@@ -2,11 +2,11 @@ import Foundation
 
 enum Constants {
     #if DEBUG
-    static let apiBaseURL = "https://bbn.boxboxnow.kartingnow.com/api"
-    static let wsBaseURL  = "wss://bbn.boxboxnow.kartingnow.com/ws"
+    static let apiBaseURL = "https://boxboxnow.com/api"
+    static let wsBaseURL  = "wss://boxboxnow.com/ws"
     #else
-    static let apiBaseURL = "https://bbn.boxboxnow.kartingnow.com/api"
-    static let wsBaseURL  = "wss://bbn.boxboxnow.kartingnow.com/ws"
+    static let apiBaseURL = "https://boxboxnow.com/api"
+    static let wsBaseURL  = "wss://boxboxnow.com/ws"
     #endif
 
     static let maxPresets = 10

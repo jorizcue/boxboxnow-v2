@@ -1,8 +1,8 @@
 package com.boxboxnow.app.util
 
 object Constants {
-    const val API_BASE_URL = "https://bbn.boxboxnow.kartingnow.com/api"
-    const val WS_BASE_URL = "wss://bbn.boxboxnow.kartingnow.com/ws"
+    const val API_BASE_URL = "https://boxboxnow.com/api"
+    const val WS_BASE_URL = "wss://boxboxnow.com/ws"
 
     const val MAX_PRESETS = 10
     const val GPS_SAMPLE_RATE_S = 0.1 // 10 Hz
