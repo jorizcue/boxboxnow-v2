@@ -98,7 +98,9 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
                     return
                 }
 
-                KeychainHelper.saveToken(token)
+                // Decode JWT to get the username (sub claim) for per-user Keychain slot
+                let username = KeychainHelper.decodeJWTPayload(token)?["sub"] as? String ?? ""
+                KeychainHelper.saveToken(token, forUser: username)
                 self.isAuthenticated = true
                 // Fetch full User from /auth/me (JWT payload lacks is_admin / tab_access)
                 Task { await self.refreshMe() }

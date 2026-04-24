@@ -28,9 +28,11 @@ enum BiometricService {
         let context = LAContext()
         _ = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
         switch context.biometryType {
-        case .faceID:  return "faceid"
-        case .touchID: return "touchid"
-        default:       return "lock.shield"
+        case .faceID:          return "faceid"
+        case .touchID:         return "touchid"
+        case .opticID:         return "opticid"
+        case .none:            return "lock.shield"
+        @unknown default:      return "lock.shield"
         }
     }
 
