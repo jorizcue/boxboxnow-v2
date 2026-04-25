@@ -188,10 +188,19 @@ private fun cardAccent(
                 if (last <= best) Color(0xFF30D158) else Color(0xFFFFCC00)
             } else gray
         }
-        DriverCard.DeltaBestLap ->
+        DriverCard.DeltaBestLap -> {
             if (deltaBestMs != null) {
                 if (deltaBestMs < 0) Color(0xFF30D158) else Color(0xFFFF453A)
-            } else Color(0xFF9C27B0)
+            } else {
+                // Server-data fallback: stint-best (not race-best) so the
+                // color reflects pace within the current stint.
+                val last = ourKart?.lastLapMs
+                val best = ourKart?.bestStintLapMs
+                if (last != null && best != null && last > 0 && best > 0) {
+                    if (last <= best) Color(0xFF30D158) else Color(0xFFFF453A)
+                } else Color(0xFF9C27B0)
+            }
+        }
         DriverCard.BestStintLap ->
             if ((ourKart?.bestStintLapMs ?: 0.0) > 0) Color(0xFF9C27B0) else gray
         else -> card.accent
@@ -237,16 +246,26 @@ private fun CardContent(
             )
         }
         DriverCard.DeltaBestLap -> {
-            if (gps == null) {
-                Text("GPS --", color = BoxBoxNowColors.SystemGray4, fontSize = (16f * scale).sp, fontFamily = FontFamily.Monospace)
-            } else if (deltaBestMs != null) {
+            // 3-tier: live GPS delta -> server stint-best fallback -> "--"
+            // Server fallback uses bestStintLapMs (not bestLapMs) so the
+            // delta resets after each pit exit and reflects current driver.
+            val last = ourKart?.lastLapMs
+            val stintBest = ourKart?.bestStintLapMs
+            if (gps != null && deltaBestMs != null) {
                 MonoValue(
                     (if (deltaBestMs < 0) "" else "+") + "%.2fs".format(deltaBestMs / 1000),
                     if (deltaBestMs < 0) Color(0xFF30D158) else Color(0xFFFF453A),
                     mainFont,
                 )
+            } else if (last != null && stintBest != null && last > 0 && stintBest > 0) {
+                val delta = last - stintBest
+                MonoValue(
+                    (if (delta < 0) "" else "+") + "%.2fs".format(delta / 1000),
+                    if (delta <= 0) Color(0xFF30D158) else Color(0xFFFF453A),
+                    mainFont,
+                )
             } else {
-                Text("Esperando vuelta...", color = BoxBoxNowColors.SystemGray4, fontSize = (12f * scale).sp)
+                Text("--", color = BoxBoxNowColors.SystemGray4, fontSize = mainFont, fontFamily = FontFamily.Monospace)
             }
         }
         DriverCard.GForceRadar -> {

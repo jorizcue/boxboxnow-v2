@@ -72,8 +72,11 @@ class LapTracker(
     private var bestLap: LapRecord? = null
     private var prevLap: LapRecord? = null
 
-    private val crossingCooldown = 75
-    private var samplesSinceCrossing = crossingCooldown + 1
+    // Cooldown: ignore crossings within this many seconds after the last
+    // detected one. Time-based so it works at any source rate (RaceBox 50Hz,
+    // phone GPS 1-10Hz) without recomputing a sample count.
+    private val crossingCooldownSec: Double = 3.0
+    private var lastCrossingTime: Double = -3600.0
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -121,8 +124,20 @@ class LapTracker(
         resetCurrentArrays()
         bestLap = null
         prevLap = null
-        samplesSinceCrossing = crossingCooldown + 1
+        lastCrossingTime = -3600.0
         uploadedLapCount = 0
+    }
+
+    /**
+     * Clears the best-lap reference (and the live delta) so the next
+     * completed lap becomes the new best — used to make the GPS delta
+     * track the current stint instead of the all-time session best.
+     * Call this on pit exit, when a new stint begins.
+     */
+    fun resetStintBest() {
+        _bestLapMs.value = null
+        bestLap = null
+        _deltaBestMs.value = null
     }
 
     private fun resetCurrentArrays() {
@@ -135,22 +150,20 @@ class LapTracker(
     }
 
     fun processSample(sample: GPSSample) {
-        samplesSinceCrossing++
-
         lastSample?.let { prev ->
             val dist = GeoUtils.haversineDistance(prev.lat, prev.lon, sample.lat, sample.lon)
             if (dist < 50) lapDistanceM += dist
             if (sample.speedKmh > lapMaxSpeed) lapMaxSpeed = sample.speedKmh
 
             finishLine?.let { fl ->
-                if (sample.fixType >= 3 && samplesSinceCrossing > crossingCooldown) {
+                if (sample.fixType >= 3 && (sample.timestamp - lastCrossingTime) > crossingCooldownSec) {
                     val frac = GeoUtils.segmentCrossingFraction(
                         GeoPoint(prev.lat, prev.lon),
                         GeoPoint(sample.lat, sample.lon),
                         fl.p1, fl.p2,
                     )
                     if (frac != null) {
-                        samplesSinceCrossing = 0
+                        lastCrossingTime = sample.timestamp
                         completeLap(sample.timestamp)
                     }
                 }
@@ -262,6 +275,10 @@ class LapTracker(
         if (newLaps.isEmpty()) return
         uploadedLapCount = all.size
 
+        // Save the full RaceBox stream at ~50Hz (no downsample). Phone GPS
+        // tops out at ~1-10Hz so the same code path keeps everything that
+        // arrives. distances/timestamps were already full rate; positions,
+        // speeds and g-force now match.
         scope.launch(Dispatchers.IO) {
             try {
                 api.saveGpsLaps(newLaps.map { lap ->
@@ -273,10 +290,10 @@ class LapTracker(
                         "max_speed_kmh" to lap.maxSpeedKmh,
                         "distances" to lap.distances,
                         "timestamps" to lap.timestamps.map { it - t0 },
-                        "positions" to downsample(lap.positions.map { mapOf("lat" to it.first, "lon" to it.second) }),
-                        "speeds" to downsample(lap.speeds),
-                        "gforce_lat" to downsample(lap.gforceLat),
-                        "gforce_lon" to downsample(lap.gforceLon),
+                        "positions" to lap.positions.map { mapOf("lat" to it.first, "lon" to it.second) },
+                        "speeds" to lap.speeds,
+                        "gforce_lat" to lap.gforceLat,
+                        "gforce_lon" to lap.gforceLon,
                         "gps_source" to gpsSource,
                     )
                 })
@@ -284,16 +301,5 @@ class LapTracker(
                 uploadedLapCount -= newLaps.size
             }
         }
-    }
-
-    /** Downsample from ~10Hz to ~2Hz, keeping first and last. */
-    private fun <T> downsample(arr: List<T>, targetHz: Double = 2.0, sourceHz: Double = 10.0): List<T> {
-        if (arr.size <= 2) return arr
-        val step = maxOf(1, (sourceHz / targetHz).toInt())
-        val result = mutableListOf(arr[0])
-        var i = step
-        while (i < arr.size - 1) { result.add(arr[i]); i += step }
-        result.add(arr.last())
-        return result
     }
 }

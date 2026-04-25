@@ -160,6 +160,21 @@ fun DriverScreen(onBack: () -> Unit) {
         onDispose { raceVM.disconnect() }
     }
 
+    // Reset the LapTracker's best-lap reference when the kart exits the pit
+    // (pitStatus changes from "in_pit" back to anything else). This makes the
+    // live GPS delta track the current stint instead of the all-time session
+    // best — mirrors the iOS DriverView.onChange(of: pitStatus) handler.
+    val ourKartPitStatus = remember(karts, ourKartNum) {
+        karts.firstOrNull { it.kartNumber == ourKartNum }?.pitStatus
+    }
+    var prevPitStatus by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(ourKartPitStatus) {
+        if (prevPitStatus == "in_pit" && ourKartPitStatus != "in_pit") {
+            driverVM.lapTracker.resetStintBest()
+        }
+        prevPitStatus = ourKartPitStatus
+    }
+
     // Audio narration on every new lap — mirrors iOS DriverView.detectLapDelta.
     // Triggers when driverVM.lapTracker.lastLapMs changes; the VM dedupes
     // repeat values internally so keyed LaunchedEffect is enough.
