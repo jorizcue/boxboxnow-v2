@@ -42,9 +42,11 @@ final class LapTracker: ObservableObject {
     private var bestLap: LapRecord?
     private var prevLap: LapRecord?
 
-    // Cooldown: ignore crossings within 75 samples (~3s at 25Hz) after last crossing
-    private static let crossingCooldown = 75
-    private var samplesSinceCrossing = crossingCooldown + 1
+    // Cooldown: ignore crossings within this many seconds after the last
+    // detected one. Time-based so it works at any source rate (RaceBox 50Hz,
+    // phone GPS 1-10Hz) without recomputing a sample count.
+    private static let crossingCooldownSec: TimeInterval = 3.0
+    private var lastCrossingTime: TimeInterval = -3600  // far past = first crossing allowed
 
     // GPS source for upload tagging
     var gpsSource: String = "phone"
@@ -96,7 +98,7 @@ final class LapTracker: ObservableObject {
         lapDistanceM = 0; lapMaxSpeed = 0
         resetCurrentArrays()
         bestLap = nil; prevLap = nil
-        samplesSinceCrossing = Self.crossingCooldown + 1
+        lastCrossingTime = -3600
         uploadedLapCount = 0
     }
 
@@ -113,7 +115,6 @@ final class LapTracker: ObservableObject {
 
     func processSample(_ sample: GPSSample) {
         defer { lastSample = sample }
-        samplesSinceCrossing += 1
 
         // Accumulate distance
         if let prev = lastSample {
@@ -129,13 +130,13 @@ final class LapTracker: ObservableObject {
             // Check finish line crossing (with cooldown + 3D fix)
             if let fl = finishLine,
                sample.fixType >= 3,
-               samplesSinceCrossing > Self.crossingCooldown {
+               sample.timestamp - lastCrossingTime > Self.crossingCooldownSec {
                 let frac = GeoUtils.segmentCrossingFraction(
                     a1: GeoPoint(lat: prev.lat, lon: prev.lon),
                     a2: GeoPoint(lat: sample.lat, lon: sample.lon),
                     b1: fl.p1, b2: fl.p2)
                 if frac != nil {
-                    samplesSinceCrossing = 0
+                    lastCrossingTime = sample.timestamp
                     completeLap(at: sample.timestamp)
                 }
             }
@@ -274,7 +275,7 @@ final class LapTracker: ObservableObject {
 
         // Detect actual source Hz from the lap's own sample timing so the
         // downsample step lands at the intended target rate regardless of
-        // whether the source is RaceBox (~25Hz) or phone GPS (~1-10Hz).
+        // whether the source is RaceBox (~50Hz) or phone GPS (~1-10Hz).
         let payload = newLaps.map { lap -> [String: Any] in
             let sourceHz = estimatedSourceHz(timestamps: lap.timestamps)
             return [
