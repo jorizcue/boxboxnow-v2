@@ -272,19 +272,24 @@ final class LapTracker: ObservableObject {
         guard !newLaps.isEmpty else { return }
         uploadedLapCount = laps.count
 
+        // Detect actual source Hz from the lap's own sample timing so the
+        // downsample step lands at the intended target rate regardless of
+        // whether the source is RaceBox (~25Hz) or phone GPS (~1-10Hz).
         let payload = newLaps.map { lap -> [String: Any] in
-            [
+            let sourceHz = estimatedSourceHz(timestamps: lap.timestamps)
+            return [
                 "lap_number": lap.lapNumber,
                 "duration_ms": lap.durationMs,
                 "total_distance_m": lap.totalDistanceM,
                 "max_speed_kmh": lap.maxSpeedKmh,
                 "distances": lap.distances,
                 "timestamps": lap.timestamps.map { $0 - (lap.timestamps.first ?? 0) },
-                // Downsample heavy arrays (~10Hz → ~2Hz) to save bandwidth
-                "positions": downsample(lap.positions.map { ["lat": $0.lat, "lon": $0.lon] }, targetHz: 2),
-                "speeds": downsample(lap.speeds, targetHz: 2),
-                "gforce_lat": downsample(lap.gforceLat, targetHz: 2),
-                "gforce_lon": downsample(lap.gforceLon, targetHz: 2),
+                // Target ≥4 samples/s for smooth playback. Use 5Hz so we
+                // always exceed 4 even with rounding loss.
+                "positions": downsample(lap.positions.map { ["lat": $0.lat, "lon": $0.lon] }, targetHz: 5, sourceHz: sourceHz),
+                "speeds": downsample(lap.speeds, targetHz: 5, sourceHz: sourceHz),
+                "gforce_lat": downsample(lap.gforceLat, targetHz: 5, sourceHz: sourceHz),
+                "gforce_lon": downsample(lap.gforceLon, targetHz: 5, sourceHz: sourceHz),
                 "gps_source": gpsSource,
             ]
         }
@@ -301,8 +306,8 @@ final class LapTracker: ObservableObject {
         }
     }
 
-    /// Downsample an array from ~10Hz to targetHz, keeping first and last elements.
-    /// Matches web `downsample()` in useGpsTelemetrySave.ts.
+    /// Downsample an array from sourceHz to targetHz, keeping first and last
+    /// elements. Matches web `downsample()` in useGpsTelemetrySave.ts.
     private func downsample<T>(_ arr: [T], targetHz: Double, sourceHz: Double = 10) -> [T] {
         guard arr.count > 2 else { return arr }
         let step = max(1, Int((sourceHz / targetHz).rounded()))
@@ -314,5 +319,14 @@ final class LapTracker: ObservableObject {
         }
         result.append(arr[arr.count - 1])
         return result
+    }
+
+    /// Estimate sample rate from the captured timestamps. Falls back to 10Hz
+    /// when the array is too small to compute a stable mean.
+    private func estimatedSourceHz(timestamps: [TimeInterval]) -> Double {
+        guard timestamps.count >= 10 else { return 10 }
+        let span = timestamps.last! - timestamps.first!
+        guard span > 0 else { return 10 }
+        return Double(timestamps.count - 1) / span
     }
 }
