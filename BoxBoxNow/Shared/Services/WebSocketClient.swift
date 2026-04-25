@@ -113,9 +113,13 @@ final class WebSocketClient: ObservableObject {
     private func sendPing() {
         guard shouldReconnect else { return }
 
-        // If no message received in 30s, force reconnect
+        // Force reconnect only after a much longer silence (60s) — short
+        // silences are normal when no race events are flowing (between
+        // sessions, kart not on track yet, etc.). Pong responses below also
+        // refresh `lastMessageTime` so a healthy connection without app
+        // traffic won't trip this.
         let silence = Date().timeIntervalSince(lastMessageTime)
-        if silence > 30 {
+        if silence > 60 {
             print("[WS] No data for \(Int(silence))s — forcing reconnect")
             task?.cancel(with: .goingAway, reason: nil)
             task = nil
@@ -125,14 +129,18 @@ final class WebSocketClient: ObservableObject {
             return
         }
 
-        // Send WebSocket ping frame
+        // Send WebSocket ping frame. A successful pong means the connection
+        // is alive even when the server hasn't sent any application data,
+        // so update `lastMessageTime` to keep the silence timer happy.
         task?.sendPing { [weak self] error in
+            guard let self = self else { return }
             if let error = error {
                 print("[WS] Ping failed: \(error.localizedDescription)")
-                guard let self = self else { return }
                 DispatchQueue.main.async { self.isConnected = false }
                 self.stopPing()
                 self.scheduleReconnect()
+            } else {
+                self.lastMessageTime = Date()
             }
         }
     }

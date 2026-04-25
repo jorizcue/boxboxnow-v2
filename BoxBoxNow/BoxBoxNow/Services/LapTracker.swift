@@ -90,6 +90,13 @@ final class LapTracker: ObservableObject {
     /// Read-only access to the configured finish line (for debug overlays).
     var currentFinishLine: FinishLine? { finishLine }
 
+    /// Live current-lap distance in meters (for debug overlays).
+    var currentLapDistanceM: Double { lapDistanceM }
+
+    /// Total distance of the best-lap reference (for debug overlays).
+    /// Nil when no best lap has been recorded yet.
+    var bestLapDistanceM: Double? { bestLap?.totalDistanceM }
+
     // MARK: - Reset
 
     func reset() {

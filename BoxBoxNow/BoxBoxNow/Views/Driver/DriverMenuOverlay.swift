@@ -140,6 +140,8 @@ struct DriverMenuOverlay: View {
                                     debugRow("Linea meta",   driverVM.lapTracker.hasFinishLine ? "Si" : "No")
                                     debugRow("Vueltas",      "\(driverVM.lapTracker.currentLap)")
                                     debugRow("Mejor (GPS)",  driverVM.lapTracker.bestLapMs.map { Formatters.msToLapTime($0) } ?? "-")
+                                    debugRow("Dist actual",  String(format: "%.0fm", driverVM.lapTracker.currentLapDistanceM))
+                                    debugRow("Dist mejor",   driverVM.lapTracker.bestLapDistanceM.map { String(format: "%.0fm", $0) } ?? "-")
                                     debugRow("Delta best",   driverVM.lapTracker.deltaBestMs.map { String(format: "%+.2fs", $0/1000) } ?? "-")
                                 }
                                 .padding(8)
