@@ -49,7 +49,9 @@ final class GPSViewModel: ObservableObject {
     private let ubxParser = UbxParser()
     let calibrator = ImuCalibrator()
 
-    private var lastSampleTime: TimeInterval = 0
+    // Sample-rate gauge: counts arrivals within a 1-second window and
+    // updates `sampleRate` (in Hz) when the window closes.
+    private var sampleWindowStart: TimeInterval = 0
     private var sampleCount = 0
     private var calibratorSink: AnyCancellable?
     private var bleSink: AnyCancellable?
@@ -136,11 +138,23 @@ final class GPSViewModel: ObservableObject {
         default: signalQuality = .excellent
         }
 
-        // Sample rate
+        // Sample rate (Hz) over a fixed 1-second window. The previous
+        // implementation was buggy: it compared `now - lastSampleTime` to 2s,
+        // but `lastSampleTime` was updated every sample, so the gap was
+        // always ~20ms and the `else` branch (where sampleRate is assigned)
+        // never fired during normal operation.
         let now = CACurrentMediaTime()
-        if now - lastSampleTime < 2 { sampleCount += 1 }
-        else { sampleRate = Double(sampleCount); sampleCount = 0 }
-        lastSampleTime = now
+        sampleCount += 1
+        if sampleWindowStart == 0 {
+            sampleWindowStart = now
+        } else {
+            let elapsed = now - sampleWindowStart
+            if elapsed >= 1.0 {
+                sampleRate = Double(sampleCount) / elapsed
+                sampleCount = 0
+                sampleWindowStart = now
+            }
+        }
 
         onSample?(calibrated)
     }

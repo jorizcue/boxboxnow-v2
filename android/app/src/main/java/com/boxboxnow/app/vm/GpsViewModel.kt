@@ -63,7 +63,9 @@ class GpsViewModel @Inject constructor(
     /** Downstream hook — DriverViewModel plugs into this to feed LapTracker. */
     var onSample: ((GPSSample) -> Unit)? = null
 
-    private var lastSampleAt: Double = 0.0
+    // Sample-rate gauge: counts arrivals within a 1-second window and
+    // updates _sampleRate (Hz) when the window closes.
+    private var sampleWindowStart: Double = 0.0
     private var sampleCount: Int = 0
 
     init {
@@ -129,15 +131,22 @@ class GpsViewModel @Inject constructor(
             else -> SignalQuality.EXCELLENT
         }
 
-        // Simple sample-rate gauge: samples/sec windowed over 2s
+        // Sample rate (Hz) over a fixed 1-second window. The previous
+        // implementation compared `now - lastSampleAt` to 2s but
+        // `lastSampleAt` was updated every sample, so the gap was always
+        // ~20ms and `_sampleRate` never updated during normal operation.
         val now = android.os.SystemClock.elapsedRealtime() / 1000.0
-        if (now - lastSampleAt < 2) {
-            sampleCount++
+        sampleCount++
+        if (sampleWindowStart == 0.0) {
+            sampleWindowStart = now
         } else {
-            _sampleRate.value = sampleCount.toDouble()
-            sampleCount = 0
+            val elapsed = now - sampleWindowStart
+            if (elapsed >= 1.0) {
+                _sampleRate.value = sampleCount.toDouble() / elapsed
+                sampleCount = 0
+                sampleWindowStart = now
+            }
         }
-        lastSampleAt = now
 
         onSample?.invoke(calibrated)
     }
