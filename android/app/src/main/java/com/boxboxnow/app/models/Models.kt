@@ -88,10 +88,15 @@ data class Circuit(
     // a segment the pilot crosses to complete a lap). All four must be
     // non-null for the line to be usable; the mobile driver view wires
     // these into LapTracker.setFinishLine on load / refresh.
-    @SerialName("finish_lat_1") val finishLat1: Double? = null,
-    @SerialName("finish_lon_1") val finishLon1: Double? = null,
-    @SerialName("finish_lat_2") val finishLat2: Double? = null,
-    @SerialName("finish_lon_2") val finishLon2: Double? = null,
+    // Backend's CircuitOut serializes these without an underscore between
+    // "lat"/"lon" and the index (finish_lat1, not finish_lat_1). The old
+    // names never matched the JSON, so finishLat1/Lon1/Lat2/Lon2 were always
+    // null — applyCircuitFinishLine() then silently skipped, leaving the
+    // LapTracker with no finish line and no lap detection.
+    @SerialName("finish_lat1") val finishLat1: Double? = null,
+    @SerialName("finish_lon1") val finishLon1: Double? = null,
+    @SerialName("finish_lat2") val finishLat2: Double? = null,
+    @SerialName("finish_lon2") val finishLon2: Double? = null,
 )
 
 // ───────────────────────── Kart State ─────────────────────────
