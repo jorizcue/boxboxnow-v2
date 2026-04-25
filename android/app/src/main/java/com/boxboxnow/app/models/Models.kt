@@ -97,6 +97,9 @@ data class Circuit(
     @SerialName("finish_lon1") val finishLon1: Double? = null,
     @SerialName("finish_lat2") val finishLat2: Double? = null,
     @SerialName("finish_lon2") val finishLon2: Double? = null,
+    // Per-circuit: number of warm-up laps excluded from the rolling 20-lap
+    // average (cold tyres are not representative of real pace). Default 3.
+    @SerialName("warmup_laps_to_skip") val warmupLapsToSkip: Int? = null,
 )
 
 // ───────────────────────── Kart State ─────────────────────────

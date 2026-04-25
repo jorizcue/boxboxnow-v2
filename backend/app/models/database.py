@@ -79,6 +79,12 @@ async def init_db():
         except Exception:
             pass
 
+        # Add warmup_laps_to_skip to circuits (excluded from rolling 20-lap mean)
+        try:
+            await conn.execute(text("ALTER TABLE circuits ADD COLUMN warmup_laps_to_skip INTEGER DEFAULT 3 NOT NULL"))
+        except Exception:
+            pass
+
         # Add recorded_at to kart_laps
         try:
             await conn.execute(text("ALTER TABLE kart_laps ADD COLUMN recorded_at DATETIME"))

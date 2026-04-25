@@ -187,6 +187,7 @@ private struct CircuitEditorSheet: View {
     @State private var finishLon1: String
     @State private var finishLat2: String
     @State private var finishLon2: String
+    @State private var warmupLapsToSkip: String
     @State private var isActive: Bool
     @State private var saving: Bool = false
 
@@ -211,6 +212,7 @@ private struct CircuitEditorSheet: View {
         _finishLon1 = State(initialValue: circuit.finishLon1.map { "\($0)" } ?? "")
         _finishLat2 = State(initialValue: circuit.finishLat2.map { "\($0)" } ?? "")
         _finishLon2 = State(initialValue: circuit.finishLon2.map { "\($0)" } ?? "")
+        _warmupLapsToSkip = State(initialValue: circuit.warmupLapsToSkip.map { "\($0)" } ?? "3")
         _isActive = State(initialValue: circuit.isActive ?? false)
     }
 
@@ -232,6 +234,7 @@ private struct CircuitEditorSheet: View {
                         textRow(label: "Vueltas descartar", value: $lapsDiscard, keyboard: .numberPad)
                         textRow(label: "Diferencial vuelta (ms)", value: $lapDifferential, keyboard: .numberPad)
                         textRow(label: "Retention days", value: $retentionDays, keyboard: .numberPad)
+                        textRow(label: "Vueltas calentamiento descartadas (media 20v)", value: $warmupLapsToSkip, keyboard: .numberPad)
                     }
 
                     section("Apex Timing") {
@@ -324,7 +327,8 @@ private struct CircuitEditorSheet: View {
             lapDifferential: Int(lapDifferential),
             phpApiUrl: phpApiUrl.isEmpty ? nil : phpApiUrl,
             liveTimingUrl: liveTimingUrl.isEmpty ? nil : liveTimingUrl,
-            retentionDays: Int(retentionDays)
+            retentionDays: Int(retentionDays),
+            warmupLapsToSkip: Int(warmupLapsToSkip)
         )
         if await app.admin?.saveCircuit(draft, isNew: isNew) != nil {
             dismiss()

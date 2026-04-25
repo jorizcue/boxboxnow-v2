@@ -41,6 +41,7 @@ interface CircuitRow {
   finish_lon1: number | null;
   finish_lat2: number | null;
   finish_lon2: number | null;
+  warmup_laps_to_skip: number;
 }
 
 interface AccessRow {
@@ -942,6 +943,7 @@ interface CircuitForm {
   finish_lon1: string;
   finish_lat2: string;
   finish_lon2: string;
+  warmup_laps_to_skip: string;
 }
 
 const emptyForm: CircuitForm = {
@@ -960,6 +962,7 @@ const emptyForm: CircuitForm = {
   finish_lon1: "",
   finish_lat2: "",
   finish_lon2: "",
+  warmup_laps_to_skip: "3",
 };
 
 function circuitToForm(c: CircuitRow): CircuitForm {
@@ -979,6 +982,7 @@ function circuitToForm(c: CircuitRow): CircuitForm {
     finish_lon1: c.finish_lon1?.toString() ?? "",
     finish_lat2: c.finish_lat2?.toString() ?? "",
     finish_lon2: c.finish_lon2?.toString() ?? "",
+    warmup_laps_to_skip: (c.warmup_laps_to_skip ?? 3).toString(),
   };
 }
 
@@ -999,6 +1003,7 @@ function formToPayload(f: CircuitForm) {
     finish_lon1: f.finish_lon1 ? Number(f.finish_lon1) : null,
     finish_lat2: f.finish_lat2 ? Number(f.finish_lat2) : null,
     finish_lon2: f.finish_lon2 ? Number(f.finish_lon2) : null,
+    warmup_laps_to_skip: Number(f.warmup_laps_to_skip ?? 3) || 3,
   };
 }
 
@@ -1163,6 +1168,10 @@ function CircuitsManager() {
             <div className="grid grid-cols-2 gap-3">
               {fieldInput(t("admin.lapDifferential"), "lap_differential", "number", "3000")}
               {fieldInput(t("admin.retentionDays"), "retention_days", "number", "30")}
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              {fieldInput(t("admin.warmupLapsToSkip"), "warmup_laps_to_skip", "number", "3")}
             </div>
 
             {fieldInput("PHP API URL", "php_api_url", "text", "http://...")}

@@ -188,6 +188,9 @@ class RaceStateManager:
         self.pit_time_s: int = 120
         self.laps_discard: int = 2
         self.lap_differential: int = 3000  # diferencial_vueltas in ms (absolute offset, not multiplier)
+        # First N laps of each stint excluded from the rolling 20-lap mean
+        # because tyres are cold. Configurable per circuit (Circuit.warmup_laps_to_skip).
+        self.warmup_laps_to_skip: int = 3
         self.rain_mode: bool = False
         self.our_kart_number: int = 0
         self.min_pits: int = 3

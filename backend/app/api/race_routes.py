@@ -76,6 +76,7 @@ async def ensure_monitoring(app_state, user_id: int):
         finish_lon1=circuit.finish_lon1,
         finish_lat2=circuit.finish_lat2,
         finish_lon2=circuit.finish_lon2,
+        warmup_laps_to_skip=getattr(circuit, "warmup_laps_to_skip", 3) or 3,
     )
 
     # Configure PHP API client for driver auto-loading

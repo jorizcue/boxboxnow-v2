@@ -354,12 +354,14 @@ class UserSession:
                   min_driver_time_min: int = 30,
                   pit_closed_start_min: int = 0, pit_closed_end_min: int = 0,
                   finish_lat1: float | None = None, finish_lon1: float | None = None,
-                  finish_lat2: float | None = None, finish_lon2: float | None = None):
+                  finish_lat2: float | None = None, finish_lon2: float | None = None,
+                  warmup_laps_to_skip: int = 3):
         """Apply race session config to state and fifo."""
         self.state.circuit_length_m = circuit_length_m or 1100
         self.state.pit_time_s = pit_time_s or 120
         self.state.laps_discard = laps_discard
         self.state.lap_differential = int(lap_differential)
+        self.state.warmup_laps_to_skip = max(0, int(warmup_laps_to_skip))
         self.state.rain_mode = rain
         self.state.our_kart_number = our_kart
         self.state.min_pits = min_pits
@@ -904,6 +906,7 @@ class ReplaySession:
             self.state.circuit_length_m = _val(circuit.length_m, 1100)
             self.state.laps_discard = _val(circuit.laps_discard, 2)
             self.state.lap_differential = _val(circuit.lap_differential, 3000)
+            self.state.warmup_laps_to_skip = _val(getattr(circuit, "warmup_laps_to_skip", 3), 3)
 
     def update_config_fields(self, session, circuit=None):
         self.state.our_kart_number = session.our_kart_number

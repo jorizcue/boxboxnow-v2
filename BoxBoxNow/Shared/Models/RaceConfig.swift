@@ -76,6 +76,9 @@ struct Circuit: Codable, Identifiable, Hashable {
     var phpApiUrl: String?
     var liveTimingUrl: String?
     var retentionDays: Int?
+    /// Per-circuit: number of warm-up laps excluded from the rolling 20-lap
+    /// average (cold tyres are not representative of real pace). Default 3.
+    var warmupLapsToSkip: Int?
 
     enum CodingKeys: String, CodingKey {
         case id, name
@@ -100,6 +103,7 @@ struct Circuit: Codable, Identifiable, Hashable {
         case phpApiUrl = "php_api_url"
         case liveTimingUrl = "live_timing_url"
         case retentionDays = "retention_days"
+        case warmupLapsToSkip = "warmup_laps_to_skip"
     }
 
     /// Explicit memberwise initializer. Declared because Swift's
@@ -125,7 +129,8 @@ struct Circuit: Codable, Identifiable, Hashable {
         lapDifferential: Int? = nil,
         phpApiUrl: String? = nil,
         liveTimingUrl: String? = nil,
-        retentionDays: Int? = nil
+        retentionDays: Int? = nil,
+        warmupLapsToSkip: Int? = nil
     ) {
         self.id = id
         self.name = name
@@ -144,6 +149,7 @@ struct Circuit: Codable, Identifiable, Hashable {
         self.phpApiUrl = phpApiUrl
         self.liveTimingUrl = liveTimingUrl
         self.retentionDays = retentionDays
+        self.warmupLapsToSkip = warmupLapsToSkip
     }
 }
 

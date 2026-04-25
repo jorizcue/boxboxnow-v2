@@ -201,6 +201,7 @@ class CircuitOut(BaseModel):
     finish_lon1: float | None = None
     finish_lat2: float | None = None
     finish_lon2: float | None = None
+    warmup_laps_to_skip: int = 3
 
     model_config = {"from_attributes": True}
 
@@ -221,6 +222,7 @@ class CircuitCreate(BaseModel):
     finish_lon1: float | None = None
     finish_lat2: float | None = None
     finish_lon2: float | None = None
+    warmup_laps_to_skip: int = 3
 
 
 class CircuitUpdate(BaseModel):
@@ -239,6 +241,7 @@ class CircuitUpdate(BaseModel):
     finish_lon1: float | None = None
     finish_lat2: float | None = None
     finish_lon2: float | None = None
+    warmup_laps_to_skip: int | None = None
 
 
 # --- User Circuit Access ---

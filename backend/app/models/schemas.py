@@ -58,6 +58,11 @@ class Circuit(Base):
     finish_lon1 = Column(Float, nullable=True)
     finish_lat2 = Column(Float, nullable=True)
     finish_lon2 = Column(Float, nullable=True)
+    # First N laps of each stint are excluded from "Tiempo_Promedio_Vuelta"
+    # (the rolling 20-lap average) because tyres are cold and the times
+    # aren't representative of the driver's real pace. Configurable per
+    # circuit because shorter tracks reach temperature in fewer laps.
+    warmup_laps_to_skip = Column(Integer, default=3, nullable=False)
 
     user_access = relationship("UserCircuitAccess", back_populates="circuit", cascade="all, delete-orphan")
 

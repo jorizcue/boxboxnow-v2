@@ -276,6 +276,7 @@ const translations: Record<string, Record<Language, string>> = {
   "admin.lapsDiscard": { es: "Vtas. descarte", en: "Discard laps", it: "Giri scarto", de: "Verwerf. Runden" },
   "admin.lapDifferential": { es: "Diferencial (ms)", en: "Differential (ms)", it: "Differenziale (ms)", de: "Differential (ms)" },
   "admin.retentionDays": { es: "Retención (días)", en: "Retention (days)", it: "Conservazione (gg)", de: "Aufbewahrung (Tage)" },
+  "admin.warmupLapsToSkip": { es: "Vueltas calentamiento descartadas (media 20v)", en: "Warm-up laps to skip (20-lap avg)", it: "Giri di riscaldamento scartati (media 20)", de: "Warm-up Runden ausgeschlossen (20-Runden-Mittel)" },
   "admin.save": { es: "Guardar", en: "Save", it: "Salva", de: "Speichern" },
   "admin.cancel": { es: "Cancelar", en: "Cancel", it: "Annulla", de: "Abbrechen" },
   "admin.deleteCircuit": { es: "Eliminar este circuito", en: "Delete this circuit", it: "Elimina questo circuito", de: "Diese Strecke loschen" },
