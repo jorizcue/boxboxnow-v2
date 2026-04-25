@@ -103,10 +103,12 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    /// Whether this card requires GPS (RaceBox or phone) data
+    /// Whether this card requires GPS (RaceBox or phone) data.
+    /// `deltaBestLap` falls back to server-based delta (last - best) when
+    /// GPS isn't available, so it's not strictly GPS-required anymore.
     var requiresGPS: Bool {
         switch self {
-        case .currentLapTime, .deltaBestLap, .gForceRadar, .gpsLapDelta, .gpsSpeed, .gpsGForce:
+        case .currentLapTime, .gForceRadar, .gpsLapDelta, .gpsSpeed, .gpsGForce:
             return true
         default:
             return false

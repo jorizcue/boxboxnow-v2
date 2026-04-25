@@ -94,6 +94,10 @@ struct DriverCardView: View {
             if let bestMs = lapTracker?.bestLapMs, bestMs > 0 {
                 return "Delta Best · \(Formatters.msToLapTime(bestMs))"
             }
+            // Fallback to server best lap when GPS is not in use
+            if let bestMs = kart?.bestLapMs, bestMs > 0 {
+                return "Delta Best · \(Formatters.msToLapTime(bestMs))"
+            }
             return card.displayName
         case .gpsLapDelta:
             if let lapNum = lapTracker?.currentLap, lapNum > 0 {
@@ -145,6 +149,11 @@ struct DriverCardView: View {
         case .deltaBestLap:
             if let d = lapTracker?.deltaBestMs {
                 return d < 0 ? .green : .red
+            }
+            // Server-data fallback so the card shows green/red without GPS
+            if let last = kart?.lastLapMs, last > 0,
+               let best = kart?.bestLapMs, best > 0 {
+                return last <= best ? .green : .red
             }
             return .purple
 
@@ -213,14 +222,11 @@ struct DriverCardView: View {
                 }
             }
 
-        // ── Delta Best Lap (GPS) — refreshes at 4Hz for smooth delta updates ──
+        // ── Delta Best Lap — live GPS delta if available, else server-based
+        // (last lap - best lap) so the card works for users without GPS.
         case .deltaBestLap:
             TimelineView(.periodic(from: .now, by: 0.25)) { _ in
-                if gps == nil {
-                    Text("GPS --")
-                        .font(.system(size: 16 * scale, design: .monospaced))
-                        .foregroundColor(Color(.systemGray4))
-                } else if let delta = lapTracker?.deltaBestMs {
+                if gps != nil, let delta = lapTracker?.deltaBestMs {
                     VStack(spacing: 2 * scale) {
                         Text(String(format: "%@%.2fs", delta < 0 ? "" : "+", delta / 1000))
                             .font(.system(size: mainFont, weight: .black, design: .monospaced))
@@ -231,9 +237,17 @@ struct DriverCardView: View {
                             .font(.system(size: smallFont, design: .monospaced))
                             .foregroundColor(Color(.systemGray))
                     }
+                } else if let last = kart?.lastLapMs, last > 0,
+                          let best = kart?.bestLapMs, best > 0 {
+                    let delta = last - best
+                    Text(String(format: "%@%.2fs", delta < 0 ? "" : "+", delta / 1000))
+                        .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                        .foregroundColor(delta <= 0 ? .green : .red)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
                 } else {
-                    Text(lapTracker?.bestLapMs != nil ? "Esperando vuelta..." : "Sin best lap")
-                        .font(.system(size: 12 * scale))
+                    Text("--")
+                        .font(.system(size: mainFont, design: .monospaced))
                         .foregroundColor(Color(.systemGray4))
                 }
             }
@@ -555,6 +569,11 @@ struct DriverCardView: View {
             return "Ultima vuelta: \(t)\(delta)"
         case .deltaBestLap:
             if let d = lapTracker?.deltaBestMs {
+                return "Delta vs mejor: \(String(format: "%@%.2f segundos", d < 0 ? "" : "+", d / 1000))"
+            }
+            if let last = kart?.lastLapMs, last > 0,
+               let best = kart?.bestLapMs, best > 0 {
+                let d = last - best
                 return "Delta vs mejor: \(String(format: "%@%.2f segundos", d < 0 ? "" : "+", d / 1000))"
             }
             return "Delta vs mejor: sin datos"
