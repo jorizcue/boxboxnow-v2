@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DriverMenuOverlay: View {
     @EnvironmentObject var driverVM: DriverViewModel
+    @EnvironmentObject var gpsVM: GPSViewModel
     @ObservedObject var speech: DriverSpeechService
     @Binding var isPresented: Bool
     var onDismiss: () -> Void
@@ -113,6 +114,31 @@ struct DriverMenuOverlay: View {
                             driverVM.saveConfig()
                         }
 
+                        // GPS / LapTracker debug panel — shows live state so the
+                        // user can diagnose why the delta isn't computing.
+                        // TimelineView refreshes every 0.5s since lapTracker
+                        // isn't bound via @ObservedObject.
+                        TimelineView(.periodic(from: .now, by: 0.5)) { _ in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("GPS / Vueltas (debug)")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    debugRow("Fuente",       gpsVM.source.displayName)
+                                    debugRow("Conectado",    gpsVM.isConnected ? "Si" : "No")
+                                    debugRow("Fix type",     "\(gpsVM.lastSample?.fixType ?? -1)")
+                                    debugRow("Satelites",    "\(gpsVM.lastSample?.numSatellites ?? 0)")
+                                    debugRow("Linea meta",   driverVM.lapTracker.hasFinishLine ? "Si" : "No")
+                                    debugRow("Vueltas",      "\(driverVM.lapTracker.currentLap)")
+                                    debugRow("Mejor (GPS)",  driverVM.lapTracker.bestLapMs.map { Formatters.msToLapTime($0) } ?? "-")
+                                    debugRow("Delta best",   driverVM.lapTracker.deltaBestMs.map { String(format: "%+.2fs", $0/1000) } ?? "-")
+                                }
+                                .padding(8)
+                                .background(Color.black.opacity(0.4))
+                                .cornerRadius(6)
+                            }
+                        }
+
                         // Exit button
                         Button(action: {
                             driverVM.saveConfig()
@@ -139,5 +165,18 @@ struct DriverMenuOverlay: View {
         }
         .transition(.move(edge: .trailing))
         .animation(.easeInOut(duration: 0.25), value: isPresented)
+    }
+
+    @ViewBuilder
+    private func debugRow(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.gray)
+            Spacer()
+            Text(value)
+                .font(.caption2.monospacedDigit())
+                .foregroundColor(.white)
+        }
     }
 }
