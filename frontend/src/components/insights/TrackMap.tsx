@@ -5,6 +5,7 @@
 // Built on Leaflet + ESRI World Imagery (no token required).
 
 import { useEffect, useRef } from "react";
+import "leaflet/dist/leaflet.css";
 import type { GpsLapDetail, LatLon } from "./types";
 import { speedToAccelMps2, smooth } from "./helpers";
 
@@ -19,11 +20,11 @@ interface Props {
 }
 
 // Lazy-load Leaflet on the client only — Next.js SSR doesn't have `window`.
+// The CSS is imported statically at the top of the file so Next.js' build
+// pipeline picks it up without TypeScript complaining about dynamic CSS
+// imports.
 async function loadLeaflet() {
   const L = (await import("leaflet")).default;
-  // The CSS is loaded once globally; we import it here so any consumer of
-  // this component picks it up without having to add it to layout.tsx.
-  await import("leaflet/dist/leaflet.css");
   return L;
 }
 

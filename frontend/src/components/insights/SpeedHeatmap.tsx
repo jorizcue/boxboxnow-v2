@@ -6,6 +6,7 @@
 // red — a quick visual map of where you're consistently slow.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import "leaflet/dist/leaflet.css";
 import { api } from "@/lib/api";
 import type { GpsLapDetail, GpsLapSummary } from "./types";
 
@@ -22,8 +23,8 @@ interface Pt {
 }
 
 async function loadLeaflet() {
+  // CSS is imported statically at the top of the file.
   const L = (await import("leaflet")).default;
-  await import("leaflet/dist/leaflet.css");
   return L;
 }
 
