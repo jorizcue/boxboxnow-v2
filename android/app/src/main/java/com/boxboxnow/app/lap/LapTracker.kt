@@ -80,7 +80,9 @@ class LapTracker(
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    var gpsSource: String = "phone"
+    // App is RaceBox-only — phone GPS samples are dropped by GpsViewModel
+    // before they reach the LapTracker, so this is always "racebox".
+    var gpsSource: String = "racebox"
     private var uploadedLapCount = 0
 
     val hasFinishLine: Boolean get() = finishLine != null

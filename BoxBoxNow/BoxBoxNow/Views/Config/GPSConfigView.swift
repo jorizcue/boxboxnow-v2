@@ -10,8 +10,10 @@ struct GPSConfigView: View {
     var body: some View {
         Form {
             Section("Fuente GPS") {
+                // App is RaceBox-only. Hide the "Telefono" option from the
+                // picker — only "Ninguno" and "RaceBox BLE" are selectable.
                 Picker("Fuente", selection: $gpsVM.source) {
-                    ForEach(GPSSource.allCases, id: \.self) { src in
+                    ForEach(GPSSource.selectable, id: \.self) { src in
                         Text(src.displayName).tag(src)
                     }
                 }
@@ -89,29 +91,8 @@ struct GPSConfigView: View {
                 }
             }
 
-            if gpsVM.source == .phone {
-                Section("GPS del telefono") {
-                    HStack {
-                        Text("Estado")
-                        Spacer()
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(gpsVM.phoneGPS.authorizationStatus == .authorizedWhenInUse ? Color.green : Color.orange)
-                                .frame(width: 8, height: 8)
-                            Text(gpsVM.phoneGPS.authorizationStatus == .authorizedWhenInUse ? "Autorizado" : "Pendiente")
-                                .foregroundColor(.gray)
-                        }
-                    }
-
-                    if gpsVM.isConnected {
-                        Button("Desconectar GPS", role: .destructive) {
-                            gpsVM.selectSource(.none)
-                            toast.warning("GPS del telefono desconectado")
-                        }
-                        .frame(minHeight: 44)
-                    }
-                }
-            }
+            // The phone GPS source is no longer selectable — the entire
+            // "GPS del telefono" section is intentionally removed.
 
             if gpsVM.source != .none {
                 Section("Estado") {

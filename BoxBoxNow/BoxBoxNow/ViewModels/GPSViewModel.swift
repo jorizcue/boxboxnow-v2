@@ -4,8 +4,13 @@ import QuartzCore
 
 enum GPSSource: String, CaseIterable {
     case none = "none"
-    case phone = "phone"
+    case phone = "phone"          // legacy — never selected by the app, kept for migration
     case racebox = "racebox"
+
+    /// Sources the user is allowed to pick from the UI. `.phone` is hidden
+    /// because the project requires RaceBox-only telemetry (the phone's GPS
+    /// caps at ~10Hz and pollutes the LapTracker if both run at once).
+    static var selectable: [GPSSource] { [.none, .racebox] }
 
     var displayName: String {
         switch self {
@@ -69,30 +74,36 @@ final class GPSViewModel: ObservableObject {
         ubxParser.onParsed = { [weak self] sample in
             self?.handleSample(sample)
         }
-        phoneGPS.onSample = { [weak self] sample in
-            self?.handleSample(sample)
-        }
+        // PhoneGPS wire-up intentionally removed: the project is RaceBox-only.
+        // Leaving phoneGPS.onSample disconnected guarantees that if any
+        // legacy code path accidentally calls `phoneGPS.start()`, its samples
+        // can never reach the LapTracker.
 
-        let saved = UserDefaults.standard.string(forKey: Constants.Keys.gpsSource) ?? "none"
-        source = GPSSource(rawValue: saved) ?? .none
-        // Auto-start GPS on launch if a source was previously selected
-        if source != .none { startGPS() }
+        // Force RaceBox on every launch — ignore any previously saved
+        // GpsSource (e.g. an older build that stored "phone" in UserDefaults).
+        source = .racebox
+        UserDefaults.standard.set(GPSSource.racebox.rawValue, forKey: Constants.Keys.gpsSource)
+        startGPS()
     }
 
     func selectSource(_ src: GPSSource) {
+        // App is RaceBox-only. Reject `.phone` requests (legacy preference,
+        // UI shouldn't expose it anyway).
+        let resolved: GPSSource = (src == .phone) ? .racebox : src
         stopGPS()
-        source = src
-        UserDefaults.standard.set(src.rawValue, forKey: Constants.Keys.gpsSource)
-        if src != .none { startGPS() }
+        source = resolved
+        UserDefaults.standard.set(resolved.rawValue, forKey: Constants.Keys.gpsSource)
+        if resolved != .none { startGPS() }
     }
 
     func startGPS() {
         switch source {
         case .none: break
         case .phone:
-            phoneGPS.requestPermission()
-            phoneGPS.start()
-            isConnected = true
+            // Defensive no-op: phone GPS is never used. If the saved
+            // preference is somehow `.phone`, treat it as RaceBox.
+            source = .racebox
+            bleManager.startScan()
         case .racebox:
             bleManager.startScan()
         }
@@ -107,6 +118,11 @@ final class GPSViewModel: ObservableObject {
     }
 
     private func handleSample(_ raw: GPSSample) {
+        // RaceBox-only guard. RaceBox samples carry `batteryPercent`; the
+        // PhoneGPSManager always emits nil. If a phone sample sneaks in via
+        // some unintended path, drop it before it reaches the LapTracker.
+        guard raw.batteryPercent != nil else { return }
+
         let calibrated = calibrator.calibrate(sample: raw)
         lastSample = calibrated
         isConnected = true

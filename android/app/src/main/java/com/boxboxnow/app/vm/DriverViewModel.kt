@@ -331,7 +331,9 @@ class DriverViewModel @Inject constructor(
 
     fun processSample(sample: GPSSample) {
         _gpsData.value = sample
-        lapTracker.gpsSource = if (sample.batteryPercent != null) "racebox" else "phone"
+        // App is RaceBox-only — phone GPS samples are dropped by GpsViewModel
+        // before they reach this method, so this is always "racebox".
+        lapTracker.gpsSource = "racebox"
         lapTracker.processSample(sample)
     }
 

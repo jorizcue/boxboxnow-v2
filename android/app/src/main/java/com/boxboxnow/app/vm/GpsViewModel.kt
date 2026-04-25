@@ -16,11 +16,15 @@ import javax.inject.Inject
 
 enum class GpsSource(val raw: String, val display: String) {
     NONE("none", "Ninguno"),
-    PHONE("phone", "Telefono"),
+    PHONE("phone", "Telefono"),    // legacy — never selectable, kept for migration
     RACEBOX("racebox", "RaceBox BLE");
 
     companion object {
         fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: NONE
+
+        /** Sources the user is allowed to pick from the UI. PHONE is hidden
+         *  because the project requires RaceBox-only telemetry. */
+        val selectable: List<GpsSource> = listOf(NONE, RACEBOX)
     }
 }
 
@@ -65,23 +69,35 @@ class GpsViewModel @Inject constructor(
     init {
         bleManager.onData = { data -> ubxParser.feed(data) }
         ubxParser.onParsed = { sample -> handleSample(sample) }
-        phoneGps.onSample = { sample -> handleSample(sample) }
-        _source.value = GpsSource.from(prefs.getString(Constants.Keys.GPS_SOURCE))
+        // PhoneGps wire-up intentionally removed: the project is RaceBox-only.
+        // Leaving phoneGps.onSample disconnected guarantees that even if any
+        // legacy code path calls phoneGps.start(), its samples can never
+        // reach the LapTracker.
+
+        // Force RaceBox on every launch — ignore any saved preference
+        // (an older build may have stored "phone" in prefs).
+        _source.value = GpsSource.RACEBOX
+        prefs.putString(Constants.Keys.GPS_SOURCE, GpsSource.RACEBOX.raw)
     }
 
     fun selectSource(src: GpsSource) {
+        // App is RaceBox-only. Reject PHONE requests (legacy preference,
+        // UI shouldn't expose it anyway).
+        val resolved = if (src == GpsSource.PHONE) GpsSource.RACEBOX else src
         stopGps()
-        _source.value = src
-        prefs.putString(Constants.Keys.GPS_SOURCE, src.raw)
-        if (src != GpsSource.NONE) startGps()
+        _source.value = resolved
+        prefs.putString(Constants.Keys.GPS_SOURCE, resolved.raw)
+        if (resolved != GpsSource.NONE) startGps()
     }
 
     fun startGps() {
         when (_source.value) {
             GpsSource.NONE -> Unit
             GpsSource.PHONE -> {
-                phoneGps.start()
-                _isConnected.value = true
+                // Defensive no-op: phone GPS is never used. If the saved
+                // preference is somehow PHONE, treat it as RACEBOX.
+                _source.value = GpsSource.RACEBOX
+                bleManager.startScan()
             }
             GpsSource.RACEBOX -> bleManager.startScan()
         }
@@ -96,6 +112,11 @@ class GpsViewModel @Inject constructor(
     }
 
     private fun handleSample(raw: GPSSample) {
+        // RaceBox-only guard. RaceBox samples carry batteryPercent; the
+        // PhoneGpsManager always emits null. If a phone sample sneaks in
+        // via some unintended path, drop it before it reaches LapTracker.
+        if (raw.batteryPercent == null) return
+
         val calibrated = calibrator.calibrate(raw)
         _lastSample.value = calibrated
         _isConnected.value = true

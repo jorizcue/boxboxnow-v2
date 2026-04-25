@@ -98,7 +98,10 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    GpsSource.entries.forEach { src ->
+                    // App is RaceBox-only. Hide the "Telefono" option from
+                    // the picker — only "Ninguno" and "RaceBox BLE" are
+                    // selectable.
+                    GpsSource.selectable.forEach { src ->
                         FilterChip(
                             selected = source == src,
                             onClick = { vm.selectSource(src) },
@@ -248,38 +251,8 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                 }
             }
 
-            // ── Section: GPS del telefono (only when Phone source) ──
-            if (source == GpsSource.PHONE) {
-                SectionCard(title = "GPS del telefono") {
-                    StatusRow(label = "Estado") {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(if (isConnected) BoxBoxNowColors.SuccessGreen else BoxBoxNowColors.WarningOrange),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            if (isConnected) "Autorizado" else "Pendiente",
-                            color = BoxBoxNowColors.SystemGray,
-                            fontSize = 15.sp,
-                        )
-                    }
-                    if (isConnected) {
-                        HorizontalDivider(
-                            color = BoxBoxNowColors.SystemGray4.copy(alpha = 0.4f),
-                            thickness = 0.5.dp,
-                        )
-                        TextButton(onClick = { vm.selectSource(GpsSource.NONE) }) {
-                            Text(
-                                "Desconectar GPS",
-                                color = BoxBoxNowColors.ErrorRed,
-                                fontSize = 15.sp,
-                            )
-                        }
-                    }
-                }
-            }
+            // The phone GPS source is no longer selectable — the entire
+            // "GPS del telefono" section is intentionally removed.
 
             // ── Section: Estado (when source is not NONE) ──
             if (source != GpsSource.NONE) {

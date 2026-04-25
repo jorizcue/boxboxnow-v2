@@ -233,7 +233,9 @@ final class DriverViewModel: ObservableObject {
         currentGForceX = sample.gForceX
         currentGForceY = sample.gForceY
         // Tag GPS source for backend upload
-        lapTracker.gpsSource = sample.batteryPercent != nil ? "racebox" : "phone"
+        // App is RaceBox-only — phone GPS samples are dropped by GPSViewModel
+        // before they reach this method, so this is always "racebox".
+        lapTracker.gpsSource = "racebox"
         lapTracker.processSample(sample)
     }
 
