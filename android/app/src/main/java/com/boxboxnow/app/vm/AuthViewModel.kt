@@ -13,6 +13,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonPrimitive
 import javax.inject.Inject
 
 /**
@@ -89,7 +90,12 @@ class AuthViewModel @Inject constructor(
     /** Called by MainActivity when the Custom Tab redirect delivers the token. */
     fun completeGoogleLogin(token: String) {
         _isGoogleLoading.value = false
-        tokenStore.saveToken(token)
+        // SecureTokenStore needs a username to key the per-user token slot.
+        // Decode the JWT `sub` claim — same approach as iOS.
+        val payload = tokenStore.decodeJwtPayload(token)
+        val username = (payload?.get("sub") as? JsonPrimitive)?.content ?: ""
+        tokenStore.saveToken(token, username)
+        biometric.saveLastUsername(username)
         _isAuthenticated.value = true
         viewModelScope.launch { refreshMe() }
     }

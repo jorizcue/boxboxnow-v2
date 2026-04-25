@@ -41,7 +41,7 @@ import kotlinx.serialization.json.put
 import javax.inject.Inject
 import javax.inject.Singleton
 
-class ApiException(val status: Int, message: String) : RuntimeException(message) {
+open class ApiException(val status: Int, message: String) : RuntimeException(message) {
     companion object {
         val Unauthorized = ApiException(401, "Sesion expirada")
         val RequestFailed = ApiException(0, "Error de conexion")
