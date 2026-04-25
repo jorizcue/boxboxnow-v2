@@ -13,8 +13,6 @@ final class BLEManager: NSObject, ObservableObject {
     var onData: ((Data) -> Void)?
 
     private var centralManager: CBCentralManager!
-    private var lastSampleTime: TimeInterval = 0
-    private let throttleInterval: TimeInterval = 0.1
 
     private let uartServiceUUID = CBUUID(string: Constants.BLE.uartServiceUUID)
     private let uartTxCharUUID  = CBUUID(string: Constants.BLE.uartTxCharUUID)
@@ -139,9 +137,11 @@ extension BLEManager: CBPeripheralDelegate {
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         guard let data = characteristic.value else { return }
-        let now = CACurrentMediaTime()
-        guard now - lastSampleTime >= throttleInterval else { return }
-        lastSampleTime = now
+        // No throttle: pass every BLE notification straight to the UBX parser.
+        // A previous 100ms throttle was capping effective rate at ~10Hz and
+        // dropping ~80% of RaceBox packets when the device runs at 50Hz.
+        // RaceBox payloads are ~90 bytes; even at 50Hz that's <5KB/s — well
+        // within what iOS can handle on the main thread.
         onData?(data)
     }
 

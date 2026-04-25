@@ -32,7 +32,8 @@ import javax.inject.Singleton
  *   • Unfiltered scan + name-prefix match (RaceBox puts the UART service UUID in
  *     the scan-response payload, so a filtered scan misses it for several seconds).
  *   • ALL_MATCHES scan mode for frequent RSSI updates.
- *   • 100 ms throttle on incoming notifications to avoid swamping the parser.
+ *   • No throttle on notifications — every BLE packet goes to the parser so we
+ *     don't lose samples when the RaceBox runs at 50Hz.
  */
 @Singleton
 class BleManager @Inject constructor(
@@ -67,8 +68,6 @@ class BleManager @Inject constructor(
     private val raceboxNamePrefixes = listOf("racebox")
 
     private var gatt: BluetoothGatt? = null
-    private var lastSampleAt: Long = 0
-    private val throttleMs = 100L
 
     // ── Scanning ──
 
@@ -181,9 +180,10 @@ class BleManager @Inject constructor(
             characteristic: BluetoothGattCharacteristic,
             value: ByteArray,
         ) {
-            val now = SystemClock.elapsedRealtime()
-            if (now - lastSampleAt < throttleMs) return
-            lastSampleAt = now
+            // No throttle: pass every BLE notification straight to the UBX
+            // parser. A previous 100ms throttle was capping effective rate at
+            // ~10Hz and dropping ~80% of RaceBox packets at 50Hz. RaceBox
+            // payloads are ~90 bytes; even at 50Hz that's <5KB/s.
             onData?.invoke(value)
         }
 
