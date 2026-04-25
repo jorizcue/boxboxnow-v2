@@ -112,6 +112,16 @@ final class LapTracker: ObservableObject {
         uploadedLapCount = 0
     }
 
+    /// Clears the best-lap reference (and the live delta) so the next
+    /// completed lap becomes the new best — used to make the GPS delta
+    /// track the current stint instead of the all-time session best.
+    /// Call this on pit exit, when a new stint begins.
+    func resetStintBest() {
+        bestLapMs = nil
+        bestLap = nil
+        deltaBestMs = nil
+    }
+
     private func resetCurrentArrays() {
         curDistances.removeAll()
         curTimestamps.removeAll()
@@ -283,11 +293,11 @@ final class LapTracker: ObservableObject {
         guard !newLaps.isEmpty else { return }
         uploadedLapCount = laps.count
 
-        // Detect actual source Hz from the lap's own sample timing so the
-        // downsample step lands at the intended target rate regardless of
-        // whether the source is RaceBox (~50Hz) or phone GPS (~1-10Hz).
+        // Save the full RaceBox stream at ~50Hz (no downsample). Phone GPS
+        // tops out at ~1-10Hz so the same code path keeps everything that
+        // arrives. distances/timestamps were already full rate; positions,
+        // speeds and g-force now match.
         let payload = newLaps.map { lap -> [String: Any] in
-            let sourceHz = estimatedSourceHz(timestamps: lap.timestamps)
             return [
                 "lap_number": lap.lapNumber,
                 "duration_ms": lap.durationMs,
@@ -295,12 +305,10 @@ final class LapTracker: ObservableObject {
                 "max_speed_kmh": lap.maxSpeedKmh,
                 "distances": lap.distances,
                 "timestamps": lap.timestamps.map { $0 - (lap.timestamps.first ?? 0) },
-                // Target ≥4 samples/s for smooth playback. Use 5Hz so we
-                // always exceed 4 even with rounding loss.
-                "positions": downsample(lap.positions.map { ["lat": $0.lat, "lon": $0.lon] }, targetHz: 5, sourceHz: sourceHz),
-                "speeds": downsample(lap.speeds, targetHz: 5, sourceHz: sourceHz),
-                "gforce_lat": downsample(lap.gforceLat, targetHz: 5, sourceHz: sourceHz),
-                "gforce_lon": downsample(lap.gforceLon, targetHz: 5, sourceHz: sourceHz),
+                "positions": lap.positions.map { ["lat": $0.lat, "lon": $0.lon] },
+                "speeds": lap.speeds,
+                "gforce_lat": lap.gforceLat,
+                "gforce_lon": lap.gforceLon,
                 "gps_source": gpsSource,
             ]
         }
@@ -317,27 +325,4 @@ final class LapTracker: ObservableObject {
         }
     }
 
-    /// Downsample an array from sourceHz to targetHz, keeping first and last
-    /// elements. Matches web `downsample()` in useGpsTelemetrySave.ts.
-    private func downsample<T>(_ arr: [T], targetHz: Double, sourceHz: Double = 10) -> [T] {
-        guard arr.count > 2 else { return arr }
-        let step = max(1, Int((sourceHz / targetHz).rounded()))
-        var result: [T] = [arr[0]]
-        var i = step
-        while i < arr.count - 1 {
-            result.append(arr[i])
-            i += step
-        }
-        result.append(arr[arr.count - 1])
-        return result
-    }
-
-    /// Estimate sample rate from the captured timestamps. Falls back to 10Hz
-    /// when the array is too small to compute a stable mean.
-    private func estimatedSourceHz(timestamps: [TimeInterval]) -> Double {
-        guard timestamps.count >= 10 else { return 10 }
-        let span = timestamps.last! - timestamps.first!
-        guard span > 0 else { return 10 }
-        return Double(timestamps.count - 1) / span
-    }
 }

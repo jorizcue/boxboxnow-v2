@@ -126,9 +126,11 @@ struct DriverCardView: View {
         case "gapBehind":
             return Color(bbnHex: 0x22c55e)
         case "deltaBestLap":
+            // Compare against stint-best (current driver's pace), not race-best
+            // (all-time best including other drivers / earlier hot sessions).
             guard let k = kart,
                   let last = k.base.lastLapMs, last > 0,
-                  let best = k.base.bestLapMs, best > 0 else { return BBNColors.textPrimary }
+                  let best = k.base.bestStintLapMs, best > 0 else { return BBNColors.textPrimary }
             return last <= best ? BBNColors.accent : Color(bbnHex: 0xef4444)
         default:
             return BBNColors.textPrimary
@@ -200,9 +202,10 @@ struct DriverCardView: View {
         case "currentPit":
             return k.base.isInPit ? "EN PIT" : "—:—"
         case "deltaBestLap":
+            // Stint-best comparison so the delta resets after each pit exit.
             guard let k = kart,
                   let last = k.base.lastLapMs, last > 0,
-                  let best = k.base.bestLapMs, best > 0 else { return "—" }
+                  let best = k.base.bestStintLapMs, best > 0 else { return "—" }
             let delta = last - best
             let sign = delta < 0 ? "" : "+"
             return String(format: "%@%.2fs", sign, delta / 1000)

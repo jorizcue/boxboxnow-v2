@@ -94,9 +94,11 @@ struct DriverCardView: View {
             if let bestMs = lapTracker?.bestLapMs, bestMs > 0 {
                 return "Delta Best · \(Formatters.msToLapTime(bestMs))"
             }
-            // Fallback to server best lap when GPS is not in use
-            if let bestMs = kart?.bestLapMs, bestMs > 0 {
-                return "Delta Best · \(Formatters.msToLapTime(bestMs))"
+            // Fallback to server stint-best when GPS isn't producing a delta.
+            // Use stint-best (not race-best) so the comparison resets after
+            // each pit exit and reflects the current driver's pace.
+            if let bestMs = kart?.bestStintLapMs, bestMs > 0 {
+                return "Delta Stint · \(Formatters.msToLapTime(bestMs))"
             }
             return card.displayName
         case .gpsLapDelta:
@@ -150,9 +152,10 @@ struct DriverCardView: View {
             if let d = lapTracker?.deltaBestMs {
                 return d < 0 ? .green : .red
             }
-            // Server-data fallback so the card shows green/red without GPS
+            // Stint-best fallback (not race-best) so the color reflects
+            // pace within the current stint.
             if let last = kart?.lastLapMs, last > 0,
-               let best = kart?.bestLapMs, best > 0 {
+               let best = kart?.bestStintLapMs, best > 0 {
                 return last <= best ? .green : .red
             }
             return .purple
@@ -238,7 +241,9 @@ struct DriverCardView: View {
                             .foregroundColor(Color(.systemGray))
                     }
                 } else if let last = kart?.lastLapMs, last > 0,
-                          let best = kart?.bestLapMs, best > 0 {
+                          let best = kart?.bestStintLapMs, best > 0 {
+                    // Stint-best fallback so the delta reflects current
+                    // driver's pace, not the all-time race best.
                     let delta = last - best
                     Text(String(format: "%@%.2fs", delta < 0 ? "" : "+", delta / 1000))
                         .font(.system(size: mainFont, weight: .black, design: .monospaced))
@@ -572,9 +577,9 @@ struct DriverCardView: View {
                 return "Delta vs mejor: \(String(format: "%@%.2f segundos", d < 0 ? "" : "+", d / 1000))"
             }
             if let last = kart?.lastLapMs, last > 0,
-               let best = kart?.bestLapMs, best > 0 {
+               let best = kart?.bestStintLapMs, best > 0 {
                 let d = last - best
-                return "Delta vs mejor: \(String(format: "%@%.2f segundos", d < 0 ? "" : "+", d / 1000))"
+                return "Delta vs mejor del stint: \(String(format: "%@%.2f segundos", d < 0 ? "" : "+", d / 1000))"
             }
             return "Delta vs mejor: sin datos"
         case .gForceRadar:

@@ -315,6 +315,15 @@ struct DriverView: View {
             // Haptic on new lap
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         }
+        // When the kart exits the pit (pitStatus changes from "in_pit" back to
+        // anything else), a new stint starts — clear the lap tracker's best
+        // reference so the live GPS delta tracks the new stint instead of the
+        // all-time session best.
+        .onChange(of: myKart?.pitStatus) { oldValue, newValue in
+            if oldValue == "in_pit" && newValue != "in_pit" {
+                driverVM.lapTracker.resetStintBest()
+            }
+        }
         .onChange(of: ourKartNumber) {
             prevLapMs = 0
             lapDelta = nil
