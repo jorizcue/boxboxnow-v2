@@ -3,9 +3,18 @@ import SwiftUI
 struct DriverMenuOverlay: View {
     @EnvironmentObject var driverVM: DriverViewModel
     @EnvironmentObject var gpsVM: GPSViewModel
+    @EnvironmentObject var configVM: ConfigViewModel
     @ObservedObject var speech: DriverSpeechService
     @Binding var isPresented: Bool
     var onDismiss: () -> Void
+
+    /// The active circuit, resolved from configVM. Used in the debug panel
+    /// to compare server-side finish line coordinates with what the
+    /// LapTracker actually has loaded.
+    private var activeCircuit: Circuit? {
+        guard let cid = configVM.session.circuitId else { return nil }
+        return configVM.circuits.first(where: { $0.id == cid })
+    }
 
     var body: some View {
         HStack {
@@ -136,6 +145,28 @@ struct DriverMenuOverlay: View {
                                 .padding(8)
                                 .background(Color.black.opacity(0.4))
                                 .cornerRadius(6)
+
+                                // Coordinates: server-side circuit config vs
+                                // what the LapTracker actually loaded. If they
+                                // don't match, applyCircuitFinishLine() didn't
+                                // run or the circuit list is stale.
+                                Text("Coordenadas meta")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                    .padding(.top, 4)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    debugRow("Circuito", activeCircuit?.name ?? "—")
+                                    debugRow("Servidor P1", coord(activeCircuit?.finishLat1, activeCircuit?.finishLon1))
+                                    debugRow("Servidor P2", coord(activeCircuit?.finishLat2, activeCircuit?.finishLon2))
+                                    debugRow("LapTracker P1", coord(driverVM.lapTracker.currentFinishLine?.p1.lat,
+                                                                    driverVM.lapTracker.currentFinishLine?.p1.lon))
+                                    debugRow("LapTracker P2", coord(driverVM.lapTracker.currentFinishLine?.p2.lat,
+                                                                    driverVM.lapTracker.currentFinishLine?.p2.lon))
+                                    debugRow("Pos actual", coord(gpsVM.lastSample?.lat, gpsVM.lastSample?.lon))
+                                }
+                                .padding(8)
+                                .background(Color.black.opacity(0.4))
+                                .cornerRadius(6)
                             }
                         }
 
@@ -178,5 +209,10 @@ struct DriverMenuOverlay: View {
                 .font(.caption2.monospacedDigit())
                 .foregroundColor(.white)
         }
+    }
+
+    private func coord(_ lat: Double?, _ lon: Double?) -> String {
+        guard let lat, let lon else { return "—" }
+        return String(format: "%.6f, %.6f", lat, lon)
     }
 }

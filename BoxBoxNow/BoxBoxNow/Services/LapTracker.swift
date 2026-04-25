@@ -87,6 +87,9 @@ final class LapTracker: ObservableObject {
 
     var hasFinishLine: Bool { finishLine != nil }
 
+    /// Read-only access to the configured finish line (for debug overlays).
+    var currentFinishLine: FinishLine? { finishLine }
+
     // MARK: - Reset
 
     func reset() {
