@@ -35,11 +35,13 @@ final class SharedModelExtensionsTests: XCTestCase {
     }
 
     func testCircuitDecodesExtendedFields() throws {
+        // Backend's CircuitOut serializes the GPS finish line keys without
+        // an underscore between "lat"/"lon" and the index.
         let json = """
         {
           "id": 1, "name": "Jarama", "length_m": 1200,
-          "finish_lat_1": 40.1234, "finish_lon_1": -3.5678,
-          "finish_lat_2": 40.1235, "finish_lon_2": -3.5679,
+          "finish_lat1": 40.1234, "finish_lon1": -3.5678,
+          "finish_lat2": 40.1235, "finish_lon2": -3.5679,
           "is_active": true
         }
         """.data(using: .utf8)!

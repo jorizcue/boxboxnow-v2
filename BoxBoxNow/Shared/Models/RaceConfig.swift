@@ -80,10 +80,16 @@ struct Circuit: Codable, Identifiable, Hashable {
     enum CodingKeys: String, CodingKey {
         case id, name
         case lengthM = "length_m"
-        case finishLat1 = "finish_lat_1"
-        case finishLon1 = "finish_lon_1"
-        case finishLat2 = "finish_lat_2"
-        case finishLon2 = "finish_lon_2"
+        // Backend's CircuitOut serializes these without an underscore between
+        // "lat"/"lon" and the index (finish_lat1, not finish_lat_1). The old
+        // keys never matched the JSON, so finishLat1/Lon1/Lat2/Lon2 were
+        // always nil — which made applyCircuitFinishLine() silently skip the
+        // setFinishLine() call, so the LapTracker never had a finish line and
+        // never detected any lap crossings.
+        case finishLat1 = "finish_lat1"
+        case finishLon1 = "finish_lon1"
+        case finishLat2 = "finish_lat2"
+        case finishLon2 = "finish_lon2"
         case isActive   = "is_active"
         case pitTimeS = "pit_time_s"
         case wsPort = "ws_port"
