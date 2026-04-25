@@ -75,6 +75,8 @@ final class GPSViewModel: ObservableObject {
 
         let saved = UserDefaults.standard.string(forKey: Constants.Keys.gpsSource) ?? "none"
         source = GPSSource(rawValue: saved) ?? .none
+        // Auto-start GPS on launch if a source was previously selected
+        if source != .none { startGPS() }
     }
 
     func selectSource(_ src: GPSSource) {

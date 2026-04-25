@@ -233,6 +233,10 @@ struct DriverView: View {
         }
         .onAppear {
             raceVM.connect()
+            // Ensure GPS is running if a source was configured
+            if gpsVM.source != .none && !gpsVM.isConnected {
+                gpsVM.startGPS()
+            }
             previousBrightness = UIScreen.main.brightness
             UIScreen.main.brightness = 1.0
             UIApplication.shared.isIdleTimerDisabled = true

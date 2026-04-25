@@ -125,6 +125,11 @@ struct DriverCardView: View {
             return Color(bbnHex: 0xef4444)
         case "gapBehind":
             return Color(bbnHex: 0x22c55e)
+        case "deltaBestLap":
+            guard let k = kart,
+                  let last = k.base.lastLapMs, last > 0,
+                  let best = k.base.bestLapMs, best > 0 else { return BBNColors.textPrimary }
+            return last <= best ? BBNColors.accent : Color(bbnHex: 0xef4444)
         default:
             return BBNColors.textPrimary
         }
@@ -143,8 +148,10 @@ struct DriverCardView: View {
         case "currentPit":
             if kart?.base.isInPit == true { return pitTimeS > 0 ? "/ \(Int(pitTimeS))s" : nil }
             return "inactivo"
-        case "gpsSpeed", "gpsLapDelta", "gpsGForce", "deltaBestLap", "gForceRadar":
+        case "gpsSpeed", "gpsLapDelta", "gpsGForce", "gForceRadar":
             return "requiere GPS"
+        case "deltaBestLap":
+            return nil
         default:
             return nil
         }
@@ -192,7 +199,14 @@ struct DriverCardView: View {
             return "\(k.base.pitCount)/\(minPits)"
         case "currentPit":
             return k.base.isInPit ? "EN PIT" : "—:—"
-        case "deltaBestLap", "gForceRadar", "gpsLapDelta", "gpsSpeed", "gpsGForce":
+        case "deltaBestLap":
+            guard let k = kart,
+                  let last = k.base.lastLapMs, last > 0,
+                  let best = k.base.bestLapMs, best > 0 else { return "—" }
+            let delta = last - best
+            let sign = delta < 0 ? "" : "+"
+            return String(format: "%@%.2fs", sign, delta / 1000)
+        case "gForceRadar", "gpsLapDelta", "gpsSpeed", "gpsGForce":
             return "GPS —"
         default:
             return "—"
