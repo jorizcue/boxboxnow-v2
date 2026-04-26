@@ -6,6 +6,8 @@ import { useRaceStore } from "@/hooks/useRaceState";
 import { useAuth } from "@/hooks/useAuth";
 import { useT } from "@/lib/i18n";
 import { CalendarPicker } from "@/components/shared/CalendarPicker";
+import { useReplayClockMs } from "@/hooks/useReplayClockMs";
+import { ReplayGpsMap } from "@/components/replay/ReplayGpsMap";
 
 // Module-level state for replay — survives tab changes
 let _replaySpeed = 10;
@@ -64,10 +66,23 @@ export function ReplayTab() {
   const [sessionModal, setSessionModal] = useState<SessionModalData | null>(null);
   const [downloading, setDownloading] = useState(false);
 
+  // GPS replay overlay window. Set when the user clicks "Play" on a session
+  // — points the ReplayGpsMap to fetch the GPS laps that finished within
+  // [windowStart, windowEnd] for the selected circuit/kart.
+  const [replayWindow, setReplayWindow] = useState<{
+    circuitId: number;
+    kartNumber: number | null;
+    windowStart: string;
+    windowEnd: string;
+  } | null>(null);
+
   const {
     requestWsReconnect,
     replayActive, replayPaused, replayProgress, replayTime, setReplayStatus,
   } = useRaceStore();
+
+  // Replay clock ticked at 10 Hz, used to drive the GPS marker animation.
+  const replayClockMs = useReplayClockMs(100);
 
   const setSpeed = (v: number) => { _replaySpeed = v; setSpeedState(v); };
 
@@ -182,6 +197,33 @@ export function ReplayTab() {
 
   return (
     <div className="space-y-4">
+      {/* GPS overlay panel — visible while a replay session is active and we
+          have a resolved circuit_id + window. Renders the satellite map
+          with the marker tracking the current replay clock. */}
+      {replayActive && replayWindow && (
+        <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider font-medium">
+              Posición GPS en directo
+            </h3>
+            <button
+              onClick={() => setReplayWindow(null)}
+              className="text-neutral-500 hover:text-white text-xs transition-colors"
+              title="Ocultar mapa GPS"
+            >
+              Ocultar
+            </button>
+          </div>
+          <ReplayGpsMap
+            circuitId={replayWindow.circuitId}
+            kartNumber={replayWindow.kartNumber}
+            windowStart={replayWindow.windowStart}
+            windowEnd={replayWindow.windowEnd}
+            replayClockMs={replayClockMs}
+          />
+        </div>
+      )}
+
       {/* Date filters */}
       <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
         <div className="flex gap-4 items-end flex-wrap">
@@ -387,12 +429,48 @@ export function ReplayTab() {
             <div className={`grid ${user?.is_admin ? "grid-cols-2" : "grid-cols-1"} gap-3`}>
               {/* Play button */}
               <button
-                onClick={() => {
+                onClick={async () => {
                   const sm = sessionModal;
                   setSessionModal(null);
-                  if (selectedCircuitDir) {
-                    startFromBlock(sm.dayFilename, selectedCircuitDir, sm.raceStart.block);
+                  if (!selectedCircuitDir) return;
+
+                  // Resolve the circuit_id and the GPS time window for the
+                  // session being played. windowEnd defaults to the next
+                  // race start in the same log; if there isn't one, fall
+                  // back to +4h. kartNumber comes from the user's currently
+                  // active race session (best-effort — null is OK, the
+                  // backend will then return all karts' GPS in the window).
+                  const circuit = recordingCircuits.find((c) => c.circuit_dir === selectedCircuitDir);
+                  const startIso = sm.raceStart.timestamp;
+                  let endIso: string | null = null;
+                  if (sm.raceStartIdx + 1 < sm.allStarts.length) {
+                    endIso = sm.allStarts[sm.raceStartIdx + 1].timestamp;
                   }
+                  if (!endIso) {
+                    const startDate = new Date(startIso);
+                    if (!isNaN(startDate.getTime())) {
+                      endIso = new Date(startDate.getTime() + 4 * 60 * 60 * 1000).toISOString();
+                    }
+                  }
+                  let kartNum: number | null = null;
+                  try {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const sess = (await api.getActiveSession()) as any;
+                    if (sess?.our_kart_number) kartNum = sess.our_kart_number;
+                  } catch { /* ignore — no active session is fine */ }
+
+                  if (circuit?.circuit_id && startIso && endIso) {
+                    setReplayWindow({
+                      circuitId: circuit.circuit_id,
+                      kartNumber: kartNum,
+                      windowStart: startIso,
+                      windowEnd: endIso,
+                    });
+                  } else {
+                    setReplayWindow(null);
+                  }
+
+                  startFromBlock(sm.dayFilename, selectedCircuitDir, sm.raceStart.block);
                 }}
                 disabled={actionLoading || !selectedCircuitDir}
                 className="flex flex-col items-center justify-center gap-2 py-6 rounded-xl bg-green-900/30 hover:bg-green-900/50 border border-green-800/40 hover:border-green-600/50 text-green-400 transition-all disabled:opacity-40"

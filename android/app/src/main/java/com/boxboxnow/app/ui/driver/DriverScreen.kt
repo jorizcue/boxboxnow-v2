@@ -160,6 +160,13 @@ fun DriverScreen(onBack: () -> Unit) {
         onDispose { raceVM.disconnect() }
     }
 
+    // Mirror the configured kart number into the LapTracker so each
+    // uploaded lap carries the kart_number field — needed for the
+    // dashboard replay to sync GPS samples with Apex Timing data.
+    LaunchedEffect(ourKartNum) {
+        driverVM.lapTracker.ourKartNumber = ourKartNum
+    }
+
     // Reset the LapTracker's best-lap reference when the kart exits the pit
     // (pitStatus changes from "in_pit" back to anything else). This makes the
     // live GPS delta track the current stint instead of the all-time session

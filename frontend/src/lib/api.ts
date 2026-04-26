@@ -432,4 +432,20 @@ export const api = {
     const qs = circuitId ? `?circuit_id=${circuitId}` : "";
     return fetchApi(`/api/gps/stats${qs}`);
   },
+  /** Replay-sync endpoint: GPS laps WITH traces, finished within [start, end]
+   *  on a given circuit (optionally filtered by kart). The web replay calls
+   *  this once when a session loads then animates the marker locally. */
+  getGpsLapsWindow: (params: {
+    circuit_id: number;
+    kart_number?: number;
+    start: string;  // ISO timestamp
+    end: string;    // ISO timestamp
+  }) => {
+    const qs = new URLSearchParams();
+    qs.set("circuit_id", String(params.circuit_id));
+    if (params.kart_number != null) qs.set("kart_number", String(params.kart_number));
+    qs.set("start", params.start);
+    qs.set("end", params.end);
+    return fetchApi(`/api/gps/laps/window?${qs}`);
+  },
 };

@@ -83,6 +83,12 @@ class LapTracker(
     // App is RaceBox-only — phone GPS samples are dropped by GpsViewModel
     // before they reach the LapTracker, so this is always "racebox".
     var gpsSource: String = "racebox"
+
+    // Configured kart number for the active session. Written into each
+    // uploaded lap so the dashboard replay can sync GPS samples with
+    // Apex Timing data for the same physical kart.
+    var ourKartNumber: Int = 0
+
     private var uploadedLapCount = 0
 
     val hasFinishLine: Boolean get() = finishLine != null
@@ -285,7 +291,7 @@ class LapTracker(
             try {
                 api.saveGpsLaps(newLaps.map { lap ->
                     val t0 = lap.timestamps.firstOrNull() ?: 0.0
-                    mapOf(
+                    val base = mutableMapOf<String, Any?>(
                         "lap_number" to lap.lapNumber,
                         "duration_ms" to lap.durationMs,
                         "total_distance_m" to lap.totalDistanceM,
@@ -298,6 +304,8 @@ class LapTracker(
                         "gforce_lon" to lap.gforceLon,
                         "gps_source" to gpsSource,
                     )
+                    if (ourKartNumber > 0) base["kart_number"] = ourKartNumber
+                    base
                 })
             } catch (e: Throwable) {
                 uploadedLapCount -= newLaps.size

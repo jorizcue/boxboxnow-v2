@@ -85,6 +85,16 @@ async def init_db():
         except Exception:
             pass
 
+        # Add kart_number to gps_telemetry_laps (used to sync with replay)
+        try:
+            await conn.execute(text("ALTER TABLE gps_telemetry_laps ADD COLUMN kart_number INTEGER"))
+        except Exception:
+            pass
+        try:
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_gps_telemetry_laps_kart_number ON gps_telemetry_laps (kart_number)"))
+        except Exception:
+            pass
+
         # Add recorded_at to kart_laps
         try:
             await conn.execute(text("ALTER TABLE kart_laps ADD COLUMN recorded_at DATETIME"))

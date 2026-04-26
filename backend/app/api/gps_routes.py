@@ -19,18 +19,26 @@ async def save_laps(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Save one or more GPS laps (typically called when session ends or periodically)."""
-    # Auto-resolve race_session_id from user's active session if not provided
-    active_session_id = None
+    """Save one or more GPS laps (typically called when session ends or periodically).
+
+    Auto-resolves both race_session_id AND kart_number / circuit_id from the
+    user's active session, so the mobile client only needs to send the
+    telemetry arrays.
+    """
+    active_session_id: int | None = None
+    active_kart_number: int | None = None
+    active_circuit_id: int | None = None
     try:
         result = await db.execute(
-            select(RaceSession.id)
+            select(RaceSession.id, RaceSession.our_kart_number, RaceSession.circuit_id)
             .where(RaceSession.user_id == user.id, RaceSession.is_active == True)
             .limit(1)
         )
-        row_rs = result.scalar_one_or_none()
+        row_rs = result.first()
         if row_rs:
-            active_session_id = row_rs
+            active_session_id = row_rs.id
+            active_kart_number = row_rs.our_kart_number
+            active_circuit_id = row_rs.circuit_id
     except Exception:
         pass  # Non-critical — save telemetry even without session link
 
@@ -38,8 +46,9 @@ async def save_laps(
     for lap in data.laps:
         row = GpsTelemetryLap(
             user_id=user.id,
-            circuit_id=lap.circuit_id,
+            circuit_id=lap.circuit_id or active_circuit_id,
             race_session_id=lap.race_session_id or active_session_id,
+            kart_number=lap.kart_number or active_kart_number,
             lap_number=lap.lap_number,
             duration_ms=lap.duration_ms,
             total_distance_m=lap.total_distance_m,
@@ -81,6 +90,47 @@ async def list_laps(
     result = await db.execute(q)
     rows = result.scalars().all()
     return [_to_out(r, include_traces=False) for r in rows]
+
+
+@router.get("/laps/window", response_model=list[GpsLapOut])
+async def list_laps_window(
+    circuit_id: int = Query(...),
+    kart_number: int | None = Query(None),
+    start: datetime = Query(..., description="ISO timestamp — laps recorded after this"),
+    end: datetime = Query(..., description="ISO timestamp — laps recorded before this"),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return GPS laps **with traces** that finished within [start, end]
+    on a given circuit/kart. This is the replay-sync endpoint: the web
+    replay calls it once when a session loads, then animates the marker
+    using the returned positions/timestamps arrays.
+
+    `recorded_at` is the absolute UTC time the lap was uploaded — for the
+    iOS/Android client this happens immediately after the finish-line
+    crossing, so it's a tight upper bound on the lap's end time. The
+    lap's start is `recorded_at - duration_ms`.
+
+    The endpoint is open to any authenticated user (not just admins) so
+    pilots can see their own historic stints overlaid on a replay without
+    needing the admin role.
+    """
+    q = (
+        select(GpsTelemetryLap)
+        .where(GpsTelemetryLap.circuit_id == circuit_id)
+        .where(GpsTelemetryLap.recorded_at >= start)
+        .where(GpsTelemetryLap.recorded_at <= end)
+    )
+    if kart_number is not None:
+        q = q.where(GpsTelemetryLap.kart_number == kart_number)
+    # Non-admin users only see their own telemetry
+    if not getattr(user, "is_admin", False):
+        q = q.where(GpsTelemetryLap.user_id == user.id)
+    q = q.order_by(GpsTelemetryLap.recorded_at)
+
+    result = await db.execute(q)
+    rows = result.scalars().all()
+    return [_to_out(r, include_traces=True) for r in rows]
 
 
 @router.get("/laps/{lap_id}", response_model=GpsLapOut)
@@ -159,6 +209,7 @@ def _to_out(row: GpsTelemetryLap, include_traces: bool) -> GpsLapOut:
         user_id=row.user_id,
         circuit_id=row.circuit_id,
         race_session_id=row.race_session_id,
+        kart_number=row.kart_number,
         lap_number=row.lap_number,
         duration_ms=row.duration_ms,
         total_distance_m=row.total_distance_m,

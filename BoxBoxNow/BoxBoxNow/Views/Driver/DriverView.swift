@@ -229,6 +229,10 @@ struct DriverView: View {
             if raceVM.ourKartNumber == 0 {
                 raceVM.ourKartNumber = configVM.session.ourKartNumber
             }
+            // Mirror the configured kart number into the LapTracker so each
+            // uploaded lap carries the kart_number field — needed for the
+            // dashboard replay to sync GPS samples with Apex Timing data.
+            driverVM.lapTracker.ourKartNumber = configVM.session.ourKartNumber
             syncConfigToRaceVM()
         }
         .onAppear {

@@ -369,6 +369,10 @@ class GpsTelemetryLap(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     circuit_id = Column(Integer, ForeignKey("circuits.id"), nullable=True)
     race_session_id = Column(Integer, ForeignKey("race_sessions.id"), nullable=True)
+    # Physical kart number that produced this telemetry — read from the
+    # user's active session at upload time. Lets us cross-reference GPS
+    # laps with Apex Timing laps in the replay (sync the same kart's data).
+    kart_number = Column(Integer, nullable=True, index=True)
 
     lap_number = Column(Integer, nullable=False)
     duration_ms = Column(Float, nullable=False)

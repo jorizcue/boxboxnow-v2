@@ -51,6 +51,11 @@ final class LapTracker: ObservableObject {
     // GPS source for upload tagging
     var gpsSource: String = "phone"
 
+    // Configured kart number for the active session, written into each
+    // uploaded lap so the dashboard replay can sync GPS samples with
+    // Apex Timing data for the same physical kart.
+    var ourKartNumber: Int = 0
+
     // Auto-upload: number of laps already sent
     private var uploadedLapCount = 0
 
@@ -298,7 +303,7 @@ final class LapTracker: ObservableObject {
         // arrives. distances/timestamps were already full rate; positions,
         // speeds and g-force now match.
         let payload = newLaps.map { lap -> [String: Any] in
-            return [
+            var item: [String: Any] = [
                 "lap_number": lap.lapNumber,
                 "duration_ms": lap.durationMs,
                 "total_distance_m": lap.totalDistanceM,
@@ -311,6 +316,8 @@ final class LapTracker: ObservableObject {
                 "gforce_lon": lap.gforceLon,
                 "gps_source": gpsSource,
             ]
+            if ourKartNumber > 0 { item["kart_number"] = ourKartNumber }
+            return item
         }
 
         Task {

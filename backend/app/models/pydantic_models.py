@@ -480,6 +480,7 @@ class RaceLogOut(BaseModel):
 class GpsLapCreate(BaseModel):
     circuit_id: int | None = None
     race_session_id: int | None = None
+    kart_number: int | None = None
     lap_number: int
     duration_ms: float
     total_distance_m: float
@@ -498,6 +499,7 @@ class GpsLapOut(BaseModel):
     user_id: int
     circuit_id: int | None
     race_session_id: int | None
+    kart_number: int | None = None
     lap_number: int
     duration_ms: float
     total_distance_m: float
