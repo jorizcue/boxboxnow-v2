@@ -81,6 +81,32 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
     api.seekReplay(block).catch(() => {});
   }, [replayTotalBlocks]);
 
+  // ── Time-jump: click the orange clock to type an exact HH:MM:SS ──
+  // The backend resolves to the nearest block via binary search on the
+  // parsed timestamps, so jumping +2h in a 4h replay is O(log n) — no
+  // fast-forwarding through messages on the client side.
+  const [timeEditing, setTimeEditing] = useState(false);
+  const [timeInput, setTimeInput] = useState("");
+
+  const startTimeEdit = useCallback(() => {
+    setTimeInput(replayTime || "");
+    setTimeEditing(true);
+  }, [replayTime]);
+
+  const submitTimeJump = useCallback(async () => {
+    const v = timeInput.trim();
+    setTimeEditing(false);
+    if (!v) return;
+    // Accept HH:MM:SS or HH:MM (basic validation — backend rejects junk).
+    if (!/^\d{1,2}:\d{2}(:\d{2})?$/.test(v)) return;
+    try { await api.seekReplayTime(v); } catch { /* ignore */ }
+  }, [timeInput]);
+
+  const cancelTimeEdit = useCallback(() => {
+    setTimeEditing(false);
+    setTimeInput("");
+  }, []);
+
   // Use interpolated race clock that ticks every second
   const raceClockMs = useRaceClock();
 
@@ -197,11 +223,33 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
                 {/* Indicator dot */}
                 <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${replayPaused ? "bg-orange-400" : "bg-orange-400 animate-pulse"}`} />
 
-                {/* Replay time */}
-                {replayTime && (
-                  <span className="text-[10px] sm:text-[11px] text-orange-300 font-mono font-semibold">
-                    {replayTime}
-                  </span>
+                {/* Replay time — clickable, opens an inline HH:MM:SS input
+                    that jumps the replay to that exact wall-clock moment via
+                    /api/replay/seek_time (no fast-forwarding). */}
+                {timeEditing ? (
+                  <input
+                    type="text"
+                    autoFocus
+                    value={timeInput}
+                    onChange={(e) => setTimeInput(e.target.value)}
+                    onBlur={submitTimeJump}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { e.preventDefault(); submitTimeJump(); }
+                      else if (e.key === "Escape") { e.preventDefault(); cancelTimeEdit(); }
+                    }}
+                    placeholder="HH:MM:SS"
+                    className="w-[78px] sm:w-[88px] text-[10px] sm:text-[11px] bg-orange-400/10 border border-orange-400/40 rounded px-1.5 py-0.5 text-orange-300 font-mono font-semibold focus:outline-none focus:border-orange-400 placeholder:text-orange-400/40"
+                  />
+                ) : (
+                  replayTime && (
+                    <button
+                      onClick={startTimeEdit}
+                      title="Saltar a hora exacta (HH:MM:SS)"
+                      className="text-[10px] sm:text-[11px] text-orange-300 font-mono font-semibold hover:bg-orange-400/15 hover:text-orange-200 rounded px-1 -mx-1 transition-colors"
+                    >
+                      {replayTime}
+                    </button>
+                  )
                 )}
 
                 {/* Progress bar (desktop) — clickable to seek */}

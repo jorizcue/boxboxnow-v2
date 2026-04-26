@@ -37,6 +37,9 @@ Thumbs.db
 
 # Logs
 *.log
+*.log.gz
+backend/data/logs/
+backend/data/recordings/
 
 # Docker
 docker-compose.override.yml

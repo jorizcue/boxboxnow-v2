@@ -211,6 +211,11 @@ export const api = {
   pauseReplay: () => fetchApi<any>("/api/replay/pause", { method: "POST" }),
   seekReplay: (block: number) =>
     fetchApi<any>("/api/replay/seek", { method: "POST", body: JSON.stringify({ block }) }),
+  /** Jump the replay to an absolute clock time. Accepts "HH:MM:SS",
+   *  "HH:MM", or full ISO datetime. Resolves to the nearest preceding
+   *  block server-side and seeks instantly. */
+  seekReplayTime: (time: string) =>
+    fetchApi<any>("/api/replay/seek_time", { method: "POST", body: JSON.stringify({ time }) }),
   setReplaySpeed: (speed: number) =>
     fetchApi<any>("/api/replay/speed", { method: "POST", body: JSON.stringify({ speed }) }),
   restartReplay: (block: number = 0) =>

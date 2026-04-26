@@ -57,6 +57,10 @@ class ReplaySeekRequest(BaseModel):
     block: int
 
 
+class ReplaySeekTimeRequest(BaseModel):
+    time: str  # "HH:MM:SS", "HH:MM", or full ISO datetime
+
+
 def _get_replay_registry(request: Request):
     return request.app.state.replay_registry
 
@@ -442,27 +446,21 @@ async def pause_replay(
     return replay_session.engine.status
 
 
-@router.post("/seek")
-async def seek_replay(
-    data: ReplaySeekRequest,
-    request: Request,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+async def _do_seek(
+    block: int,
+    replay_session,
+    user: User,
+    db: AsyncSession,
 ):
-    """Seek to a specific block in the replay."""
-    replay_reg = _get_replay_registry(request)
-    replay_session = replay_reg.get(user.id)
-    if not replay_session:
-        raise HTTPException(400, "No active replay")
-
+    """Shared helper for both /seek (by block) and /seek_time (by clock).
+    Resets state, re-applies the user's session config from DB, and tells
+    the engine to jump to `block`."""
     if not replay_session.engine._filename or not replay_session.engine._blocks:
         raise HTTPException(400, "No replay loaded")
 
-    # Reset state
     replay_session.state.reset()
-    replay_session._init_teams_loaded = False  # Allow teams to re-load from new init
+    replay_session._init_teams_loaded = False  # Allow teams to re-load
 
-    # Re-apply user config from DB (same as start_replay)
     session = (await db.execute(
         select(RaceSession)
         .options(
@@ -497,14 +495,49 @@ async def seek_replay(
         replay_session.differentials["team_positions"] = {}
         replay_session.differentials["driver_differentials"] = {}
 
-    # Reset FIFO for seek
     replay_session.fifo.reset(replay_session.state.box_karts, replay_session.state.box_lines)
     replay_session.fifo.apply_to_state(replay_session.state)
 
-    await replay_session.engine.seek(data.block)
+    await replay_session.engine.seek(block)
     await replay_session.start_analytics()
     await replay_session.state._broadcast(replay_session.state.get_snapshot())
     return replay_session.engine.status
+
+
+@router.post("/seek")
+async def seek_replay(
+    data: ReplaySeekRequest,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Seek to a specific block in the replay."""
+    replay_reg = _get_replay_registry(request)
+    replay_session = replay_reg.get(user.id)
+    if not replay_session:
+        raise HTTPException(400, "No active replay")
+    return await _do_seek(data.block, replay_session, user, db)
+
+
+@router.post("/seek_time")
+async def seek_replay_time(
+    data: ReplaySeekTimeRequest,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Seek to an absolute clock time (HH:MM:SS, HH:MM, or full ISO).
+    The engine resolves the time to the nearest preceding block by
+    binary-searching its parsed timestamps, so this is O(log n) and
+    instant — no fast-forwarding through messages on the client side."""
+    replay_reg = _get_replay_registry(request)
+    replay_session = replay_reg.get(user.id)
+    if not replay_session:
+        raise HTTPException(400, "No active replay")
+    block = replay_session.engine.block_at_time(data.time)
+    if block is None:
+        raise HTTPException(400, f"Could not resolve time '{data.time}' to a block")
+    return await _do_seek(block, replay_session, user, db)
 
 
 @router.get("/download-session")

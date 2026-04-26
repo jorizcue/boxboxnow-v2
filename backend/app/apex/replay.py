@@ -337,6 +337,52 @@ class ReplayEngine:
         self._task = asyncio.create_task(self._replay_from(start_block))
         logger.info(f"Replay started: {filename} at {speed}x from block {start_block}")
 
+    def block_at_time(self, target: str) -> int | None:
+        """Resolve a target time (HH:MM:SS, HH:MM, or full ISO datetime) to
+        the nearest block index whose timestamp is at or before `target`.
+        Returns None if the input is unparseable or there are no blocks.
+
+        For HH:MM:SS / HH:MM we combine with the date of the first block —
+        long replay sessions are typically a single day's log so this
+        matches the user's mental model of "jump to 21:35".
+        """
+        if not self._blocks:
+            return None
+        try:
+            if "T" in target or "-" in target:
+                # ISO datetime path
+                clean = target.replace("Z", "").replace("+00:00", "")
+                target_dt = datetime.fromisoformat(clean)
+            else:
+                # HH:MM[:SS] path — anchor against the first block's date.
+                # The first block always has a parsed timestamp because
+                # replay loading rejects entries without one.
+                hms = target.strip().split(":")
+                hour = int(hms[0])
+                minute = int(hms[1]) if len(hms) > 1 else 0
+                second = int(hms[2]) if len(hms) > 2 else 0
+                first_date = self._blocks[0][0].date()
+                target_dt = datetime(
+                    first_date.year, first_date.month, first_date.day,
+                    hour, minute, second,
+                )
+        except (ValueError, IndexError):
+            return None
+
+        # Binary search the blocks (sorted by timestamp) for the largest
+        # index whose timestamp is <= target. Returning the previous index
+        # (rather than the next) means the user lands at the block just
+        # before their target, so the rebuild loop catches up to it
+        # naturally without skipping the message they pointed at.
+        lo, hi = 0, len(self._blocks)
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if self._blocks[mid][0] <= target_dt:
+                lo = mid + 1
+            else:
+                hi = mid
+        return max(0, lo - 1)
+
     async def seek(self, block: int):
         """Seek to a specific block. Stops current replay, replays init blocks silently, resumes."""
         if not self._filename or not self._blocks:
