@@ -152,6 +152,10 @@ class ReplayEngine:
         self._current_block = 0
         self._blocks: list[tuple[datetime, str]] = []
         self.current_block_timestamp: datetime | None = None  # Accessible by callback
+        # True while we're replaying init/intermediate blocks silently to
+        # rebuild state after a seek. Listeners (registry.on_events) can
+        # short-circuit any heavy outbound broadcast while this is set.
+        self._silent_rebuild: bool = False
 
     @property
     def status(self) -> dict:
@@ -459,6 +463,19 @@ class ReplayEngine:
 
         logger.info(f"Replaying {len(blocks)} blocks starting from {start_block}")
 
+        # Anchor `_current_block` and progress to the target BEFORE the silent
+        # rebuild kicks in. Without this, every `on_events` broadcast emitted
+        # during rebuild (for state updates) reports the OLD position because
+        # `_current_block` only gets updated inside the main loop below.
+        # That made the orange replay clock and progress bar appear stuck on
+        # the previous time after a seek/seek_time even though the underlying
+        # state had already moved.
+        anchored_block = max(0, min(start_block, len(blocks)))
+        if anchored_block > 0:
+            self._current_block = anchored_block
+            self._progress = anchored_block / max(1, self._total_blocks)
+            self.current_block_timestamp = blocks[anchored_block - 1][0]
+
         # Find the nearest init block at or before start_block for state rebuild
         init_block = 0
         if start_block > 0:
@@ -469,16 +486,29 @@ class ReplayEngine:
 
             # Silently replay init_block → start_block to rebuild state (no delays)
             logger.info(f"Rebuilding state from block {init_block} to {start_block}")
-            for i in range(init_block, min(start_block, len(blocks))):
-                if not self._active:
-                    return
-                self.current_block_timestamp = blocks[i][0]
-                try:
-                    events = self.parser.parse(blocks[i][1])
-                    if events:
-                        await self.on_events(events)
-                except Exception as e:
-                    logger.error(f"Error rebuilding block {i}: {e}")
+            self._silent_rebuild = True
+            try:
+                for i in range(init_block, min(start_block, len(blocks))):
+                    if not self._active:
+                        return
+                    self.current_block_timestamp = blocks[i][0]
+                    try:
+                        events = self.parser.parse(blocks[i][1])
+                        if events:
+                            await self.on_events(events)
+                    except Exception as e:
+                        logger.error(f"Error rebuilding block {i}: {e}")
+            finally:
+                self._silent_rebuild = False
+
+            # Push one explicit replay_status now that the silent rebuild
+            # is done — listeners had their broadcasts suppressed during
+            # rebuild, so the client clock would otherwise stay frozen
+            # until the very first block of the main loop processes.
+            try:
+                await self.on_events([])
+            except Exception as e:
+                logger.warning(f"Post-rebuild replay_status broadcast failed: {e}")
 
         # Now replay from start_block with normal timing
         actual_start = max(start_block, 0)

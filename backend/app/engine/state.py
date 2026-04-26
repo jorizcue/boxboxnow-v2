@@ -191,6 +191,11 @@ class RaceStateManager:
         # First N laps of each stint excluded from the rolling 20-lap mean
         # because tyres are cold. Configurable per circuit (Circuit.warmup_laps_to_skip).
         self.warmup_laps_to_skip: int = 3
+
+        # Set by the user session while the replay engine is in silent
+        # rebuild mode (catching up state from init block to seek target).
+        # Suppresses outbound broadcasts so clients don't get flooded.
+        self._silent_rebuild: bool = False
         self.rain_mode: bool = False
         self.our_kart_number: int = 0
         self.min_pits: int = 3
@@ -277,7 +282,12 @@ class RaceStateManager:
             if event.type == EventType.INIT and event.value == "kart":
                 had_init_kart = True
 
-        if self._ws_clients:
+        # Skip outbound broadcasts while a silent rebuild is in flight (set
+        # by the replay engine during init→target catch-up after a seek).
+        # The local state is still updated above so the simulation lands in
+        # the right shape, but the WS doesn't get spammed with hundreds of
+        # intermediate updates.
+        if self._ws_clients and not getattr(self, "_silent_rebuild", False):
             if had_init_kart or getattr(self, '_needs_snapshot', False):
                 # Send full snapshot when karts init'd or race just started
                 # (so frontend gets updated stintStartCountdownMs values)

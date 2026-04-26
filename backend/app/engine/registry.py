@@ -660,40 +660,52 @@ class ReplaySession:
             # Keep state aware of replay speed for lap-based race countdown simulation
             self.state._replay_speed = getattr(self.engine, '_speed', 1.0)
 
-            # Broadcast replay status to ALL user connections (not just replay
-            # state clients).  This ensures devices on the live state (e.g. iOS
-            # driver view) also learn about replay start/stop and can switch.
-            #
-            # Always broadcast (no currentTime guard) so `active: false` also
-            # gets through when a replay ends. Without this the frontend header
-            # stayed stuck showing "replay in progress" forever, because the
-            # final on_events broadcast happens with active=true and the
-            # completion path (_replay_from's trailing _active=False) never
-            # emitted a follow-up message.
-            status = self.engine.status
-            rs_msg = json.dumps({
-                "type": "replay_status",
-                "data": {
-                    "progress": status["progress"],
-                    "currentTime": status["currentTime"],
-                    "paused": status["paused"],
-                    "active": status["active"],
-                    "speed": status.get("speed", 1),
-                },
-            })
-            # Import lazily to avoid circular dependency
-            from app.ws.server import _ws_connections
-            all_user_ws = _ws_connections.get(self.user_id, set())
-            dead = set()
-            for client in list(all_user_ws):
-                try:
-                    await client.send_text(rs_msg)
-                except Exception:
-                    dead.add(client)
-            # Clean up dead connections from replay state if applicable
-            for c in dead:
-                self.state._ws_clients.discard(c)
-                all_user_ws.discard(c)
+            # During a silent rebuild (the init→target playback after a
+            # seek/seek_time), we still need to update local state so the
+            # simulation arrives at the right snapshot — but we DON'T want
+            # to flood every WS client with hundreds of intermediate
+            # broadcasts. Skipping the heavy broadcast keeps the seek
+            # genuinely instant from the client's perspective.
+            silent = getattr(self.engine, "_silent_rebuild", False)
+            # Propagate so RaceStateManager.handle_events can suppress its
+            # own outbound _broadcast() while in rebuild mode.
+            self.state._silent_rebuild = silent
+
+            if not silent:
+                # Broadcast replay status to ALL user connections (not just replay
+                # state clients).  This ensures devices on the live state (e.g. iOS
+                # driver view) also learn about replay start/stop and can switch.
+                #
+                # Always broadcast (no currentTime guard) so `active: false` also
+                # gets through when a replay ends. Without this the frontend header
+                # stayed stuck showing "replay in progress" forever, because the
+                # final on_events broadcast happens with active=true and the
+                # completion path (_replay_from's trailing _active=False) never
+                # emitted a follow-up message.
+                status = self.engine.status
+                rs_msg = json.dumps({
+                    "type": "replay_status",
+                    "data": {
+                        "progress": status["progress"],
+                        "currentTime": status["currentTime"],
+                        "paused": status["paused"],
+                        "active": status["active"],
+                        "speed": status.get("speed", 1),
+                    },
+                })
+                # Import lazily to avoid circular dependency
+                from app.ws.server import _ws_connections
+                all_user_ws = _ws_connections.get(self.user_id, set())
+                dead = set()
+                for client in list(all_user_ws):
+                    try:
+                        await client.send_text(rs_msg)
+                    except Exception:
+                        dead.add(client)
+                # Clean up dead connections from replay state if applicable
+                for c in dead:
+                    self.state._ws_clients.discard(c)
+                    all_user_ws.discard(c)
 
             # Track pit transitions
             pre_pit_status = {
