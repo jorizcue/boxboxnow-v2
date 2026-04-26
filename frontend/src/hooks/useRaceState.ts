@@ -41,6 +41,17 @@ interface RaceStore {
   setReplayStartBlock: (block: number) => void;
   setReplayCircuitDir: (dir: string) => void;
 
+  // GPS overlay window for the active replay session. Stored globally so
+  // the synced satellite map can be shown from anywhere in the app (GPS
+  // Insights tab) and survive tab switches without losing the marker.
+  replayGpsOverlay: {
+    circuitId: number;
+    kartNumber: number | null;
+    windowStart: string;   // ISO timestamp
+    windowEnd: string;     // ISO timestamp
+  } | null;
+  setReplayGpsOverlay: (overlay: RaceStore["replayGpsOverlay"]) => void;
+
   // WS reconnect trigger - increment to force WS to close and reconnect
   wsReconnectTrigger: number;
   requestWsReconnect: () => void;
@@ -112,8 +123,15 @@ export const useRaceStore = create<RaceStore>((set) => ({
       replayTime: currentTime,
       replaySpeed: speed !== undefined ? speed : s.replaySpeed,
       replayTotalBlocks: totalBlocks !== undefined ? totalBlocks : s.replayTotalBlocks,
+      // When replay stops, also drop the GPS overlay so the panel hides
+      // automatically — the user explicitly opted in by hitting Play, so
+      // we shouldn't keep it ghosting on the GPS Insights tab afterwards.
+      replayGpsOverlay: active ? s.replayGpsOverlay : null,
     })),
   setReplayStartBlock: (block) => set({ replayStartBlock: block }),
+
+  replayGpsOverlay: null,
+  setReplayGpsOverlay: (overlay) => set({ replayGpsOverlay: overlay }),
 
   wsReconnectTrigger: 0,
   requestWsReconnect: () => set((s) => ({ wsReconnectTrigger: s.wsReconnectTrigger + 1 })),

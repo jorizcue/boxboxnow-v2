@@ -6,8 +6,6 @@ import { useRaceStore } from "@/hooks/useRaceState";
 import { useAuth } from "@/hooks/useAuth";
 import { useT } from "@/lib/i18n";
 import { CalendarPicker } from "@/components/shared/CalendarPicker";
-import { useReplayClockMs } from "@/hooks/useReplayClockMs";
-import { ReplayGpsMap } from "@/components/replay/ReplayGpsMap";
 
 // Module-level state for replay — survives tab changes
 let _replaySpeed = 10;
@@ -66,23 +64,11 @@ export function ReplayTab() {
   const [sessionModal, setSessionModal] = useState<SessionModalData | null>(null);
   const [downloading, setDownloading] = useState(false);
 
-  // GPS replay overlay window. Set when the user clicks "Play" on a session
-  // — points the ReplayGpsMap to fetch the GPS laps that finished within
-  // [windowStart, windowEnd] for the selected circuit/kart.
-  const [replayWindow, setReplayWindow] = useState<{
-    circuitId: number;
-    kartNumber: number | null;
-    windowStart: string;
-    windowEnd: string;
-  } | null>(null);
-
   const {
     requestWsReconnect,
     replayActive, replayPaused, replayProgress, replayTime, setReplayStatus,
+    setReplayGpsOverlay,
   } = useRaceStore();
-
-  // Replay clock ticked at 10 Hz, used to drive the GPS marker animation.
-  const replayClockMs = useReplayClockMs(100);
 
   const setSpeed = (v: number) => { _replaySpeed = v; setSpeedState(v); };
 
@@ -197,33 +183,6 @@ export function ReplayTab() {
 
   return (
     <div className="space-y-4">
-      {/* GPS overlay panel — visible while a replay session is active and we
-          have a resolved circuit_id + window. Renders the satellite map
-          with the marker tracking the current replay clock. */}
-      {replayActive && replayWindow && (
-        <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider font-medium">
-              Posición GPS en directo
-            </h3>
-            <button
-              onClick={() => setReplayWindow(null)}
-              className="text-neutral-500 hover:text-white text-xs transition-colors"
-              title="Ocultar mapa GPS"
-            >
-              Ocultar
-            </button>
-          </div>
-          <ReplayGpsMap
-            circuitId={replayWindow.circuitId}
-            kartNumber={replayWindow.kartNumber}
-            windowStart={replayWindow.windowStart}
-            windowEnd={replayWindow.windowEnd}
-            replayClockMs={replayClockMs}
-          />
-        </div>
-      )}
-
       {/* Date filters */}
       <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
         <div className="flex gap-4 items-end flex-wrap">
@@ -460,14 +419,14 @@ export function ReplayTab() {
                   } catch { /* ignore — no active session is fine */ }
 
                   if (circuit?.circuit_id && startIso && endIso) {
-                    setReplayWindow({
+                    setReplayGpsOverlay({
                       circuitId: circuit.circuit_id,
                       kartNumber: kartNum,
                       windowStart: startIso,
                       windowEnd: endIso,
                     });
                   } else {
-                    setReplayWindow(null);
+                    setReplayGpsOverlay(null);
                   }
 
                   startFromBlock(sm.dayFilename, selectedCircuitDir, sm.raceStart.block);

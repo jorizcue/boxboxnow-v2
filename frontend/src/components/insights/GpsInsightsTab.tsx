@@ -8,6 +8,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import { useRaceStore } from "@/hooks/useRaceState";
+import { useReplayClockMs } from "@/hooks/useReplayClockMs";
 import type { CircuitOption, GpsLapDetail, GpsLapSummary, GpsStats, LatLon } from "./types";
 import {
   formatDateShort,
@@ -27,6 +29,7 @@ import { ApexList } from "./ApexList";
 import { MicrosectorTable } from "./MicrosectorTable";
 import { ConsistencyView } from "./ConsistencyView";
 import { SpeedHeatmap } from "./SpeedHeatmap";
+import { ReplayGpsMap } from "@/components/replay/ReplayGpsMap";
 
 type ViewMode = "list" | "detail" | "compare" | "consistency" | "heatmap";
 
@@ -38,6 +41,16 @@ function lapTimeColor(ms: number, bestMs: number, avgMs: number): string {
 }
 
 export function GpsInsightsTab() {
+  // ── Replay overlay (live during a replay session) ──────────────────
+  // The overlay state (circuit/kart/window) is set in ReplayTab when the
+  // user hits Play, and lives in the global race store so this panel
+  // survives switching tabs and coming back. The replay clock is
+  // interpolated locally at 10 Hz to drive the marker animation.
+  const replayActive = useRaceStore((s) => s.replayActive);
+  const replayGpsOverlay = useRaceStore((s) => s.replayGpsOverlay);
+  const setReplayGpsOverlay = useRaceStore((s) => s.setReplayGpsOverlay);
+  const replayClockMs = useReplayClockMs(100);
+
   // ── Circuit list & filter ───────────────────────────────────────────
   const [circuits, setCircuits] = useState<CircuitOption[]>([]);
   const [selectedCircuit, setSelectedCircuit] = useState<number | null>(null);
@@ -222,6 +235,37 @@ export function GpsInsightsTab() {
 
   return (
     <div className="space-y-4">
+      {/* Live GPS marker synced to the active replay session. The overlay
+          window is populated by ReplayTab when Play is pressed and lives in
+          the global store, so this panel persists across tab switches. */}
+      {replayActive && replayGpsOverlay && (
+        <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider font-medium flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              Posición GPS en directo
+              <span className="text-neutral-500 font-normal normal-case tracking-normal">
+                · sincronizado con replay
+              </span>
+            </h3>
+            <button
+              onClick={() => setReplayGpsOverlay(null)}
+              className="text-neutral-500 hover:text-white text-xs transition-colors"
+              title="Ocultar mapa GPS"
+            >
+              Ocultar
+            </button>
+          </div>
+          <ReplayGpsMap
+            circuitId={replayGpsOverlay.circuitId}
+            kartNumber={replayGpsOverlay.kartNumber}
+            windowStart={replayGpsOverlay.windowStart}
+            windowEnd={replayGpsOverlay.windowEnd}
+            replayClockMs={replayClockMs}
+          />
+        </div>
+      )}
+
       {/* ── Header + filter + stats ────────────────────────────────── */}
       <div className="bg-white/[0.03] rounded-xl p-4 border border-border">
         <div className="flex items-center justify-between flex-wrap gap-3">
