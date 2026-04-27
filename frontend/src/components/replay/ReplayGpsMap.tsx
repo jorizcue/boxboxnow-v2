@@ -333,11 +333,29 @@ export function ReplayGpsMap({
         )}
       </div>
       {error && <div className="text-xs text-red-400">{error}</div>}
+      {/* Map container — spinner shown while loading, empty-state when no laps */}
       <div
-        ref={containerRef}
-        className="w-full rounded-lg overflow-hidden border border-border bg-black/40"
+        className="relative w-full rounded-lg overflow-hidden border border-border bg-black/40"
         style={{ height }}
-      />
+      >
+        <div ref={containerRef} className="absolute inset-0" />
+        {loading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 z-10">
+            <div className="w-8 h-8 border-2 border-orange-400/30 border-t-orange-400 rounded-full animate-spin" />
+            <span className="text-[11px] text-neutral-400">Cargando datos GPS…</span>
+          </div>
+        )}
+        {!loading && prepared.length === 0 && !error && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+            <svg className="w-8 h-8 text-neutral-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="text-[11px] text-neutral-600">Sin telemetría GPS para esta ventana</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

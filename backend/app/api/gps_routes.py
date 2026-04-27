@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, or_
 
 from app.models.database import get_db
 from app.models.schemas import GpsTelemetryLap, RaceSession, User
@@ -125,7 +125,14 @@ async def list_laps_window(
         end = end.replace(tzinfo=None)
     q = (
         select(GpsTelemetryLap)
-        .where(GpsTelemetryLap.circuit_id == circuit_id)
+        # Include laps whose circuit_id matches OR is NULL (historical data
+        # that was saved before the circuit link was established).
+        .where(
+            or_(
+                GpsTelemetryLap.circuit_id == circuit_id,
+                GpsTelemetryLap.circuit_id.is_(None),
+            )
+        )
         .where(GpsTelemetryLap.recorded_at >= start)
         .where(GpsTelemetryLap.recorded_at <= end)
     )

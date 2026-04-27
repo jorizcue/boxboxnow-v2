@@ -9,7 +9,12 @@ import { useRaceStore } from "@/hooks/useRaceState";
  * The backend sends replay_status with currentTime (ISO datetime or HH:MM:SS)
  * only when a new message block is processed. This hook interpolates between
  * updates using the replay speed multiplier so the clock advances smoothly.
- * Displays in browser local timezone.
+ *
+ * IMPORTANT: log file timestamps are the server's wall-clock time (UTC).
+ * We display them verbatim — NOT converted to the browser's local timezone —
+ * so "21:20" in the log shows as "21:20" in the clock regardless of where
+ * the browser is. This keeps the display consistent with what the user types
+ * when they want to jump to a specific moment.
  */
 export function useReplayTime(): string {
   const serverTime = useRaceStore((s) => s.replayTime);
@@ -21,17 +26,27 @@ export function useReplayTime(): string {
   const lastServerSecsRef = useRef(0);
   const lastWallRef = useRef(Date.now());
 
-  /** Parse ISO datetime or HH:MM:SS into seconds-of-day (in local timezone) */
+  /**
+   * Parse ISO datetime or HH:MM:SS into seconds-of-day.
+   *
+   * For ISO strings (e.g. "2026-04-25T21:20:10Z") we extract the HH:MM:SS
+   * component directly from the string — NOT via new Date().getHours() which
+   * would shift the value to the browser's local timezone.  The log clock
+   * should display the server's own timestamp as-is.
+   */
   const parseTime = (t: string): number => {
     if (!t) return 0;
-    // ISO datetime format (e.g. "2026-04-05T08:16:11")
-    if (t.includes("T") || t.includes("-")) {
-      const d = new Date(t);
-      if (!isNaN(d.getTime())) {
-        return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+    // ISO datetime: extract time part directly to avoid local-TZ offset
+    if (t.includes("T")) {
+      // "2026-04-25T21:20:10Z" → "21:20:10"
+      const timePart = t.split("T")[1].replace(/[Z+-].*$/, "");
+      const parts = timePart.split(":");
+      if (parts.length >= 2) {
+        return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 +
+          (parts.length >= 3 ? Math.floor(parseFloat(parts[2])) : 0);
       }
     }
-    // HH:MM:SS format (legacy)
+    // HH:MM:SS or HH:MM format (legacy / seek-input)
     const parts = t.split(":");
     if (parts.length === 3) return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
     if (parts.length === 2) return parseInt(parts[0]) * 60 + parseInt(parts[1]);
