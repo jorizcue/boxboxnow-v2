@@ -41,12 +41,15 @@ export function SpeedHistogram({ speeds, bucket = 10, height = 160 }: Props) {
     const plotH = h - pad.top - pad.bottom;
 
     const barW = plotW / counts.length;
+    // Colour scale: red (slow) → orange → yellow → green (fast).
+    // Racing intuition: red = stuck in low speed = problem to fix,
+    // green = spending time at high speed = good.
     const palette = (i: number) => {
       const t = i / Math.max(1, counts.length - 1);
-      if (t < 0.25) return "rgba(96,165,250,0.85)";
-      if (t < 0.5) return "rgba(52,211,153,0.85)";
+      if (t < 0.25) return "rgba(239,68,68,0.85)";
+      if (t < 0.5)  return "rgba(251,146,60,0.85)";
       if (t < 0.75) return "rgba(250,204,21,0.85)";
-      return "rgba(248,113,113,0.85)";
+      return "rgba(74,222,128,0.85)";
     };
 
     counts.forEach((c, i) => {

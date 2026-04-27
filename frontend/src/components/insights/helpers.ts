@@ -192,6 +192,24 @@ export function detectApexes(
   return out;
 }
 
+/** Binary-search for the sample index in `distances` closest to `target`.
+ * Returns the index with the minimum absolute distance difference.
+ * Useful for snapping a hover position to the nearest GPS sample. */
+export function indexAtDist(distances: number[], target: number): number {
+  const n = distances.length;
+  if (n === 0) return 0;
+  if (target <= distances[0]) return 0;
+  if (target >= distances[n - 1]) return n - 1;
+  let lo = 0, hi = n - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (distances[mid] < target) lo = mid + 1;
+    else hi = mid;
+  }
+  if (lo > 0 && Math.abs(distances[lo - 1] - target) < Math.abs(distances[lo] - target)) return lo - 1;
+  return lo;
+}
+
 /** Velocity-bucket histogram. Returns counts per bucket. */
 export function speedHistogram(speeds: number[], bucketKmh = 10, maxKmh?: number): number[] {
   const top = maxKmh ?? Math.ceil(Math.max(...speeds, 0) / bucketKmh) * bucketKmh;

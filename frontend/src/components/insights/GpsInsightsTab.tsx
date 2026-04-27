@@ -64,7 +64,9 @@ export function GpsInsightsTab() {
   const [view, setView] = useState<ViewMode>("list");
   const [detailLap, setDetailLap] = useState<GpsLapDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [colorMode, setColorMode] = useState<"accel" | "speed">("accel");
+  const [colorMode, setColorMode] = useState<"accel" | "speed" | "sectors">("accel");
+  const [detailHoverDist, setDetailHoverDist] = useState<number | null>(null);
+  const [compareHoverDist, setCompareHoverDist] = useState<number | null>(null);
 
   // ── Compare ─────────────────────────────────────────────────────────
   const [compareIds, setCompareIds] = useState<Set<number>>(new Set());
@@ -225,6 +227,18 @@ export function GpsInsightsTab() {
     if (!detailLap || !detailLap.speeds || !detailLap.distances) return [];
     return detectApexes(detailLap.speeds, detailLap.distances);
   }, [detailLap]);
+
+  const compareApexesA = useMemo(() => {
+    const lap = compareLaps[0];
+    if (!lap?.speeds || !lap?.distances) return [];
+    return detectApexes(lap.speeds, lap.distances);
+  }, [compareLaps]);
+
+  const compareApexesB = useMemo(() => {
+    const lap = compareLaps[1];
+    if (!lap?.speeds || !lap?.distances) return [];
+    return detectApexes(lap.speeds, lap.distances);
+  }, [compareLaps]);
 
   const exportLap = (kind: "gpx" | "csv") => {
     if (!detailLap) return;
@@ -525,6 +539,12 @@ export function GpsInsightsTab() {
                       >
                         Velocidad
                       </button>
+                      <button
+                        onClick={() => setColorMode("sectors")}
+                        className={`px-2 py-0.5 rounded ${colorMode === "sectors" ? "bg-accent/20 text-accent" : "text-neutral-500 hover:text-white"}`}
+                      >
+                        Sectores
+                      </button>
                     </div>
                   </div>
                   <TrackMap
@@ -532,6 +552,7 @@ export function GpsInsightsTab() {
                     finishLine={finishLine}
                     colorMode={colorMode}
                     apexes={apexIndices}
+                    hoverDistance={detailHoverDist}
                   />
                   {colorMode === "accel" && (
                     <div className="flex items-center gap-3 mt-2 text-[10px] text-neutral-400">
@@ -562,7 +583,12 @@ export function GpsInsightsTab() {
                     Velocidad vs distancia
                   </div>
                   <div className="bg-black/30 rounded-lg border border-border p-2">
-                    <SpeedTrace lap={detailLap} apexes={apexIndices} height={200} />
+                    <SpeedTrace
+                      lap={detailLap}
+                      apexes={apexIndices}
+                      height={200}
+                      onHoverDistance={setDetailHoverDist}
+                    />
                   </div>
                 </div>
               )}
@@ -636,7 +662,12 @@ export function GpsInsightsTab() {
                   Velocidad superpuesta
                 </div>
                 <div className="bg-black/30 rounded-lg border border-border p-2">
-                  <SpeedTraceCompare lapA={compareLaps[0]} lapB={compareLaps[1]} height={220} />
+                  <SpeedTraceCompare
+                    lapA={compareLaps[0]}
+                    lapB={compareLaps[1]}
+                    height={220}
+                    onHoverDistance={setCompareHoverDist}
+                  />
                 </div>
               </div>
 
@@ -650,11 +681,45 @@ export function GpsInsightsTab() {
                       </span>
                     </div>
                     {lap.positions && lap.positions.length > 1 && (
-                      <TrackMap lap={lap} colorMode="accel" height={260} />
+                      <TrackMap
+                        lap={lap}
+                        colorMode="accel"
+                        height={260}
+                        apexes={i === 0 ? compareApexesA : compareApexesB}
+                        hoverDistance={compareHoverDist}
+                      />
                     )}
                   </div>
                 ))}
               </div>
+
+              {(compareApexesA.length > 0 || compareApexesB.length > 0) && (
+                <div>
+                  <div className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
+                    Apex detectados
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {compareLaps.map((lap, i) => {
+                      const apx = i === 0 ? compareApexesA : compareApexesB;
+                      return (
+                        <div key={lap.id}>
+                          <div className="text-[10px] mb-1.5">
+                            <span className={i === 0 ? "text-blue-400" : "text-orange-400"}>
+                              V{lap.lap_number}
+                            </span>
+                            <span className="text-neutral-500 ml-1.5">({apx.length} apexes)</span>
+                          </div>
+                          {apx.length > 0 ? (
+                            <ApexList lap={lap} apexes={apx} />
+                          ) : (
+                            <div className="text-neutral-600 text-xs">Sin apexes detectados</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="text-neutral-500 text-xs text-center py-8">
