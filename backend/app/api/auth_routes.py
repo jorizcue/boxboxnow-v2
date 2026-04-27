@@ -27,6 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
+from sqlalchemy.orm.exc import StaleDataError
 
 from app.config import get_settings
 from app.models.database import get_db
@@ -368,7 +369,18 @@ async def get_current_user(
         device_session.app_platform = incoming_platform[:16]
     if incoming_version:
         device_session.app_version = incoming_version[:32]
-    await db.commit()
+    try:
+        await db.commit()
+    except StaleDataError:
+        # The device_session row was deleted (concurrent logout, admin kill,
+        # or reconnect that replaced the session) between our SELECT and the
+        # UPDATE that runs at commit time. Treat it as a terminated session so
+        # the client gets a clean 401 instead of a 500.
+        await db.rollback()
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Session terminated. Please log in again.",
+        )
 
     # Get user with tab_access
     result = await db.execute(
