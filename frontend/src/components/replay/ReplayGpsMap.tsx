@@ -176,6 +176,9 @@ export function ReplayGpsMap({
   useEffect(() => {
     if (!containerRef.current || prepared.length === 0) return;
     let cancelled = false;
+    let t1: ReturnType<typeof setTimeout> | null = null;
+    let t2: ReturnType<typeof setTimeout> | null = null;
+
     (async () => {
       const L = await loadLeaflet();
       if (cancelled || !containerRef.current) return;
@@ -184,10 +187,14 @@ export function ReplayGpsMap({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let map: any = mapRef.current;
       if (!map) {
+        // Use SVG renderer (not canvas). The canvas renderer requires
+        // _pxBounds to be set before any layer is added; with async init the
+        // bounds aren't ready in time and Leaflet throws on _clipPoints/min.
+        // SVG doesn't have that constraint and works fine for our layer count.
         map = Lany.map(containerRef.current, {
           zoomControl: true,
           attributionControl: false,
-          preferCanvas: true,
+          renderer: Lany.svg(),
         });
         Lany.tileLayer(
           "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -196,13 +203,30 @@ export function ReplayGpsMap({
         mapRef.current = map;
       }
 
-      // Replace the static trace + marker
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (traceLayerRef.current) map.removeLayer(traceLayerRef.current as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (trailRef.current)      map.removeLayer(trailRef.current as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (markerRef.current)     map.removeLayer(markerRef.current as any);
+      // Set an initial view at the first GPS point before adding any layers.
+      // This forces Leaflet to compute _pxBounds so the SVG/canvas renderer
+      // has valid clip bounds when polylines are first drawn.
+      const firstPt = prepared[0].positions[0];
+      map.setView([firstPt.lat, firstPt.lon], 15);
+      map.invalidateSize();
+
+      // Replace the static trace + marker; guard against partially-added
+      // layers from a previous failed init.
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (traceLayerRef.current) map.removeLayer(traceLayerRef.current as any);
+      } catch { /* ignore */ }
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (trailRef.current) map.removeLayer(trailRef.current as any);
+      } catch { /* ignore */ }
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (markerRef.current) map.removeLayer(markerRef.current as any);
+      } catch { /* ignore */ }
+      traceLayerRef.current = null;
+      trailRef.current = null;
+      markerRef.current = null;
 
       const traceGroup = Lany.layerGroup();
       const allPts: [number, number][] = [];
@@ -219,8 +243,7 @@ export function ReplayGpsMap({
       traceLayerRef.current = traceGroup;
 
       // Marker that follows the replay clock
-      const start = prepared[0].positions[0];
-      const marker = Lany.circleMarker([start.lat, start.lon], {
+      const marker = Lany.circleMarker([firstPt.lat, firstPt.lon], {
         radius: 8,
         color: "#fde047",
         weight: 2.5,
@@ -238,29 +261,30 @@ export function ReplayGpsMap({
       }).addTo(map);
       trailRef.current = trail;
 
-      // Signal that the marker is ready — the animation effect adds this to
-      // its deps so it re-fires immediately without waiting for the next tick.
+      // Signal that the marker is ready so the animation effect fires
+      // immediately without waiting for the next 100ms clock tick.
       setMapReady((v) => v + 1);
 
-      // Fit bounds AFTER invalidateSize so Leaflet knows the container's pixel
-      // dimensions before computing the zoom level. Without this, fitBounds
-      // uses a 0×0 size and the map snaps to a world-view.
+      // Re-fit to the full circuit trace once the container has settled.
+      // Two passes: 150ms (typical) and 700ms (slow layouts / first paint).
       const boundsData = allPts.length >= 2 ? Lany.latLngBounds(allPts) : null;
-      setTimeout(() => {
+      t1 = setTimeout(() => {
+        if (cancelled) return;
         map.invalidateSize();
-        if (boundsData) {
-          map.fitBounds(boundsData, { padding: [40, 40], maxZoom: 18 });
-        }
-      }, 120);
-      // Second pass in case the container's CSS layout settled late.
-      setTimeout(() => {
+        if (boundsData) map.fitBounds(boundsData, { padding: [40, 40], maxZoom: 18 });
+      }, 150);
+      t2 = setTimeout(() => {
+        if (cancelled) return;
         map.invalidateSize();
-        if (boundsData) {
-          map.fitBounds(boundsData, { padding: [40, 40], maxZoom: 18 });
-        }
-      }, 600);
+        if (boundsData) map.fitBounds(boundsData, { padding: [40, 40], maxZoom: 18 });
+      }, 700);
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+      if (t1 !== null) clearTimeout(t1);
+      if (t2 !== null) clearTimeout(t2);
+    };
   }, [prepared]);
 
   // Animate the marker on every replay clock tick
