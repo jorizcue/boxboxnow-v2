@@ -400,13 +400,20 @@ export function ReplayTab() {
                   // active race session (best-effort — null is OK, the
                   // backend will then return all karts' GPS in the window).
                   const circuit = recordingCircuits.find((c) => c.circuit_dir === selectedCircuitDir);
-                  const startIso = sm.raceStart.timestamp;
+                  // Replay log timestamps are in the server's local timezone (no Z).
+                  // GPS recorded_at is stored as UTC. Convert the window boundaries
+                  // to UTC ISO so the backend query compares apples-to-apples.
+                  const toUtcIso = (localIso: string) => {
+                    const d = new Date(localIso); // JS parses no-Z as local → correct
+                    return isNaN(d.getTime()) ? localIso : d.toISOString();
+                  };
+                  const startIso = toUtcIso(sm.raceStart.timestamp);
                   let endIso: string | null = null;
                   if (sm.raceStartIdx + 1 < sm.allStarts.length) {
-                    endIso = sm.allStarts[sm.raceStartIdx + 1].timestamp;
+                    endIso = toUtcIso(sm.allStarts[sm.raceStartIdx + 1].timestamp);
                   }
                   if (!endIso) {
-                    const startDate = new Date(startIso);
+                    const startDate = new Date(startIso); // already UTC at this point
                     if (!isNaN(startDate.getTime())) {
                       endIso = new Date(startDate.getTime() + 4 * 60 * 60 * 1000).toISOString();
                     }

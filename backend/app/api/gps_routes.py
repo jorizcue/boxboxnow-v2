@@ -1,7 +1,7 @@
 """GPS Telemetry endpoints — save and retrieve lap data from RaceBox/phone GPS."""
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
@@ -116,6 +116,13 @@ async def list_laps_window(
     pilots can see their own historic stints overlaid on a replay without
     needing the admin role.
     """
+    # SQLite stores `recorded_at` as naive UTC text. Strip tzinfo from the
+    # query params (which FastAPI may parse as UTC-aware) so SQLAlchemy
+    # generates a plain string comparison that SQLite can evaluate correctly.
+    if start.tzinfo is not None:
+        start = start.replace(tzinfo=None)
+    if end.tzinfo is not None:
+        end = end.replace(tzinfo=None)
     q = (
         select(GpsTelemetryLap)
         .where(GpsTelemetryLap.circuit_id == circuit_id)
@@ -205,6 +212,13 @@ async def gps_stats(
 
 
 def _to_out(row: GpsTelemetryLap, include_traces: bool) -> GpsLapOut:
+    # recorded_at is stored as a naive datetime whose *value* is UTC (it is
+    # written with datetime.now(timezone.utc), but SQLite drops tzinfo).
+    # Re-attach UTC so Pydantic serialises it with "+00:00" and JS
+    # new Date(...) parses it unambiguously as UTC instead of local time.
+    ra = row.recorded_at
+    if ra is not None and ra.tzinfo is None:
+        ra = ra.replace(tzinfo=timezone.utc)
     out = GpsLapOut(
         id=row.id,
         user_id=row.user_id,
@@ -216,7 +230,7 @@ def _to_out(row: GpsTelemetryLap, include_traces: bool) -> GpsLapOut:
         total_distance_m=row.total_distance_m,
         max_speed_kmh=row.max_speed_kmh,
         gps_source=row.gps_source,
-        recorded_at=row.recorded_at,
+        recorded_at=ra,
     )
     if include_traces:
         out.distances = json.loads(row.distances_json) if row.distances_json else None
