@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { msToCountdown } from "@/lib/formatters";
 import { useAuth } from "@/hooks/useAuth";
 import { useT, useLangStore, LANGUAGES } from "@/lib/i18n";
@@ -87,6 +87,8 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
   // fast-forwarding through messages on the client side.
   const [timeEditing, setTimeEditing] = useState(false);
   const [timeInput, setTimeInput] = useState("");
+  const [seeking, setSeeking] = useState(false);
+  const seekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startTimeEdit = useCallback(() => {
     setTimeInput(replayTime || "");
@@ -99,8 +101,22 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
     if (!v) return;
     // Accept HH:MM:SS or HH:MM (basic validation — backend rejects junk).
     if (!/^\d{1,2}:\d{2}(:\d{2})?$/.test(v)) return;
-    try { await api.seekReplayTime(v); } catch { /* ignore */ }
+    setSeeking(true);
+    // Safety: clear spinner after 10s even if no WS update arrives.
+    if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
+    seekTimeoutRef.current = setTimeout(() => setSeeking(false), 10_000);
+    try { await api.seekReplayTime(v); } catch { setSeeking(false); }
   }, [timeInput]);
+
+  // Clear the seeking spinner as soon as the backend confirms the new position
+  // by pushing a replay_status update (replayTime changes).
+  useEffect(() => {
+    if (seeking) {
+      setSeeking(false);
+      if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replayTime]);
 
   const cancelTimeEdit = useCallback(() => {
     setTimeEditing(false);
@@ -225,7 +241,9 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
 
                 {/* Replay time — clickable, opens an inline HH:MM:SS input
                     that jumps the replay to that exact wall-clock moment via
-                    /api/replay/seek_time (no fast-forwarding). */}
+                    /api/replay/seek_time (no fast-forwarding).
+                    While seeking, shows a spinner + the requested time so
+                    the user knows the jump is in progress. */}
                 {timeEditing ? (
                   <input
                     type="text"
@@ -240,6 +258,14 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
                     placeholder="HH:MM:SS"
                     className="w-[78px] sm:w-[88px] text-[10px] sm:text-[11px] bg-orange-400/10 border border-orange-400/40 rounded px-1.5 py-0.5 text-orange-300 font-mono font-semibold focus:outline-none focus:border-orange-400 placeholder:text-orange-400/40"
                   />
+                ) : seeking ? (
+                  <span className="flex items-center gap-1 text-orange-300 font-mono font-semibold text-[10px] sm:text-[11px]">
+                    <svg className="w-3 h-3 animate-spin shrink-0" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 100 16 8 8 0 01-8-8z" />
+                    </svg>
+                    <span className="opacity-60">{timeInput}</span>
+                  </span>
                 ) : (
                   replayTime && (
                     <button
