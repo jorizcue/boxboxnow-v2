@@ -63,8 +63,17 @@ class ApexApiClient:
 
     def extract_drivers(self, html: str) -> list[dict]:
         """
-        Exact port of websocket_Secuencial.py extract_drivers().
-        Parses driver info from INF API response.
+        Parses driver info from an INF API response.
+
+        Handles two formats:
+          - Individual kart:  D7458.INF#<driver id="7458" name="IVAN GARCÍA" .../>
+          - Team kart:        <driver id="16967" name="TMS RACING #PRO" ...>
+                                <driver id="16969" name="HERMIER Carl" current="1"/>
+                                ...
+                              </driver>
+
+        For team responses the outer <driver> is the team container; we skip it
+        and return only the leaf (nested) drivers.
 
         Returns list of {"id": str, "name": str, "is_current": bool}
         """
@@ -75,6 +84,9 @@ class ApexApiClient:
             soup = BeautifulSoup(html, "html.parser")
             drivers = []
             for driver in soup.find_all("driver"):
+                # Skip team containers: they have at least one nested <driver> child.
+                if driver.find("driver"):
+                    continue
                 driver_id = driver.get("id")
                 name = driver.get("name")
                 is_current = driver.get("current") == "1"

@@ -4,6 +4,7 @@ CircuitHub architecture: users are auto-subscribed to their circuit's
 message stream when they have an active session. No manual connect needed.
 """
 
+import asyncio
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from app.models.schemas import User
@@ -219,33 +220,66 @@ async def disconnect_monitoring(request: Request, user: User = Depends(get_curre
 @router.get("/live-teams")
 async def get_live_teams(request: Request, user: User = Depends(get_current_user)):
     """Get teams and drivers currently visible in the live timing.
+
+    If the circuit has a PHP API port configured, fetches full driver lists
+    (including all stint drivers for endurance karts) in parallel from the
+    Apex PHP API.  Falls back to the driver_name already in the kart state
+    when the API is not configured or a request fails.
+
     Returns data suitable for importing into team_positions + team_drivers.
     """
-    state = _get_user_state(request, user)
+    registry = request.app.state.registry
+    user_session = registry.get(user.id)
 
-    if not state.karts:
+    if not user_session or not user_session.state.karts:
         return {"teams": [], "hasDrivers": False}
 
-    sorted_karts = sorted(state.karts.values(), key=lambda k: k.position or 999)
+    sorted_karts = sorted(
+        user_session.state.karts.values(), key=lambda k: k.position or 999
+    )
+
+    # Determine whether we can hit the PHP API for detailed driver lists.
+    api_client = user_session.api_client
+    use_api = bool(api_client and api_client.php_api_port)
+
+    async def _fetch_drivers(kart) -> list[dict]:
+        """Return driver list for one kart; never raises."""
+        row_id = getattr(kart, "row_id", None)
+        if use_api and row_id:
+            try:
+                html = await api_client.request_api(row_id, "INF")
+                if html:
+                    parsed = api_client.extract_drivers(html)
+                    if parsed:
+                        return parsed
+            except Exception as exc:
+                logger.warning(
+                    "PHP API driver fetch failed for kart %s (%s): %s",
+                    kart.kart_number, row_id, exc,
+                )
+        # Fallback: use the driver_name already present in the kart state.
+        if kart.driver_name and kart.driver_name.strip():
+            return [{"id": "", "name": kart.driver_name.strip(), "is_current": True}]
+        return []
+
+    # Fetch all karts in parallel — total time ≈ max(individual latencies).
+    driver_lists = await asyncio.gather(*[_fetch_drivers(k) for k in sorted_karts])
 
     teams = []
     has_any_drivers = False
 
-    for i, kart in enumerate(sorted_karts):
+    for i, (kart, drivers) in enumerate(zip(sorted_karts, driver_lists)):
         team_data = {
             "position": i + 1,
             "kart": kart.kart_number,
             "team_name": kart.team_name,
-            "drivers": [],
+            "drivers": [
+                {"driver_name": d["name"], "differential_ms": 0}
+                for d in drivers
+            ],
         }
-
-        if kart.driver_name and kart.driver_name.strip():
+        if drivers:
             has_any_drivers = True
-            team_data["drivers"].append({
-                "driver_name": kart.driver_name.strip(),
-                "differential_ms": 0,
-            })
-
         teams.append(team_data)
 
     return {
