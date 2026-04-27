@@ -119,6 +119,9 @@ export function ReplayGpsMap({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hud, setHud] = useState<{ lap: number; speed: number; accel: number } | null>(null);
+  // Bumped every time the map/marker is (re-)initialised so the animation
+  // effect re-runs immediately instead of waiting for the next clock tick.
+  const [mapReady, setMapReady] = useState(0);
 
   // Fetch GPS laps for the replay window once per (circuit, kart, window) change
   useEffect(() => {
@@ -207,9 +210,9 @@ export function ReplayGpsMap({
         const segPts = lap.positions.map((p) => [p.lat, p.lon]) as [number, number][];
         allPts.push(...segPts);
         Lany.polyline(segPts, {
-          color: "rgba(255,255,255,0.30)",
-          weight: 2,
-          opacity: 0.7,
+          color: "rgba(255,255,255,0.55)",
+          weight: 2.5,
+          opacity: 0.85,
         }).addTo(traceGroup);
       }
       traceGroup.addTo(map);
@@ -218,9 +221,9 @@ export function ReplayGpsMap({
       // Marker that follows the replay clock
       const start = prepared[0].positions[0];
       const marker = Lany.circleMarker([start.lat, start.lon], {
-        radius: 7,
+        radius: 8,
         color: "#fde047",
-        weight: 2,
+        weight: 2.5,
         fillColor: "#facc15",
         fillOpacity: 0.95,
       }).addTo(map);
@@ -229,18 +232,33 @@ export function ReplayGpsMap({
       // Trail polyline (last few seconds of marker history) — short and
       // dynamic, redrawn on every animation tick.
       const trail = Lany.polyline([], {
-        color: "rgba(250,204,21,0.8)",
+        color: "rgba(250,204,21,0.85)",
         weight: 4,
-        opacity: 0.9,
+        opacity: 0.95,
       }).addTo(map);
       trailRef.current = trail;
 
-      // Fit bounds to the full circuit trace
-      if (allPts.length >= 2) {
-        const bounds = Lany.latLngBounds(allPts);
-        map.fitBounds(bounds, { padding: [30, 30] });
-      }
-      setTimeout(() => map.invalidateSize(), 60);
+      // Signal that the marker is ready — the animation effect adds this to
+      // its deps so it re-fires immediately without waiting for the next tick.
+      setMapReady((v) => v + 1);
+
+      // Fit bounds AFTER invalidateSize so Leaflet knows the container's pixel
+      // dimensions before computing the zoom level. Without this, fitBounds
+      // uses a 0×0 size and the map snaps to a world-view.
+      const boundsData = allPts.length >= 2 ? Lany.latLngBounds(allPts) : null;
+      setTimeout(() => {
+        map.invalidateSize();
+        if (boundsData) {
+          map.fitBounds(boundsData, { padding: [40, 40], maxZoom: 18 });
+        }
+      }, 120);
+      // Second pass in case the container's CSS layout settled late.
+      setTimeout(() => {
+        map.invalidateSize();
+        if (boundsData) {
+          map.fitBounds(boundsData, { padding: [40, 40], maxZoom: 18 });
+        }
+      }, 600);
     })();
     return () => { cancelled = true; };
   }, [prepared]);
@@ -296,7 +314,7 @@ export function ReplayGpsMap({
     if (marker) {
       marker.setStyle({ color: accelColor(accel), fillColor: accelColor(accel) });
     }
-  }, [replayClockMs, prepared]);
+  }, [replayClockMs, prepared, mapReady]);
 
   // Cleanup on unmount
   useEffect(() => {

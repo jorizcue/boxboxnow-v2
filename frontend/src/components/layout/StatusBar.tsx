@@ -11,6 +11,36 @@ import { api } from "@/lib/api";
 import { StyledSelect } from "@/components/shared/StyledSelect";
 import { SessionManager } from "@/components/auth/SessionManager";
 
+/** Parse HH:MM:SS (or HH:MM) into total seconds; returns -1 on failure. */
+function parseHMS(t: string): number {
+  if (!t) return -1;
+  const parts = t.split(":");
+  if (parts.length === 3) return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+  if (parts.length === 2) return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+  return -1;
+}
+
+/**
+ * Convert a local-time HH:MM:SS string to its UTC equivalent.
+ * The orange clock now shows local time, but the backend's seek_time
+ * endpoint searches log timestamps which are stored in UTC — so we
+ * must convert back before sending.
+ */
+function localHmsToUtcHms(hms: string): string {
+  const parts = hms.split(":");
+  if (parts.length < 2) return hms;
+  const now = new Date();
+  const d = new Date(
+    now.getFullYear(), now.getMonth(), now.getDate(),
+    parseInt(parts[0]), parseInt(parts[1]),
+    parts.length >= 3 ? parseInt(parts[2]) : 0,
+  );
+  const h = d.getUTCHours();
+  const m = d.getUTCMinutes();
+  const s = d.getUTCSeconds();
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
 interface StatusBarProps {
   connected: boolean;
   trackName: string;
@@ -105,18 +135,26 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
     // Safety: clear spinner after 10s even if no WS update arrives.
     if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
     seekTimeoutRef.current = setTimeout(() => setSeeking(false), 10_000);
-    try { await api.seekReplayTime(v); } catch { setSeeking(false); }
+    // The orange clock now shows local time, but the backend searches UTC
+    // log timestamps — convert before sending.
+    const utcTime = localHmsToUtcHms(v);
+    try { await api.seekReplayTime(utcTime); } catch { setSeeking(false); }
   }, [timeInput]);
 
-  // Clear the seeking spinner as soon as the backend confirms the new position
-  // by pushing a replay_status update (replayTime changes).
+  // Clear the seeking spinner once the replay clock reaches within ±5 s of
+  // the requested time. Comparing times (not just "any change") prevents the
+  // spinner from vanishing on every regular 1-s clock tick while the backend
+  // is still processing the seek.
   useEffect(() => {
-    if (seeking) {
+    if (!seeking || !replayTime || !timeInput) return;
+    const requestedSecs = parseHMS(timeInput);
+    const currentSecs = parseHMS(replayTime);
+    if (requestedSecs < 0 || currentSecs < 0) return;
+    if (Math.abs(currentSecs - requestedSecs) <= 5) {
       setSeeking(false);
       if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [replayTime]);
+  }, [replayTime, seeking, timeInput]);
 
   const cancelTimeEdit = useCallback(() => {
     setTimeEditing(false);

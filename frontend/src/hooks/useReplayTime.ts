@@ -10,11 +10,10 @@ import { useRaceStore } from "@/hooks/useRaceState";
  * only when a new message block is processed. This hook interpolates between
  * updates using the replay speed multiplier so the clock advances smoothly.
  *
- * IMPORTANT: log file timestamps are the server's wall-clock time (UTC).
- * We display them verbatim — NOT converted to the browser's local timezone —
- * so "21:20" in the log shows as "21:20" in the clock regardless of where
- * the browser is. This keeps the display consistent with what the user types
- * when they want to jump to a specific moment.
+ * IMPORTANT: log file timestamps are stored in UTC on the server. We convert
+ * them to the browser's local timezone for display (so a race at 21:20 UTC
+ * shows as "23:20" for a user in Spain UTC+2). The GPS sync clock
+ * (useReplayClockMs) always works in UTC epoch — only the display is local.
  */
 export function useReplayTime(): string {
   const serverTime = useRaceStore((s) => s.replayTime);
@@ -26,24 +25,15 @@ export function useReplayTime(): string {
   const lastServerSecsRef = useRef(0);
   const lastWallRef = useRef(Date.now());
 
-  /**
-   * Parse ISO datetime or HH:MM:SS into seconds-of-day.
-   *
-   * For ISO strings (e.g. "2026-04-25T21:20:10Z") we extract the HH:MM:SS
-   * component directly from the string — NOT via new Date().getHours() which
-   * would shift the value to the browser's local timezone.  The log clock
-   * should display the server's own timestamp as-is.
-   */
   const parseTime = (t: string): number => {
     if (!t) return 0;
-    // ISO datetime: extract time part directly to avoid local-TZ offset
+    // ISO datetime: parse as UTC and convert to the browser's local timezone
+    // so the replay clock displays the same wall-clock moment the user
+    // experienced at the track (e.g. "23:20" Spain local, not "21:20" UTC).
     if (t.includes("T")) {
-      // "2026-04-25T21:20:10Z" → "21:20:10"
-      const timePart = t.split("T")[1].replace(/[Z+-].*$/, "");
-      const parts = timePart.split(":");
-      if (parts.length >= 2) {
-        return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 +
-          (parts.length >= 3 ? Math.floor(parseFloat(parts[2])) : 0);
+      const d = new Date(t);
+      if (!isNaN(d.getTime())) {
+        return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
       }
     }
     // HH:MM:SS or HH:MM format (legacy / seek-input)
