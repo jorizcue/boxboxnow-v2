@@ -30,6 +30,7 @@ interface SessionModalData {
   dayFilename: string;
   allStarts: RaceStartMarker[];
   totalBlocks: number;
+  logEndTime: string | null;  // endTime of the whole log file
 }
 
 interface RecordingCircuit {
@@ -333,6 +334,7 @@ export function ReplayTab() {
                                     dayFilename: day.filename,
                                     allStarts: day.analysis!.raceStarts,
                                     totalBlocks: day.analysis!.totalBlocks,
+                                    logEndTime: day.analysis!.endTime ?? null,
                                   });
                                 }
                               }}
@@ -394,17 +396,18 @@ export function ReplayTab() {
                   if (!selectedCircuitDir) return;
 
                   // Resolve the circuit_id and the GPS time window for the
-                  // session being played. windowEnd defaults to the next
-                  // race start in the same log; if there isn't one, fall
-                  // back to +4h. kartNumber comes from the user's currently
-                  // active race session (best-effort — null is OK, the
-                  // backend will then return all karts' GPS in the window).
+                  // session being played. windowEnd is (in order of preference):
+                  //   1. Next race start timestamp in the same log
+                  //   2. End of the log file (logEndTime) — covers the whole day
+                  //      so GPS data recorded at any point in the session is found
+                  //   3. +24h fallback (should never be needed)
+                  // kartNumber comes from the user's currently active race session
+                  // (best-effort — null is OK, the backend returns all karts).
                   const circuit = recordingCircuits.find((c) => c.circuit_dir === selectedCircuitDir);
-                  // Replay log timestamps are in the server's local timezone (no Z).
-                  // GPS recorded_at is stored as UTC. Convert the window boundaries
-                  // to UTC ISO so the backend query compares apples-to-apples.
+                  // Log timestamps have "Z" (server is UTC). toISOString() is a no-op
+                  // for Z strings but normalises any edge-case local strings.
                   const toUtcIso = (localIso: string) => {
-                    const d = new Date(localIso); // JS parses no-Z as local → correct
+                    const d = new Date(localIso);
                     return isNaN(d.getTime()) ? localIso : d.toISOString();
                   };
                   const startIso = toUtcIso(sm.raceStart.timestamp);
@@ -412,10 +415,15 @@ export function ReplayTab() {
                   if (sm.raceStartIdx + 1 < sm.allStarts.length) {
                     endIso = toUtcIso(sm.allStarts[sm.raceStartIdx + 1].timestamp);
                   }
+                  // Use the log's own endTime so GPS data recorded anywhere in the
+                  // session is within the window (avoids the old +4h truncation).
+                  if (!endIso && sm.logEndTime) {
+                    endIso = toUtcIso(sm.logEndTime);
+                  }
                   if (!endIso) {
-                    const startDate = new Date(startIso); // already UTC at this point
+                    const startDate = new Date(startIso);
                     if (!isNaN(startDate.getTime())) {
-                      endIso = new Date(startDate.getTime() + 4 * 60 * 60 * 1000).toISOString();
+                      endIso = new Date(startDate.getTime() + 24 * 60 * 60 * 1000).toISOString();
                     }
                   }
                   let kartNum: number | null = null;
