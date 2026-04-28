@@ -30,10 +30,25 @@ from app.models.schemas import DocChunk
 
 logger = logging.getLogger(__name__)
 
-# Default: docs/chatbot/ at the repo root, regardless of where Python is
-# run from. The backend lives at /backend/app/chatbot/, so the repo root
-# is two parents up from this file.
-DEFAULT_DOCS_DIR = Path(__file__).resolve().parents[3] / "docs" / "chatbot"
+# Default docs location. Two layouts to support:
+#   - Local dev: <repo_root>/docs/chatbot, with the backend living at
+#     <repo_root>/backend/app/chatbot/ingest.py (parents[3] = repo root).
+#   - Docker container: docs/ is mounted at /app/docs (see docker-compose.yml),
+#     and ingest.py lives at /app/app/chatbot/ingest.py (parents[2] = /app).
+# We try both and use whichever exists.
+def _resolve_default_docs_dir() -> Path:
+    here = Path(__file__).resolve()
+    candidates = [
+        here.parents[2] / "docs" / "chatbot",   # container layout
+        here.parents[3] / "docs" / "chatbot",   # local dev layout
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    return candidates[0]  # fall back so the error message is informative
+
+
+DEFAULT_DOCS_DIR = _resolve_default_docs_dir()
 
 # Target chunk size in characters. ~500 tokens for Spanish. Small enough
 # to fit several chunks in the LLM context, big enough that the chunk

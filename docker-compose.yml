@@ -6,6 +6,10 @@ services:
     volumes:
       - ./backend/data:/app/data
       - ./logs:/app/data/logs
+      # Chatbot documentation, read-only. Mounted so editing docs/ on
+      # the host and re-running `python -m app.chatbot.ingest --reset`
+      # picks up the new content without an image rebuild.
+      - ./docs:/app/docs:ro
     env_file:
       - .env
     restart: unless-stopped
