@@ -66,6 +66,10 @@ struct DriverView: View {
                                 .foregroundColor(.gray)
                                 .font(.caption)
                         }
+                    } else if myKart?.isInPit == true {
+                        // Kart is in pit — show a dedicated full-screen card instead
+                        // of the normal grid. Restores automatically on pit-out.
+                        PitInProgressView(kart: myKart)
                     } else {
                         // Card grid with contrast/brightness filter applied
                         Group {
@@ -337,7 +341,8 @@ struct DriverView: View {
             if raceVM.boxCallActive {
                 // Heavy haptic for BOX call
                 UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
+                // Auto-dismiss after 5 seconds (mirrors Android BoxCallOverlay)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                     raceVM.boxCallActive = false
                 }
             }
@@ -492,5 +497,41 @@ struct DriverView: View {
             boxScore: raceVM.boxScore,
             lapsToMaxStint: stintCalc.lapsToMax
         )
+    }
+}
+
+// MARK: - Pit In Progress
+
+/// Shown while our kart's pitStatus == "in_pit". Replaces the card grid so the
+/// driver sees a clear "pit in progress" indicator instead of stale race data.
+/// Restores to the normal card grid automatically when pitStatus returns to "racing".
+private struct PitInProgressView: View {
+    let kart: KartState?
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            VStack(spacing: 20) {
+                Text("PIT")
+                    .font(.system(size: 90, weight: .black, design: .monospaced))
+                    .foregroundColor(.green)
+
+                Text("EN CURSO")
+                    .font(.system(size: 22, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.55))
+                    .kerning(6)
+
+                if let k = kart, k.pitCount > 0 {
+                    Text("PARADA #\(k.pitCount)")
+                        .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                        .foregroundColor(Color.green.opacity(0.75))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 8)
+                        .background(Color.green.opacity(0.1))
+                        .cornerRadius(8)
+                }
+            }
+        }
     }
 }
