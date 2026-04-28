@@ -26,6 +26,7 @@ import { CircuitSelector } from "@/components/checkout/CircuitSelector";
 import { EmbeddedCheckout } from "@/components/checkout/EmbeddedCheckout";
 import { AccountPanel } from "@/components/account/AccountPanel";
 import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
+import { ChatWidget } from "@/components/chat/ChatWidget";
 
 export default function DashboardPage() {
   const { token, user, _hydrated, updateUser } = useAuth();
@@ -274,6 +275,9 @@ function Dashboard({
           {activeTab === "admin-marketing" && user?.is_admin && <AdminMarketingPanel />}
         </main>
       </div>
+      {/* Floating support chatbot — visible only when user has the `chat`
+          permission (or is admin). Self-gated inside the component. */}
+      <ChatWidget />
     </div>
   );
 }

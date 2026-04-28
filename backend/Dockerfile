@@ -10,7 +10,8 @@ RUN pip install --no-cache-dir \
     beautifulsoup4 httpx pandas numpy \
     jenkspy scikit-learn pydantic-settings \
     python-dotenv bcrypt PyJWT \
-    pyotp "qrcode[pil]" stripe resend
+    pyotp "qrcode[pil]" stripe resend \
+    openai
 
 COPY . .
 RUN mkdir -p data/logs

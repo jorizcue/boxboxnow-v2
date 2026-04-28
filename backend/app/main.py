@@ -25,6 +25,7 @@ from app.api.stripe_routes import router as stripe_router
 from app.ws.server import router as ws_router
 from app.api.public_routes import router as public_router
 from app.api.apex_replay_routes import router as apex_replay_router
+from app.chatbot.routes import router as chatbot_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -113,6 +114,7 @@ app.include_router(stripe_router)
 app.include_router(ws_router)
 app.include_router(public_router)
 app.include_router(apex_replay_router)
+app.include_router(chatbot_router)
 
 
 # Redirect Apex Timing JS image references (../commonv2/images/ resolves here)

@@ -60,6 +60,19 @@ class Settings(BaseSettings):
     resend_api_key: str = ""
     from_email: str = "BoxBoxNow <noreply@boxboxnow.com>"
 
+    # Chatbot — RAG support agent on /dashboard.
+    # OpenAI is used only for embeddings (cheap; ~$0.02/M tokens). Groq runs
+    # the LLM on its free tier. Both default to empty so the chat endpoint
+    # responds with a clear "not configured" error if keys aren't set.
+    openai_api_key: str = ""
+    groq_api_key: str = ""
+    chatbot_daily_message_limit: int = 30
+    chatbot_max_input_chars: int = 800
+    chatbot_max_output_tokens: int = 600
+    chatbot_llm_model: str = "llama-3.1-8b-instant"
+    chatbot_embed_model: str = "text-embedding-3-small"
+    chatbot_top_k: int = 5
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @property

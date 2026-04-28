@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Text, UniqueConstraint, Index
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Text, UniqueConstraint, Index, LargeBinary, Date
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.models.database import Base
@@ -421,4 +421,63 @@ class WaitlistEntry(Base):
     name = Column(String(255), nullable=True)
     source = Column(String(50), default="landing")
     created_at = Column(DateTime, server_default=func.now())
+
+
+# ───────────────────────── Chatbot ─────────────────────────
+#
+# RAG-based support chatbot. The ingest CLI splits Markdown docs in
+# `docs/chatbot/` into chunks, embeds each chunk with OpenAI's
+# text-embedding-3-small, and stores the float32 vector as a BLOB. At query
+# time the /api/chat endpoint embeds the user's question, runs cosine
+# similarity in numpy against every chunk (O(N) — fine for ~hundreds of
+# chunks), picks top-k, and feeds them as context to a Groq LLM.
+
+class DocChunk(Base):
+    """One semantically-coherent slice of the documentation, with its
+    embedding stored inline as a float32 BLOB."""
+    __tablename__ = "doc_chunks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source_path = Column(String(255), nullable=False, index=True)   # e.g. "conceptos/circuitos.md"
+    section_title = Column(String(255), nullable=True)              # closest H1/H2/H3 above the chunk
+    content = Column(Text, nullable=False)
+    token_count = Column(Integer, nullable=True)
+    # Float32 little-endian bytes (1536 dims * 4B = 6KB per chunk for OpenAI
+    # text-embedding-3-small). Loaded into numpy at query time.
+    embedding = Column(LargeBinary, nullable=False)
+    embedding_dim = Column(Integer, nullable=False)
+    embedding_model = Column(String(100), nullable=False)
+    indexed_at = Column(DateTime, server_default=func.now())
+
+
+class ChatUsage(Base):
+    """Per-user, per-day usage counter — the hard cap that keeps the LLM
+    bill predictable. Checked & incremented atomically before each
+    completion. A row is created on first message of the day."""
+    __tablename__ = "chat_usage"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    day = Column(Date, primary_key=True)
+    message_count = Column(Integer, default=0, nullable=False)
+    input_tokens = Column(Integer, default=0, nullable=False)
+    output_tokens = Column(Integer, default=0, nullable=False)
+
+
+class ChatMessage(Base):
+    """Persisted history of every chat exchange. Used to continue
+    conversations across reloads and to surface the most-asked questions
+    in admin analytics. Grouped by `session_id` (UUID generated client-
+    side and stored in localStorage)."""
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    session_id = Column(String(36), nullable=False, index=True)
+    role = Column(String(16), nullable=False)   # "user" | "assistant"
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_chat_messages_user_session", "user_id", "session_id", "created_at"),
+    )
 

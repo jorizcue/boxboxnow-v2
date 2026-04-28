@@ -219,6 +219,8 @@ const STANDARD_TAB_OPTIONS: [string, string][] = [
   ["app-config-visualizacion", "App: Visualizacion"],
   ["app-config-plantillas", "App: Plantillas"],
   ["app-config-gps-racebox", "App: GPS RaceBox"],
+  // Support chatbot widget on /dashboard
+  ["chat", "Asistente"],
 ];
 
 const ADMIN_TAB_OPTIONS: [string, string][] = [

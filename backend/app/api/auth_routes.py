@@ -405,6 +405,8 @@ ALL_TABS = [
     # iOS app config sections
     "app-config-carrera", "app-config-box", "app-config-visualizacion",
     "app-config-plantillas", "app-config-gps-racebox",
+    # Support chatbot widget on /dashboard
+    "chat",
 ]
 
 

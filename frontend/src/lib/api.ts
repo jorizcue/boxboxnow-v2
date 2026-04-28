@@ -453,4 +453,19 @@ export const api = {
     qs.set("end", params.end);
     return fetchApi(`/api/gps/laps/window?${qs}`);
   },
+
+  // Support chatbot — RAG-based, answers from docs/chatbot/.
+  chat: (question: string, sessionId?: string | null) =>
+    fetchApi<{
+      answer: string;
+      session_id: string;
+      sources: { source_path: string; section_title: string | null; score: number }[];
+      remaining_today: number;
+    }>("/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        question,
+        session_id: sessionId ?? null,
+      }),
+    }),
 };
