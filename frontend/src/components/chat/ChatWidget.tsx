@@ -1,19 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, Send, X, Loader2, AlertCircle } from "lucide-react";
-import clsx from "clsx";
+import {
+  MessageCircle,
+  Send,
+  X,
+  Loader2,
+  AlertCircle,
+  RotateCcw,
+} from "lucide-react";
 
-import { api } from "@/lib/api";
+import { api, streamChat } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 
 /**
  * Floating support chatbot widget — pinned bottom-right of `/dashboard`.
  *
- * Single-turn RAG: every question is independent (no conversation memory
- * sent to the LLM yet). Messages are persisted server-side under a
- * `session_id` we generate client-side and store in localStorage so the
- * conversation survives reloads.
+ * - Streams the answer via SSE as the LLM emits tokens.
+ * - Persists the conversation server-side under a `session_id` we save in
+ *   localStorage so reopening the widget restores the history.
+ * - "Nueva conversación" button resets to a fresh session.
  */
 
 const STORAGE_KEY = "boxboxnow-chat-session";
@@ -24,6 +30,7 @@ type Role = "user" | "assistant" | "error";
 interface ChatTurn {
   role: Role;
   content: string;
+  streaming?: boolean;
 }
 
 export function ChatWidget() {
@@ -37,6 +44,7 @@ export function ChatWidget() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(null);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -49,7 +57,34 @@ export function ChatWidget() {
     } catch {}
   }, []);
 
-  // Auto-scroll to the latest message when conversation changes.
+  // First time the panel opens with a known session, load history.
+  useEffect(() => {
+    if (!open || historyLoaded || !sessionId || !token) return;
+    let cancelled = false;
+    api
+      .chatHistory(sessionId)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.messages.length > 0) {
+          setTurns(
+            res.messages.map((m) => ({
+              role: m.role === "assistant" ? "assistant" : "user",
+              content: m.content,
+            })),
+          );
+        }
+        setHistoryLoaded(true);
+      })
+      .catch(() => {
+        // Non-fatal; just start with an empty conversation.
+        setHistoryLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, historyLoaded, sessionId, token]);
+
+  // Auto-scroll to the latest message when conversation grows.
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -77,32 +112,94 @@ export function ChatWidget() {
   const allowed = user.is_admin || (user.tab_access || []).includes("chat");
   if (!allowed) return null;
 
+  function resetConversation() {
+    setTurns([]);
+    setSessionId(null);
+    setRemaining(null);
+    setHistoryLoaded(true);   // an empty fresh session needs no fetch
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+  }
+
   async function send() {
     const question = input.trim();
     if (!question || loading) return;
     setInput("");
-    setTurns((prev) => [...prev, { role: "user", content: question }]);
+
+    // Append the user turn and an empty streaming assistant turn straight
+    // away so the UI can update before the first token arrives.
+    setTurns((prev) => [
+      ...prev,
+      { role: "user", content: question },
+      { role: "assistant", content: "", streaming: true },
+    ]);
     setLoading(true);
+
     try {
-      const res = await api.chat(question, sessionId);
-      if (!sessionId) {
-        setSessionId(res.session_id);
-        try { localStorage.setItem(STORAGE_KEY, res.session_id); } catch {}
+      let activeSession = sessionId;
+      for await (const event of streamChat(question, sessionId)) {
+        if (event.type === "meta") {
+          if (!activeSession) {
+            activeSession = event.session_id;
+            setSessionId(event.session_id);
+            try { localStorage.setItem(STORAGE_KEY, event.session_id); } catch {}
+          }
+          setRemaining(event.remaining_today);
+        } else if (event.type === "token") {
+          setTurns((prev) => {
+            const out = [...prev];
+            const last = out[out.length - 1];
+            if (last && last.role === "assistant" && last.streaming) {
+              out[out.length - 1] = {
+                ...last,
+                content: last.content + event.content,
+              };
+            }
+            return out;
+          });
+        } else if (event.type === "error") {
+          setTurns((prev) => {
+            const out = [...prev];
+            // Replace the streaming-empty assistant turn with an error one.
+            const lastIdx = out.length - 1;
+            if (out[lastIdx]?.role === "assistant" && out[lastIdx]?.streaming) {
+              out[lastIdx] = { role: "error", content: event.message };
+            } else {
+              out.push({ role: "error", content: event.message });
+            }
+            return out;
+          });
+        } else if (event.type === "done") {
+          // Mark the last assistant turn as no longer streaming.
+          setTurns((prev) => {
+            const out = [...prev];
+            const last = out[out.length - 1];
+            if (last && last.role === "assistant") {
+              out[out.length - 1] = { ...last, streaming: false };
+            }
+            return out;
+          });
+        }
       }
-      setRemaining(res.remaining_today);
-      setTurns((prev) => [...prev, { role: "assistant", content: res.answer }]);
     } catch (err: any) {
       const msg = (err?.message || "").includes("429")
         ? "Has alcanzado el límite diario de mensajes. Inténtalo mañana."
         : "Error al contactar con el asistente. Inténtalo de nuevo.";
-      setTurns((prev) => [...prev, { role: "error", content: msg }]);
+      setTurns((prev) => {
+        const out = [...prev];
+        const last = out[out.length - 1];
+        if (last?.role === "assistant" && last?.streaming) {
+          out[out.length - 1] = { role: "error", content: msg };
+        } else {
+          out.push({ role: "error", content: msg });
+        }
+        return out;
+      });
     } finally {
       setLoading(false);
     }
   }
 
   function handleKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    // Enter sends, Shift+Enter inserts a newline.
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       send();
@@ -111,7 +208,6 @@ export function ChatWidget() {
 
   return (
     <>
-      {/* Floating trigger button */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
@@ -122,7 +218,6 @@ export function ChatWidget() {
         </button>
       )}
 
-      {/* Chat panel */}
       {open && (
         <div className="fixed bottom-5 right-5 z-[90] flex h-[min(640px,calc(100vh-2.5rem))] w-[min(420px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-2xl border border-accent/30 bg-surface shadow-2xl shadow-black/50">
           {/* Header */}
@@ -136,13 +231,24 @@ export function ChatWidget() {
                 </div>
               </div>
             </div>
-            <button
-              onClick={() => setOpen(false)}
-              className="rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-bg hover:text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
-              aria-label="Cerrar asistente"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={resetConversation}
+                disabled={loading || turns.length === 0}
+                title="Nueva conversación"
+                className="rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-bg hover:text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-400"
+                aria-label="Nueva conversación"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setOpen(false)}
+                className="rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-bg hover:text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
+                aria-label="Cerrar asistente"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           {/* Messages */}
@@ -153,12 +259,6 @@ export function ChatWidget() {
             {turns.map((turn, i) => (
               <Bubble key={i} turn={turn} />
             ))}
-            {loading && (
-              <div className="flex items-center gap-2 text-xs text-neutral-500">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Pensando…
-              </div>
-            )}
           </div>
 
           {/* Footer */}
@@ -218,12 +318,30 @@ function Bubble({ turn }: { turn: ChatTurn }) {
       </div>
     );
   }
+  // assistant
+  const empty = !turn.content;
   return (
     <div className="flex justify-start">
       <div className="max-w-[90%] rounded-2xl rounded-bl-sm border border-border bg-card px-3 py-2 text-sm text-muted">
-        <Markdown text={turn.content} />
+        {empty && turn.streaming ? (
+          <span className="inline-flex items-center gap-2 text-neutral-500">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Pensando…
+          </span>
+        ) : (
+          <>
+            <Markdown text={turn.content} />
+            {turn.streaming && <Caret />}
+          </>
+        )}
       </div>
     </div>
+  );
+}
+
+function Caret() {
+  return (
+    <span className="ml-0.5 inline-block h-3.5 w-1.5 translate-y-[2px] animate-pulse bg-accent/70" />
   );
 }
 
@@ -260,11 +378,6 @@ function EmptyState({ onPick }: { onPick: (q: string) => void }) {
 }
 
 // ─────────────────────── Tiny markdown renderer ───────────────────────
-//
-// Handles the formatting an LLM typically emits — bold (**x**), italic
-// (*x* / _x_), inline code (`x`), bullet lists (- x), numbered lists
-// (1. x) and paragraphs separated by blank lines. Avoids pulling
-// react-markdown (would force a package-lock.json change).
 
 function Markdown({ text }: { text: string }) {
   const blocks = parseBlocks(text);
@@ -312,7 +425,6 @@ function parseBlocks(md: string): Block[] {
     const line = lines[i];
     if (!line.trim()) { i++; continue; }
 
-    // Bullet list
     if (/^\s*[-*]\s+/.test(line)) {
       const items: string[] = [];
       while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
@@ -323,7 +435,6 @@ function parseBlocks(md: string): Block[] {
       continue;
     }
 
-    // Numbered list
     if (/^\s*\d+\.\s+/.test(line)) {
       const items: string[] = [];
       while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
@@ -334,7 +445,6 @@ function parseBlocks(md: string): Block[] {
       continue;
     }
 
-    // Paragraph: collect until blank line
     const buf: string[] = [];
     while (i < lines.length && lines[i].trim() && !/^\s*([-*]|\d+\.)\s+/.test(lines[i])) {
       buf.push(lines[i]);
@@ -347,7 +457,6 @@ function parseBlocks(md: string): Block[] {
 
 /** Renders bold (**x**), italic (*x* or _x_), and inline code. */
 function Inline({ text }: { text: string }) {
-  // Tokenize on the supported markers, preserving order.
   const parts: { kind: "text" | "bold" | "italic" | "code"; value: string }[] = [];
   const re = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*\n]+\*|_[^_\n]+_)/g;
   let last = 0;

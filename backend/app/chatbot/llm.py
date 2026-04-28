@@ -65,16 +65,14 @@ def build_user_message(question: str, chunks: list[dict]) -> str:
 
 
 def complete(question: str, chunks: list[dict]) -> tuple[str, int, int]:
-    """Run a single chat completion. Returns (answer, input_tokens, output_tokens).
-
-    No streaming in MVP — the frontend just spinners while we wait. With
-    Llama 3.1 8B on Groq this typically returns in ~1 second.
-    """
+    """Run a single non-streaming chat completion. Returns
+    (answer, input_tokens, output_tokens). Used by tests / batch tooling;
+    the live endpoint uses `stream_complete` instead."""
     settings = get_settings()
     response = _client().chat.completions.create(
         model=settings.chatbot_llm_model,
         max_tokens=settings.chatbot_max_output_tokens,
-        temperature=0.2,  # low — we want grounded answers, not creativity
+        temperature=0.2,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": build_user_message(question, chunks)},
@@ -85,3 +83,35 @@ def complete(question: str, chunks: list[dict]) -> tuple[str, int, int]:
     in_tokens = usage.prompt_tokens if usage else 0
     out_tokens = usage.completion_tokens if usage else 0
     return answer, in_tokens, out_tokens
+
+
+def stream_complete(question: str, chunks: list[dict]):
+    """Stream a chat completion. Yields chunks of the form:
+        ("token", str)            — a piece of the answer to append
+        ("usage", (int, int))     — (input_tokens, output_tokens) at end
+    Caller is responsible for assembling the full answer if it needs it.
+
+    Groq's OpenAI-compatible SDK supports `stream=True` and includes a
+    final chunk with `usage` populated when `stream_options={"include_usage": True}`.
+    """
+    settings = get_settings()
+    stream = _client().chat.completions.create(
+        model=settings.chatbot_llm_model,
+        max_tokens=settings.chatbot_max_output_tokens,
+        temperature=0.2,
+        stream=True,
+        stream_options={"include_usage": True},
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": build_user_message(question, chunks)},
+        ],
+    )
+    for chunk in stream:
+        # Token deltas from the model.
+        if chunk.choices:
+            delta = chunk.choices[0].delta
+            if delta and delta.content:
+                yield ("token", delta.content)
+        # Final chunk has usage but empty choices.
+        if chunk.usage:
+            yield ("usage", (chunk.usage.prompt_tokens, chunk.usage.completion_tokens))

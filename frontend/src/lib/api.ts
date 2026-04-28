@@ -455,17 +455,118 @@ export const api = {
   },
 
   // Support chatbot — RAG-based, answers from docs/chatbot/.
-  chat: (question: string, sessionId?: string | null) =>
+  // Streaming endpoint, see `streamChat` below for SSE consumption.
+  chatHistory: (sessionId: string, limit = 100) =>
     fetchApi<{
-      answer: string;
       session_id: string;
-      sources: { source_path: string; section_title: string | null; score: number }[];
-      remaining_today: number;
-    }>("/api/chat", {
-      method: "POST",
-      body: JSON.stringify({
-        question,
-        session_id: sessionId ?? null,
-      }),
-    }),
+      messages: { role: string; content: string; created_at: string }[];
+    }>(`/api/chat/history?session_id=${encodeURIComponent(sessionId)}&limit=${limit}`),
+
+  // Admin
+  chatAdminStats: () =>
+    fetchApi<{
+      messages_24h: number;
+      messages_7d: number;
+      messages_30d: number;
+      input_tokens_30d: number;
+      output_tokens_30d: number;
+      estimated_cost_usd_30d: number;
+      indexed_chunks: number;
+      top_users_30d: {
+        user_id: number;
+        username: string;
+        message_count: number;
+        input_tokens: number;
+        output_tokens: number;
+      }[];
+      recent_questions: {
+        user_id: number;
+        username: string;
+        content: string;
+        created_at: string;
+      }[];
+      daily_message_limit: number;
+    }>("/api/chat/admin/stats"),
+
+  chatAdminReindex: () =>
+    fetchApi<{ indexed_chunks: number; duration_s: number }>(
+      "/api/chat/admin/reindex",
+      { method: "POST" }
+    ),
 };
+
+/**
+ * Stream a chatbot answer over Server-Sent Events.
+ *
+ * Yields decoded events of three shapes:
+ *   { type: "meta", session_id, remaining_today }
+ *   { type: "token", content }
+ *   { type: "error", message }
+ *   { type: "done" }
+ *
+ * EventSource doesn't support custom Authorization headers, so we use
+ * fetch + ReadableStream and parse SSE frames manually.
+ */
+export async function* streamChat(
+  question: string,
+  sessionId: string | null,
+): AsyncGenerator<
+  | { type: "meta"; session_id: string; remaining_today: number }
+  | { type: "token"; content: string }
+  | { type: "error"; message: string }
+  | { type: "done" }
+> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "text/event-stream",
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_URL}/api/chat`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ question, session_id: sessionId }),
+  });
+
+  if (res.status === 401) {
+    clearAuth();
+    throw new Error("Unauthorized");
+  }
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`API error ${res.status}: ${body}`);
+  }
+  if (!res.body) {
+    throw new Error("Streaming not supported by this response");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+
+    // SSE frames are separated by a blank line. Split as we go.
+    let idx: number;
+    while ((idx = buf.indexOf("\n\n")) !== -1) {
+      const frame = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+
+      // Each frame may have multiple lines; we only emit the `data:` payload.
+      const dataLine = frame
+        .split("\n")
+        .find((l) => l.startsWith("data:"));
+      if (!dataLine) continue;
+      const json = dataLine.slice(5).trimStart();
+      try {
+        yield JSON.parse(json);
+      } catch {
+        // ignore malformed frames
+      }
+    }
+  }
+}

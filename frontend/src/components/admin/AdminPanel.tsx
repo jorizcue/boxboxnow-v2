@@ -66,7 +66,12 @@ export function AdminHubPanel() {
 }
 
 export function AdminPlatformPanel() {
-  return <PlatformSettingsManager />;
+  return (
+    <>
+      <PlatformSettingsManager />
+      <ChatbotAdminManager />
+    </>
+  );
 }
 
 export function AdminMarketingPanel() {
@@ -2225,3 +2230,200 @@ function PlatformSettingsManager() {
     </div>
   );
 }
+
+// ─── Chatbot Admin Manager ─────────────────────────────────────────────────────
+//
+// Stats + recent questions + reindex button for the support chatbot.
+// Lives inside Plataforma so admins have a single page for backend ops.
+
+interface ChatbotStats {
+  messages_24h: number;
+  messages_7d: number;
+  messages_30d: number;
+  input_tokens_30d: number;
+  output_tokens_30d: number;
+  estimated_cost_usd_30d: number;
+  indexed_chunks: number;
+  top_users_30d: {
+    user_id: number;
+    username: string;
+    message_count: number;
+    input_tokens: number;
+    output_tokens: number;
+  }[];
+  recent_questions: {
+    user_id: number;
+    username: string;
+    content: string;
+    created_at: string;
+  }[];
+  daily_message_limit: number;
+}
+
+function ChatbotAdminManager() {
+  const [stats, setStats] = useState<ChatbotStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reindexing, setReindexing] = useState(false);
+  const [reindexMsg, setReindexMsg] = useState<string | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    api
+      .chatAdminStats()
+      .then((s) => { setStats(s); setLoading(false); })
+      .catch((e) => { setError(e?.message || "Error al cargar"); setLoading(false); });
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const reindex = async () => {
+    if (reindexing) return;
+    setReindexing(true);
+    setReindexMsg(null);
+    try {
+      const res = await api.chatAdminReindex();
+      setReindexMsg(`Reindexado: ${res.indexed_chunks} chunks en ${res.duration_s}s`);
+      load();
+    } catch (e: any) {
+      setReindexMsg(e?.message || "Error al reindexar");
+    } finally {
+      setReindexing(false);
+    }
+  };
+
+  const fmtNum = (n: number) => n.toLocaleString("es-ES");
+  const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleString("es-ES", {
+      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+    });
+
+  return (
+    <div className="p-4 sm:p-6 max-w-5xl border-t border-border mt-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <div>
+          <h2 className="text-lg font-semibold text-white">Asistente — Soporte</h2>
+          <p className="text-sm text-neutral-400 mt-0.5">
+            Uso del chatbot, coste estimado y reindexado de la documentación.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={load}
+            disabled={loading}
+            className="border border-border text-neutral-400 hover:text-white hover:border-accent rounded-lg px-3 py-1.5 text-sm transition-colors"
+          >
+            Refrescar
+          </button>
+          <button
+            onClick={reindex}
+            disabled={reindexing}
+            className="bg-accent hover:bg-accent-hover disabled:opacity-40 text-black font-semibold px-4 py-1.5 rounded-lg text-sm transition-colors"
+          >
+            {reindexing ? "Reindexando…" : "Reindexar docs"}
+          </button>
+        </div>
+      </div>
+
+      {reindexMsg && (
+        <div className="mb-4 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-accent">
+          {reindexMsg}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-neutral-400 text-sm py-12 text-center">Cargando…</div>
+      ) : error ? (
+        <div className="text-red-400 text-sm py-12 text-center">{error}</div>
+      ) : stats ? (
+        <>
+          {/* Stat tiles */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <Tile label="Mensajes 24h" value={fmtNum(stats.messages_24h)} />
+            <Tile label="Mensajes 7d" value={fmtNum(stats.messages_7d)} />
+            <Tile label="Mensajes 30d" value={fmtNum(stats.messages_30d)} />
+            <Tile
+              label="Coste estimado 30d"
+              value={`$${stats.estimated_cost_usd_30d.toFixed(3)}`}
+              hint="OpenAI emb. + Groq paid"
+            />
+            <Tile label="Tokens IN 30d" value={fmtNum(stats.input_tokens_30d)} />
+            <Tile label="Tokens OUT 30d" value={fmtNum(stats.output_tokens_30d)} />
+            <Tile label="Chunks indexados" value={fmtNum(stats.indexed_chunks)} />
+            <Tile
+              label="Cap diario / usuario"
+              value={fmtNum(stats.daily_message_limit)}
+              hint="CHATBOT_DAILY_MESSAGE_LIMIT"
+            />
+          </div>
+
+          {/* Top users */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-white mb-2">Top usuarios (30d)</h3>
+            {stats.top_users_30d.length === 0 ? (
+              <div className="text-neutral-500 text-xs py-4">Sin actividad en los últimos 30 días.</div>
+            ) : (
+              <div className="border border-border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-white/[0.02]">
+                      <th className="text-left px-4 py-2 text-neutral-400 font-medium">Usuario</th>
+                      <th className="text-right px-4 py-2 text-neutral-400 font-medium">Mensajes</th>
+                      <th className="text-right px-4 py-2 text-neutral-400 font-medium hidden sm:table-cell">Tokens IN</th>
+                      <th className="text-right px-4 py-2 text-neutral-400 font-medium hidden sm:table-cell">Tokens OUT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.top_users_30d.map((u) => (
+                      <tr key={u.user_id} className="border-b border-border/50 hover:bg-white/[0.02]">
+                        <td className="px-4 py-2 text-white">{u.username}</td>
+                        <td className="px-4 py-2 text-neutral-200 text-right tabular-nums">{fmtNum(u.message_count)}</td>
+                        <td className="px-4 py-2 text-neutral-400 text-right tabular-nums hidden sm:table-cell">{fmtNum(u.input_tokens)}</td>
+                        <td className="px-4 py-2 text-neutral-400 text-right tabular-nums hidden sm:table-cell">{fmtNum(u.output_tokens)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Recent questions */}
+          <div>
+            <h3 className="text-sm font-semibold text-white mb-2">Preguntas recientes</h3>
+            <p className="text-xs text-neutral-500 mb-2">
+              Últimas 30 preguntas. Útil para detectar qué falta documentar.
+            </p>
+            {stats.recent_questions.length === 0 ? (
+              <div className="text-neutral-500 text-xs py-4">Sin preguntas registradas todavía.</div>
+            ) : (
+              <div className="border border-border rounded-lg divide-y divide-border">
+                {stats.recent_questions.map((q, i) => (
+                  <div key={i} className="px-4 py-2.5 hover:bg-white/[0.02]">
+                    <div className="flex items-baseline justify-between gap-3 mb-0.5">
+                      <span className="text-xs text-accent font-medium">{q.username}</span>
+                      <span className="text-[10px] text-neutral-600 tabular-nums">{fmtDate(q.created_at)}</span>
+                    </div>
+                    <div className="text-sm text-neutral-200">{q.content}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="border border-border rounded-lg bg-card px-3 py-2.5">
+      <div className="text-[10px] uppercase tracking-widest text-neutral-500">{label}</div>
+      <div className="text-xl font-semibold text-white tabular-nums mt-0.5">{value}</div>
+      {hint && <div className="text-[10px] text-neutral-600 mt-0.5">{hint}</div>}
+    </div>
+  );
+}
+
