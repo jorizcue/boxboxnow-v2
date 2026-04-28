@@ -667,10 +667,10 @@ function UsersManager() {
                       <input
                         type="number"
                         min={1}
-                        max={20}
+                        max={1000}
                         value={su.max_devices}
                         onChange={async (e) => {
-                          const val = Math.max(1, Math.min(20, Number(e.target.value)));
+                          const val = Math.max(1, Math.min(1000, Number(e.target.value)));
                           try {
                             await api.updateUser(su.id, { max_devices: val });
                             loadUsers();
@@ -679,7 +679,7 @@ function UsersManager() {
                         className="w-full bg-black border border-border rounded-lg px-3 py-1.5 text-sm text-center font-mono"
                       />
                       <p className="text-[9px] text-neutral-600 mt-1 leading-tight">
-                        Fallback si no hay override.
+                        Fallback si no hay override. Máx 1000 (load tests).
                       </p>
                     </div>
 
