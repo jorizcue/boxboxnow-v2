@@ -2,19 +2,9 @@ import SwiftUI
 
 struct DriverMenuOverlay: View {
     @EnvironmentObject var driverVM: DriverViewModel
-    @EnvironmentObject var gpsVM: GPSViewModel
-    @EnvironmentObject var configVM: ConfigViewModel
     @ObservedObject var speech: DriverSpeechService
     @Binding var isPresented: Bool
     var onDismiss: () -> Void
-
-    /// The active circuit, resolved from configVM. Used in the debug panel
-    /// to compare server-side finish line coordinates with what the
-    /// LapTracker actually has loaded.
-    private var activeCircuit: Circuit? {
-        guard let cid = configVM.session.circuitId else { return nil }
-        return configVM.circuits.first(where: { $0.id == cid })
-    }
 
     var body: some View {
         HStack {
@@ -123,55 +113,6 @@ struct DriverMenuOverlay: View {
                             driverVM.saveConfig()
                         }
 
-                        // GPS / LapTracker debug panel — shows live state so the
-                        // user can diagnose why the delta isn't computing.
-                        // TimelineView refreshes every 0.5s since lapTracker
-                        // isn't bound via @ObservedObject.
-                        TimelineView(.periodic(from: .now, by: 0.5)) { _ in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("GPS / Vueltas (debug)")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    debugRow("Fuente",       gpsVM.source.displayName)
-                                    debugRow("Conectado",    gpsVM.isConnected ? "Si" : "No")
-                                    debugRow("Fix type",     "\(gpsVM.lastSample?.fixType ?? -1)")
-                                    debugRow("Satelites",    "\(gpsVM.lastSample?.numSatellites ?? 0)")
-                                    debugRow("Linea meta",   driverVM.lapTracker.hasFinishLine ? "Si" : "No")
-                                    debugRow("Vueltas",      "\(driverVM.lapTracker.currentLap)")
-                                    debugRow("Mejor (GPS)",  driverVM.lapTracker.bestLapMs.map { Formatters.msToLapTime($0) } ?? "-")
-                                    debugRow("Dist actual",  String(format: "%.0fm", driverVM.lapTracker.currentLapDistanceM))
-                                    debugRow("Dist mejor",   driverVM.lapTracker.bestLapDistanceM.map { String(format: "%.0fm", $0) } ?? "-")
-                                    debugRow("Delta best",   driverVM.lapTracker.deltaBestMs.map { String(format: "%+.2fs", $0/1000) } ?? "-")
-                                }
-                                .padding(8)
-                                .background(Color.black.opacity(0.4))
-                                .cornerRadius(6)
-
-                                // Coordinates: server-side circuit config vs
-                                // what the LapTracker actually loaded. If they
-                                // don't match, applyCircuitFinishLine() didn't
-                                // run or the circuit list is stale.
-                                Text("Coordenadas meta")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                    .padding(.top, 4)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    debugRow("Circuito", activeCircuit?.name ?? "—")
-                                    debugRow("Servidor P1", coord(activeCircuit?.finishLat1, activeCircuit?.finishLon1))
-                                    debugRow("Servidor P2", coord(activeCircuit?.finishLat2, activeCircuit?.finishLon2))
-                                    debugRow("LapTracker P1", coord(driverVM.lapTracker.currentFinishLine?.p1.lat,
-                                                                    driverVM.lapTracker.currentFinishLine?.p1.lon))
-                                    debugRow("LapTracker P2", coord(driverVM.lapTracker.currentFinishLine?.p2.lat,
-                                                                    driverVM.lapTracker.currentFinishLine?.p2.lon))
-                                    debugRow("Pos actual", coord(gpsVM.lastSample?.lat, gpsVM.lastSample?.lon))
-                                }
-                                .padding(8)
-                                .background(Color.black.opacity(0.4))
-                                .cornerRadius(6)
-                            }
-                        }
-
                         // Exit button
                         Button(action: {
                             driverVM.saveConfig()
@@ -200,21 +141,4 @@ struct DriverMenuOverlay: View {
         .animation(.easeInOut(duration: 0.25), value: isPresented)
     }
 
-    @ViewBuilder
-    private func debugRow(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label)
-                .font(.caption2)
-                .foregroundColor(.gray)
-            Spacer()
-            Text(value)
-                .font(.caption2.monospacedDigit())
-                .foregroundColor(.white)
-        }
-    }
-
-    private func coord(_ lat: Double?, _ lon: Double?) -> String {
-        guard let lat, let lon else { return "—" }
-        return String(format: "%.6f, %.6f", lat, lon)
-    }
 }

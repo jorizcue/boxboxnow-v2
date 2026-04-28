@@ -124,6 +124,7 @@ data class KartState(
     val stintElapsedMs: Double? = null,
     val stintStartCountdownMs: Double? = null,
     val stintStartTime: Double? = null,
+    val pitInCountdownMs: Double? = null,
     val tierScore: Double? = null,
     val driverName: String? = null,
     val teamName: String? = null,

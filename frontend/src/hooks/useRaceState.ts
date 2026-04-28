@@ -200,6 +200,7 @@ export const useRaceStore = create<RaceStore>((set) => ({
             break;
           case "pitIn":
             kart.pitStatus = "in_pit";
+            if (typeof ev.pitInCountdownMs === "number") kart.pitInCountdownMs = ev.pitInCountdownMs;
             if (ev.pitRecord) {
               kart.pitHistory = [...(kart.pitHistory || []), ev.pitRecord as any];
             }
@@ -208,6 +209,7 @@ export const useRaceStore = create<RaceStore>((set) => ({
             kart.pitStatus = "racing";
             if (typeof ev.pitCount === "number") kart.pitCount = ev.pitCount;
             if (typeof ev.stintStartCountdownMs === "number") kart.stintStartCountdownMs = ev.stintStartCountdownMs;
+            kart.pitInCountdownMs = undefined;
             kart.stintDurationS = 0;
             kart.stintElapsedMs = 0;
             kart.stintLapsCount = 0;

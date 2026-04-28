@@ -429,10 +429,54 @@ private fun CardContent(
         }
         DriverCard.CurrentPit -> {
             val inPit = ourKart?.pitStatus == "in_pit"
-            if (inPit && ourKart != null) {
-                MonoValue("--", Color(0xFF00BCD4), mainFont)
+            if (inPit) {
+                // pitInCountdownMs sent by backend at pitIn; elapsed = pitIn - raceClock.
+                val pitInCd = ourKart?.pitInCountdownMs ?: 0.0
+                val elapsed = if (pitInCd > 0 && raceClockMs > 0)
+                    max(0.0, pitInCd - raceClockMs) / 1000.0
+                else 0.0
+                val m = elapsed.toInt() / 60
+                val s = elapsed.toInt() % 60
+                val pitM = raceVM.pitTimeS.value.toInt() / 60
+                val pitS = raceVM.pitTimeS.value.toInt() % 60
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    // Pulsing cyan timer (matching web animate-pulse)
+                    val alpha = androidx.compose.animation.core.rememberInfiniteTransition(label = "pitPulse")
+                        .animateFloat(
+                            initialValue = 1f,
+                            targetValue = 0.4f,
+                            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                                animation = androidx.compose.animation.core.tween(1000),
+                                repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+                            ),
+                            label = "pitAlpha",
+                        )
+                    Text(
+                        "$m:${s.toString().padStart(2, '0')}",
+                        color = Color(0xFF00BCD4).copy(alpha = alpha.value),
+                        fontSize = mainFont,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                    )
+                    Text(
+                        "/ $pitM:${pitS.toString().padStart(2, '0')}",
+                        color = BoxBoxNowColors.SystemGray,
+                        fontSize = subFont,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
             } else {
-                MonoValue("--", BoxBoxNowColors.SystemGray4, mainFont)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    MonoValue("--:--", BoxBoxNowColors.SystemGray4, mainFont)
+                    Text(
+                        "inactivo",
+                        color = BoxBoxNowColors.SystemGray4,
+                        fontSize = subFont,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
             }
         }
         DriverCard.PitWindow -> {

@@ -548,15 +548,13 @@ export function DriverView() {
   const pitsDone = ourKartObj?.pitCount ?? 0;
   const pitsMissing = Math.max(0, config.minPits - pitsDone);
   const pitInProgress = ourKartObj?.pitStatus === "in_pit";
-  // Current pit elapsed: matches FifoQueue.pitElapsedSec — (pitTimeS) - stintStartCountdownMs-remaining.
-  // Simpler approximation: use the kart's stintStartCountdownMs to compute elapsed pit seconds.
+  // Elapsed seconds in pit: pitInCountdownMs is the race clock at the moment the kart entered
+  // the pit lane. Elapsed = (pitInCountdownMs − raceClock) / 1000, counting up from 0.
   const pitElapsedSec = (() => {
     if (!ourKartObj || !pitInProgress || raceClock === 0) return 0;
-    // When a kart is in_pit, stintStartCountdownMs represents the race clock at which the pit started
-    // plus pitTimeS. Elapsed = pitTimeS - (stintStartCountdownMs - raceClock) / 1000.
-    const remainingMs = Math.max(0, ourKartObj.stintStartCountdownMs - raceClock);
-    const elapsed = config.pitTimeS - remainingMs / 1000;
-    return Math.max(0, Math.min(config.pitTimeS, elapsed));
+    const pitInCd = ourKartObj.pitInCountdownMs;
+    if (!pitInCd || pitInCd <= 0) return 0;
+    return Math.max(0, (pitInCd - raceClock) / 1000);
   })();
   const pitElapsedStr = (() => {
     const s = Math.round(pitElapsedSec);

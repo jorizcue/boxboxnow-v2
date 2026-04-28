@@ -141,6 +141,7 @@ class KartState:
             "stintStartTime": self.stint_start_time,  # kept for backwards compat
             "stintElapsedMs": self.stint_elapsed_ms,
             "stintStartCountdownMs": self.stint_start_countdown_ms,
+            "pitInCountdownMs": self.pit_in_countdown_ms if self.pit_in_countdown_ms else None,
             "pitHistory": [p.to_dict() for p in self.pit_history],
             "driverTotalMs": self.driver_total_ms,
             "driverAvgLapMs": self.driver_avg_lap_ms_map(),
@@ -490,6 +491,7 @@ class RaceStateManager:
                     "kartNumber": kart.kart_number,
                     "pitCount": kart.pit_count,
                     "lap": kart.total_laps,
+                    "pitInCountdownMs": kart.pit_in_countdown_ms,
                     "pitRecord": pit_record.to_dict()}
 
         elif event.type == EventType.PIT_OUT and kart:

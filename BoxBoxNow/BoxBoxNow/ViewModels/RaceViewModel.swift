@@ -463,12 +463,24 @@ final class RaceViewModel: ObservableObject {
         case "pitIn":
             karts[kartIdx].pitStatus = "in_pit"
             if let pc = asInt(event["pitCount"]) { karts[kartIdx].pitCount = pc }
+            // Newer backends include pitInCountdownMs in the pitIn event.
+            // Fall back to the currently-interpolated countdown so older
+            // backends still get a working pit timer.
+            if let cd = asDouble(event["pitInCountdownMs"]) {
+                karts[kartIdx].pitInCountdownMs = cd
+            } else {
+                let interpolated = interpolatedClockMs(at: Date())
+                if interpolated > 0 {
+                    karts[kartIdx].pitInCountdownMs = interpolated
+                }
+            }
         case "pitOut":
             karts[kartIdx].pitStatus = "racing"
             if let pc = asInt(event["pitCount"]) { karts[kartIdx].pitCount = pc }
             if let cd = asDouble(event["stintStartCountdownMs"]) {
                 karts[kartIdx].stintStartCountdownMs = cd
             }
+            karts[kartIdx].pitInCountdownMs = nil
             karts[kartIdx].stintElapsedMs = 0
         case "driver":
             if let name = event["driverName"] as? String { karts[kartIdx].driverName = name }

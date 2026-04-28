@@ -21,6 +21,7 @@ struct KartState: Identifiable, Codable, Hashable {
     var stintElapsedMs: Double?
     var stintStartCountdownMs: Double?
     var stintStartTime: Double?
+    var pitInCountdownMs: Double?
     var tierScore: Double?
     var driverName: String?
     var teamName: String?
@@ -55,7 +56,7 @@ struct KartState: Identifiable, Codable, Hashable {
         case gap, interval
         case pitCount, pitStatus
         case stintLapsCount, stintDurationS, stintElapsedMs
-        case stintStartCountdownMs, stintStartTime
+        case stintStartCountdownMs, stintStartTime, pitInCountdownMs
         case tierScore
         case driverName, teamName
         case driverDifferentialMs

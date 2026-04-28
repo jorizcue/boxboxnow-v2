@@ -378,14 +378,24 @@ class RaceViewModel @Inject constructor(
             "interval" -> k.copy(interval = evt["value"]?.jsonPrimitive?.contentOrNull ?: k.interval)
             "totalLaps" -> k.copy(totalLaps = evt["value"]?.asIntOrNull() ?: k.totalLaps)
             "pitCount" -> k.copy(pitCount = evt["value"]?.asIntOrNull() ?: k.pitCount)
-            "pitIn" -> k.copy(
-                pitStatus = "in_pit",
-                pitCount = evt["pitCount"]?.asIntOrNull() ?: k.pitCount,
-            )
+            "pitIn" -> {
+                // Newer backends include pitInCountdownMs in the pitIn event.
+                // Fall back to the currently-interpolated countdown so older
+                // backends still get a working pit timer.
+                val pitInCd = evt["pitInCountdownMs"]?.asDoubleOrNull()
+                    ?: interpolatedClockMs().takeIf { it > 0 }
+                    ?: k.pitInCountdownMs
+                k.copy(
+                    pitStatus = "in_pit",
+                    pitCount = evt["pitCount"]?.asIntOrNull() ?: k.pitCount,
+                    pitInCountdownMs = pitInCd,
+                )
+            }
             "pitOut" -> k.copy(
                 pitStatus = "racing",
                 pitCount = evt["pitCount"]?.asIntOrNull() ?: k.pitCount,
                 stintStartCountdownMs = evt["stintStartCountdownMs"]?.asDoubleOrNull() ?: k.stintStartCountdownMs,
+                pitInCountdownMs = null,
                 stintElapsedMs = 0.0,
             )
             "driver" -> k.copy(driverName = evt["driverName"]?.jsonPrimitive?.contentOrNull ?: k.driverName)

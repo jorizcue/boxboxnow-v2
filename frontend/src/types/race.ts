@@ -31,6 +31,7 @@ export interface KartState {
   stintStartTime: number;  // epoch seconds
   stintElapsedMs: number;  // accumulated lap time in stint (ms)
   stintStartCountdownMs: number;  // race clock (ms) when stint started
+  pitInCountdownMs?: number;     // race clock (ms) when pit entry occurred
   pitHistory: PitRecord[];
   driverTotalMs: Record<string, number>;
   driverAvgLapMs: Record<string, number>;

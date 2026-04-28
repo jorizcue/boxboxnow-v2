@@ -511,28 +511,41 @@ struct DriverCardView: View {
             }
 
         // ── Current Pit (live elapsed time) ──
+        // Matches web DriverView "currentPit" card: shows M:SS counting up from 0,
+        // with a "/ M:SS" subtitle showing the configured pit time.
+        // pitInCountdownMs is sent by the backend in the pitIn event and snapshot
+        // so we can compute elapsed = pitInCountdownMs − raceClock (both in ms).
         case .currentPit:
             let inPit = (kart?.pitStatus == "in_pit")
-            if inPit, let k = kart {
-                let stintStart = k.stintStartCountdownMs ?? (raceVM.durationMs > 0 ? raceVM.durationMs : raceClock)
-                let remainingMs = max(0, stintStart - raceClock)
-                let elapsed = max(0, min(raceVM.pitTimeS, raceVM.pitTimeS - remainingMs / 1000))
+            if inPit {
+                let pitInCd = kart?.pitInCountdownMs ?? 0
+                let elapsed = pitInCd > 0 && raceClock > 0
+                    ? max(0, pitInCd - raceClock) / 1000
+                    : 0
                 let m = Int(elapsed) / 60
                 let s = Int(elapsed) % 60
+                let pitM = Int(raceVM.pitTimeS) / 60
+                let pitS = Int(raceVM.pitTimeS) % 60
                 VStack(spacing: 2 * scale) {
                     Text("\(m):\(String(format: "%02d", s))")
                         .font(.system(size: mainFont, weight: .black, design: .monospaced))
                         .foregroundColor(.cyan)
                         .minimumScaleFactor(0.5)
                         .lineLimit(1)
-                    Text("EN PIT")
-                        .font(.system(size: smallFont, weight: .bold))
+                        .modifier(PulseModifier(active: true))
+                    Text("/ \(pitM):\(String(format: "%02d", pitS))")
+                        .font(.system(size: smallFont, weight: .bold, design: .monospaced))
                         .foregroundColor(Color(.systemGray))
                 }
             } else {
-                Text("--")
-                    .font(.system(size: mainFont, design: .monospaced))
-                    .foregroundColor(Color(.systemGray4))
+                VStack(spacing: 2 * scale) {
+                    Text("--:--")
+                        .font(.system(size: mainFont, design: .monospaced))
+                        .foregroundColor(Color(.systemGray4))
+                    Text("inactivo")
+                        .font(.system(size: smallFont, weight: .medium))
+                        .foregroundColor(Color(.systemGray4))
+                }
             }
 
         // ── Pit Window (no title — full card) ──
