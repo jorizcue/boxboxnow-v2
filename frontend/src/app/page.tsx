@@ -450,6 +450,15 @@ export default function ComingSoonPage() {
           text-decoration: none; transition: color 0.15s;
         }
         .bbn-footer-link:hover { color: rgba(245,245,245,0.55); }
+
+        /* Instagram social link */
+        .bbn-instagram {
+          display: flex; align-items: center; justify-content: center; gap: 8px;
+          font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em;
+          color: rgba(245,245,245,0.28); text-decoration: none; margin-bottom: 52px;
+          transition: color 0.2s;
+        }
+        .bbn-instagram:hover { color: var(--green); }
       `}</style>
 
       <div className="bbn-glow" />
@@ -516,6 +525,22 @@ export default function ComingSoonPage() {
             </div>
           </div>
 
+          {/* Instagram */}
+          <a
+            href="https://www.instagram.com/boxboxnow.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bbn-instagram"
+            aria-label="Síguenos en Instagram @boxboxnow.app"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+            </svg>
+            @boxboxnow.app
+          </a>
+
           {/* Waitlist */}
           <div className="bbn-waitlist">
             <p className="bbn-waitlist-label">{T(lang, "waitlistLabel")}</p>
@@ -548,6 +573,20 @@ export default function ComingSoonPage() {
           <div className="bbn-footer-links">
             <a href="/privacidad" className="bbn-footer-link">{T(lang, "privacy")}</a>
             <a href="/cookies"    className="bbn-footer-link">{T(lang, "cookies")}</a>
+            <a
+              href="https://www.instagram.com/boxboxnow.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bbn-footer-link"
+              style={{ display: "flex", alignItems: "center", gap: "5px" }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+              </svg>
+              @boxboxnow.app
+            </a>
           </div>
           <span className="bbn-footer-copy">{T(lang, "launch")}</span>
         </footer>
