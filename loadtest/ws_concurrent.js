@@ -11,8 +11,8 @@
 // Tunables (env vars):
 //   BASE_URL      HTTP base for login (default: https://boxboxnow.com)
 //   WS_URL        WS base for the websocket connection (default: derived from BASE_URL)
-//   USERNAME      login username (default: admin)
-//   PASSWORD      login password (REQUIRED — no default)
+//   BBN_USER      login username (default: admin)
+//   BBN_PASS      login password (REQUIRED — no default)
 //   VUS           peak concurrent virtual users (default: 50)
 //   HOLD_S        seconds each VU keeps the WS open (default: 120)
 //   RAMP_S        seconds to ramp up from 0 to VUS  (default: 30)
@@ -32,8 +32,11 @@ import { Counter, Trend, Rate } from 'k6/metrics';
 
 const BASE_URL = (__ENV.BASE_URL || 'https://boxboxnow.com').replace(/\/$/, '');
 const WS_URL = (__ENV.WS_URL || BASE_URL.replace(/^http/, 'ws')).replace(/\/$/, '');
-const USERNAME = __ENV.USERNAME || 'admin';
-const PASSWORD = __ENV.PASSWORD;
+// We deliberately use prefixed names (BBN_USER / BBN_PASS) instead of the
+// usual USERNAME / PASSWORD because zsh on macOS auto-exports USERNAME=<your
+// macOS user>, which silently shadows the value passed on the command line.
+const USERNAME = __ENV.BBN_USER || 'admin';
+const PASSWORD = __ENV.BBN_PASS;
 const VUS = parseInt(__ENV.VUS || '50');
 const HOLD_S = parseInt(__ENV.HOLD_S || '120');
 const RAMP_S = parseInt(__ENV.RAMP_S || '30');
@@ -75,7 +78,7 @@ export const options = {
 
 export function setup() {
   if (!PASSWORD) {
-    fail('PASSWORD env var is required (e.g. PASSWORD=xxx k6 run ...)');
+    fail('BBN_PASS env var is required (e.g. BBN_PASS=xxx k6 run ...)');
   }
   console.log(`Logging in as ${USERNAME} at ${BASE_URL}…`);
   const res = http.post(

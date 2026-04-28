@@ -32,8 +32,8 @@ Pruebas de carga para el backend de BoxBoxNow. Dos escenarios:
 Carga sostenida de 50 conexiones WS durante 2 minutos:
 
 ```bash
-PASSWORD='tu_password_loadtest' \
-USERNAME='loadtest' \
+BBN_PASS='tu_password_loadtest' \
+BBN_USER='loadtest' \
 VUS=50 \
 HOLD_S=120 \
 k6 run loadtest/ws_concurrent.js
@@ -45,13 +45,18 @@ Variables disponibles (todas opcionales salvo `PASSWORD`):
 |---|---|---|
 | `BASE_URL` | `https://boxboxnow.com` | Base HTTP para login |
 | `WS_URL`   | derivado de `BASE_URL` (`wss://...`) | Base del WebSocket |
-| `USERNAME` | `admin` | Usuario para login |
-| `PASSWORD` | — | **Obligatorio.** Contraseña del usuario |
+| `BBN_USER` | `admin` | Usuario para login |
+| `BBN_PASS` | — | **Obligatorio.** Contraseña del usuario |
 | `VUS`      | `50` | Conexiones WS simultáneas en pico |
 | `HOLD_S`   | `120` | Segundos que cada VU mantiene la WS abierta |
 | `RAMP_S`   | `30` | Segundos para subir de 0 a `VUS` |
 | `VIEW`     | `driver` | Param `view=` del WS (driver permite +1 conexión) |
 | `DEVICE`   | `web` | Param `device=` del WS |
+
+> Nota: usamos `BBN_USER` / `BBN_PASS` (no `USERNAME` / `PASSWORD`) porque
+> zsh en macOS exporta automáticamente `USERNAME=<tu usuario de Mac>` y
+> sobreescribiría silenciosamente el valor que pases en la línea de
+> comandos.
 
 ### Qué deberías ver
 
@@ -70,8 +75,8 @@ Si todos los thresholds están en verde, el backend aguantó esa carga sin caíd
 Burst HTTP que sube hasta 30 RPS y mantiene 60s en pico:
 
 ```bash
-PASSWORD='tu_password_loadtest' \
-USERNAME='loadtest' \
+BBN_PASS='tu_password_loadtest' \
+BBN_USER='loadtest' \
 PEAK_RPS=30 \
 HOLD_S=60 \
 k6 run loadtest/http_burst.js
@@ -82,8 +87,8 @@ Variables:
 | Var | Default | Qué hace |
 |---|---|---|
 | `BASE_URL` | `https://boxboxnow.com` | Base HTTP |
-| `USERNAME` | `admin` | Usuario |
-| `PASSWORD` | — | **Obligatorio.** |
+| `BBN_USER` | `admin` | Usuario |
+| `BBN_PASS` | — | **Obligatorio.** |
 | `PEAK_RPS` | `30` | Iteraciones por segundo en pico (×4 endpoints = 120 reqs/s reales) |
 | `STAGE_S`  | `30` | Segundos por etapa de rampa |
 | `HOLD_S`   | `60` | Segundos sosteniendo el pico |

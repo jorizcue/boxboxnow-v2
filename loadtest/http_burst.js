@@ -17,8 +17,8 @@
 //
 // Tunables (env vars):
 //   BASE_URL    HTTP base                   (default: https://boxboxnow.com)
-//   USERNAME    login username              (default: admin)
-//   PASSWORD    login password              (REQUIRED)
+//   BBN_USER    login username              (default: admin)
+//   BBN_PASS    login password              (REQUIRED)
 //   PEAK_RPS    peak iterations per second  (default: 30)
 //   STAGE_S     seconds per ramp stage      (default: 30)
 //   HOLD_S      seconds at peak             (default: 60)
@@ -30,8 +30,9 @@ import { check, fail } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
 
 const BASE_URL = (__ENV.BASE_URL || 'https://boxboxnow.com').replace(/\/$/, '');
-const USERNAME = __ENV.USERNAME || 'admin';
-const PASSWORD = __ENV.PASSWORD;
+// Prefixed names to avoid colliding with zsh's auto-exported USERNAME on macOS.
+const USERNAME = __ENV.BBN_USER || 'admin';
+const PASSWORD = __ENV.BBN_PASS;
 const PEAK_RPS = parseInt(__ENV.PEAK_RPS || '30');
 const STAGE_S = parseInt(__ENV.STAGE_S || '30');
 const HOLD_S = parseInt(__ENV.HOLD_S || '60');
@@ -75,7 +76,7 @@ export const options = {
 
 export function setup() {
   if (!PASSWORD) {
-    fail('PASSWORD env var is required (e.g. PASSWORD=xxx k6 run ...)');
+    fail('BBN_PASS env var is required (e.g. BBN_PASS=xxx k6 run ...)');
   }
   const res = http.post(
     `${BASE_URL}/api/auth/login`,
