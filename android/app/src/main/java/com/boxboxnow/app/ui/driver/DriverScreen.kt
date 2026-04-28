@@ -277,23 +277,13 @@ fun DriverScreen(onBack: () -> Unit) {
         // ColorMatrix-backed paint so the view pops in direct sunlight.
         Box(modifier = Modifier.fillMaxSize().then(contrastFilterModifier(brightness))) {
             if (ourKartPitStatus == "in_pit") {
-                // Kart is in pit — show only the "Pit en curso" card filling the
-                // full screen. Restores to the normal grid on pit-out.
-                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    DriverCardView(
-                        card = DriverCard.CurrentPit,
-                        ourKart = ourKart,
-                        raceVM = raceVM,
-                        raceClockMs = clockMs,
-                        lastLapMs = lastLap,
-                        bestLapMs = bestLap,
-                        deltaBestMs = deltaBest,
-                        gps = gps,
-                        boxScore = boxScore.toInt(),
-                        cardHeight = maxHeight,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+                // Kart is in pit — full-screen pit-elapsed timer
+                // (big header + huge clock).
+                PitInProgressFullScreen(
+                    ourKart = ourKart,
+                    clockMs = clockMs,
+                    pitTimeS = raceVM.pitTimeS.collectAsState().value,
+                )
             } else {
                 CardsGrid(
                     cards = cards,
@@ -509,6 +499,88 @@ private fun CardsGrid(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Full-screen "Pit en curso" view — shown while our kart's pitStatus == "in_pit".
+ * Replaces the normal card grid so the pilot sees a clear, dominant pit
+ * indicator instead of stale race data. Big header + huge cyan timer counting
+ * up from 0 toward the configured pit duration.
+ */
+@Composable
+private fun PitInProgressFullScreen(
+    ourKart: com.boxboxnow.app.models.KartState?,
+    clockMs: Double,
+    pitTimeS: Double,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        // Use the smaller dimension so portrait/landscape both look good.
+        val baseAxis = if (maxWidth < maxHeight) maxWidth else maxHeight
+        val headerSize = (baseAxis.value * 0.07f).coerceAtLeast(28f).sp
+        val timerSize = (baseAxis.value * 0.55f).sp
+        val subSize = (baseAxis.value * 0.05f).coerceAtLeast(18f).sp
+
+        // Compute elapsed seconds in pit. pitInCountdownMs is set when the
+        // backend (or client fallback) records the countdown at pit entry.
+        val pitInCd = ourKart?.pitInCountdownMs ?: 0.0
+        val elapsed = if (pitInCd > 0 && clockMs > 0)
+            kotlin.math.max(0.0, pitInCd - clockMs) / 1000.0
+        else 0.0
+        val m = elapsed.toInt() / 60
+        val s = elapsed.toInt() % 60
+        val pitM = pitTimeS.toInt() / 60
+        val pitS = pitTimeS.toInt() % 60
+
+        // Pulsing alpha for the header
+        val alpha = androidx.compose.animation.core.rememberInfiniteTransition(label = "pitPulse")
+            .animateFloat(
+                initialValue = 1f,
+                targetValue = 0.5f,
+                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                    animation = androidx.compose.animation.core.tween(1000),
+                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+                ),
+                label = "pitAlpha",
+            )
+
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                "PIT EN CURSO",
+                color = Color(0xFF00BCD4).copy(alpha = alpha.value),
+                fontSize = headerSize,
+                fontWeight = FontWeight.Black,
+                letterSpacing = (headerSize.value * 0.12f).sp,
+                maxLines = 1,
+            )
+
+            Spacer(Modifier.height((headerSize.value * 0.6f).dp))
+
+            Text(
+                "$m:${s.toString().padStart(2, '0')}",
+                color = Color(0xFF00BCD4),
+                fontSize = timerSize,
+                fontWeight = FontWeight.Black,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                maxLines = 1,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(Modifier.height((subSize.value * 0.4f).dp))
+
+            Text(
+                "/ $pitM:${pitS.toString().padStart(2, '0')}",
+                color = BoxBoxNowColors.SystemGray,
+                fontSize = subSize,
+                fontWeight = FontWeight.Bold,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            )
         }
     }
 }

@@ -67,18 +67,12 @@ struct DriverView: View {
                                 .font(.caption)
                         }
                     } else if myKart?.isInPit == true {
-                        // Kart is in pit — show only the "Pit en curso" card filling
-                        // the full screen. Restores to the normal grid on pit-out.
-                        DriverCardView(
-                            card: .currentPit,
+                        // Kart is in pit — full-screen pit-elapsed timer
+                        // (big header + huge clock).
+                        PitInProgressFullScreen(
                             kart: myKart,
-                            raceVM: raceVM,
-                            ourKartNumber: ourKartNumber,
-                            gps: driverVM.gpsData,
-                            lapDelta: lapDelta,
-                            cardHeight: geo.size.height - safeTop - safeBottom,
                             clockMs: clockMs,
-                            lapTracker: driverVM.lapTracker
+                            pitTimeS: raceVM.pitTimeS
                         )
                         .padding(.top, safeTop)
                         .padding(.bottom, safeBottom)
@@ -511,6 +505,67 @@ struct DriverView: View {
             boxScore: raceVM.boxScore,
             lapsToMaxStint: stintCalc.lapsToMax
         )
+    }
+}
+
+// MARK: - Full-screen "Pit en curso" view
+//
+// Shown while our kart's pitStatus == "in_pit". Replaces the normal card
+// grid so the pilot sees a clear, dominant pit indicator instead of stale
+// race data. Header text + huge cyan timer counting up from 0 toward the
+// configured pit duration. Restores to the normal grid on pit-out.
+private struct PitInProgressFullScreen: View {
+    let kart: KartState?
+    let clockMs: Double
+    let pitTimeS: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            // Use the smaller dimension so portrait/landscape both look good.
+            // Timer takes ~55% of the smaller axis, header ~7%, subtitle ~5%.
+            let baseAxis = min(geo.size.width, geo.size.height)
+            let headerSize = max(28, baseAxis * 0.07)
+            let timerSize = baseAxis * 0.55
+            let subSize = max(18, baseAxis * 0.05)
+
+            // Compute elapsed seconds in pit. pitInCountdownMs is set when the
+            // backend (or client fallback) records the countdown at pit entry.
+            let pitInCd = kart?.pitInCountdownMs ?? 0
+            let elapsed: Double = (pitInCd > 0 && clockMs > 0)
+                ? max(0, pitInCd - clockMs) / 1000
+                : 0
+            let m = Int(elapsed) / 60
+            let s = Int(elapsed) % 60
+            let pitM = Int(pitTimeS) / 60
+            let pitS = Int(pitTimeS) % 60
+
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
+
+                Text("PIT EN CURSO")
+                    .font(.system(size: headerSize, weight: .black, design: .rounded))
+                    .foregroundColor(.cyan)
+                    .kerning(headerSize * 0.12)
+                    .modifier(PulseModifier(active: true))
+
+                Spacer(minLength: 0)
+
+                Text("\(m):\(String(format: "%02d", s))")
+                    .font(.system(size: timerSize, weight: .black, design: .monospaced))
+                    .foregroundColor(.cyan)
+                    .minimumScaleFactor(0.3)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+
+                Text("/ \(pitM):\(String(format: "%02d", pitS))")
+                    .font(.system(size: subSize, weight: .bold, design: .monospaced))
+                    .foregroundColor(Color(.systemGray))
+                    .padding(.top, subSize * 0.4)
+
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
     }
 }
 
