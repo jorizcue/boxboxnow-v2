@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,9 +34,13 @@ import androidx.compose.ui.unit.sp
  */
 @Composable
 fun BoxCallOverlay(onDismiss: () -> Unit) {
-    // Pulse alpha between 1.0 and 0.3 every 0.5s
+    // Pulse alpha between 1.0 and 0.3 every 0.5s; auto-dismiss after 5 s
     var flash by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { flash = true }
+    LaunchedEffect(Unit) {
+        flash = true
+        delay(5_000)
+        onDismiss()
+    }
 
     val alpha by animateFloatAsState(
         targetValue = if (flash) 1f else 0.3f,
@@ -72,6 +77,11 @@ fun BoxCallOverlay(onDismiss: () -> Unit) {
                 "Toca para cerrar",
                 color = Color.White.copy(alpha = 0.7f),
                 fontSize = 14.sp,
+            )
+            Text(
+                "Se cierra automáticamente",
+                color = Color.White.copy(alpha = 0.4f),
+                fontSize = 11.sp,
             )
         }
     }

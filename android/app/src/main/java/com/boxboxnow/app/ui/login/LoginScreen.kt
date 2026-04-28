@@ -10,7 +10,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mail
@@ -28,7 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import com.boxboxnow.app.ui.theme.InterFontFamily
@@ -37,7 +35,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.fragment.app.FragmentActivity
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.vm.AuthViewModel
 
@@ -49,7 +46,6 @@ fun LoginScreen(
     onStartGoogleSso: () -> Unit,
 ) {
     val isAuth by authVM.isAuthenticated.collectAsState()
-    val biometricPending by authVM.biometricPending.collectAsState()
     val upgradeRequired by authVM.upgradeRequired.collectAsState()
 
     LaunchedEffect(isAuth) { if (isAuth) onLoggedIn() }
@@ -67,7 +63,6 @@ fun LoginScreen(
 
         when {
             upgradeRequired != null -> UpgradeRequiredScreen(upgradeRequired!!)
-            biometricPending -> BiometricWaiting(authVM)
             else -> LoginForm(authVM, onStartGoogleSso)
         }
     }
@@ -196,55 +191,7 @@ private fun LoginForm(authVM: AuthViewModel, onStartGoogleSso: () -> Unit) {
             onClick = { authVM.startGoogleLogin(); onStartGoogleSso() },
         )
 
-        if (authVM.biometricEnabled && authVM.biometricAvailable && authVM.hasStoredToken) {
-            Spacer(Modifier.height(10.dp))
-            val ctx = LocalContext.current
-            SecondaryButton(
-                text = "Entrar con biometría",
-                icon = Icons.Default.Fingerprint,
-                enabled = true,
-                loading = false,
-                accent = true,
-                onClick = {
-                    authVM.setBiometricPending(true)
-                    (ctx as? FragmentActivity)?.let { authVM.authenticateWithBiometric(it) }
-                },
-            )
-        }
-
         Spacer(Modifier.height(40.dp))
-    }
-}
-
-@Composable
-private fun BiometricWaiting(authVM: AuthViewModel) {
-    val ctx = LocalContext.current
-    Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(
-            Icons.Default.Fingerprint,
-            contentDescription = null,
-            tint = BoxBoxNowColors.Accent,
-            modifier = Modifier.size(80.dp),
-        )
-        Spacer(Modifier.height(20.dp))
-        Text("Verificando identidad...", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(28.dp))
-        PrimaryAccentButton(
-            text = "Reintentar biometría",
-            loading = false,
-            enabled = true,
-            onClick = {
-                (ctx as? FragmentActivity)?.let { authVM.authenticateWithBiometric(it) }
-            },
-        )
-        Spacer(Modifier.height(10.dp))
-        TextButton(onClick = { authVM.setBiometricPending(false) }) {
-            Text("Usar contraseña", color = BoxBoxNowColors.SystemGray)
-        }
     }
 }
 

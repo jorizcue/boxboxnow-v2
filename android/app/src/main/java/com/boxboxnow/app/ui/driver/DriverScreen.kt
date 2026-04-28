@@ -276,17 +276,21 @@ fun DriverScreen(onBack: () -> Unit) {
         // drags the contrast slider in the menu, we run the cards through a
         // ColorMatrix-backed paint so the view pops in direct sunlight.
         Box(modifier = Modifier.fillMaxSize().then(contrastFilterModifier(brightness))) {
-            CardsGrid(
-                cards = cards,
-                ourKart = ourKart,
-                raceVM = raceVM,
-                raceClockMs = clockMs,
-                lastLapMs = lastLap,
-                bestLapMs = bestLap,
-                deltaBestMs = deltaBest,
-                gps = gps,
-                boxScore = boxScore.toInt(),
-            )
+            if (ourKartPitStatus == "in_pit") {
+                PitInProgressScreen(ourKart = ourKart)
+            } else {
+                CardsGrid(
+                    cards = cards,
+                    ourKart = ourKart,
+                    raceVM = raceVM,
+                    raceClockMs = clockMs,
+                    lastLapMs = lastLap,
+                    bestLapMs = bestLap,
+                    deltaBestMs = deltaBest,
+                    gps = gps,
+                    boxScore = boxScore.toInt(),
+                )
+            }
         }
 
         // Menu handle — small dots on the right edge
@@ -486,6 +490,63 @@ private fun CardsGrid(
                             )
                         }
                         repeat(numCols - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Full-screen "pit in progress" card — shown while our kart's pitStatus == "in_pit".
+ * Replaces the normal card grid so the pilot sees a clear pit indicator instead of
+ * stale race data.  When the kart exits the pit, DriverScreen restores CardsGrid
+ * automatically (pitStatus transitions to "racing").
+ */
+@Composable
+private fun PitInProgressScreen(
+    ourKart: com.boxboxnow.app.models.KartState?,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                "PIT",
+                color = Color(0xFF4CAF50),
+                fontSize = 100.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            )
+            Text(
+                "EN CURSO",
+                color = Color.White.copy(alpha = 0.55f),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 6.sp,
+            )
+            ourKart?.let { k ->
+                if (k.pitCount > 0) {
+                    Spacer(Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF4CAF50).copy(alpha = 0.12f))
+                            .padding(horizontal = 20.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            "PARADA #${k.pitCount}",
+                            color = Color(0xFF4CAF50).copy(alpha = 0.8f),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 2.sp,
+                        )
                     }
                 }
             }

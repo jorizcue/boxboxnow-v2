@@ -143,14 +143,9 @@ class AuthViewModel @Inject constructor(
             biometric.disable()
             return
         }
-        // Check biometric for the last-known user (per-user flag in BiometricService).
-        if (biometric.isEnabled && biometric.isAvailable) {
-            _biometricPending.value = true
-            viewModelScope.launch { refreshMe() }
-        } else {
-            _isAuthenticated.value = true
-            viewModelScope.launch { refreshMe() }
-        }
+        // Auto-login with existing valid token (biometric removed).
+        _isAuthenticated.value = true
+        viewModelScope.launch { refreshMe() }
     }
 
     suspend fun refreshMe() {
@@ -209,8 +204,5 @@ class AuthViewModel @Inject constructor(
         _user.value = resp.user
         _isAuthenticated.value = true
         refreshMe()
-        if (biometric.isAvailable && !biometric.isEnabledForUser(username)) {
-            _showBiometricPrompt.value = true
-        }
     }
 }

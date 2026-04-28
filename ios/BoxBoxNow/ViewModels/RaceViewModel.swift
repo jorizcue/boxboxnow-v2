@@ -6,6 +6,9 @@ final class RaceViewModel: ObservableObject {
     @Published var isConnected = false
     @Published var raceStatus = ""
     @Published var sessionName = ""
+    @Published var boxCallActive = false
+
+    func clearBoxCall() { boxCallActive = false }
 
     private let wsClient = WebSocketClient()
     private var cancellables = Set<AnyCancellable>()
@@ -35,6 +38,13 @@ final class RaceViewModel: ObservableObject {
                 }
                 if let status = json["status"] as? String { raceStatus = status }
                 if let name = json["session_name"] as? String { sessionName = name }
+            case "snapshot", "analytics":
+                if let inner = json["data"] as? [String: Any],
+                   let kartsData = inner["karts"] as? [[String: Any]] {
+                    parseKarts(kartsData)
+                }
+            case "box_call":
+                boxCallActive = true
             default: break
             }
         }
