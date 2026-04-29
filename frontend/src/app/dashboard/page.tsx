@@ -27,6 +27,8 @@ import { EmbeddedCheckout } from "@/components/checkout/EmbeddedCheckout";
 import { AccountPanel } from "@/components/account/AccountPanel";
 import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
 import { ChatWidget } from "@/components/chat/ChatWidget";
+import { useSiteStatus } from "@/hooks/useSiteStatus";
+import { MaintenancePage } from "@/components/landing/MaintenancePage";
 
 export default function DashboardPage() {
   const { token, user, _hydrated, updateUser } = useAuth();
@@ -38,11 +40,19 @@ export default function DashboardPage() {
   const [eventDates, setEventDates] = useState<string[] | undefined>(undefined);
   const router = useRouter();
 
+  const { maintenance, loading: siteLoading } = useSiteStatus();
+
   useEffect(() => {
     if (_hydrated && !token) {
       router.push("/login");
     }
   }, [_hydrated, token, router]);
+
+  // Maintenance gate: non-admin traffic gets the maintenance page even
+  // when authenticated. Admins keep full access so they can monitor.
+  if (!siteLoading && maintenance && user && !user.is_admin) {
+    return <MaintenancePage />;
+  }
 
   // Refresh user data after Stripe checkout success.
   // Uses a retry loop because the Stripe webhook that activates the

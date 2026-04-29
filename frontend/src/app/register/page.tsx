@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { useSiteStatus } from "@/hooks/useSiteStatus";
+import { MaintenancePage } from "@/components/landing/MaintenancePage";
 import Link from "next/link";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -21,7 +23,8 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const { token, _hydrated, setAuth } = useAuth();
+  const { token, user, _hydrated, setAuth } = useAuth();
+  const { maintenance, loading: siteLoading } = useSiteStatus();
   const router = useRouter();
   const [pendingPlan] = useState(getPlanFromUrl);
 
@@ -44,6 +47,13 @@ export default function RegisterPage() {
       router.push("/dashboard");
     }
   }, [_hydrated, token, router]);
+
+  // Maintenance gate — block new registrations during maintenance.
+  // Admins (already logged in) bypass; everyone else gets the maintenance
+  // page instead of the registration form.
+  if (!siteLoading && maintenance && !user?.is_admin) {
+    return <MaintenancePage />;
+  }
 
   // Client-side validation
   const validationErrors = useMemo(() => {

@@ -492,6 +492,12 @@ PLATFORM_SETTINGS_KEYS = [
     # in the app for nice "update available" prompts (non-blocking).
     "latest_ios_version",
     "latest_android_version",
+    # Site launch & maintenance switches. Read publicly via
+    # GET /api/public/site-status (no auth) so the homepage can branch
+    # between countdown / marketing / maintenance without leaking other
+    # platform settings.
+    "site_launch_at",       # ISO 8601 datetime; empty = already launched
+    "site_maintenance",     # "true" / "false"; default "false"
 ]
 
 PLATFORM_DEFAULTS = {
@@ -506,6 +512,8 @@ PLATFORM_DEFAULTS = {
     "min_android_version": "",
     "latest_ios_version": "",
     "latest_android_version": "",
+    "site_launch_at": "",
+    "site_maintenance": "false",
 }
 
 

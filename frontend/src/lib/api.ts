@@ -71,6 +71,18 @@ export const api = {
       body: JSON.stringify({ email, name: name || null }),
     }),
 
+  // Site status (public — countdown / launch / maintenance toggles).
+  // No auth required. Used by `useSiteStatus` to switch the homepage.
+  getSiteStatus: () =>
+    fetch(`${API_URL}/api/public/site-status`).then(async (r) => {
+      if (!r.ok) throw new Error(`API error ${r.status}`);
+      return r.json() as Promise<{
+        launch_at: string | null;
+        maintenance: boolean;
+        now: string;
+      }>;
+    }),
+
   // Auth
   login: (username: string, password: string, mfaCode?: string) => {
     const body: any = { username, password };

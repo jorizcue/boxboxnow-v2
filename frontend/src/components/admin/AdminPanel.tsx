@@ -1400,6 +1400,7 @@ function PlatformSettingsManager() {
 
   // Collapsible sections
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    site: true,
     registration: true,
     trial: true,
     mobile: true,
@@ -1583,6 +1584,88 @@ function PlatformSettingsManager() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <h2 className="text-lg font-bold text-white mb-2">Configuracion de Plataforma</h2>
+
+      {/* Section: Site Status — countdown / launch date / maintenance */}
+      <div className="bg-surface rounded-xl border border-border">
+        <button
+          onClick={() => toggleSection("site")}
+          className="w-full flex items-center justify-between p-5 text-left"
+        >
+          <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
+            Estado del sitio
+          </h3>
+          <span className="text-neutral-500 text-xs">{openSections.site ? "▲" : "▼"}</span>
+        </button>
+        {openSections.site && (
+          <div className="px-5 pb-5 space-y-5">
+            {/* Maintenance toggle */}
+            <div>
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={(settings.site_maintenance || "false") === "true"}
+                  onChange={(e) => handleChange("site_maintenance", e.target.checked ? "true" : "false")}
+                  className="mt-1 accent-accent w-4 h-4"
+                />
+                <div className="flex-1">
+                  <div className="text-sm text-white font-medium">Modo mantenimiento</div>
+                  <div className="text-xs text-neutral-500 mt-0.5">
+                    Cuando esté activo, los usuarios no admin verán una página de mantenimiento.
+                    Los admins mantienen acceso completo.
+                  </div>
+                </div>
+              </label>
+              {(settings.site_maintenance || "false") === "true" && (
+                <div className="mt-3 ml-7 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-300">
+                  Mantenimiento ON. La web está bloqueada para usuarios normales.
+                </div>
+              )}
+            </div>
+
+            {/* Launch date */}
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1.5 uppercase tracking-wider">
+                Fecha de apertura
+              </label>
+              <input
+                type="datetime-local"
+                value={(() => {
+                  const v = settings.site_launch_at || "";
+                  if (!v) return "";
+                  // Convert ISO UTC string → local datetime-local format (YYYY-MM-DDTHH:mm).
+                  try {
+                    const d = new Date(v);
+                    if (isNaN(d.getTime())) return "";
+                    const pad = (n: number) => String(n).padStart(2, "0");
+                    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                  } catch { return ""; }
+                })()}
+                onChange={(e) => {
+                  const local = e.target.value;
+                  if (!local) {
+                    handleChange("site_launch_at", "");
+                  } else {
+                    // datetime-local has no timezone; treat as local and store as UTC ISO.
+                    const iso = new Date(local).toISOString();
+                    handleChange("site_launch_at", iso);
+                  }
+                }}
+                className="w-full max-w-xs bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50 transition-colors"
+              />
+              <p className="text-[11px] text-neutral-500 mt-1.5 leading-tight">
+                Los usuarios no logueados verán la countdown hasta esta fecha. Vacío = ya abierto, todos
+                ven la home definitiva con opciones de compra. Los admins logueados acceden a la home
+                independientemente de esta fecha.
+              </p>
+              {settings.site_launch_at && (
+                <p className="text-[11px] text-accent/80 mt-1.5 font-mono">
+                  Almacenado UTC: {settings.site_launch_at}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Section: Registration Defaults */}
       <div className="bg-surface rounded-xl border border-border">
