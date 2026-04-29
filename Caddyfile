@@ -12,6 +12,13 @@ www.{$DOMAIN:localhost} {
         reverse_proxy backend:8000
     }
 
+    # Expose the backend health endpoint so external uptime monitors
+    # (UptimeRobot, Pingdom, etc.) can hit https://boxboxnow.com/health
+    # without going through the Next.js frontend.
+    handle /health {
+        reverse_proxy backend:8000
+    }
+
     handle {
         reverse_proxy frontend:3000
     }
