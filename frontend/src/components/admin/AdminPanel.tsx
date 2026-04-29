@@ -690,12 +690,12 @@ function UsersManager() {
                       <input
                         type="number"
                         min={0}
-                        max={20}
+                        max={1000}
                         value={su.concurrency_web ?? ""}
                         placeholder="—"
                         onChange={async (e) => {
                           const raw = e.target.value.trim();
-                          const val = raw === "" ? null : Math.max(0, Math.min(20, Number(raw)));
+                          const val = raw === "" ? null : Math.max(0, Math.min(1000, Number(raw)));
                           try {
                             await api.updateUser(su.id, { concurrency_web: val });
                             loadUsers();
@@ -715,12 +715,12 @@ function UsersManager() {
                       <input
                         type="number"
                         min={0}
-                        max={20}
+                        max={1000}
                         value={su.concurrency_mobile ?? ""}
                         placeholder="—"
                         onChange={async (e) => {
                           const raw = e.target.value.trim();
-                          const val = raw === "" ? null : Math.max(0, Math.min(20, Number(raw)));
+                          const val = raw === "" ? null : Math.max(0, Math.min(1000, Number(raw)));
                           try {
                             await api.updateUser(su.id, { concurrency_mobile: val });
                             loadUsers();
