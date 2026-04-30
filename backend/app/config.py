@@ -34,7 +34,13 @@ class Settings(BaseSettings):
     # Auth
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 1440  # 24 hours
+    # JWT lifetime. Reduced from 24h to 4h after the security audit:
+    # combined with the per-request alive-session check and the
+    # subscription gate, a leaked / expired-account token has at most
+    # a 4h window of misuse instead of a full day. UX impact is small
+    # for a SaaS dashboard; users on long sessions just re-login once
+    # in the afternoon.
+    jwt_expire_minutes: int = 240
 
     # Race defaults
     default_circuit_length: int = 1100

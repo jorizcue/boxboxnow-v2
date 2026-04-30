@@ -42,10 +42,24 @@
                 var start_block = parseInt(params.get('start_block') || '0');
                 var speed = parseFloat(params.get('speed') || '1');
 
+                // Pull the JWT from the parent app's auth store. This page
+                // is loaded inside an iframe from /dashboard, so we share
+                // localStorage with the SPA. The backend WS handshake now
+                // requires the token + an active subscription; without it
+                // the WS rejects with close code 4001.
+                var token = '';
+                try {
+                    var stored = localStorage.getItem('boxboxnow-auth');
+                    if (stored) {
+                        token = (JSON.parse(stored).state || {}).token || '';
+                    }
+                } catch(e) {}
+
                 // Build WebSocket URL for our replay endpoint
                 var proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 var wsUrl = proto + '//' + window.location.host +
-                    '/api/apex-replay/ws?filename=' + encodeURIComponent(filename) +
+                    '/api/apex-replay/ws?token=' + encodeURIComponent(token) +
+                    '&filename=' + encodeURIComponent(filename) +
                     '&start_block=' + start_block +
                     '&speed=' + speed;
                 if (circuit_dir) {

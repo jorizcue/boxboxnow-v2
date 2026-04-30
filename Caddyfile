@@ -4,6 +4,39 @@ www.{$DOMAIN:localhost} {
 }
 
 {$DOMAIN:localhost} {
+    # ── Security headers (defense-in-depth) ───────────────────────────────
+    # Caddy attaches these to every response from this site, including the
+    # reverse-proxied backend and Next.js frontend.
+    header {
+        # Force HTTPS for two years (max-age=63072000s) including subdomains.
+        # Caddy already redirects HTTP→HTTPS, but HSTS protects users who
+        # type the URL without a scheme on a hostile network.
+        Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+
+        # Block clickjacking. We don't intentionally embed BoxBoxNow in any
+        # iframe (the apex-timing iframe is same-origin so SAMEORIGIN is OK).
+        X-Frame-Options "SAMEORIGIN"
+        Content-Security-Policy-Report-Only "frame-ancestors 'self'"
+
+        # Don't let browsers MIME-sniff response bodies (anti-XSS hardening
+        # for static assets).
+        X-Content-Type-Options "nosniff"
+
+        # Suppress Referer leakage to third-party sites: only same-origin
+        # navigations get the full URL; cross-origin requests get only the
+        # bare origin. This neutralises the OAuth-callback Referer leak even
+        # if a token ever ends up in a URL again.
+        Referrer-Policy "strict-origin-when-cross-origin"
+
+        # Lock down ambient browser APIs we don't use. Geolocation /
+        # accelerometer / gyroscope are required by the mobile app, which
+        # is a native client — the WEB doesn't need them, so deny.
+        Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(self), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
+
+        # Strip the Server header so the Caddy version isn't broadcast.
+        -Server
+    }
+
     handle /api/* {
         reverse_proxy backend:8000
     }

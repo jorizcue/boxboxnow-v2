@@ -11,6 +11,7 @@ Security:
 
 import json
 import logging
+from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy import select
 from app.api.auth_routes import decode_token
@@ -176,6 +177,36 @@ async def race_websocket(
     if not await _validate_session_token(session_token):
         await websocket.close(code=4001, reason="Session terminated")
         return
+
+    # Active subscription gate. Race telemetry is paid content; reject any
+    # client whose subscription has expired / been cancelled before we
+    # accept the WS handshake. Admins bypass automatically. Mirrors the
+    # `require_active_subscription` HTTP dependency. Close code 4003
+    # ("policy violation"-ish) is what we already use for max-devices.
+    async with async_session() as db:
+        u_row = await db.execute(
+            select(User.is_admin).where(User.id == user_id)
+        )
+        is_admin_check = bool(u_row.scalar() or False)
+        if not is_admin_check:
+            sub_q = await db.execute(
+                select(Subscription.status, Subscription.current_period_end).where(
+                    Subscription.user_id == user_id,
+                    Subscription.status.in_(("active", "trialing")),
+                )
+            )
+            now = datetime.now(timezone.utc)
+            has_active_sub = False
+            for status_, period_end in sub_q.all():
+                if period_end is not None and period_end.tzinfo is None:
+                    period_end = period_end.replace(tzinfo=timezone.utc)
+                if period_end is None or period_end > now:
+                    has_active_sub = True
+                    break
+            if not has_active_sub:
+                logger.warning(f"WS rejected: no active subscription (user={user_id})")
+                await websocket.close(code=4003, reason="Active subscription required")
+                return
 
     # Enforce max concurrent WS connections per user, split by device type.
     # Driver view gets +1 extra slot on top of the per-kind limit (mobile only).

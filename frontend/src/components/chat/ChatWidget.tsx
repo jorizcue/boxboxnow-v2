@@ -12,6 +12,7 @@ import {
 
 import { api, streamChat } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
+import { STORAGE_KEYS } from "@/lib/storage";
 
 /**
  * Floating support chatbot widget — pinned bottom-right of `/dashboard`.
@@ -22,7 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
  * - "Nueva conversación" button resets to a fresh session.
  */
 
-const STORAGE_KEY = "boxboxnow-chat-session";
+const STORAGE_KEY = STORAGE_KEYS.CHAT_SESSION;
 const MAX_INPUT_CHARS = 800;
 
 type Role = "user" | "assistant" | "error";

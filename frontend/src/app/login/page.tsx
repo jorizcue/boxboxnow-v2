@@ -38,30 +38,43 @@ export default function LoginPage() {
     /wv|WebView/i.test(navigator.userAgent)
   );
 
-  // Handle Google OAuth callback
+  // Handle Google OAuth callback.
+  //
+  // The backend now hands off the JWT via a short-lived httpOnly cookie
+  // instead of stuffing it into the URL (URL-bound tokens leak via
+  // browser history and Referer). When we land on `/login?oauth=success`,
+  // we POST to /api/auth/oauth-exchange — the browser auto-attaches the
+  // cookie, the backend returns the auth payload as JSON, and clears the
+  // cookie so the handoff is one-shot.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("oauth") === "google") {
-      const accessToken = params.get("token");
-      const sessionTk = params.get("session_token");
-      const userJson = params.get("user");
-      const plan = params.get("plan");
-      // Store pending plan from OAuth callback
-      if (plan) {
-        localStorage.setItem("bbn_pending_plan", plan);
-      }
-      if (accessToken && sessionTk && userJson) {
-        try {
-          const userData = JSON.parse(userJson);
-          setAuth(accessToken, sessionTk, userData);
-          // Clean URL and redirect
-          window.history.replaceState({}, "", "/login");
-          router.push("/dashboard");
-          return;
-        } catch {}
-      }
-    }
+    if (params.get("oauth") !== "success") return;
+
+    const plan = params.get("plan");
+    if (plan) localStorage.setItem("bbn_pending_plan", plan);
+
+    // Strip query params immediately so a refresh can't replay this code
+    // path (the cookie's already gone after the first exchange anyway).
+    window.history.replaceState({}, "", "/login");
+
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
+    fetch(`${apiBase}/api/auth/oauth-exchange`, {
+      method: "POST",
+      credentials: "include",  // send the bbn_oauth_handoff cookie
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data) => {
+        setAuth(data.access_token, data.session_token, data.user);
+        router.push("/dashboard");
+      })
+      .catch(() => {
+        // Cookie missing / expired / malformed — fall through to the
+        // normal login form so the user can authenticate manually.
+      });
   }, []);
 
   useEffect(() => {

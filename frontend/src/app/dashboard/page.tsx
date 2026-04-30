@@ -297,7 +297,18 @@ function NoSubscription({ username }: { username: string }) {
   const router = useRouter();
 
   const handleLogout = async () => {
-    try { await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/auth/logout`, { method: "POST" }); } catch {}
+    // Use the api wrapper so the Authorization header is attached. The
+    // bare fetch we used here before went without auth and silently
+    // failed server-side — leaving the device session alive even after
+    // the user "logged out". We log loud now and only fall through to
+    // local logout if the server call really did fail; the redirect
+    // happens regardless so the user is never stranded.
+    try {
+      const { api } = await import("@/lib/api");
+      await api.logout();
+    } catch (e) {
+      console.error("[logout] backend logout failed; clearing local state anyway", e);
+    }
     logout();
     router.push("/");
   };

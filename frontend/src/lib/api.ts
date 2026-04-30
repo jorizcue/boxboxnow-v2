@@ -102,7 +102,9 @@ export const api = {
     });
   },
   getMe: () => fetchApi<any>("/api/auth/me"),
-  logout: () => fetchApi<any>("/api/auth/logout", { method: "POST" }).catch(() => {}),
+  // No silent .catch — callers must handle failure so we never end up
+  // believing the server-side session was killed when it wasn't.
+  logout: () => fetchApi<any>("/api/auth/logout", { method: "POST" }),
 
   // MFA
   mfaSetup: () => fetchApi<{ secret: string; qr_uri: string }>("/api/auth/mfa/setup", { method: "POST" }),

@@ -199,7 +199,15 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
   }, [replayActive, setReplayStatus]);
 
   const handleLogout = async () => {
-    try { await api.logout(); } catch {}
+    // Surface backend logout errors instead of swallowing them. The
+    // local logout always runs so the user is never stranded, but we
+    // log loud so a chronically failing logout endpoint doesn't ship
+    // silently and leave dead sessions accumulating server-side.
+    try {
+      await api.logout();
+    } catch (e) {
+      console.error("[logout] backend logout failed; clearing local state anyway", e);
+    }
     logout();
   };
 

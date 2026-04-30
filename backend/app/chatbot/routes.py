@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete as sa_delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_routes import get_current_user
+from app.api.auth_routes import get_current_user, require_active_subscription
 from app.chatbot import embeddings, ingest as ingest_mod, llm, rate_limit, vectorstore
 from app.config import get_settings
 from app.models.database import async_session, get_db
@@ -38,7 +38,16 @@ from app.models.schemas import ChatMessage, ChatUsage, DocChunk, User
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/chat", tags=["chat"])
+# Router-level subscription gate. The chatbot calls paid LLM APIs (OpenAI
+# embeddings + Groq) and is a premium feature; non-subscribers shouldn't
+# burn credits on it. Admin-only endpoints (/admin/...) below override
+# the gate via require_admin since admins always pass user_has_active_*
+# anyway, but stating it for clarity.
+router = APIRouter(
+    prefix="/api/chat",
+    tags=["chat"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 # ───────────────────────── Schemas ─────────────────────────

@@ -6,11 +6,16 @@ original Apex interface without connecting to their WebSocket.
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from fastapi.responses import FileResponse, HTMLResponse
+from sqlalchemy import select
 
 from app.apex.replay import parse_log_file
+from app.api.auth_routes import decode_token
+from app.models.database import async_session
+from app.models.schemas import DeviceSession, Subscription, User
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/apex-replay", tags=["apex-replay"])
@@ -99,9 +104,56 @@ def _resolve_log_path(filename: str, circuit_dir: str | None = None) -> str | No
     return None
 
 
+async def _ws_authenticate(token: str | None) -> int | None:
+    """Validate the JWT, alive device session, and active subscription
+    for an Apex-replay WS handshake. Returns user_id on success, None
+    on any failure. Mirrors `/ws/race`'s checks so this endpoint can't
+    be used as a back-door to read race data without a paid account.
+    """
+    if not token:
+        return None
+    try:
+        payload = decode_token(token)
+    except Exception:
+        return None
+    user_id = payload.get("sub")
+    session_token = payload.get("sid")
+    if not user_id or not session_token:
+        return None
+
+    async with async_session() as db:
+        # Device session must still exist (logout / admin kill revokes).
+        ds_q = await db.execute(
+            select(DeviceSession.id).where(DeviceSession.session_token == session_token)
+        )
+        if not ds_q.scalar_one_or_none():
+            return None
+
+        # Active/trialing subscription required (admins bypass).
+        u_q = await db.execute(select(User.is_admin).where(User.id == user_id))
+        is_admin_user = bool(u_q.scalar() or False)
+        if is_admin_user:
+            return user_id
+
+        sub_q = await db.execute(
+            select(Subscription.current_period_end).where(
+                Subscription.user_id == user_id,
+                Subscription.status.in_(("active", "trialing")),
+            )
+        )
+        now = datetime.now(timezone.utc)
+        for (period_end,) in sub_q.all():
+            if period_end is not None and period_end.tzinfo is None:
+                period_end = period_end.replace(tzinfo=timezone.utc)
+            if period_end is None or period_end > now:
+                return user_id
+        return None
+
+
 @router.websocket("/ws")
 async def apex_replay_ws(
     websocket: WebSocket,
+    token: str = Query(""),
     filename: str = Query(...),
     circuit_dir: str = Query(None),
     start_block: int = Query(0),
@@ -111,7 +163,20 @@ async def apex_replay_ws(
 
     The Apex Timing JS connects here instead of the real Apex server.
     Messages are sent as-is (pipe-delimited text) with timing preserved.
+
+    Auth: requires a valid JWT (`?token=…`) plus an alive device session
+    plus an active/trialing subscription, same surface as `/ws/race`. The
+    Apex Timing viewer page passes the user's token into the `wsConfig`
+    URL it builds for this endpoint.
     """
+    user_id = await _ws_authenticate(token)
+    if user_id is None:
+        # Close BEFORE accepting so the handshake itself fails (HTTP 403)
+        # instead of accepting and immediately closing — both work but
+        # 403-on-handshake is what curl / the apex viewer expect.
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+
     await websocket.accept()
 
     filepath = _resolve_log_path(filename, circuit_dir)

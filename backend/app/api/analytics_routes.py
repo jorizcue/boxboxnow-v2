@@ -13,11 +13,19 @@ from sqlalchemy import select, delete, and_, func as sqlfunc
 from app.models.database import get_db
 from app.models.schemas import User, RaceLog, KartLap, Circuit, UserCircuitAccess
 from app.models.pydantic_models import KartStatsOut, RaceLogOut, CircuitOut
-from app.api.auth_routes import get_current_user
+from app.api.auth_routes import get_current_user, require_active_subscription
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/analytics", tags=["analytics"])
+# Router-level subscription gate. Analytics aggregates kart stats and lap
+# times across past sessions — paid content. _check_circuit_access still
+# runs per-endpoint to enforce the per-circuit ACL on top of the
+# subscription gate.
+router = APIRouter(
+    prefix="/api/analytics",
+    tags=["analytics"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 async def _check_circuit_access(user: User, circuit_id: int, db: AsyncSession):

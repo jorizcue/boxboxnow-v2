@@ -244,6 +244,12 @@ class RateLimiter:
 # 5/60s window now that we only count failures.
 login_limiter = RateLimiter(max_attempts=10, window_seconds=300)
 
+# /forgot-password is a rate-limited firehose: every call costs an email
+# (and a queue slot if Resend retries). 5 per 15 minutes per IP is generous
+# for legit users (worst case: a typo + retry) and tight enough to make
+# spamming a known mailbox tedious.
+forgot_password_limiter = RateLimiter(max_attempts=5, window_seconds=900)
+
 
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -467,6 +473,56 @@ async def require_admin(
 ) -> User:
     if not user.is_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin access required")
+    return user
+
+
+def user_has_active_subscription(user: User) -> bool:
+    """Synchronous check: does this (already-loaded) user have an active or
+    trialing subscription right now?
+
+    Reads from `user.subscriptions` which `get_current_user` eager-loads via
+    `selectinload(User.subscriptions)` — no extra DB query. Status mirrors
+    Stripe's lifecycle: only "active" and "trialing" grant access; "canceled",
+    "past_due", "unpaid", "incomplete", "expired", and friends do not.
+
+    Admins always pass even with no subscription record so we can keep
+    operating the platform without paying ourselves.
+    """
+    if user.is_admin:
+        return True
+    now = datetime.now(timezone.utc)
+    for sub in (user.subscriptions or []):
+        if sub.status not in ("active", "trialing"):
+            continue
+        period_end = sub.current_period_end
+        if period_end is not None:
+            # SQLite stores naive datetimes; normalize to UTC before compare.
+            if period_end.tzinfo is None:
+                period_end = period_end.replace(tzinfo=timezone.utc)
+            if period_end <= now:
+                continue
+        return True
+    return False
+
+
+async def require_active_subscription(
+    user: User = Depends(get_current_user),
+) -> User:
+    """Dependency: 403 unless the caller has an active/trialing subscription.
+
+    Use as a router-level dependency on every router that exposes data
+    behind the paywall (race state, GPS, analytics, replay, chat, the
+    realtime WS, etc.). Admins bypass automatically.
+
+    Note: subscription_required is the second line of defense after
+    `get_current_user` (JWT + alive device session). With both in place,
+    a leaked or expired-account JWT can't be used to read race data.
+    """
+    if not user_has_active_subscription(user):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Active subscription required.",
+        )
     return user
 
 
@@ -823,12 +879,23 @@ async def login(
 
 @router.get("/google")
 async def google_login(request: Request, plan: str | None = None):
-    """Redirect to Google OAuth."""
+    """Redirect to Google OAuth.
+
+    CSRF defense: we mint a random `state` nonce, store it in a short-lived
+    httpOnly cookie, and forward the same value to Google. The callback
+    must see the same nonce in both the query (echoed back by Google) and
+    the cookie — otherwise it's a forged request.
+
+    Plan selection used to ride on `state`; now it lives in its own
+    short-lived cookie so the nonce stays purely random.
+    """
     settings = get_settings()
     if not settings.google_client_id:
         raise HTTPException(501, "Google login not configured")
 
     redirect_uri = f"{'https' if 'localhost' not in str(request.url) else 'http'}://{request.headers.get('host', 'localhost:8000')}/api/auth/google/callback"
+
+    nonce = secrets.token_urlsafe(32)
 
     from urllib.parse import urlencode
     params = {
@@ -837,20 +904,54 @@ async def google_login(request: Request, plan: str | None = None):
         "response_type": "code",
         "scope": "openid email profile",
         "access_type": "offline",
+        "state": nonce,
     }
-    # Pass plan selection through OAuth state parameter
-    if plan:
-        params["state"] = plan
     url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
     from fastapi.responses import RedirectResponse
-    return RedirectResponse(url)
+    response = RedirectResponse(url)
+    is_https = "localhost" not in str(request.url)
+    response.set_cookie(
+        key="bbn_oauth_state",
+        value=nonce,
+        max_age=600,                # 10 min OAuth round-trip budget
+        httponly=True,
+        secure=is_https,
+        samesite="lax",
+        path="/api/auth",
+    )
+    if plan:
+        response.set_cookie(
+            key="bbn_oauth_plan",
+            value=plan[:64],         # plan keys are short identifiers
+            max_age=600,
+            httponly=True,
+            secure=is_https,
+            samesite="lax",
+            path="/api/auth",
+        )
+    return response
 
 
 @router.get("/google/callback")
 async def google_callback(code: str, request: Request, state: str | None = None, db: AsyncSession = Depends(get_db)):
-    """Handle Google OAuth callback."""
+    """Handle Google OAuth callback.
+
+    Validates the CSRF state nonce (query `state` must equal the cookie
+    `bbn_oauth_state` set by /google) before doing anything else, then
+    reads the plan choice from the `bbn_oauth_plan` cookie. Both cookies
+    are stamped to expire in this response regardless of outcome — the
+    nonce is single-use.
+    """
     import httpx
     settings = get_settings()
+
+    # CSRF defense: cookie-bound nonce must match the state Google echoed
+    # back. Anyone tricking a victim into hitting this URL with a forged
+    # state can't supply the matching cookie.
+    cookie_state = request.cookies.get("bbn_oauth_state")
+    if not cookie_state or not state or not secrets.compare_digest(cookie_state, state):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid OAuth state")
+    plan = request.cookies.get("bbn_oauth_plan")
 
     redirect_uri = f"{'https' if 'localhost' not in str(request.url) else 'http'}://{request.headers.get('host', 'localhost:8000')}/api/auth/google/callback"
 
@@ -992,32 +1093,96 @@ async def google_callback(code: str, request: Request, state: str | None = None,
 
     access_token = create_token(user.id, user.username, user.is_admin, session_token)
 
-    # Redirect to frontend with tokens as query params (frontend will extract and store)
+    # Hand off the JWT via a short-lived, httpOnly cookie instead of stuffing
+    # it into the URL. URL-bound tokens leak to browser history, Referer
+    # headers (if the user clicks any external link before the SPA strips
+    # them), and any access-log pipeline that captures URLs. The cookie
+    # is `Secure; SameSite=Lax; HttpOnly`, max-age 60s, scoped to /api so
+    # only the same-origin SPA can consume it via /api/auth/oauth-exchange.
     from fastapi.responses import RedirectResponse
     from urllib.parse import urlencode
-    import json
     frontend_url = settings.frontend_url
-    user_out = _user_out(user)
-    redirect_params = {
-        "token": access_token,
-        "session_token": session_token,
-        "user": json.dumps({
-            "id": user_out.id, "username": user_out.username,
-            "email": user_out.email,
-            "is_admin": user_out.is_admin, "max_devices": user_out.max_devices,
-            "mfa_enabled": user_out.mfa_enabled,
-            "mfa_required": user_out.mfa_required,
-            "tab_access": user_out.tab_access,
-            "has_active_subscription": user_out.has_active_subscription,
-            "subscription_plan": user_out.subscription_plan,
-            "trial_ends_at": user_out.trial_ends_at,
-        }),
-    }
-    # Pass plan selection back to frontend if provided via OAuth state
-    if state:
-        redirect_params["plan"] = state
+    redirect_params = {"oauth": "success"}
+    if plan:
+        # Plan choice (the user picked it BEFORE OAuth; it lived in the
+        # bbn_oauth_plan cookie across the round-trip). Not sensitive —
+        # safe to put in the URL so the SPA can route to checkout.
+        redirect_params["plan"] = plan
     params = urlencode(redirect_params)
-    return RedirectResponse(f"{frontend_url}/login?oauth=google&{params}")
+    response = RedirectResponse(f"{frontend_url}/login?{params}")
+    is_https = "localhost" not in str(request.url)
+    response.set_cookie(
+        key="bbn_oauth_handoff",
+        value=access_token,
+        max_age=60,
+        httponly=True,
+        secure=is_https,
+        samesite="lax",
+        path="/api/auth",
+    )
+    # Burn the CSRF state and plan-handoff cookies — they were single-use.
+    response.delete_cookie("bbn_oauth_state", path="/api/auth")
+    response.delete_cookie("bbn_oauth_plan", path="/api/auth")
+    return response
+
+
+@router.post("/oauth-exchange")
+async def oauth_exchange(request: Request, db: AsyncSession = Depends(get_db)):
+    """Exchange the short-lived OAuth handoff cookie for the auth payload.
+
+    The Google OAuth callback parks the JWT in an httpOnly cookie
+    (`bbn_oauth_handoff`) and redirects the SPA to /login?oauth=success.
+    The SPA POSTs here once on landing; we read the cookie, validate the
+    JWT + alive device session, return the same shape as a normal /login,
+    and immediately expire the cookie so it can't be replayed.
+
+    No CSRF concern: the cookie is bound to /api/auth, the same-origin
+    SPA is the only thing that can read it (via the auto-attached cookie
+    on this fetch), and SameSite=Lax keeps cross-site contexts out.
+    """
+    raw_token = request.cookies.get("bbn_oauth_handoff")
+    if not raw_token:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "No handoff cookie")
+    try:
+        payload = decode_token(raw_token)
+    except Exception:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid handoff token")
+    user_id = payload.get("sub")
+    session_token = payload.get("sid")
+    if not user_id or not session_token:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Malformed handoff token")
+
+    # Verify the device session is still alive (it should be — we just
+    # created it in the OAuth callback — but defend against races where
+    # the session was killed in the seconds between callback and exchange).
+    ds_q = await db.execute(
+        select(DeviceSession.id).where(DeviceSession.session_token == session_token)
+    )
+    if not ds_q.scalar_one_or_none():
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session terminated")
+
+    # Load the user with the same eager loads as a normal login.
+    u_q = await db.execute(
+        select(User)
+        .where(User.id == user_id)
+        .options(selectinload(User.tab_access), selectinload(User.subscriptions))
+    )
+    user = u_q.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
+
+    # Build the response and burn the cookie. Setting Max-Age=0 with the
+    # same path tells the browser to drop it, so a second exchange call
+    # fails — the handoff is one-shot.
+    from fastapi.responses import JSONResponse
+    body = {
+        "access_token": raw_token,
+        "session_token": session_token,
+        "user": _user_out(user).model_dump(),
+    }
+    response = JSONResponse(body)
+    response.delete_cookie(key="bbn_oauth_handoff", path="/api/auth")
+    return response
 
 
 @router.get("/google/ios")
@@ -1395,12 +1560,23 @@ async def logout(
 
 @router.post("/forgot-password")
 async def forgot_password(request: Request, db: AsyncSession = Depends(get_db)):
-    """Request a password reset email."""
+    """Request a password reset email.
+
+    Rate-limited per IP (5 per 15 min). Note `record_failure` is called
+    on EVERY request — successes count too — because the cost we want
+    to bound here is the outbound email volume, not just abuse. Legit
+    users won't hit the cap at 5 attempts.
+    """
+    ip = request.client.host if request.client else "unknown"
+    forgot_password_limiter.check(ip)
+
     body = await request.json()
     email = body.get("email", "").strip().lower()
 
     if not email:
         raise HTTPException(400, "Email requerido")
+
+    forgot_password_limiter.record_failure(ip)
 
     # Always return success to prevent email enumeration
     result = await db.execute(select(User).where(User.email == email))

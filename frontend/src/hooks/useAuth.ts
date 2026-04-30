@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { clearSessionStorage } from "@/lib/storage";
 
 interface AuthUser {
   id: number;
@@ -41,7 +42,14 @@ export const useAuth = create<AuthStore>()(
 
       updateUser: (user) => set({ user }),
 
-      logout: () => set({ token: null, sessionToken: null, user: null }),
+      // Logout wipes the auth state AND every other session-bound
+      // localStorage key (chat session id, pending plan, racebox cache).
+      // Without this sweep, a second user on the same browser would
+      // inherit the previous user's chat history / pending purchase.
+      logout: () => {
+        set({ token: null, sessionToken: null, user: null });
+        clearSessionStorage();
+      },
 
       setHydrated: () => set({ _hydrated: true }),
     }),
