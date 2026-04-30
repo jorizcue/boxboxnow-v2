@@ -356,20 +356,28 @@ export function FifoQueue() {
                     const isFrozen = kartNum ? frozenKarts.has(kartNum) : true;
                     const hasInfo = team || driver;
 
-                    // Pit-in-progress timer: cross-reference the live kart
-                    // state so we can show "0:23" in the corner of any card
-                    // whose kart is currently parked in the pit lane.
-                    // Re-renders every second because `raceClockMs` ticks
-                    // through `useRaceClock()` (interpolation between WS
-                    // updates from Apex Timing every ~30s).
+                    // "Time since last pit-in" badge. We use the same
+                    // reference the freeze logic uses (pitHistory[-1].
+                    // raceTimeMs) so the timer stays in sync with the
+                    // snowfall threshold: when the badge reads 15:00 the
+                    // snow kicks in. The timer keeps running across the
+                    // pit-out → on-track transition because raceTimeMs is
+                    // race-elapsed-at-pit-in, not "currently in pit". It
+                    // only resets when the kart pits again (a new
+                    // pitHistory entry pushes the reference forward).
                     const liveKart = kartNum
                       ? karts.find((k) => k.kartNumber === kartNum)
                       : null;
+                    const lastPit = liveKart?.pitHistory?.length
+                      ? liveKart.pitHistory[liveKart.pitHistory.length - 1]
+                      : null;
+                    const raceElapsedMs = config.durationMin * 60 * 1000 - raceClockMs;
+                    const sinceLastPitSec =
+                      lastPit && lastPit.raceTimeMs > 0 && raceElapsedMs > lastPit.raceTimeMs
+                        ? (raceElapsedMs - lastPit.raceTimeMs) / 1000
+                        : 0;
+                    const showPitTimer = sinceLastPitSec > 0;
                     const isInPit = liveKart?.pitStatus === "in_pit";
-                    const pitInCd = liveKart?.pitInCountdownMs ?? 0;
-                    const pitElapsedSec = isInPit && pitInCd > 0 && raceClockMs > 0
-                      ? Math.max(0, (pitInCd - raceClockMs) / 1000)
-                      : 0;
 
                     return (
                       <button
@@ -384,16 +392,28 @@ export function FifoQueue() {
                       >
                         {isFrozen && <FrozenOverlay />}
 
-                        {/* Pit elapsed badge — top-right corner. Hidden on
-                            mobile (sm:flex) because the cards are too small
-                            to fit it; on phones the user opens the detail
-                            modal which surfaces the same value. */}
-                        {isInPit && (
+                        {/* "Time since last pit-in" badge. Top-right corner,
+                            cyan while the kart is currently in pit (so it
+                            doubles as a parking timer), neutral once the
+                            kart is back on track but still ticking up
+                            toward the 15-min freeze threshold. Hidden on
+                            mobile (sm:flex) — phones open the detail
+                            modal where the same value lives full-width. */}
+                        {showPitTimer && (
                           <span
-                            className="hidden sm:flex absolute top-0.5 right-0.5 items-center gap-0.5 rounded bg-cyan-500/20 border border-cyan-400/60 text-cyan-300 text-[9px] font-mono font-bold px-1 py-px animate-pulse z-10"
-                            title={`En pit hace ${secondsToHMS(pitElapsedSec)}`}
+                            className={clsx(
+                              "hidden sm:flex absolute top-0.5 right-0.5 items-center gap-0.5 rounded text-[9px] font-mono font-bold px-1 py-px z-10 border",
+                              isInPit
+                                ? "bg-cyan-500/20 border-cyan-400/60 text-cyan-300 animate-pulse"
+                                : "bg-neutral-700/40 border-neutral-500/40 text-neutral-300"
+                            )}
+                            title={
+                              isInPit
+                                ? `En pit hace ${secondsToHMS(sinceLastPitSec)}`
+                                : `Última entrada a boxes hace ${secondsToHMS(sinceLastPitSec)}`
+                            }
                           >
-                            {secondsToHMS(pitElapsedSec)}
+                            {secondsToHMS(sinceLastPitSec)}
                           </span>
                         )}
 
@@ -691,18 +711,27 @@ function KartDetailModal({ entry, onClose }: {
   onClose: () => void;
 }) {
   const t = useT();
-  // Pull live kart state so we can show "Tiempo en pit" when the kart is
-  // currently parked. The modal is the only spot on mobile where this
-  // info is visible — the corner badge on the queue cards is desktop-only
-  // (sm:flex) because there isn't enough space at phone widths.
+  // Pull live kart state so we can show "time since last pit-in". This
+  // mirrors the corner badge on the queue cards (desktop-only there);
+  // phones rely on this modal to surface the same info. The reference
+  // is pitHistory[-1].raceTimeMs (race-elapsed when the last pit-in
+  // happened) so the timer keeps counting after the kart leaves boxes,
+  // matching the 15-min freeze logic. Cyan + pulse while still in pit,
+  // neutral once the kart is back on track.
   const karts = useRaceStore((s) => s.karts);
+  const config = useRaceStore((s) => s.config);
   const raceClockMs = useRaceClock();
   const liveKart = karts.find((k) => k.kartNumber === entry.kartNumber);
+  const lastPit = liveKart?.pitHistory?.length
+    ? liveKart.pitHistory[liveKart.pitHistory.length - 1]
+    : null;
+  const raceElapsedMs = config.durationMin * 60 * 1000 - raceClockMs;
+  const sinceLastPitSec =
+    lastPit && lastPit.raceTimeMs > 0 && raceElapsedMs > lastPit.raceTimeMs
+      ? (raceElapsedMs - lastPit.raceTimeMs) / 1000
+      : 0;
+  const showPitTimer = sinceLastPitSec > 0;
   const isInPit = liveKart?.pitStatus === "in_pit";
-  const pitInCd = liveKart?.pitInCountdownMs ?? 0;
-  const pitElapsedSec = isInPit && pitInCd > 0 && raceClockMs > 0
-    ? Math.max(0, (pitInCd - raceClockMs) / 1000)
-    : 0;
 
   const avgPosition = entry.avgPosition ?? 0;
   const avgLapMs = entry.avgLapMs ?? 0;
@@ -738,18 +767,35 @@ function KartDetailModal({ entry, onClose }: {
           </button>
         </div>
 
-        {/* In-pit timer — only shown when this kart is currently parked.
-            Cyan accent + pulse to mirror the corner badge on the queue
-            cards, so the same status reads the same on desktop and
-            mobile. Hidden when the kart is on track. */}
-        {isInPit && (
+        {/* Time-since-last-pit-in tile. Same reference as the freeze
+            timer (pitHistory[-1].raceTimeMs). Cyan + pulse while still
+            in pit; neutral once back on track but still ticking until
+            the kart pits again. Hidden if the kart hasn't pitted yet. */}
+        {showPitTimer && (
           <div className="px-5 pt-4">
-            <div className="bg-cyan-500/10 border border-cyan-400/40 rounded-xl p-3 flex items-center justify-between">
-              <span className="text-[10px] text-cyan-300 uppercase tracking-widest font-bold">
-                Tiempo en pit
+            <div
+              className={clsx(
+                "rounded-xl p-3 flex items-center justify-between border",
+                isInPit
+                  ? "bg-cyan-500/10 border-cyan-400/40"
+                  : "bg-neutral-800/50 border-neutral-600/40"
+              )}
+            >
+              <span
+                className={clsx(
+                  "text-[10px] uppercase tracking-widest font-bold",
+                  isInPit ? "text-cyan-300" : "text-neutral-400"
+                )}
+              >
+                {isInPit ? "Tiempo en pit" : "Desde último pit-in"}
               </span>
-              <span className="text-2xl font-black font-mono text-cyan-300 animate-pulse">
-                {secondsToHMS(pitElapsedSec)}
+              <span
+                className={clsx(
+                  "text-2xl font-black font-mono",
+                  isInPit ? "text-cyan-300 animate-pulse" : "text-neutral-200"
+                )}
+              >
+                {secondsToHMS(sinceLastPitSec)}
               </span>
             </div>
           </div>
