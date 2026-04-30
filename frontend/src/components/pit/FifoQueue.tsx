@@ -355,6 +355,22 @@ export function FifoQueue() {
                     const kartNum = typeof entry === "object" && entry ? entry.kartNumber : null;
                     const isFrozen = kartNum ? frozenKarts.has(kartNum) : true;
                     const hasInfo = team || driver;
+
+                    // Pit-in-progress timer: cross-reference the live kart
+                    // state so we can show "0:23" in the corner of any card
+                    // whose kart is currently parked in the pit lane.
+                    // Re-renders every second because `raceClockMs` ticks
+                    // through `useRaceClock()` (interpolation between WS
+                    // updates from Apex Timing every ~30s).
+                    const liveKart = kartNum
+                      ? karts.find((k) => k.kartNumber === kartNum)
+                      : null;
+                    const isInPit = liveKart?.pitStatus === "in_pit";
+                    const pitInCd = liveKart?.pitInCountdownMs ?? 0;
+                    const pitElapsedSec = isInPit && pitInCd > 0 && raceClockMs > 0
+                      ? Math.max(0, (pitInCd - raceClockMs) / 1000)
+                      : 0;
+
                     return (
                       <button
                         key={colIdx}
@@ -367,6 +383,20 @@ export function FifoQueue() {
                         )}
                       >
                         {isFrozen && <FrozenOverlay />}
+
+                        {/* Pit elapsed badge — top-right corner. Hidden on
+                            mobile (sm:flex) because the cards are too small
+                            to fit it; on phones the user opens the detail
+                            modal which surfaces the same value. */}
+                        {isInPit && (
+                          <span
+                            className="hidden sm:flex absolute top-0.5 right-0.5 items-center gap-0.5 rounded bg-cyan-500/20 border border-cyan-400/60 text-cyan-300 text-[9px] font-mono font-bold px-1 py-px animate-pulse z-10"
+                            title={`En pit hace ${secondsToHMS(pitElapsedSec)}`}
+                          >
+                            {secondsToHMS(pitElapsedSec)}
+                          </span>
+                        )}
+
                         <span
                           className="text-lg sm:text-2xl font-bold leading-tight"
                           style={{ color: tierHex(score) }}
@@ -661,6 +691,19 @@ function KartDetailModal({ entry, onClose }: {
   onClose: () => void;
 }) {
   const t = useT();
+  // Pull live kart state so we can show "Tiempo en pit" when the kart is
+  // currently parked. The modal is the only spot on mobile where this
+  // info is visible — the corner badge on the queue cards is desktop-only
+  // (sm:flex) because there isn't enough space at phone widths.
+  const karts = useRaceStore((s) => s.karts);
+  const raceClockMs = useRaceClock();
+  const liveKart = karts.find((k) => k.kartNumber === entry.kartNumber);
+  const isInPit = liveKart?.pitStatus === "in_pit";
+  const pitInCd = liveKart?.pitInCountdownMs ?? 0;
+  const pitElapsedSec = isInPit && pitInCd > 0 && raceClockMs > 0
+    ? Math.max(0, (pitInCd - raceClockMs) / 1000)
+    : 0;
+
   const avgPosition = entry.avgPosition ?? 0;
   const avgLapMs = entry.avgLapMs ?? 0;
   const recentLaps = entry.recentLaps ?? [];
@@ -694,6 +737,23 @@ function KartDetailModal({ entry, onClose }: {
             </svg>
           </button>
         </div>
+
+        {/* In-pit timer — only shown when this kart is currently parked.
+            Cyan accent + pulse to mirror the corner badge on the queue
+            cards, so the same status reads the same on desktop and
+            mobile. Hidden when the kart is on track. */}
+        {isInPit && (
+          <div className="px-5 pt-4">
+            <div className="bg-cyan-500/10 border border-cyan-400/40 rounded-xl p-3 flex items-center justify-between">
+              <span className="text-[10px] text-cyan-300 uppercase tracking-widest font-bold">
+                Tiempo en pit
+              </span>
+              <span className="text-2xl font-black font-mono text-cyan-300 animate-pulse">
+                {secondsToHMS(pitElapsedSec)}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Stats grid */}
         <div className="grid grid-cols-2 gap-3 px-5 py-4">
