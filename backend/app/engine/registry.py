@@ -667,6 +667,17 @@ class ReplaySession:
             # Keep state aware of replay speed for lap-based race countdown simulation
             self.state._replay_speed = getattr(self.engine, '_speed', 1.0)
 
+            # Hand the LOG timestamp of the current block to the state so
+            # the LAP handler's elapsed-time discriminator (which catches
+            # identical-ms new laps that the value/class checks miss) can
+            # work in *log time* — invariant under replay speed. Without
+            # this, fast replays at 10x+ would compress real-lap intervals
+            # under the threshold and Modo C dropouts (e.g. Cabanillas
+            # SPRINT 3, kart 4 / Óscar Pérez) would re-appear in the
+            # replay even though the live race didn't have them.
+            if self.engine and self.engine.current_block_timestamp:
+                self.state._current_log_time = self.engine.current_block_timestamp.timestamp()
+
             # During a silent rebuild (the init→target playback after a
             # seek/seek_time), we still need to update local state so the
             # simulation arrives at the right snapshot — but we DON'T want

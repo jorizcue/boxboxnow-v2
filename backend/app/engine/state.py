@@ -74,6 +74,16 @@ class KartState:
     # lap 3 was silently dropped and the counter stayed -1 for the rest
     # of the race.
     _last_c7_class: str = ""
+    # Timestamp (in seconds, scale set by RaceStateManager._now_seconds())
+    # of when we last RECORDED a c7 for this kart. Used as a fourth
+    # discriminator in the LAP handler: if a c7 with identical ms and
+    # CSS-class transition that doesn't match our "new lap" pattern
+    # arrives more than ~70% of `lap_ms` after the previous one, it's
+    # almost certainly a real new lap (CSS repaints arrive within ms
+    # of the trigger; real laps take a full lap to come around).
+    # Critical for replays of Modo C circuits where the PHP API isn't
+    # available — purely WS-side recovery.
+    _last_c7_at: float = 0.0
     best_lap_ms: int = 0
     gap: str = ""
     interval: str = ""
@@ -203,6 +213,16 @@ class RaceStateManager:
         # column to give us the counter independently).
         self._php_api = None  # type: ApexApiClient | None
 
+        # Replay-aware clock. When a ReplaySession owns this state, it
+        # writes the current log-block timestamp here before each
+        # handle_events(). The LAP handler reads it via _now_seconds()
+        # so the time-elapsed-since-last-c7 check works at any replay
+        # speed (the comparison is in *log time*, not wall clock).
+        # In live operation this stays None and we fall back to
+        # time.monotonic() — equivalent because live time advances at
+        # 1x by definition.
+        self._current_log_time: float | None = None
+
         # Analytics state
         self.fifo_queue: list[dict] = []
         self.fifo_score: float = 0.0
@@ -251,6 +271,17 @@ class RaceStateManager:
         that don't expose a `tlp` column (Modo C — Ariza). On all other
         circuits this is a no-op."""
         self._php_api = php_api
+
+    def _now_seconds(self) -> float:
+        """Time source for lap-interval checks. Replay sessions write
+        `_current_log_time` (block timestamp) before each handle_events
+        call so the elapsed-since-last-c7 comparison happens in LOG
+        time — invariant under replay speed. Live mode falls back to
+        monotonic, which IS log time at 1x by definition.
+        """
+        if self._current_log_time is not None:
+            return self._current_log_time
+        return time.monotonic()
 
     def reset(self):
         """Reset all race state (used when starting/stopping replay)."""
@@ -506,14 +537,34 @@ class RaceStateManager:
                     )
                 )
 
+                now = self._now_seconds()
                 if c6_advanced or value_changed or class_indicates_new_lap:
                     kart._last_c7_value = lap_ms
                     kart._last_c7_class = new_class
+                    kart._last_c7_at = now
                     return self._record_lap(kart, row_id, lap_ms, new_class)
 
-                # Ambiguous: same ms, same/repaint-class, counter not advanced.
-                # Modo A circuit (apex_total_laps>0 and equal to ours):
-                # unambiguous CSS repaint — discard.
+                # Time-elapsed discriminator. If the previous c7 was
+                # recorded long enough ago that an entire new lap could
+                # have completed in between (≥70% of lap_ms in LOG time),
+                # the incoming event is almost certainly a real new lap
+                # whose ms happens to coincide with the previous one. CSS
+                # repaints arrive within milliseconds of their trigger,
+                # so this threshold separates them cleanly. Works in
+                # replays at any speed because _now_seconds() returns
+                # LOG time, not wall clock.
+                if kart._last_c7_at > 0:
+                    elapsed_log_s = now - kart._last_c7_at
+                    if elapsed_log_s * 1000 > 0.7 * lap_ms:
+                        kart._last_c7_value = lap_ms
+                        kart._last_c7_class = new_class
+                        kart._last_c7_at = now
+                        return self._record_lap(kart, row_id, lap_ms, new_class)
+
+                # Ambiguous: same ms, same/repaint-class, counter not
+                # advanced, AND elapsed time is too short for a real lap.
+                # In Modo A circuits (apex_total_laps > 0 and equal to
+                # ours): unambiguous CSS repaint — discard.
                 if kart.apex_total_laps > 0:
                     return None
 
@@ -535,6 +586,7 @@ class RaceStateManager:
                         api_top_ms = recent[0][1]
                         kart._last_c7_value = lap_ms
                         kart._last_c7_class = new_class
+                        kart._last_c7_at = now
                         return self._record_lap(
                             kart, row_id, api_top_ms or lap_ms, new_class,
                         )
