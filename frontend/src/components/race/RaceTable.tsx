@@ -350,7 +350,25 @@ export function RaceTable() {
                     <td className="px-2 py-1.5 text-right font-mono text-accent">
                       {kart.bestStintLapMs > 0 ? msToLapTime(kart.bestStintLapMs) : "-"}
                     </td>
-                    <td className="px-2 py-1.5 text-center text-neutral-300">{kart.totalLaps}</td>
+                    <td className="px-2 py-1.5 text-center text-neutral-300">
+                      <span className="inline-flex items-center gap-1">
+                        {kart.totalLaps}
+                        {/* When Apex's counter is ahead of our recorded
+                            lap times (some `c7` events were dropped on
+                            the WS), show a small amber warning so the
+                            strategist knows the avg/best columns are
+                            computed from fewer laps than what Apex sees.
+                            Hover for the exact gap. */}
+                        {(kart.lapTimesMissing ?? 0) > 0 && (
+                          <span
+                            className="text-[9px] font-mono text-amber-400 leading-none"
+                            title={`Apex registró ${kart.totalLaps} vueltas pero solo recibimos ${kart.totalLaps - (kart.lapTimesMissing ?? 0)} tiempos`}
+                          >
+                            ⚠-{kart.lapTimesMissing}
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     <td className="px-2 py-1.5 text-center">
                       <span className={pitsRemaining > 0 ? "text-tier-25" : "text-neutral-300"}>
                         {kart.pitCount}

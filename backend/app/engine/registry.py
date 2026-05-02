@@ -381,10 +381,17 @@ class UserSession:
         self.fifo.update_config(box_karts, box_lines)
 
     def set_php_api(self, php_api_url: str, php_api_port: int):
-        """Configure the PHP API client for driver loading."""
+        """Configure the PHP API client for driver loading.
+
+        Also handed to `RaceStateManager` so the LAP handler can use it
+        as a tie-breaker for ambiguous `c7` events on Modo C circuits
+        (Ariza). On other circuits the state simply never reaches the
+        ambiguous code path.
+        """
         if php_api_port:
             url = php_api_url or DEFAULT_PHP_API_URL
             self.api_client = ApexApiClient(url, php_api_port)
+            self.state.set_php_api(self.api_client)
             logger.info(f"PHP API configured: port={php_api_port}, url={url}")
 
     def set_driver_differentials(self, differentials: dict[int, dict[str, int]],

@@ -26,6 +26,12 @@ export interface KartState {
   pitTime: string;
   visualStatus: string;
   arrowStatus: string;
+  // Number of laps Apex's `tlp` counter is ahead of our recorded count.
+  // > 0 means the WebSocket dropped some `c7` events: we know the kart
+  // completed N laps but only have N-lapTimesMissing actual times. The
+  // `totalLaps` field already shows max(our_count, apex_count) so the
+  // display is correct; this field tells the UI to show a small warning.
+  lapTimesMissing?: number;
   stintLapsCount: number;
   stintDurationS: number;
   stintStartTime: number;  // epoch seconds

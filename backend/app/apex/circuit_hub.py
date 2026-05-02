@@ -86,7 +86,14 @@ class CircuitConnection:
     after backend restarts. State is persisted to DB and kept in memory.
     """
 
-    def __init__(self, circuit_id: int, circuit_name: str, ws_url: str):
+    def __init__(
+        self,
+        circuit_id: int,
+        circuit_name: str,
+        ws_url: str,
+        php_api_url: str | None = None,
+        php_api_port: int = 0,
+    ):
         self.circuit_id = circuit_id
         self.circuit_name = circuit_name
         self.ws_url = ws_url
@@ -114,6 +121,18 @@ class CircuitConnection:
         self._lap_saved_per_kart: dict[int, int] = {}
         self._lap_save_lock = asyncio.Lock()
         self._lap_save_counter = 0  # batch saves every N lap events
+
+        # PHP API client for the LAP handler tie-breaker on Modo C
+        # circuits (no `tlp` column). Shared between the headless
+        # `_lap_state` here and any `UserSession.state` for this same
+        # circuit — but each one keeps its own reference, since they
+        # process the same WS stream independently.
+        self._php_api_client = None
+        if php_api_port:
+            from app.apex.api_client import ApexApiClient, DEFAULT_PHP_API_URL
+            url = php_api_url or DEFAULT_PHP_API_URL
+            self._php_api_client = ApexApiClient(url, php_api_port)
+            self._lap_state.set_php_api(self._php_api_client)
         self._lap_current_session_key: str = ""  # track category+session changes
 
     @property
@@ -161,6 +180,13 @@ class CircuitConnection:
                 pass
         # Finalize any pending lap data before shutdown
         await self._finalize_lap_race_log()
+        # Close the PHP API client (if any) so we don't leak the
+        # underlying httpx connection pool on circuit reload.
+        if self._php_api_client is not None:
+            try:
+                await self._php_api_client.close()
+            except Exception:
+                pass
         self._recorder.close()
         self._connected = False
 
@@ -812,7 +838,13 @@ class CircuitHub:
             ws_port = circuit.ws_port_data or (circuit.ws_port - 1)
             ws_url = f"ws://{settings.apex_ws_host}:{ws_port}"
 
-            conn = CircuitConnection(circuit.id, circuit.name, ws_url)
+            conn = CircuitConnection(
+                circuit.id,
+                circuit.name,
+                ws_url,
+                php_api_url=circuit.php_api_url or None,
+                php_api_port=circuit.php_api_port or 0,
+            )
             self._connections[circuit.id] = conn
             await conn.start()
 
@@ -869,7 +901,13 @@ class CircuitHub:
         if conn:
             await conn.stop()
 
-        new_conn = CircuitConnection(circuit.id, circuit.name, ws_url)
+        new_conn = CircuitConnection(
+            circuit.id,
+            circuit.name,
+            ws_url,
+            php_api_url=circuit.php_api_url or None,
+            php_api_port=circuit.php_api_port or 0,
+        )
         self._connections[circuit.id] = new_conn
         await new_conn.start()
         logger.info(f"CircuitHub: started connection to {circuit.name}")

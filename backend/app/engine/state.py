@@ -119,6 +119,15 @@ class KartState:
         return {name: sum(times) / len(times) for name, times in sums.items() if times}
 
     def to_dict(self) -> dict:
+        # `totalLaps` is what the dashboard displays as VLT. We expose
+        # the MAX of (our recorded count, Apex's `tlp` counter) so the
+        # cell stays in sync with Apex even when we can't capture every
+        # `c7` event (Modo A: Alcanede, Henakart 3h). `lapTimesMissing`
+        # is the gap, surfaced to the frontend so the UI can tell the
+        # user "Apex says 6 laps but we only have 5 lap times" via a
+        # small ⚠ badge instead of silently lying about averages.
+        display_total = max(self.total_laps, self.apex_total_laps)
+        lap_times_missing = max(0, self.apex_total_laps - self.total_laps)
         return {
             "rowId": self.row_id,
             "kartNumber": self.kart_number,
@@ -126,7 +135,8 @@ class KartState:
             "driverName": self.driver_name,
             "driverTime": self.driver_time,
             "position": self.position,
-            "totalLaps": self.total_laps,
+            "totalLaps": display_total,
+            "lapTimesMissing": lap_times_missing,
             "lastLapMs": self.last_lap_ms,
             "bestLapMs": self.best_lap_ms,
             "gap": self.gap,
@@ -171,6 +181,15 @@ class RaceStateManager:
         self._event_buffer: list[dict] = []
         self._broadcast_lock = asyncio.Lock()
 
+        # Optional Apex PHP API client. Set via `set_php_api()` from the
+        # owning UserSession / CircuitConnection once the circuit's
+        # php_api_url and php_api_port are known. Used as a tie-breaker
+        # in the LAP handler when we can't tell from the WebSocket
+        # stream alone whether an incoming `c7` is a new lap or a CSS
+        # repaint (Modo C circuits like Ariza, where there's no `tlp`
+        # column to give us the counter independently).
+        self._php_api = None  # type: ApexApiClient | None
+
         # Analytics state
         self.fifo_queue: list[dict] = []
         self.fifo_score: float = 0.0
@@ -212,6 +231,13 @@ class RaceStateManager:
         self.finish_lon1: float | None = None
         self.finish_lat2: float | None = None
         self.finish_lon2: float | None = None
+
+    def set_php_api(self, php_api):
+        """Inject the Apex PHP API client. Once set, the LAP handler
+        will use it to disambiguate identical-ms `c7` events on circuits
+        that don't expose a `tlp` column (Modo C — Ariza). On all other
+        circuits this is a no-op."""
+        self._php_api = php_api
 
     def reset(self):
         """Reset all race state (used when starting/stopping replay)."""
@@ -437,6 +463,35 @@ class RaceStateManager:
                     kart._last_c7_value = lap_ms
                     return self._record_lap(kart, row_id, lap_ms,
                                             event.extra.get("class", "tn"))
+
+                # Ambiguous: same ms, counter not advanced.
+                # In Modo A circuits (apex_total_laps>0 and equal to ours)
+                # this is unambiguously a CSS repaint — discard.
+                if kart.apex_total_laps > 0:
+                    return None
+
+                # Modo C: no `tlp` column ever appeared, so we have NO
+                # independent counter to disambiguate. Ask Apex's PHP API
+                # for the kart's recent laps and check if its lap count
+                # exceeds ours. If yes, the incoming c7 is a real new lap
+                # whose ms happens to match the previous one; if no,
+                # it's a repaint we should ignore.
+                if self._php_api is not None and self._php_api.php_api_port:
+                    try:
+                        recent = await self._php_api.get_recent_laps(row_id, n=10)
+                    except Exception as exc:
+                        logger.warning(f"[php_api] tie-break failed for {row_id}: {exc}")
+                        recent = []
+                    if recent and recent[0][0] > kart.total_laps:
+                        # Apex confirms a lap exists past ours — record it.
+                        # Use the API's reported time when it differs (rare,
+                        # but the WS could be lagged); otherwise our lap_ms.
+                        api_top_ms = recent[0][1]
+                        kart._last_c7_value = lap_ms
+                        return self._record_lap(
+                            kart, row_id, api_top_ms or lap_ms,
+                            event.extra.get("class", "tn"),
+                        )
                 return None
 
         elif event.type == EventType.LAP_MS:
