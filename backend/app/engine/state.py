@@ -303,7 +303,7 @@ class RaceStateManager:
         updates = []
         had_init_kart = False
         for event in events:
-            update = self._apply_event(event)
+            update = await self._apply_event(event)
             if update:
                 updates.append(update)
             if event.type == EventType.INIT and event.value == "kart":
@@ -368,8 +368,14 @@ class RaceStateManager:
                 "lapClass": lap_class,
                 "totalLaps": kart.total_laps}
 
-    def _apply_event(self, event: RaceEvent) -> dict | None:
-        """Apply a single event to state. Returns update dict for broadcast."""
+    async def _apply_event(self, event: RaceEvent) -> dict | None:
+        """Apply a single event to state. Returns update dict for broadcast.
+
+        Async because the LAP handler may call into the Apex PHP API to
+        disambiguate identical-ms `c7` events on Modo C circuits (no
+        `tlp` column). All other branches are pure-sync; only the rare
+        ambiguous lap event triggers a real `await` that yields.
+        """
         row_id = event.row_id
 
         if event.type == EventType.INIT and event.value == "kart":
