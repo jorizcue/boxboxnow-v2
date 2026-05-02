@@ -61,6 +61,19 @@ class KartState:
     #   - apex_total_laps has moved forward since our last recorded lap
     #     (covers the rare case of two consecutive laps with identical ms).
     _last_c7_value: int = 0
+    # CSS class of the last c7 we recorded ("tn" normal, "ti" improvement,
+    # "tb" best, "to" other). Used as an additional discriminator alongside
+    # _last_c7_value: when a c7 arrives with the same value but a class
+    # transition that REQUIRES a new lap completion (anything → ti / tb,
+    # or ti → tn), we accept it as a real new lap. This catches the case
+    # where two consecutive laps coincidentally share the same ms — Apex's
+    # row class still flips because the new lap isn't an "improvement"
+    # over the previous best of the same kart anymore. Critical for Modo C
+    # circuits like Cabanillas SPRINT 3 where a kart (kart 4 / Oscar Pérez)
+    # had laps 2 and 3 both at 48.982ms — without this discriminator,
+    # lap 3 was silently dropped and the counter stayed -1 for the rest
+    # of the race.
+    _last_c7_class: str = ""
     best_lap_ms: int = 0
     gap: str = ""
     interval: str = ""
@@ -465,23 +478,53 @@ class RaceStateManager:
                     and kart.apex_total_laps > kart.total_laps
                 )
                 value_changed = lap_ms != kart._last_c7_value
-                if c6_advanced or value_changed:
-                    kart._last_c7_value = lap_ms
-                    return self._record_lap(kart, row_id, lap_ms,
-                                            event.extra.get("class", "tn"))
+                new_class = event.extra.get("class", "tn")
 
-                # Ambiguous: same ms, counter not advanced.
-                # In Modo A circuits (apex_total_laps>0 and equal to ours)
-                # this is unambiguously a CSS repaint — discard.
+                # CSS class transition signal. If two consecutive c7 events
+                # share the same ms but differ in class, the transition
+                # itself can prove a new lap was completed even when neither
+                # apex_total_laps nor lap_ms moved:
+                #   - new class is "ti" (improvement) or "tb" (best): these
+                #     statuses are only assigned on a fresh lap completion;
+                #     a CSS repaint never UPGRADES the row to ti or tb.
+                #   - old "ti" → new "tn": once a lap was the kart's best
+                #     improvement, the only way the row can flip back to
+                #     normal is by completing another lap (no longer an
+                #     improvement over the new best).
+                # The deliberate non-match is "tb" → "tn", which is the
+                # textbook CSS repaint when another kart beats this one's
+                # best. We DON'T accept on that transition — falls through
+                # to the existing PHP-API tie-breaker (Modo C) or discard
+                # (Modo A).
+                old_cls = kart._last_c7_class
+                class_indicates_new_lap = (
+                    old_cls != ""
+                    and new_class != old_cls
+                    and (
+                        new_class in ("ti", "tb")
+                        or (old_cls == "ti" and new_class == "tn")
+                    )
+                )
+
+                if c6_advanced or value_changed or class_indicates_new_lap:
+                    kart._last_c7_value = lap_ms
+                    kart._last_c7_class = new_class
+                    return self._record_lap(kart, row_id, lap_ms, new_class)
+
+                # Ambiguous: same ms, same/repaint-class, counter not advanced.
+                # Modo A circuit (apex_total_laps>0 and equal to ours):
+                # unambiguous CSS repaint — discard.
                 if kart.apex_total_laps > 0:
                     return None
 
                 # Modo C: no `tlp` column ever appeared, so we have NO
-                # independent counter to disambiguate. Ask Apex's PHP API
-                # for the kart's recent laps and check if its lap count
-                # exceeds ours. If yes, the incoming c7 is a real new lap
-                # whose ms happens to match the previous one; if no,
-                # it's a repaint we should ignore.
+                # independent counter and class didn't change suggestively
+                # either. Ask Apex's PHP API for the kart's recent laps;
+                # if it shows more laps than we've recorded, the incoming
+                # c7 is a real new lap whose ms happens to match the
+                # previous one. The class-transition rule above already
+                # caught the Oscar Pérez case (ti→tn); this is the
+                # remaining tn→tn or tb→tn fallback.
                 if self._php_api is not None and self._php_api.php_api_port:
                     try:
                         recent = await self._php_api.get_recent_laps(row_id, n=10)
@@ -489,14 +532,11 @@ class RaceStateManager:
                         logger.warning(f"[php_api] tie-break failed for {row_id}: {exc}")
                         recent = []
                     if recent and recent[0][0] > kart.total_laps:
-                        # Apex confirms a lap exists past ours — record it.
-                        # Use the API's reported time when it differs (rare,
-                        # but the WS could be lagged); otherwise our lap_ms.
                         api_top_ms = recent[0][1]
                         kart._last_c7_value = lap_ms
+                        kart._last_c7_class = new_class
                         return self._record_lap(
-                            kart, row_id, api_top_ms or lap_ms,
-                            event.extra.get("class", "tn"),
+                            kart, row_id, api_top_ms or lap_ms, new_class,
                         )
                 return None
 
