@@ -511,30 +511,34 @@ class RaceStateManager:
                 value_changed = lap_ms != kart._last_c7_value
                 new_class = event.extra.get("class", "tn")
 
-                # CSS class transition signal. If two consecutive c7 events
-                # share the same ms but differ in class, the transition
-                # itself can prove a new lap was completed even when neither
-                # apex_total_laps nor lap_ms moved:
-                #   - new class is "ti" (improvement) or "tb" (best): these
-                #     statuses are only assigned on a fresh lap completion;
-                #     a CSS repaint never UPGRADES the row to ti or tb.
-                #   - old "ti" → new "tn": once a lap was the kart's best
-                #     improvement, the only way the row can flip back to
-                #     normal is by completing another lap (no longer an
-                #     improvement over the new best).
-                # The deliberate non-match is "tb" → "tn", which is the
-                # textbook CSS repaint when another kart beats this one's
-                # best. We DON'T accept on that transition — falls through
-                # to the existing PHP-API tie-breaker (Modo C) or discard
-                # (Modo A).
+                # CSS class transition signal.
+                #
+                # Apex's class is one of: tn (normal), ti (improvement over
+                # the kart's own best), tb (session best), to (invalidated).
+                # Class transitions can prove a new lap was completed when
+                # neither apex_total_laps nor lap_ms moved — but ONLY for
+                # the transitions that genuinely require a new lap. The
+                # bug we hit at race start in Cabanillas SPRINT 3 was that
+                # `tb → ti` was being accepted as a new lap, when in fact
+                # it's a textbook repaint: another kart beat your session
+                # best, so your lap drops from "session best" to "just
+                # your own improvement" — same lap, lower badge.
+                #
+                # Safe transitions (require a real new lap):
+                #   - any transition FROM tn or to (going up)
+                #   - ti → tb (improvement promoted to session best)
+                #   - ti → tn (no longer an improvement, i.e. you ran a
+                #     better lap so the previous one is now plain)
+                #
+                # Unsafe transitions (could be CSS repaint, ignore):
+                #   - tb → anything: another kart took session best
+                #   - anything → to: lap got invalidated (same lap)
                 old_cls = kart._last_c7_class
                 class_indicates_new_lap = (
                     old_cls != ""
                     and new_class != old_cls
-                    and (
-                        new_class in ("ti", "tb")
-                        or (old_cls == "ti" and new_class == "tn")
-                    )
+                    and old_cls != "tb"      # downgrades from tb are repaints
+                    and new_class != "to"    # invalidations are repaints of the same lap
                 )
 
                 now = self._now_seconds()
