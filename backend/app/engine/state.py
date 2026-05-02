@@ -540,6 +540,20 @@ class RaceStateManager:
                     and old_cls != "tb"      # downgrades from tb are repaints
                     and new_class != "to"    # invalidations are repaints of the same lap
                 )
+                # Explicit repaint detection: when the class transitioned in
+                # a way that PROVES it's a repaint of the same lap (tb was
+                # downgraded because another kart took session best, or the
+                # lap got invalidated to `to`). Must take precedence over
+                # the time-elapsed discriminator below — otherwise a long
+                # stint with identical lap_ms can fool the time check into
+                # accepting the repaint as a phantom new lap (Cabanillas
+                # SPRINT 3, k1 Gonzalo del Hoyo: tb|52.551 at 17:10:34 →
+                # ti|52.551 at 17:11:22, 48s gap > 0.7×52.5s = 36.8s).
+                class_repaint = (
+                    old_cls != ""
+                    and new_class != old_cls
+                    and (old_cls == "tb" or new_class == "to")
+                )
 
                 now = self._now_seconds()
                 if c6_advanced or value_changed or class_indicates_new_lap:
@@ -547,6 +561,14 @@ class RaceStateManager:
                     kart._last_c7_class = new_class
                     kart._last_c7_at = now
                     return self._record_lap(kart, row_id, lap_ms, new_class)
+
+                # CSS repaint of the same lap — discard before the time
+                # check has a chance to misfire. Update _last_c7_class so
+                # subsequent events compare against the current (post-
+                # repaint) class.
+                if class_repaint:
+                    kart._last_c7_class = new_class
+                    return None
 
                 # Time-elapsed discriminator. If the previous c7 was
                 # recorded long enough ago that an entire new lap could
