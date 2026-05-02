@@ -67,6 +67,7 @@ interface RaceStore {
   applyUpdates: (events: WsUpdateEvent[]) => void;
   applyFifoUpdate: (data: any) => void;
   applyAnalytics: (data: any) => void;
+  applyClassificationUpdate: (data: any) => void;
 }
 
 const defaultFifo: FifoState = { queue: [], score: 0, history: [] };
@@ -261,5 +262,14 @@ export const useRaceStore = create<RaceStore>((set) => ({
       classificationMeta: data.classificationMeta ?? state.classificationMeta,
       // Merge config if present (allows live config updates without reconnect)
       config: data.config ? { ...state.config, ...data.config } : state.config,
+    })),
+
+  // Lightweight: backend pushes this on every batch with a LAP event so the
+  // Clasif Real table re-orders live (instead of waiting up to 10-30s for
+  // the next analytics tick). Only touches classification + meta.
+  applyClassificationUpdate: (data) =>
+    set((state) => ({
+      classification: data.classification || state.classification,
+      classificationMeta: data.classificationMeta ?? state.classificationMeta,
     })),
 }));

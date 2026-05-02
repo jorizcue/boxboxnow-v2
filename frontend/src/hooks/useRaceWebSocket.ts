@@ -47,7 +47,7 @@ export function useRaceWebSocket(options?: WsOptions) {
   const viewParam = options?.view;
 
   const { token } = useAuth();
-  const { setConnected, applySnapshot, applyUpdates, applyFifoUpdate, applyAnalytics, notifyTeamsUpdated, setReplayStatus } =
+  const { setConnected, applySnapshot, applyUpdates, applyFifoUpdate, applyAnalytics, applyClassificationUpdate, notifyTeamsUpdated, setReplayStatus } =
     useRaceStore();
   const wsReconnectTrigger = useRaceStore((s) => s.wsReconnectTrigger);
 
@@ -140,6 +140,9 @@ export function useRaceWebSocket(options?: WsOptions) {
             applyAnalytics(msg.data);
             // Forward analytics as a full snapshot so driver gets complete kart data
             ch?.postMessage({ type: "analytics", data: msg.data });
+          } else if (msg.type === "classification_update" && msg.data) {
+            applyClassificationUpdate(msg.data);
+            ch?.postMessage({ type: "classification_update", data: msg.data });
           } else if (msg.type === "replay_status" && msg.data) {
             const rs = msg.data as any;
             setReplayStatus(rs.active, rs.paused, undefined, rs.progress, rs.currentTime, rs.speed, rs.totalBlocks);
@@ -175,7 +178,7 @@ export function useRaceWebSocket(options?: WsOptions) {
       }
     };
     // wsReconnectTrigger in deps => entire effect re-runs (close old WS, open new)
-  }, [token, wsReconnectTrigger, setConnected, applySnapshot, applyUpdates, applyFifoUpdate, applyAnalytics, setReplayStatus, notifyTeamsUpdated]);
+  }, [token, wsReconnectTrigger, setConnected, applySnapshot, applyUpdates, applyFifoUpdate, applyAnalytics, applyClassificationUpdate, setReplayStatus, notifyTeamsUpdated]);
 
   // Expose WS ref so sendBoxCall can relay through server (for iOS app)
   useEffect(() => {

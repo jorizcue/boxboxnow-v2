@@ -381,6 +381,28 @@ class RaceStateManager:
             elif updates:
                 await self._broadcast({"type": "update", "events": updates})
 
+        # Real classification: positions only change at lap-line crossings
+        # (every kart's adj_progress otherwise advances at +1 s/s in steady
+        # state). Recompute and push a lightweight `classification_update`
+        # whenever this batch contained a LAP event so the UI animates the
+        # row swap immediately instead of waiting for the next analytics
+        # tick (which can be 10-30s away). Lazy import to avoid circular
+        # dependency with classification.py which itself imports state.
+        if (
+            self._ws_clients
+            and not getattr(self, "_silent_rebuild", False)
+            and self._lap_karts_this_block
+        ):
+            from app.engine.classification import compute_classification
+            compute_classification(self)
+            await self._broadcast({
+                "type": "classification_update",
+                "data": {
+                    "classification": self.classification,
+                    "classificationMeta": self.classification_meta,
+                },
+            })
+
     def _record_lap(self, kart: KartState, row_id: str, lap_ms: int,
                     lap_class: str = "tn") -> dict:
         """Record a lap for a kart. Handles counting, filtering, analytics.

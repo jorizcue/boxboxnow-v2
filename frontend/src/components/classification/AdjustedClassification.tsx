@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { msToLapTime, tierHex } from "@/lib/formatters";
 import { useT } from "@/lib/i18n";
@@ -108,16 +109,31 @@ export function AdjustedClassification() {
               <SortTh align="center" colKey="tierScore" current={sortKey} dir={sortDir} onSort={toggleSort} className="w-8 sm:w-12">Tier</SortTh>
             </tr>
           </thead>
-          <tbody>
+          {/*
+            framer-motion `layout` on each row drives the "fly up/down" effect
+            when the array re-orders (which now happens on every backend lap
+            event via the lightweight `classification_update` WS message).
+            Spring tuned for a quick but visible swap (~250-350ms).
+          */}
+          <motion.tbody layout>
+            <AnimatePresence initial={false}>
             {sorted.map((entry) => {
               const isOurTeam = config.ourKartNumber > 0 && entry.kartNumber === config.ourKartNumber;
               const inPit = entry.pitStatus === "in_pit";
 
               return (
-                <tr
+                <motion.tr
                   key={entry.kartNumber}
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{
+                    layout: { type: "spring", stiffness: 320, damping: 32 },
+                    opacity: { duration: 0.18 },
+                  }}
                   className={clsx(
-                    "border-b border-border hover:bg-surface/50 transition-colors",
+                    "border-b border-border hover:bg-surface/50",
                     isOurTeam && "our-team",
                     inPit && "bg-yellow-950/20",
                   )}
@@ -202,10 +218,11 @@ export function AdjustedClassification() {
                       {entry.tierScore}
                     </span>
                   </td>
-                </tr>
+                </motion.tr>
               );
             })}
-          </tbody>
+            </AnimatePresence>
+          </motion.tbody>
         </table>
       </div>
     </div>
