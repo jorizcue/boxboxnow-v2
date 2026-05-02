@@ -35,7 +35,13 @@ logger = logging.getLogger(__name__)
 def compute_classification(state: RaceStateManager) -> None:
     """Compute the time-domain real classification and store on state."""
 
-    duration_ms = state.duration_min * 60 * 1000
+    # Total race duration: prefer `_first_countdown_ms` (the initial value
+    # captured from Apex's first `dyn1|countdown|` signal) over the
+    # configured `duration_min`, because replays of races whose actual
+    # duration doesn't match the user's config (e.g. user has 180min set
+    # but loads a 12h Santos replay) would otherwise produce a NEGATIVE
+    # elapsed time and an empty classification.
+    duration_ms = getattr(state, '_first_countdown_ms', 0) or state.duration_min * 60 * 1000
     elapsed_ms = duration_ms - state.countdown_ms
     if elapsed_ms <= 0 or not state.karts:
         state.classification = []
