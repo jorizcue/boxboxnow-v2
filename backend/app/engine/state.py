@@ -344,6 +344,15 @@ class RaceStateManager:
 
     async def handle_events(self, events: list[RaceEvent]):
         """Process a batch of parsed events and broadcast updates."""
+        # Pre-scan: which karts had a c6 LAP event in this block? The
+        # LAP_MS handler uses this to skip the * (own-lap signal) when c6
+        # is also present (i.e. c6 wasn't dropped). Robust to event
+        # ordering within the block — doesn't rely on c6 always preceding
+        # the * line.
+        self._lap_karts_this_block: set[str] = {
+            e.row_id for e in events
+            if e.type == EventType.LAP and e.row_id
+        }
         updates = []
         had_init_kart = False
         for event in events:
@@ -619,10 +628,41 @@ class RaceStateManager:
                 return None
 
         elif event.type == EventType.LAP_MS:
-            # The r{id}|*|{ms}| pattern is NOT a lap event.
-            # It carries a timing metric (not always the actual lap time).
-            # The original code did not process this for lap counting.
-            # We ignore it — laps are counted exclusively from cell updates.
+            # `r{id}|*|<X>|` is Apex's per-kart "own lap completed" signal.
+            # In Modo A circuits (with `tlp`), `apex_total_laps` already
+            # gives us a reliable counter and dropped c6/c7 events are
+            # caught by the c6_advanced discriminator in the LAP handler,
+            # so we ignore * there. In Modo C (no tlp column,
+            # apex_total_laps stays at 0), the c6 cell update sometimes
+            # gets dropped while the * still arrives — that's a lap we'd
+            # otherwise miss entirely. The * fires only on this kart's
+            # own line crossing (gap recalcs from the LEADER lapping
+            # update other karts' c2/c7 but NOT their *), so it's a clean
+            # signal. The * VALUE is unreliable as the lap time
+            # (sometimes carries the actual ms, often a derived/stale
+            # metric), so we use elapsed log time since the previous
+            # recorded lap as the lap_ms instead.
+            #
+            # Cabanillas SPRINT 3, k16 Marin Moreno: c6 dropped at
+            # 17:13:05 but `r1785|*|49552` still arrived; without this
+            # path his VLT lagged 1 lap behind the field for the rest
+            # of the race.
+            if (
+                kart
+                and kart.apex_total_laps == 0
+                and event.row_id not in getattr(self, '_lap_karts_this_block', ())
+            ):
+                now = self._now_seconds()
+                if kart._last_c7_at > 0:
+                    elapsed_ms = int(round((now - kart._last_c7_at) * 1000))
+                    # Sanity range: at least one credible lap (15s),
+                    # at most one credible lap+slow (10min, covers pit
+                    # laps). Outside that range, leave it alone.
+                    if 15000 <= elapsed_ms <= 600000:
+                        kart._last_c7_value = elapsed_ms
+                        kart._last_c7_class = "tn"
+                        kart._last_c7_at = now
+                        return self._record_lap(kart, row_id, elapsed_ms, "tn")
             return None
 
         elif event.type == EventType.BEST_LAP:
