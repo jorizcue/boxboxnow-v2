@@ -42,8 +42,6 @@ struct LoginView: View {
 
             if let info = authVM.upgradeRequired {
                 UpgradeRequiredView(info: info)
-            } else if authVM.biometricPending {
-                biometricWaitingView
             } else {
                 ScrollView {
                     VStack(spacing: 28) {
@@ -85,44 +83,6 @@ struct LoginView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
-        }
-        // Biometric prompt alert is shown at app root level (BoxBoxNowApp)
-    }
-
-    // MARK: - Biometric waiting screen
-
-    private var biometricWaitingView: some View {
-        VStack(spacing: 28) {
-            Spacer()
-
-            Image(systemName: BiometricService.iconName)
-                .font(.system(size: 64))
-                .foregroundColor(.accentColor)
-                .shadow(color: .accentColor.opacity(0.3), radius: 20)
-
-            Text("Verificando identidad...")
-                .font(.title3.bold())
-                .foregroundColor(.white)
-
-            Button(action: {
-                Task { await authVM.authenticateWithBiometric() }
-            }) {
-                Text("Reintentar \(BiometricService.biometricName)")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(Color.accentColor)
-                    .foregroundColor(.black)
-                    .cornerRadius(10)
-            }
-            .padding(.horizontal, 48)
-
-            Button("Usar contrasena") {
-                authVM.biometricPending = false
-            }
-            .frame(minHeight: 44)
-            .foregroundColor(.gray)
-
-            Spacer()
         }
     }
 
@@ -259,28 +219,6 @@ struct LoginView: View {
             }
             .disabled(authVM.isLoading || authVM.isGoogleLoading)
             .accessibilityLabel("Continuar con Google")
-
-            // Biometric quick-login
-            if BiometricService.isEnabled && BiometricService.isAvailable && KeychainHelper.loadToken() != nil {
-                Button(action: {
-                    authVM.biometricPending = true
-                    Task { await authVM.authenticateWithBiometric() }
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: BiometricService.iconName)
-                        Text("Entrar con \(BiometricService.biometricName)")
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(Color(.systemGray6))
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.accentColor.opacity(0.3), lineWidth: 0.5)
-                    )
-                }
-                .accessibilityLabel("Iniciar sesion con \(BiometricService.biometricName)")
-            }
         }
     }
 

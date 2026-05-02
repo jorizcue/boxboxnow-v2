@@ -8,8 +8,6 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var isGoogleLoading = false
-    @Published var showBiometricPrompt = false  // offer to enable after first login
-    @Published var biometricPending = false     // waiting for Face ID on app launch
 
     /// Set when the backend rejects the client's version with HTTP 426.
     /// LoginView swaps its whole body for a blocking "update required"
@@ -113,21 +111,21 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
         session.start()
     }
 
-    /// Normal logout: flips local state but keeps the token + biometric
-    /// so the user can re-enter with Face ID. The server-side DeviceSession
-    /// is kept alive (matches the "soft lock" semantics the product wants).
+    /// Normal logout: flips local state but keeps the token in Keychain so
+    /// `checkExistingSession` can auto-login on the next app launch (until
+    /// the JWT expires or the user does a full sign-out). The server-side
+    /// DeviceSession is kept alive — matches the "soft lock" semantics
+    /// the product wants.
     func logout() {
         isAuthenticated = false
         user = nil
-        biometricPending = false
-        // Token stays in Keychain for biometric re-login
     }
 
-    /// Full sign-out: wipes local token + biometric AND tells the server
-    /// to delete the DeviceSession so it no longer appears under "Sesiones
-    /// activas" in the admin panel. The server call is fire-and-forget —
-    /// if the network is flaky or the token already expired, local state
-    /// is cleaned up regardless.
+    /// Full sign-out: wipes the local token AND tells the server to delete
+    /// the DeviceSession so it no longer appears under "Sesiones activas"
+    /// in the admin panel. The server call is fire-and-forget — if the
+    /// network is flaky or the token already expired, local state is
+    /// cleaned up regardless.
     func fullSignOut() {
         Task {
             do {
@@ -137,37 +135,25 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
             }
             await MainActor.run {
                 KeychainHelper.deleteToken()
-                BiometricService.disable()
                 logout()
             }
         }
     }
 
     private func checkExistingSession() {
-        // Load the last-known username to look up the right keychain slot.
+        // Auto-login if the stored JWT is still valid. Biometric was
+        // removed (matches the Android cleanup in commit e66181b).
         guard let token = KeychainHelper.loadToken() else { return }
         guard let payload = KeychainHelper.decodeJWTPayload(token),
               let exp = payload["exp"] as? TimeInterval,
               exp > Date().timeIntervalSince1970 else {
             KeychainHelper.deleteToken()
-            BiometricService.disable()
             return
         }
-
-        // JWT payload only contains {sub, sid, exp, ...} — NOT full User fields.
-        // We'll fetch /auth/me below to populate is_admin, tab_access, etc.
-
-        // Check biometric for the user stored in keychain (per-user flag).
-        if BiometricService.isEnabled && BiometricService.isAvailable {
-            // Require biometric before granting access; fetch user in background
-            biometricPending = true
-            Task { await refreshMe() }
-            Task { await authenticateWithBiometric() }
-        } else {
-            // No biometric — auto-login as before; fetch user in background
-            isAuthenticated = true
-            Task { await refreshMe() }
-        }
+        // JWT payload only contains {sub, sid, exp, ...} — NOT full User
+        // fields. /auth/me populates is_admin, tab_access, etc.
+        isAuthenticated = true
+        Task { await refreshMe() }
     }
 
     /// Refresh the local User object from /auth/me (id, is_admin, tab_access, ...)
@@ -182,59 +168,6 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
     }
 
-    /// Attempt biometric auth; on success, VALIDATE the token against the
-    /// server before granting access so we don't let the user into an
-    /// account that was deleted or whose session was killed while the
-    /// token sat locally. If the server rejects the token, we wipe the
-    /// keychain + biometric flag so the next launch shows the login form.
-    func authenticateWithBiometric() async {
-        let success = await BiometricService.authenticate()
-        guard success else {
-            await MainActor.run {
-                biometricPending = false
-                // Failed biometric — user stays on login screen with token
-                // still in keychain so they can retry.
-            }
-            return
-        }
-        // Face/Touch ID succeeded — check the token is still valid.
-        do {
-            let me = try await APIClient.shared.getMe()
-            await MainActor.run {
-                self.user = me
-                self.biometricPending = false
-                self.isAuthenticated = true
-            }
-        } catch {
-            // Token is invalid (user deleted, session killed, DB reset).
-            // APIClient already nuked the token on 401 — also wipe
-            // biometric preference and send the user back to login.
-            await MainActor.run {
-                KeychainHelper.deleteToken()
-                BiometricService.disable()
-                self.biometricPending = false
-                self.isAuthenticated = false
-                self.user = nil
-                self.errorMessage = "La sesion ya no es valida. Inicia sesion de nuevo."
-            }
-        }
-    }
-
-    /// Called after a successful login to offer enabling biometric
-    func enableBiometric() {
-        // Enable biometric for the currently logged-in user only
-        if let username = user?.username {
-            BiometricService.setEnabled(true, for: username)
-        } else {
-            BiometricService.isEnabled = true  // fallback to last-username key
-        }
-        showBiometricPrompt = false
-    }
-
-    func skipBiometric() {
-        showBiometricPrompt = false
-    }
-
     private func handleAuthResponse(_ resp: AuthResponse) {
         if let token = resp.accessToken as String? {
             // Save token keyed to this specific user so multiple accounts
@@ -243,11 +176,6 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
             KeychainHelper.saveToken(token, forUser: username)
             user = resp.user
             isAuthenticated = true
-
-            // Offer biometric setup if available and not already enabled for this user
-            if BiometricService.isAvailable && !BiometricService.isEnabled(for: username) {
-                showBiometricPrompt = true
-            }
         }
     }
 }
