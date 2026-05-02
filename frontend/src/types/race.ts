@@ -81,10 +81,23 @@ export interface ClassificationEntry {
   driverName: string;
   totalLaps: number;
   pitCount: number;
-  gap: string;
-  interval: string;
+  pitStatus: "racing" | "in_pit";
+  pitsRemaining: number;     // Pits aún por hacer (incluye el actual si está en pit)
+  gapS: number;              // Segundos al líder (positivo)
+  intervalS: number;         // Segundos al kart inmediatamente delante
+  gapM: number;              // Metros equivalentes (con velocidad mediana de campo)
+  intervalM: number;         // Metros equivalentes al kart delante
+  trackTimeS: number;        // Tiempo en pista acumulado (debug/info)
+  adjProgressS: number;      // Progreso ajustado: trackTime - pitDebt
   avgLapMs: number;
   tierScore: number;
+}
+
+export interface ClassificationMeta {
+  minPits: number;             // Pits obligatorios (de config)
+  pitTimeRefS: number;         // Mediana del campo de pits ya completados
+  medianFieldSpeedMs: number;  // Velocidad mediana del campo (m/s)
+  raceTimeS: number;           // Tiempo de carrera transcurrido (s)
 }
 
 export interface RaceConfig {
@@ -115,6 +128,7 @@ export interface RaceSnapshot {
   karts: KartState[];
   fifo: FifoState;
   classification: ClassificationEntry[];
+  classificationMeta?: ClassificationMeta;
   config: RaceConfig;
   durationMs: number;
 }

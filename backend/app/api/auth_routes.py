@@ -153,7 +153,7 @@ async def _get_registration_config(db) -> dict:
         try:
             tabs = _json.loads(tabs_json) if tabs_json and tabs_json != "0" else []
         except (ValueError, TypeError):
-            tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config", "replay", "analytics", "insights"]
+            tabs = ["race", "pit", "live", "config", "adjusted", "driver", "driver-config", "replay", "analytics", "insights"]
         try:
             max_devices = int(max_devices_str) if max_devices_str and max_devices_str != "0" else 2
         except (ValueError, TypeError):
@@ -164,7 +164,7 @@ async def _get_registration_config(db) -> dict:
         try:
             tabs = _json.loads(tabs_json) if tabs_json and tabs_json != "0" else []
         except (ValueError, TypeError):
-            tabs = ["race", "pit", "live", "config", "adjusted", "adjusted-beta", "driver", "driver-config"]
+            tabs = ["race", "pit", "live", "config", "adjusted", "driver", "driver-config"]
         try:
             max_devices = int(max_devices_str) if max_devices_str and max_devices_str != "0" else 2
         except (ValueError, TypeError):
@@ -404,7 +404,7 @@ async def get_current_user(
 
 ALL_TABS = [
     "race", "pit", "live", "config",
-    "adjusted", "adjusted-beta",
+    "adjusted",
     "driver", "driver-config",
     "replay", "analytics", "insights",
     "admin-users", "admin-circuits", "admin-hub",

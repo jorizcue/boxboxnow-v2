@@ -212,7 +212,6 @@ const STANDARD_TAB_OPTIONS: [string, string][] = [
   ["live", "Live"],
   ["config", "Config"],
   ["adjusted", "Clasif. Real"],
-  ["adjusted-beta", "Real Beta"],
   ["driver", "Vista en vivo"],
   ["driver-config", "Config Piloto"],
   ["replay", "Replay"],

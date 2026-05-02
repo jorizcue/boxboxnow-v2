@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { useT } from "@/lib/i18n";
 import { useRaceStore } from "@/hooks/useRaceState";
 
-export type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "adjusted-beta" | "driver" | "driver-config" | "config" | "replay" | "analytics" | "insights" | "account" | "admin-users" | "admin-circuits" | "admin-hub" | "admin-platform" | "admin-marketing";
+export type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "driver" | "driver-config" | "config" | "replay" | "analytics" | "insights" | "account" | "admin-users" | "admin-circuits" | "admin-hub" | "admin-platform" | "admin-marketing";
 
 interface SidebarProps {
   activeTab: Tab;
@@ -135,11 +135,6 @@ const TAB_ICONS: Record<string, JSX.Element> = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25-.75L17.25 9m0 0L21 12.75M17.25 9v12" />
     </svg>
   ),
-  "adjusted-beta": (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
-    </svg>
-  ),
 };
 
 // Persist sidebar state
@@ -173,7 +168,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs, username }:
     if (activeTab.startsWith("admin-")) setAdminExpanded(true);
     if (activeTab === "replay" || activeTab === "analytics" || activeTab === "insights") setAnalysisExpanded(true);
     if (activeTab === "driver" || activeTab === "driver-config") setDriverExpanded(true);
-    if (activeTab === "adjusted" || activeTab === "adjusted-beta") setClasificacionExpanded(true);
+    if (activeTab === "adjusted") setClasificacionExpanded(true);
   }, [activeTab]);
 
   const mainTabs: { id: Tab; labelKey: string; tabAccess?: string }[] = [
@@ -185,7 +180,6 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs, username }:
 
   const clasificacionSubTabs: { id: Tab; labelKey: string; tabAccess: string }[] = [
     { id: "adjusted", labelKey: "nav.adjusted", tabAccess: "adjusted" },
-    { id: "adjusted-beta", labelKey: "nav.adjustedBeta", tabAccess: "adjusted-beta" },
   ];
 
   const driverSubTabs: { id: Tab; labelKey: string; tabAccess: string }[] = [
@@ -214,7 +208,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs, username }:
 
   const visibleClasificacionTabs = clasificacionSubTabs.filter((tab) => userTabs.includes(tab.tabAccess));
   const hasClasificacion = visibleClasificacionTabs.length > 0;
-  const isClasificacionTabActive = activeTab === "adjusted" || activeTab === "adjusted-beta";
+  const isClasificacionTabActive = activeTab === "adjusted";
 
   const visibleDriverTabs = driverSubTabs.filter((tab) => userTabs.includes(tab.tabAccess));
   const hasDriver = visibleDriverTabs.length > 0;

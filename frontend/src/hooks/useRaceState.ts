@@ -5,6 +5,7 @@ import type {
   KartState,
   FifoState,
   ClassificationEntry,
+  ClassificationMeta,
   RaceConfig,
   RaceSnapshot,
   WsUpdateEvent,
@@ -20,6 +21,7 @@ interface RaceStore {
   karts: KartState[];
   fifo: FifoState;
   classification: ClassificationEntry[];
+  classificationMeta: ClassificationMeta | null;
   config: RaceConfig;
 
   // Apex connection status (persists across tab changes)
@@ -98,6 +100,7 @@ export const useRaceStore = create<RaceStore>((set) => ({
   karts: [],
   fifo: defaultFifo,
   classification: [],
+  classificationMeta: null,
   config: defaultConfig,
 
   apexConnected: false,
@@ -151,6 +154,7 @@ export const useRaceStore = create<RaceStore>((set) => ({
       karts: snapshot.karts,
       fifo: snapshot.fifo || defaultFifo,
       classification: snapshot.classification || [],
+      classificationMeta: snapshot.classificationMeta || null,
       config: snapshot.config || defaultConfig,
     }),
 
@@ -254,6 +258,7 @@ export const useRaceStore = create<RaceStore>((set) => ({
       karts: data.karts || [],
       fifo: data.fifo || defaultFifo,
       classification: data.classification || [],
+      classificationMeta: data.classificationMeta ?? state.classificationMeta,
       // Merge config if present (allows live config updates without reconnect)
       config: data.config ? { ...state.config, ...data.config } : state.config,
     })),

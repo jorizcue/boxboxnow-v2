@@ -172,9 +172,10 @@ async def init_db():
             """), {"tab": tab})
 
         # Migrate granular tab permissions: users with parent tab get new sub-tabs
-        # adjusted → adjusted-beta, driver → driver-config, analytics → insights
+        # driver → driver-config, analytics → insights
+        # (adjusted-beta retired — folded into adjusted with the time-domain
+        # algorithm, no longer a separate tab.)
         tab_migrations = [
-            ("adjusted", "adjusted-beta"),
             ("driver", "driver-config"),
             ("analytics", "insights"),
         ]
@@ -263,9 +264,9 @@ async def init_db():
 
         # Seed default/trial tab configuration in app_settings
         new_settings_defaults = {
-            "default_tabs": '["race","pit","live","config","adjusted","adjusted-beta","driver","driver-config"]',
+            "default_tabs": '["race","pit","live","config","adjusted","driver","driver-config"]',
             "default_max_devices": "2",
-            "trial_tabs": '["race","pit","live","config","adjusted","adjusted-beta","driver","driver-config","replay","analytics","insights"]',
+            "trial_tabs": '["race","pit","live","config","adjusted","driver","driver-config","replay","analytics","insights"]',
             "trial_max_devices": "2",
         }
         for key, default_value in new_settings_defaults.items():

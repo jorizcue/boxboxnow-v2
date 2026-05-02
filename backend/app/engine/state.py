@@ -228,6 +228,10 @@ class RaceStateManager:
         self.fifo_score: float = 0.0
         self.fifo_history: list[dict] = []
         self.classification: list[dict] = []
+        # Reference values used by the latest classification compute pass:
+        # minPits, pitTimeRefS, medianFieldSpeedMs, raceTimeS. Surfaced to
+        # the frontend so the UI can show "Pits oblig.: N · Ref. pit: X.Xs".
+        self.classification_meta: dict = {}
 
         # Session metadata (auto-detected from Apex signals)
         self.category: str = ""  # title1: "70 SILVER", "85 GOLD", etc.
@@ -299,6 +303,7 @@ class RaceStateManager:
         self.fifo_score = 0.0
         self.fifo_history.clear()
         self.classification.clear()
+        self.classification_meta = {}
         self._first_countdown_ms = 0
         self._needs_snapshot = False
         self.race_current_lap = 0
@@ -1034,6 +1039,7 @@ class RaceStateManager:
                     "history": self.fifo_history[-10:],
                 },
                 "classification": self.classification,
+                "classificationMeta": self.classification_meta,
                 "config": {
                     "circuitLengthM": self.circuit_length_m,
                     "pitTimeS": self.pit_time_s,

@@ -611,6 +611,7 @@ class UserSession:
                                     "history": self.state.fifo_history[-10:],
                                 },
                                 "classification": self.state.classification,
+                                "classificationMeta": self.state.classification_meta,
                                 "config": {
                                     "circuitLengthM": self.state.circuit_length_m,
                                     "pitTimeS": self.state.pit_time_s,
@@ -1005,6 +1006,7 @@ class ReplaySession:
                                     "history": self.state.fifo_history[-10:],
                                 },
                                 "classification": self.state.classification,
+                                "classificationMeta": self.state.classification_meta,
                                 "config": {
                                     "circuitLengthM": self.state.circuit_length_m,
                                     "pitTimeS": self.state.pit_time_s,

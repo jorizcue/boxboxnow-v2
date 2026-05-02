@@ -1,87 +1,48 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useState, useCallback } from "react";
 import { useRaceStore } from "@/hooks/useRaceState";
-import { useSimNow } from "@/hooks/useSimNow";
 import { msToLapTime, tierHex } from "@/lib/formatters";
-import { stableSpeedMs, PositionHysteresis, applyHysteresis } from "@/lib/classificationUtils";
 import { useT } from "@/lib/i18n";
 import clsx from "clsx";
+import type { ClassificationEntry } from "@/types/race";
 
 /**
- * Clasificación Real — distance-based calculation (inspired by Prepro/boxboxnow.py)
+ * Clasificación Real — pure visualizer of the backend's
+ * time-domain classification (see backend/app/engine/classification.py).
  *
- * Algorithm:
- * 1. For each kart, compute average speed (m/s) from avgLapMs and circuit length.
- * 2. Total distance = (completedLaps × circuitLength) + metersExtra
- *    where metersExtra = speed × secondsSinceLastLapCrossing (interpolated position).
- * 3. Pit penalty = missedPits × speed × pitTimeS  (distance NOT covered while in pit).
- * 4. Adjusted distance = totalDistance − pitPenalty
- * 5. Gap (to leader) in seconds = (leaderDist − kartDist) / kartSpeed
- * 6. Interval (to kart ahead) in seconds = (aheadDist − kartDist) / kartSpeed
- * 7. Gap/Interval in meters = gap/int seconds × kartSpeed
+ * The backend ranks karts by:
+ *
+ *   adjProgress_K = trackTime_K - pitDebt_K
+ *
+ * where trackTime is "race time spent on track so far" (T - pit time)
+ * and pitDebt is "remaining mandatory pit obligation in seconds"
+ * (using the field-median pit duration as the per-pit reference).
+ *
+ * Gaps and intervals are in seconds; meters are a secondary display
+ * computed with the field-median speed for stability.
  */
+
+type SortKey = "position" | "kartNumber" | "totalLaps" | "pitCount" | "gapS" | "intervalS" | "avgLapMs" | "tierScore";
+type SortDir = "asc" | "desc";
+
 export function AdjustedClassification() {
   const t = useT();
-  const { karts, config } = useRaceStore();
-  const { now, speed } = useSimNow();
-  const hysteresisRef = useRef(new PositionHysteresis(3));
+  const { classification, classificationMeta, config } = useRaceStore();
+  const [sortKey, setSortKey] = useState<SortKey>("position");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
-  const circuitLengthM = config.circuitLengthM || 1100;
-  const pitTimeS = config.pitTimeS || 0;
+  const toggleSort = useCallback((key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      // Default sort direction: position/avgLap ascending, everything else descending
+      setSortDir(key === "position" || key === "avgLapMs" ? "asc" : "desc");
+    }
+  }, [sortKey]);
 
-  const adjusted = useMemo(() => {
-    if (karts.length === 0) return [];
-
-    // Only count completed pits (exclude karts currently in pit — their stop isn't done yet)
-    const maxPits = Math.max(...karts.filter((k) => k.pitStatus !== "in_pit").map((k) => k.pitCount), 0);
-
-    const rawSorted = karts
-      .filter((k) => k.totalLaps > 0)
-      .map((kart) => {
-        // Stable speed with outlier filtering
-        const speedMs = stableSpeedMs(kart, circuitLengthM);
-
-        // Base distance: completed laps × circuit length
-        const baseDistanceM = kart.totalLaps * circuitLengthM;
-
-        // Meters extra: interpolated position beyond last completed lap
-        let metersExtra = 0;
-        if (kart.pitStatus === "racing" && speedMs > 0 && kart.stintStartTime > 0) {
-          const wallTimeSinceStintS = Math.max(0, (now - kart.stintStartTime) * speed);
-          const stintElapsedS = kart.stintElapsedMs / 1000;
-          const secondsSinceLastCrossing = wallTimeSinceStintS - stintElapsedS;
-          if (secondsSinceLastCrossing > 0) {
-            // Cap at one full lap worth of distance
-            metersExtra = Math.min(secondsSinceLastCrossing * speedMs, circuitLengthM * 0.99);
-          }
-        }
-
-        const totalDistanceM = baseDistanceM + metersExtra;
-
-        // Pit penalty: distance not covered while in pit for missing stops
-        const missingPits = Math.max(0, maxPits - kart.pitCount);
-        const pitPenaltyM = missingPits * speedMs * pitTimeS;
-
-        const adjustedDistanceM = totalDistanceM - pitPenaltyM;
-
-        return {
-          ...kart,
-          speedMs,
-          totalDistanceM,
-          metersExtra,
-          missingPits,
-          pitPenaltyM,
-          adjustedDistanceM,
-          maxPits,
-        };
-      })
-      .sort((a, b) => b.adjustedDistanceM - a.adjustedDistanceM);
-
-    return applyHysteresis(rawSorted, hysteresisRef.current);
-  }, [karts, now, circuitLengthM, pitTimeS]);
-
-  if (karts.length === 0 || adjusted.length === 0) {
+  if (!classification || classification.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-neutral-400">
         <div className="text-center">
@@ -92,15 +53,40 @@ export function AdjustedClassification() {
     );
   }
 
-  const maxPits = adjusted[0]?.maxPits ?? 0;
-  const leader = adjusted[0];
+  // Sort
+  const sorted = [...classification].sort((a, b) => {
+    const get = (e: ClassificationEntry): number => {
+      switch (sortKey) {
+        case "position": return e.position;
+        case "kartNumber": return e.kartNumber;
+        case "totalLaps": return e.totalLaps;
+        case "pitCount": return e.pitCount;
+        case "avgLapMs": return e.avgLapMs > 0 ? e.avgLapMs : Infinity;
+        case "tierScore": return e.tierScore;
+        case "gapS": return e.gapS;
+        case "intervalS": return e.intervalS;
+        default: return 0;
+      }
+    };
+    const av = get(a), bv = get(b);
+    return sortDir === "asc" ? av - bv : bv - av;
+  });
+
+  const meta = classificationMeta;
+  const minPits = meta?.minPits ?? config.minPits ?? 0;
+  const pitRefStr = meta ? meta.pitTimeRefS.toFixed(1) : "—";
+  const raceTimeStr = meta ? formatRaceTime(meta.raceTimeS) : "—";
 
   return (
     <div className="space-y-4">
-      {/* Explanation */}
+      {/* Header with reference values */}
       <div className="bg-surface rounded-xl p-3 border border-border">
         <p className="text-[11px] text-neutral-400">
-          {t("adjusted.explanation", { maxPits: String(maxPits) })}
+          {t("adjusted.explanation", {
+            minPits: String(minPits),
+            pitRef: pitRefStr,
+            raceTime: raceTimeStr,
+          })}
         </p>
       </div>
 
@@ -109,95 +95,111 @@ export function AdjustedClassification() {
         <table className="w-full text-xs sm:text-sm">
           <thead className="bg-surface text-neutral-200 sticky top-0 z-10 text-[10px] sm:text-[11px] uppercase tracking-wider">
             <tr>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-6 sm:w-8">#</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left w-8 sm:w-12">{t("race.kart")}</th>
+              <SortTh align="center" colKey="position" current={sortKey} dir={sortDir} onSort={toggleSort} className="w-8 sm:w-10">#</SortTh>
+              <SortTh align="center" colKey="kartNumber" current={sortKey} dir={sortDir} onSort={toggleSort} className="w-8 sm:w-12">{t("race.kart")}</SortTh>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">{t("race.team")}</th>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-left">{t("race.driver")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">{t("race.pit")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">{t("adjusted.missingPits")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right font-semibold text-accent">{t("adjusted.adjustedDist")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("adjusted.gapMeters")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("adjusted.gapSeconds")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("adjusted.intMeters")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("adjusted.intSeconds")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right">{t("race.avg20")}</th>
-              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-8 sm:w-12">Tier</th>
+              <SortTh align="center" colKey="totalLaps" current={sortKey} dir={sortDir} onSort={toggleSort}>Vlts</SortTh>
+              <SortTh align="center" colKey="pitCount" current={sortKey} dir={sortDir} onSort={toggleSort}>{t("race.pit")}</SortTh>
+              <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center">{t("adjusted.pendingPits")}</th>
+              <SortTh align="right" colKey="gapS" current={sortKey} dir={sortDir} onSort={toggleSort}>{t("adjusted.gapSeconds")}</SortTh>
+              <SortTh align="right" colKey="intervalS" current={sortKey} dir={sortDir} onSort={toggleSort}>{t("adjusted.intSeconds")}</SortTh>
+              <SortTh align="right" colKey="avgLapMs" current={sortKey} dir={sortDir} onSort={toggleSort}>{t("race.avg20")}</SortTh>
+              <SortTh align="center" colKey="tierScore" current={sortKey} dir={sortDir} onSort={toggleSort} className="w-8 sm:w-12">Tier</SortTh>
             </tr>
           </thead>
           <tbody>
-            {adjusted.map((kart, index) => {
-              const isOurTeam = config.ourKartNumber > 0 && kart.kartNumber === config.ourKartNumber;
-
-              // Gap to leader (seconds) = distance diff / this kart's speed
-              const gapM = leader.adjustedDistanceM - kart.adjustedDistanceM;
-              const gapS = kart.speedMs > 0 ? gapM / kart.speedMs : 0;
-
-              // Interval to kart immediately ahead
-              const kartAhead = index > 0 ? adjusted[index - 1] : null;
-              const intM = kartAhead ? kartAhead.adjustedDistanceM - kart.adjustedDistanceM : 0;
-              const intS = kart.speedMs > 0 ? intM / kart.speedMs : 0;
-
-              // Adjusted laps (for display) = adjustedDistance / circuitLength
-              const adjustedLaps = kart.adjustedDistanceM / circuitLengthM;
+            {sorted.map((entry) => {
+              const isOurTeam = config.ourKartNumber > 0 && entry.kartNumber === config.ourKartNumber;
+              const inPit = entry.pitStatus === "in_pit";
 
               return (
                 <tr
-                  key={kart.rowId}
+                  key={entry.kartNumber}
                   className={clsx(
                     "border-b border-border hover:bg-surface/50 transition-colors",
                     isOurTeam && "our-team",
-                    kart.pitStatus === "in_pit" && "opacity-50"
+                    inPit && "bg-yellow-950/20",
                   )}
                 >
-                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center font-bold text-base sm:text-lg text-white">{index + 1}</td>
-                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 font-mono text-neutral-300">{kart.kartNumber}</td>
-                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 font-medium truncate max-w-[100px] sm:max-w-[180px] text-white">{kart.teamName}</td>
-                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 truncate max-w-[80px] sm:max-w-[140px] text-neutral-400 text-xs">{kart.driverName || "-"}</td>
-                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center text-neutral-300">{kart.pitCount}</td>
+                  {/* Position */}
+                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center font-bold text-base sm:text-lg text-white">
+                    {entry.position}
+                  </td>
+
+                  {/* Kart */}
+                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center font-mono text-neutral-300">
+                    {entry.kartNumber}
+                  </td>
+
+                  {/* Team */}
+                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 font-medium truncate max-w-[100px] sm:max-w-[180px] text-white">
+                    {entry.teamName}
+                  </td>
+
+                  {/* Driver */}
+                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 truncate max-w-[80px] sm:max-w-[140px] text-neutral-400 text-xs">
+                    {entry.driverName || "-"}
+                  </td>
+
+                  {/* Laps */}
+                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center font-mono text-neutral-300">
+                    {entry.totalLaps}
+                  </td>
+
+                  {/* Pits done */}
+                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center text-neutral-300">
+                    {entry.pitCount}
+                  </td>
+
+                  {/* Pending pits */}
                   <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center">
-                    {kart.missingPits > 0 ? (
-                      <span className="text-orange-400 font-medium">{kart.missingPits}</span>
+                    {entry.pitsRemaining > 0 ? (
+                      <span className={clsx(
+                        "font-medium",
+                        inPit ? "text-yellow-400" : "text-orange-400",
+                      )}>
+                        {entry.pitsRemaining}
+                        {inPit && <span className="ml-1 text-[10px] opacity-80">({t("adjusted.inPit")})</span>}
+                      </span>
                     ) : (
                       <span className="text-neutral-700">0</span>
                     )}
                   </td>
-                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-right font-mono font-bold text-accent">
-                    {adjustedLaps.toFixed(2)}
-                  </td>
+
+                  {/* Gap (seconds primary, meters secondary) */}
                   <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-right font-mono text-xs">
-                    {index === 0 ? (
-                      <span className="text-neutral-500">-</span>
+                    {entry.position === 1 ? (
+                      <span className="text-accent font-bold">LDR</span>
                     ) : (
-                      <span className="text-red-400">{Math.round(gapM).toLocaleString()}m</span>
+                      <div className="flex flex-col items-end leading-tight">
+                        <span className="text-red-400">+{entry.gapS.toFixed(1)}s</span>
+                        <span className="text-neutral-600 text-[10px]">{entry.gapM.toLocaleString()}m</span>
+                      </div>
                     )}
                   </td>
+
+                  {/* Interval (seconds primary, meters secondary) */}
                   <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-right font-mono text-xs">
-                    {index === 0 ? (
-                      <span className="text-neutral-500">-</span>
+                    {entry.position === 1 ? (
+                      <span className="text-neutral-600">-</span>
                     ) : (
-                      <span className="text-red-400">{gapS.toFixed(1)}s</span>
+                      <div className="flex flex-col items-end leading-tight">
+                        <span className="text-yellow-400">+{entry.intervalS.toFixed(1)}s</span>
+                        <span className="text-neutral-600 text-[10px]">{entry.intervalM.toLocaleString()}m</span>
+                      </div>
                     )}
                   </td>
-                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-right font-mono text-xs">
-                    {index === 0 ? (
-                      <span className="text-neutral-500">-</span>
-                    ) : (
-                      <span className="text-yellow-400">{Math.round(intM).toLocaleString()}m</span>
-                    )}
-                  </td>
-                  <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-right font-mono text-xs">
-                    {index === 0 ? (
-                      <span className="text-neutral-500">-</span>
-                    ) : (
-                      <span className="text-yellow-400">{intS.toFixed(1)}s</span>
-                    )}
-                  </td>
+
+                  {/* Avg lap */}
                   <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-right font-mono text-neutral-300">
-                    {kart.avgLapMs > 0 ? msToLapTime(Math.round(kart.avgLapMs)) : "-"}
+                    {entry.avgLapMs > 0 ? msToLapTime(Math.round(entry.avgLapMs)) : "-"}
                   </td>
+
+                  {/* Tier */}
                   <td className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center">
-                    <span className="tier-badge" style={{ backgroundColor: tierHex(kart.tierScore) }}>
-                      {kart.tierScore}
+                    <span className="tier-badge" style={{ backgroundColor: tierHex(entry.tierScore) }}>
+                      {entry.tierScore}
                     </span>
                   </td>
                 </tr>
@@ -208,4 +210,53 @@ export function AdjustedClassification() {
       </div>
     </div>
   );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sortable table header                                              */
+/* ------------------------------------------------------------------ */
+
+function SortTh({ children, colKey, current, dir, onSort, align, title, className }: {
+  children: React.ReactNode;
+  colKey: SortKey;
+  current: SortKey;
+  dir: SortDir;
+  onSort: (key: SortKey) => void;
+  align: "left" | "center" | "right";
+  title?: string;
+  className?: string;
+}) {
+  const active = current === colKey;
+  return (
+    <th
+      className={clsx(
+        "px-1.5 sm:px-2 py-2 sm:py-2.5 cursor-pointer select-none hover:text-accent transition-colors",
+        `text-${align}`,
+        active && "text-accent",
+        className,
+      )}
+      onClick={() => onSort(colKey)}
+      title={title}
+    >
+      <span className="inline-flex items-center gap-0.5">
+        {children}
+        {active && (
+          <span className="text-[8px] leading-none">{dir === "asc" ? "▲" : "▼"}</span>
+        )}
+      </span>
+    </th>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+function formatRaceTime(seconds: number): string {
+  const total = Math.floor(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2, "0")}`;
 }

@@ -84,10 +84,10 @@ export function ClassificationTable() {
                   <td className="px-1.5 sm:px-3 py-1.5 sm:py-2 text-center text-neutral-300">{entry.totalLaps}</td>
                   <td className="px-1.5 sm:px-3 py-1.5 sm:py-2 text-center text-neutral-300">{entry.pitCount}</td>
                   <td className="px-1.5 sm:px-3 py-1.5 sm:py-2 text-right font-mono text-neutral-300">
-                    {entry.gap || "-"}
+                    {entry.position === 1 ? "-" : `+${entry.gapS.toFixed(1)}s`}
                   </td>
                   <td className="px-1.5 sm:px-3 py-1.5 sm:py-2 text-right font-mono text-neutral-200">
-                    {entry.interval || "-"}
+                    {entry.position === 1 ? "-" : `+${entry.intervalS.toFixed(1)}s`}
                   </td>
                   <td className="px-1.5 sm:px-3 py-1.5 sm:py-2 text-right font-mono text-neutral-400">
                     {msToLapTime(entry.avgLapMs)}
