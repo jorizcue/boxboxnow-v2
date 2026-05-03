@@ -634,6 +634,18 @@ class UserSession:
                                     "finishLat2": self.state.finish_lat2,
                                     "finishLon2": self.state.finish_lon2,
                                 },
+                                # Sector telemetry must be carried on analytics
+                                # frames too — clients treat analytics as a
+                                # full snapshot replacement (overwriting every
+                                # @Published field), so omitting these would
+                                # reset hasSectors → false and the driver-view
+                                # sector cards would flash "--" between every
+                                # analytics tick (~10-30s).
+                                "hasSectors": self.state.has_sectors,
+                                "sectorMeta": (
+                                    self.state._compute_sector_meta()
+                                    if self.state.has_sectors else None
+                                ),
                             },
                         }
                         data = json.dumps(update)
@@ -1029,6 +1041,18 @@ class ReplaySession:
                                     "finishLat2": self.state.finish_lat2,
                                     "finishLon2": self.state.finish_lon2,
                                 },
+                                # Sector telemetry must be carried on analytics
+                                # frames too — clients treat analytics as a
+                                # full snapshot replacement (overwriting every
+                                # @Published field), so omitting these would
+                                # reset hasSectors → false and the driver-view
+                                # sector cards would flash "--" between every
+                                # analytics tick (~10-30s).
+                                "hasSectors": self.state.has_sectors,
+                                "sectorMeta": (
+                                    self.state._compute_sector_meta()
+                                    if self.state.has_sectors else None
+                                ),
                             },
                         }
                         data = json.dumps(update)

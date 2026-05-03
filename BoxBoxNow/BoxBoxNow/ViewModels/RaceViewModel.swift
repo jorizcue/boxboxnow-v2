@@ -323,13 +323,21 @@ final class RaceViewModel: ObservableObject {
                 parseFifoScore(snapshotData)
 
                 // Sector telemetry (present only on circuits with sector
-                // columns). Both fields land at top level of `data` —
-                // hasSectors is a bool, sectorMeta is a dict with s1/s2/s3
-                // entries each carrying { bestMs, kartNumber, driverName,
-                // teamName, secondBestMs }. We always update both, even
-                // when null, so a session change clears stale data.
-                hasSectors = (snapshotData["hasSectors"] as? Bool) ?? false
-                sectorMeta = decodeSectorMeta(snapshotData["sectorMeta"])
+                // columns). Both fields land at top level of `data`.
+                // CRITICAL: only overwrite when the keys are actually
+                // present in the payload — older backends (and edge
+                // cases like a cluster broadcast that didn't bundle
+                // sectors) would otherwise reset our cached state to
+                // empty between ticks, making the sector cards flicker
+                // to "--" every analytics cycle. Genuine clears come
+                // through hasSectors=false explicitly, which is what
+                // the backend sends on session change.
+                if snapshotData.keys.contains("hasSectors") {
+                    hasSectors = (snapshotData["hasSectors"] as? Bool) ?? false
+                }
+                if snapshotData.keys.contains("sectorMeta") {
+                    sectorMeta = decodeSectorMeta(snapshotData["sectorMeta"])
+                }
             }
 
         case "update":

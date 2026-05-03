@@ -161,21 +161,33 @@ export const useRaceStore = create<RaceStore>((set) => ({
   setConnected: (v) => set({ connected: v }),
 
   applySnapshot: (snapshot) =>
-    set({
-      raceStarted: snapshot.raceStarted,
-      raceFinished: snapshot.raceFinished || false,
-      countdownMs: snapshot.countdownMs,
-      trackName: snapshot.trackName,
-      durationMs: snapshot.durationMs || 0,
-      karts: snapshot.karts,
-      fifo: snapshot.fifo || defaultFifo,
-      classification: snapshot.classification || [],
-      classificationMeta: snapshot.classificationMeta || null,
-      config: snapshot.config || defaultConfig,
-      // Sector flags reset to false / null when the snapshot says so
-      // (e.g. session change to a circuit without sectors).
-      hasSectors: !!snapshot.hasSectors,
-      sectorMeta: snapshot.sectorMeta ?? null,
+    set((state) => {
+      const out: Partial<RaceStore> = {
+        raceStarted: snapshot.raceStarted,
+        raceFinished: snapshot.raceFinished || false,
+        countdownMs: snapshot.countdownMs,
+        trackName: snapshot.trackName,
+        durationMs: snapshot.durationMs || 0,
+        karts: snapshot.karts,
+        fifo: snapshot.fifo || defaultFifo,
+        classification: snapshot.classification || [],
+        classificationMeta: snapshot.classificationMeta || null,
+        config: snapshot.config || defaultConfig,
+      };
+      // Sector telemetry: only overwrite when the snapshot actually
+      // carries the keys. Analytics broadcasts can reuse the same
+      // applySnapshot path without bundling sectorMeta — overwriting
+      // unconditionally would flash hasSectors → false between every
+      // analytics tick, making the driver-view sector cards flicker
+      // to "--" every ~10-30s. Genuine clears arrive as explicit
+      // `hasSectors: false` from the backend on session change.
+      if (Object.prototype.hasOwnProperty.call(snapshot, "hasSectors")) {
+        out.hasSectors = !!snapshot.hasSectors;
+      }
+      if (Object.prototype.hasOwnProperty.call(snapshot, "sectorMeta")) {
+        out.sectorMeta = snapshot.sectorMeta ?? null;
+      }
+      return out as RaceStore;
     }),
 
   applyUpdates: (events) =>
@@ -296,14 +308,27 @@ export const useRaceStore = create<RaceStore>((set) => ({
     }),
 
   applyAnalytics: (data) =>
-    set((state) => ({
-      karts: data.karts || [],
-      fifo: data.fifo || defaultFifo,
-      classification: data.classification || [],
-      classificationMeta: data.classificationMeta ?? state.classificationMeta,
-      // Merge config if present (allows live config updates without reconnect)
-      config: data.config ? { ...state.config, ...data.config } : state.config,
-    })),
+    set((state) => {
+      const out: Partial<RaceStore> = {
+        karts: data.karts || [],
+        fifo: data.fifo || defaultFifo,
+        classification: data.classification || [],
+        classificationMeta: data.classificationMeta ?? state.classificationMeta,
+        // Merge config if present (allows live config updates without reconnect)
+        config: data.config ? { ...state.config, ...data.config } : state.config,
+      };
+      // Forward sector telemetry through analytics frames too — the
+      // backend bundles it on every analytics broadcast since flicker
+      // fix. Falling back to the existing state when keys are absent
+      // keeps the cards stable on older backends.
+      if (Object.prototype.hasOwnProperty.call(data, "hasSectors")) {
+        out.hasSectors = !!data.hasSectors;
+      }
+      if (Object.prototype.hasOwnProperty.call(data, "sectorMeta")) {
+        out.sectorMeta = data.sectorMeta ?? null;
+      }
+      return out as RaceStore;
+    }),
 
   // Lightweight: backend pushes this on every batch with a LAP event so the
   // Clasif Real table re-orders live (instead of waiting up to 10-30s for
