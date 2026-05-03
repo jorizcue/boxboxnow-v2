@@ -5,14 +5,12 @@ enum DriverCardGroup: String, CaseIterable {
     case race
     case box
     case gps
-    case sector
 
     var label: String {
         switch self {
-        case .race:   return "Carrera"
-        case .box:    return "BOX"
-        case .gps:    return "GPS"
-        case .sector: return "Sectores"
+        case .race: return "Carrera"
+        case .box:  return "BOX"
+        case .gps:  return "GPS"
         }
     }
 }
@@ -55,9 +53,11 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
             return .box
         case .deltaBestLap, .gForceRadar, .gpsLapDelta, .gpsSpeed, .gpsGForce:
             return .gps
-        case .deltaBestS1, .deltaBestS2, .deltaBestS3, .theoreticalBestLap:
-            return .sector
         default:
+            // Sector cards (deltaBestS1/S2/S3, theoreticalBestLap) live
+            // alongside the race-pace cards rather than in their own
+            // group — pilots think of them as race indicators, not as
+            // a separate device feature.
             return .race
         }
     }
@@ -210,10 +210,12 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
     static let defaultVisible: [String: Bool] = {
         var dict = [String: Bool]()
         for card in DriverCard.allCases {
-            // GPS cards and sector cards are off by default — pilots
-            // opt in via the driver config view, and sector cards only
-            // make sense on circuits with sector telemetry.
-            dict[card.rawValue] = !card.requiresGPS && !card.requiresSectors
+            // GPS cards stay off by default (require RaceBox or phone GPS).
+            // Sector cards default to ON: they self-handle "no sector data"
+            // by showing "--" on circuits without S1/S2/S3 columns, so the
+            // pilot doesn't have to know whether the active circuit
+            // exposes them — the cards just light up where it matters.
+            dict[card.rawValue] = !card.requiresGPS
         }
         return dict
     }()
