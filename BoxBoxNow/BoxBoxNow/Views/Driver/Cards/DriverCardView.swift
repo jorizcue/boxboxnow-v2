@@ -227,8 +227,13 @@ struct DriverCardView: View {
 
         // ── Delta Best Lap — live GPS delta if available, else server-based
         // (last lap - best lap) so the card works for users without GPS.
+        // Refresh at 2Hz: the underlying `deltaBestMs` is recomputed at the
+        // RaceBox sample rate (~50Hz), but the centisecond digit shown in
+        // the UI flickers too much at 4Hz to be readable while driving. 2Hz
+        // matches the cadence of comparable telemetry apps (RaceBox app,
+        // MoTeC, Sector55) — fast enough to feel live, calm enough to read.
         case .deltaBestLap:
-            TimelineView(.periodic(from: .now, by: 0.25)) { _ in
+            TimelineView(.periodic(from: .now, by: 0.5)) { _ in
                 if gps != nil, let delta = lapTracker?.deltaBestMs {
                     VStack(spacing: 2 * scale) {
                         Text(String(format: "%@%.2fs", delta < 0 ? "" : "+", delta / 1000))
@@ -386,9 +391,10 @@ struct DriverCardView: View {
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
 
-        // ── GPS Lap Delta (vs previous lap) — refreshes at 4Hz ──
+        // ── GPS Lap Delta (vs previous lap) — refreshes at 2Hz, same
+        // cadence as `.deltaBestLap` for visual consistency.
         case .gpsLapDelta:
-            TimelineView(.periodic(from: .now, by: 0.25)) { _ in
+            TimelineView(.periodic(from: .now, by: 0.5)) { _ in
                 if gps == nil {
                     Text("GPS --")
                         .font(.system(size: 16 * scale, design: .monospaced))
