@@ -12,17 +12,13 @@ struct DriverCardView: View {
     var lapTracker: LapTracker? = nil
 
     /// User-configurable refresh rate (Hz) for the GPS delta cards.
-    /// Set in GPSConfigView. Default 2 Hz. Bound via @AppStorage so the
-    /// TimelineView re-renders with the new cadence as soon as the
-    /// pilot flips it in config — no need to relaunch the app.
+    /// Set in GPSConfigView. Default 2 Hz. Forwarded to the dedicated
+    /// `DeltaBestLapContent` / `DeltaPrevLapContent` subviews, which
+    /// snapshot the lapTracker values into @State at this cadence so
+    /// the on-screen number is decoupled from the parent's 50 Hz
+    /// re-render cycle (driverVM.gpsData fires @Published per sample,
+    /// invalidating DriverView and the whole card grid).
     @AppStorage(Constants.Keys.gpsDeltaRefreshHz) private var deltaRefreshHz: Int = 2
-
-    /// `TimelineView(by:)` is in seconds; convert from Hz with a guard
-    /// so a 0/negative value (corrupt UserDefaults) can't crash the view.
-    private var deltaRefreshInterval: TimeInterval {
-        let hz = max(1, deltaRefreshHz)
-        return 1.0 / Double(hz)
-    }
 
     // Font scale factor relative to base height of 90
     private var scale: CGFloat { min(2.0, max(0.8, cardHeight / 90)) }
@@ -240,39 +236,16 @@ struct DriverCardView: View {
 
         // ── Delta Best Lap — live GPS delta if available, else server-based
         // (last lap - best lap) so the card works for users without GPS.
-        // Refresh rate is pilot-configurable (1/2/4 Hz, default 2) via
-        // GPSConfigView. Underlying `deltaBestMs` is recomputed at the
-        // RaceBox sample rate (~50Hz) regardless — this only controls
-        // how often the visible number changes on screen.
         case .deltaBestLap:
-            TimelineView(.periodic(from: .now, by: deltaRefreshInterval)) { _ in
-                if gps != nil, let delta = lapTracker?.deltaBestMs {
-                    VStack(spacing: 2 * scale) {
-                        Text(String(format: "%@%.2fs", delta < 0 ? "" : "+", delta / 1000))
-                            .font(.system(size: mainFont, weight: .black, design: .monospaced))
-                            .foregroundColor(delta < 0 ? .green : .red)
-                            .minimumScaleFactor(0.5)
-                            .lineLimit(1)
-                        Text(Formatters.msToLapTime(lapTracker?.currentLapElapsedMs ?? 0))
-                            .font(.system(size: smallFont, design: .monospaced))
-                            .foregroundColor(Color(.systemGray))
-                    }
-                } else if let last = kart?.lastLapMs, last > 0,
-                          let best = kart?.bestStintLapMs, best > 0 {
-                    // Stint-best fallback so the delta reflects current
-                    // driver's pace, not the all-time race best.
-                    let delta = last - best
-                    Text(String(format: "%@%.2fs", delta < 0 ? "" : "+", delta / 1000))
-                        .font(.system(size: mainFont, weight: .black, design: .monospaced))
-                        .foregroundColor(delta <= 0 ? .green : .red)
-                        .minimumScaleFactor(0.5)
-                        .lineLimit(1)
-                } else {
-                    Text("--")
-                        .font(.system(size: mainFont, design: .monospaced))
-                        .foregroundColor(Color(.systemGray4))
-                }
-            }
+            DeltaBestLapContent(
+                lapTracker: lapTracker,
+                kart: kart,
+                gpsAvailable: gps != nil,
+                refreshHz: deltaRefreshHz,
+                mainFont: mainFont,
+                smallFont: smallFont,
+                scale: scale
+            )
 
         // ── G-Force Radar (GPS) ──
         case .gForceRadar:
@@ -403,46 +376,16 @@ struct DriverCardView: View {
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
 
-        // ── GPS Lap Delta (vs previous lap) — same configurable cadence
-        // as `.deltaBestLap` for visual consistency.
+        // ── GPS Lap Delta (vs previous lap)
         case .gpsLapDelta:
-            TimelineView(.periodic(from: .now, by: deltaRefreshInterval)) { _ in
-                if gps == nil {
-                    Text("GPS --")
-                        .font(.system(size: 16 * scale, design: .monospaced))
-                        .foregroundColor(Color(.systemGray4))
-                } else if let delta = lapTracker?.deltaPrevMs {
-                    VStack(spacing: 2 * scale) {
-                        Text(String(format: "%@%.2fs", delta < 0 ? "" : "+", delta / 1000))
-                            .font(.system(size: mainFont, weight: .black, design: .monospaced))
-                            .foregroundColor(delta < 0 ? .green : .red)
-                            .minimumScaleFactor(0.5)
-                            .lineLimit(1)
-                        Text(Formatters.msToLapTime(lapTracker?.currentLapElapsedMs ?? 0))
-                            .font(.system(size: smallFont, design: .monospaced))
-                            .foregroundColor(Color(.systemGray))
-                            .minimumScaleFactor(0.5)
-                            .lineLimit(1)
-                    }
-                } else {
-                    VStack(spacing: 2 * scale) {
-                        Text(lapTracker != nil && (lapTracker?.currentLapElapsedMs ?? 0) > 0
-                             ? Formatters.msToLapTime(lapTracker!.currentLapElapsedMs)
-                             : "--:--.---")
-                            .font(.system(size: mainFont, weight: .bold, design: .monospaced))
-                            .foregroundColor(Color(.systemGray))
-                            .minimumScaleFactor(0.5)
-                            .lineLimit(1)
-                        if let last = lapTracker?.lastLapMs, last > 0 {
-                            Text("Prev: \(Formatters.msToLapTime(last))")
-                                .font(.system(size: smallFont, design: .monospaced))
-                                .foregroundColor(Color(.systemGray4))
-                                .minimumScaleFactor(0.5)
-                                .lineLimit(1)
-                        }
-                    }
-                }
-            }
+            DeltaPrevLapContent(
+                lapTracker: lapTracker,
+                gpsAvailable: gps != nil,
+                refreshHz: deltaRefreshHz,
+                mainFont: mainFont,
+                smallFont: smallFont,
+                scale: scale
+            )
 
         // ── GPS Speed ──
         case .gpsSpeed:
@@ -720,5 +663,137 @@ struct PulseModifier: ViewModifier {
             .onAppear {
                 if active { pulsing = true }
             }
+    }
+}
+
+// MARK: - GPS Delta cards (decoupled from parent re-render rate)
+//
+// Both subviews snapshot the lapTracker values into local @State at the
+// pilot-configured cadence (1/2/4 Hz). The parent (DriverView) re-renders
+// at the RaceBox sample rate (~50 Hz) because driverVM.gpsData is
+// @Published per sample — but the visible Text only flips when @State
+// changes, which the .task(id:) loop controls precisely.
+//
+// .task(id: refreshHz) is automatically cancelled+restarted when the
+// pilot moves the picker, so the cadence change applies live.
+
+private struct DeltaBestLapContent: View {
+    let lapTracker: LapTracker?
+    let kart: KartState?
+    let gpsAvailable: Bool
+    let refreshHz: Int
+    let mainFont: CGFloat
+    let smallFont: CGFloat
+    let scale: CGFloat
+
+    @State private var snapDelta: Double? = nil
+    @State private var snapElapsed: Double = 0
+
+    var body: some View {
+        Group {
+            if gpsAvailable, let delta = snapDelta {
+                VStack(spacing: 2 * scale) {
+                    Text(String(format: "%@%.2fs", delta < 0 ? "" : "+", delta / 1000))
+                        .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                        .foregroundColor(delta < 0 ? .green : .red)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                    Text(Formatters.msToLapTime(snapElapsed))
+                        .font(.system(size: smallFont, design: .monospaced))
+                        .foregroundColor(Color(.systemGray))
+                }
+            } else if let last = kart?.lastLapMs, last > 0,
+                      let best = kart?.bestStintLapMs, best > 0 {
+                // Stint-best fallback (server-driven; updates on lap crossing).
+                let delta = last - best
+                Text(String(format: "%@%.2fs", delta < 0 ? "" : "+", delta / 1000))
+                    .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                    .foregroundColor(delta <= 0 ? .green : .red)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+            } else {
+                Text("--")
+                    .font(.system(size: mainFont, design: .monospaced))
+                    .foregroundColor(Color(.systemGray4))
+            }
+        }
+        .task(id: refreshHz) {
+            let interval = 1.0 / Double(max(1, refreshHz))
+            let nanos = UInt64(interval * 1_000_000_000)
+            // Initial snapshot so the card paints immediately.
+            snapDelta = lapTracker?.deltaBestMs
+            snapElapsed = lapTracker?.currentLapElapsedMs ?? 0
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: nanos)
+                if Task.isCancelled { break }
+                snapDelta = lapTracker?.deltaBestMs
+                snapElapsed = lapTracker?.currentLapElapsedMs ?? 0
+            }
+        }
+    }
+}
+
+private struct DeltaPrevLapContent: View {
+    let lapTracker: LapTracker?
+    let gpsAvailable: Bool
+    let refreshHz: Int
+    let mainFont: CGFloat
+    let smallFont: CGFloat
+    let scale: CGFloat
+
+    @State private var snapDelta: Double? = nil
+    @State private var snapElapsed: Double = 0
+    @State private var snapLastLap: Double = 0
+
+    var body: some View {
+        Group {
+            if !gpsAvailable {
+                Text("GPS --")
+                    .font(.system(size: 16 * scale, design: .monospaced))
+                    .foregroundColor(Color(.systemGray4))
+            } else if let delta = snapDelta {
+                VStack(spacing: 2 * scale) {
+                    Text(String(format: "%@%.2fs", delta < 0 ? "" : "+", delta / 1000))
+                        .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                        .foregroundColor(delta < 0 ? .green : .red)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                    Text(Formatters.msToLapTime(snapElapsed))
+                        .font(.system(size: smallFont, design: .monospaced))
+                        .foregroundColor(Color(.systemGray))
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                }
+            } else {
+                VStack(spacing: 2 * scale) {
+                    Text(snapElapsed > 0 ? Formatters.msToLapTime(snapElapsed) : "--:--.---")
+                        .font(.system(size: mainFont, weight: .bold, design: .monospaced))
+                        .foregroundColor(Color(.systemGray))
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                    if snapLastLap > 0 {
+                        Text("Prev: \(Formatters.msToLapTime(snapLastLap))")
+                            .font(.system(size: smallFont, design: .monospaced))
+                            .foregroundColor(Color(.systemGray4))
+                            .minimumScaleFactor(0.5)
+                            .lineLimit(1)
+                    }
+                }
+            }
+        }
+        .task(id: refreshHz) {
+            let interval = 1.0 / Double(max(1, refreshHz))
+            let nanos = UInt64(interval * 1_000_000_000)
+            snapDelta = lapTracker?.deltaPrevMs
+            snapElapsed = lapTracker?.currentLapElapsedMs ?? 0
+            snapLastLap = lapTracker?.lastLapMs ?? 0
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: nanos)
+                if Task.isCancelled { break }
+                snapDelta = lapTracker?.deltaPrevMs
+                snapElapsed = lapTracker?.currentLapElapsedMs ?? 0
+                snapLastLap = lapTracker?.lastLapMs ?? 0
+            }
+        }
     }
 }
