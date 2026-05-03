@@ -12,6 +12,7 @@ import { useT } from "@/lib/i18n";
 import { useRaceBox, useRaceBoxStore } from "@/hooks/useRaceBox";
 import { usePhoneGps } from "@/hooks/usePhoneGps";
 import { useDriverConfig, ALL_DRIVER_CARDS, DEFAULT_CARD_ORDER, type DriverCardId } from "@/hooks/useDriverConfig";
+import type { KartState, SectorMeta } from "@/types/race";
 import { useAuth } from "@/hooks/useAuth";
 import { GForceRadar } from "@/components/driver/GForceRadar";
 // Config panel moved to separate sidebar tab (driver-config)
@@ -199,12 +200,156 @@ function useBoxAlert() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Sector card renderers                                              */
+/* ------------------------------------------------------------------ */
+//
+// Both card types follow the same data flow as the iOS implementation:
+// the kart's `currentSNMs` is the latest sector pass; the field-best
+// holder + runner-up come from the backend's `sectorMeta`. Sign
+// convention: ALWAYS positive numbers, color encodes good/bad. Star
+// icon on green = "you're the leader" — no minus sign needed for the
+// pilot to read it at a glance.
+
+function renderSectorDeltaCard(
+  sectorIdx: 1 | 2 | 3,
+  hasSectors: boolean,
+  sectorMeta: SectorMeta | null,
+  myKart: KartState | null,
+): { label: string; content: React.ReactNode; accent: string } {
+  const label = `Δ Mejor S${sectorIdx}`;
+  const stubAccent = "from-neutral-500/15 to-neutral-500/5 border-neutral-500/30";
+
+  const leader = sectorMeta
+    ? (sectorIdx === 1 ? sectorMeta.s1 : sectorIdx === 2 ? sectorMeta.s2 : sectorMeta.s3)
+    : null;
+
+  if (!hasSectors || !leader || !myKart) {
+    return {
+      label,
+      accent: stubAccent,
+      content: (
+        <span className="text-3xl sm:text-4xl font-mono font-black text-neutral-600 leading-none">--</span>
+      ),
+    };
+  }
+
+  const myCurrent = sectorIdx === 1 ? myKart.currentS1Ms
+    : sectorIdx === 2 ? myKart.currentS2Ms
+    : myKart.currentS3Ms;
+  const myBest = sectorIdx === 1 ? myKart.bestS1Ms
+    : sectorIdx === 2 ? myKart.bestS2Ms
+    : myKart.bestS3Ms;
+  const isMine = leader.kartNumber === myKart.kartNumber;
+
+  // Margin (when leader): runner-up best minus my best — positive = my lead.
+  // Deficit (when not leader): my latest pass minus field-best — positive = my gap.
+  let deltaMs: number | null = null;
+  if (isMine) {
+    if (myBest && myBest > 0 && leader.secondBestMs && leader.secondBestMs > 0) {
+      deltaMs = leader.secondBestMs - myBest;
+    } else {
+      deltaMs = 0;  // Only kart with sectors → no margin to show
+    }
+  } else if (myCurrent && myCurrent > 0) {
+    deltaMs = myCurrent - leader.bestMs;
+  }
+
+  if (deltaMs === null) {
+    return {
+      label,
+      accent: stubAccent,
+      content: (
+        <span className="text-3xl sm:text-4xl font-mono font-black text-neutral-600 leading-none">--</span>
+      ),
+    };
+  }
+
+  const accent = isMine
+    ? "from-green-500/25 to-green-500/5 border-green-400/50"
+    : "from-red-500/25 to-red-500/5 border-red-400/50";
+
+  const leaderLabel = (() => {
+    const t = (leader.teamName ?? "").trim();
+    const d = (leader.driverName ?? "").trim();
+    if (t && d) return `#${leader.kartNumber} ${t}/${d}`;
+    if (t) return `#${leader.kartNumber} ${t}`;
+    if (d) return `#${leader.kartNumber} ${d}`;
+    return `#${leader.kartNumber}`;
+  })();
+
+  return {
+    label,
+    accent,
+    content: (
+      <div className="flex flex-col items-center">
+        <div className="flex items-baseline gap-1">
+          {isMine && (
+            <span className="text-yellow-400 text-2xl sm:text-3xl leading-none" title="Lider">★</span>
+          )}
+          <span className={`text-3xl sm:text-4xl font-mono font-black leading-none ${
+            isMine ? "text-green-400" : "text-red-400"
+          }`}>
+            +{(Math.abs(deltaMs) / 1000).toFixed(2)}s
+          </span>
+        </div>
+        {!isMine && (
+          <span className="text-[9px] sm:text-[10px] text-neutral-400 uppercase tracking-wider mt-1 truncate max-w-full">
+            {leaderLabel}
+          </span>
+        )}
+      </div>
+    ),
+  };
+}
+
+function renderTheoreticalBestLapCard(
+  hasSectors: boolean,
+  myKart: KartState | null,
+): { label: string; content: React.ReactNode; accent: string } {
+  const label = "Vuelta teórica";
+  const stubAccent = "from-neutral-500/15 to-neutral-500/5 border-neutral-500/30";
+
+  const s1 = myKart?.bestS1Ms ?? 0;
+  const s2 = myKart?.bestS2Ms ?? 0;
+  const s3 = myKart?.bestS3Ms ?? 0;
+  const realBest = myKart?.bestLapMs ?? 0;
+
+  if (!hasSectors || !myKart || s1 <= 0 || s2 <= 0 || s3 <= 0) {
+    return {
+      label,
+      accent: stubAccent,
+      content: (
+        <span className="text-3xl sm:text-4xl font-mono font-black text-neutral-600 leading-none">--</span>
+      ),
+    };
+  }
+
+  const theoMs = s1 + s2 + s3;
+  return {
+    label,
+    accent: "from-pink-500/25 to-pink-500/5 border-pink-400/50",
+    content: (
+      <div className="flex flex-col items-center">
+        <span className="text-3xl sm:text-4xl font-mono font-black text-pink-400 leading-none">
+          {msToLapTime(theoMs)}
+        </span>
+        {realBest > 0 && (
+          <span className="text-[9px] sm:text-[10px] text-neutral-400 uppercase tracking-wider mt-1">
+            Real: {msToLapTime(realBest)}
+          </span>
+        )}
+      </div>
+    ),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
 export function DriverView() {
   const t = useT();
-  const { karts, config, fifo, connected, countdownMs, durationMs, raceFinished } = useRaceStore();
+  const { karts, config, fifo, connected, countdownMs, durationMs, raceFinished, hasSectors, sectorMeta } = useRaceStore();
   const { now, speed } = useSimNow();
   const raceClock = useRaceClock();
   const driverCfg = useDriverConfig();
@@ -957,6 +1102,16 @@ export function DriverView() {
         </div>
       ),
     },
+    // ── Sector cards ──
+    // The three Δ cards and the theoretical-best lap card all read
+    // from `sectorMeta` (field-best leader + 2nd-best ms per sector)
+    // and the kart's own `currentSNMs` / `bestSNMs`. On circuits that
+    // don't expose sectors (`hasSectors === false`), the cards render
+    // a "--" stub instead of empty content — same as iOS.
+    deltaBestS1: renderSectorDeltaCard(1, hasSectors, sectorMeta, ourKartObj),
+    deltaBestS2: renderSectorDeltaCard(2, hasSectors, sectorMeta, ourKartObj),
+    deltaBestS3: renderSectorDeltaCard(3, hasSectors, sectorMeta, ourKartObj),
+    theoreticalBestLap: renderTheoreticalBestLapCard(hasSectors, ourKartObj),
   };
 
   // Count visible cards to calculate grid rows

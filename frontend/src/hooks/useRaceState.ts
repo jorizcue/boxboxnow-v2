@@ -8,6 +8,7 @@ import type {
   ClassificationMeta,
   RaceConfig,
   RaceSnapshot,
+  SectorMeta,
   WsUpdateEvent,
 } from "@/types/race";
 
@@ -23,6 +24,13 @@ interface RaceStore {
   classification: ClassificationEntry[];
   classificationMeta: ClassificationMeta | null;
   config: RaceConfig;
+
+  // Sector telemetry — only present on circuits whose Apex grid declares
+  // `s1|s2|s3` columns. `hasSectors` flips true when the backend reports
+  // its first SECTOR event in the active session; the driver-view sector
+  // cards check this to decide whether to render data or a "--" stub.
+  hasSectors: boolean;
+  sectorMeta: SectorMeta | null;
 
   // Apex connection status (persists across tab changes)
   apexConnected: boolean;
@@ -68,6 +76,11 @@ interface RaceStore {
   applyFifoUpdate: (data: any) => void;
   applyAnalytics: (data: any) => void;
   applyClassificationUpdate: (data: any) => void;
+  /** Refresh hasSectors + sectorMeta from a top-level update message
+   * (only sent by the backend when a sector event was in the batch).
+   * Called from the WS hook after `applyUpdates` so per-kart sector
+   * mutations and field-best refresh land in the same render. */
+  applySectorMetaUpdate: (hasSectors: boolean, meta: SectorMeta | null) => void;
 }
 
 const defaultFifo: FifoState = { queue: [], score: 0, history: [] };
@@ -103,6 +116,8 @@ export const useRaceStore = create<RaceStore>((set) => ({
   classification: [],
   classificationMeta: null,
   config: defaultConfig,
+  hasSectors: false,
+  sectorMeta: null,
 
   apexConnected: false,
   apexStatusMsg: "",
@@ -157,6 +172,10 @@ export const useRaceStore = create<RaceStore>((set) => ({
       classification: snapshot.classification || [],
       classificationMeta: snapshot.classificationMeta || null,
       config: snapshot.config || defaultConfig,
+      // Sector flags reset to false / null when the snapshot says so
+      // (e.g. session change to a circuit without sectors).
+      hasSectors: !!snapshot.hasSectors,
+      sectorMeta: snapshot.sectorMeta ?? null,
     }),
 
   applyUpdates: (events) =>
@@ -241,6 +260,28 @@ export const useRaceStore = create<RaceStore>((set) => ({
           case "team":
             kart.teamName = (ev.teamName as string) || "";
             break;
+          case "sector": {
+            // Per-kart sector update. Backend also bundles a fresh
+            // sectorMeta at the top level of the same update message
+            // (handled below) — this branch only updates the kart's
+            // own currentSNMs / bestSNMs so the live "Δ vs field-best"
+            // card reflects the latest sector pass for this pilot.
+            const sectorIdx = typeof ev.sectorIdx === "number" ? ev.sectorIdx : 0;
+            const ms = typeof ev.ms === "number" ? ev.ms : 0;
+            if (ms > 0) {
+              if (sectorIdx === 1) {
+                kart.currentS1Ms = ms;
+                if (!kart.bestS1Ms || ms < kart.bestS1Ms) kart.bestS1Ms = ms;
+              } else if (sectorIdx === 2) {
+                kart.currentS2Ms = ms;
+                if (!kart.bestS2Ms || ms < kart.bestS2Ms) kart.bestS2Ms = ms;
+              } else if (sectorIdx === 3) {
+                kart.currentS3Ms = ms;
+                if (!kart.bestS3Ms || ms < kart.bestS3Ms) kart.bestS3Ms = ms;
+              }
+            }
+            break;
+          }
         }
 
         karts[idx] = kart;
@@ -272,4 +313,7 @@ export const useRaceStore = create<RaceStore>((set) => ({
       classification: data.classification || state.classification,
       classificationMeta: data.classificationMeta ?? state.classificationMeta,
     })),
+
+  applySectorMetaUpdate: (hasSectors, meta) =>
+    set({ hasSectors, sectorMeta: meta }),
 }));

@@ -31,7 +31,15 @@ export type DriverCardId =
   | "lapsToMaxStint"
   | "pitWindow"
   | "pitCount"
-  | "currentPit";
+  | "currentPit"
+  // Sector telemetry — only meaningful on circuits whose Apex grid
+  // declares `s1|s2|s3` data-type columns. The cards self-handle the
+  // "no sector data" state with a "--" placeholder, so they're safe
+  // to leave enabled on circuits without sectors.
+  | "deltaBestS1"
+  | "deltaBestS2"
+  | "deltaBestS3"
+  | "theoreticalBestLap";
 
 export type DriverCardGroup = "race" | "box" | "gps";
 
@@ -54,6 +62,13 @@ export const ALL_DRIVER_CARDS: {
   { id: "currentLapTime", label: "Vuelta actual (tiempo real)", requiresGps: true, group: "race" },
   { id: "avgLap20", label: "Vuelta media (20v)", requiresGps: false, group: "race" },
   { id: "lapsToMaxStint", label: "Vueltas hasta stint máximo", requiresGps: false, group: "race" },
+  // Sector cards live in the Race group — pilots think of sector
+  // deltas as race telemetry, not a separate device feature. They
+  // appear "--" on circuits without S1/S2/S3 columns.
+  { id: "deltaBestS1", label: "Δ Mejor S1", requiresGps: false, group: "race" },
+  { id: "deltaBestS2", label: "Δ Mejor S2", requiresGps: false, group: "race" },
+  { id: "deltaBestS3", label: "Δ Mejor S3", requiresGps: false, group: "race" },
+  { id: "theoreticalBestLap", label: "Vuelta teórica", requiresGps: false, group: "race" },
   // --- BOX group (alphabetical by label) ---
   { id: "currentPit", label: "Pit en curso", requiresGps: false, group: "box" },
   { id: "pitCount", label: "PITS (realizados / mínimos)", requiresGps: false, group: "box" },

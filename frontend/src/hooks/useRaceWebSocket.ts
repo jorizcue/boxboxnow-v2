@@ -47,7 +47,7 @@ export function useRaceWebSocket(options?: WsOptions) {
   const viewParam = options?.view;
 
   const { token } = useAuth();
-  const { setConnected, applySnapshot, applyUpdates, applyFifoUpdate, applyAnalytics, applyClassificationUpdate, notifyTeamsUpdated, setReplayStatus } =
+  const { setConnected, applySnapshot, applyUpdates, applyFifoUpdate, applyAnalytics, applyClassificationUpdate, applySectorMetaUpdate, notifyTeamsUpdated, setReplayStatus } =
     useRaceStore();
   const wsReconnectTrigger = useRaceStore((s) => s.wsReconnectTrigger);
 
@@ -132,7 +132,19 @@ export function useRaceWebSocket(options?: WsOptions) {
             ch?.postMessage({ type: "snapshot", data: msg.data });
           } else if (msg.type === "update" && msg.events) {
             applyUpdates(msg.events);
-            ch?.postMessage({ type: "update", events: msg.events });
+            // The backend bundles a fresh sectorMeta + hasSectors at
+            // the top level of update messages whose batch contained a
+            // sector event (skipped otherwise to save bandwidth). When
+            // present, refresh the field-best leaders so the sector
+            // cards re-render with the new state.
+            const anyMsg = msg as any;
+            if (anyMsg.sectorMeta !== undefined || anyMsg.hasSectors !== undefined) {
+              applySectorMetaUpdate(
+                !!anyMsg.hasSectors,
+                anyMsg.sectorMeta ?? null,
+              );
+            }
+            ch?.postMessage({ type: "update", events: msg.events, sectorMeta: anyMsg.sectorMeta, hasSectors: anyMsg.hasSectors });
           } else if (msg.type === "fifo_update" && msg.data) {
             applyFifoUpdate(msg.data);
             ch?.postMessage({ type: "fifo_update", data: msg.data });
@@ -178,7 +190,7 @@ export function useRaceWebSocket(options?: WsOptions) {
       }
     };
     // wsReconnectTrigger in deps => entire effect re-runs (close old WS, open new)
-  }, [token, wsReconnectTrigger, setConnected, applySnapshot, applyUpdates, applyFifoUpdate, applyAnalytics, applyClassificationUpdate, setReplayStatus, notifyTeamsUpdated]);
+  }, [token, wsReconnectTrigger, setConnected, applySnapshot, applyUpdates, applyFifoUpdate, applyAnalytics, applyClassificationUpdate, applySectorMetaUpdate, setReplayStatus, notifyTeamsUpdated]);
 
   // Expose WS ref so sendBoxCall can relay through server (for iOS app)
   useEffect(() => {

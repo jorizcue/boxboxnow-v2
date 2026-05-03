@@ -47,6 +47,37 @@ export interface KartState {
   bestStintLapMs: number;
   driverDifferentialMs: number;
   recentLaps: { lapTime: number; totalLap: number; driverName: string }[];
+  // Sector times — only populated on circuits whose Apex grid declares
+  // `s1|s2|s3` data-type columns. The "1/2/3" in the field names is
+  // the SECTOR index, not the column index — backend resolves the
+  // cN→sector mapping per-circuit from the live grid header.
+  // `currentSNMs` is the latest sector time we've received for this
+  // kart (drives the live "Δ vs field-best" indicator). `bestSNMs`
+  // is the kart's session-long PB per sector, used for the
+  // theoretical-best-lap card.
+  currentS1Ms?: number;
+  currentS2Ms?: number;
+  currentS3Ms?: number;
+  bestS1Ms?: number;
+  bestS2Ms?: number;
+  bestS3Ms?: number;
+}
+
+export interface SectorBest {
+  bestMs: number;
+  kartNumber: number;
+  driverName?: string;
+  teamName?: string;
+  /** Runner-up's session-long PB. Used only when the local pilot IS the
+   * field-best holder, so the driver-view card can display their margin
+   * over the chaser instead of always 0.00s. */
+  secondBestMs?: number | null;
+}
+
+export interface SectorMeta {
+  s1: SectorBest | null;
+  s2: SectorBest | null;
+  s3: SectorBest | null;
 }
 
 export interface FifoEntry {
@@ -131,6 +162,13 @@ export interface RaceSnapshot {
   classificationMeta?: ClassificationMeta;
   config: RaceConfig;
   durationMs: number;
+  // Sector telemetry — present only when the active session's Apex
+  // grid declares `s1|s2|s3` columns. `hasSectors` flips to true the
+  // first time a sector event is processed by the backend, gating
+  // the sector-related driver cards. `sectorMeta` carries the
+  // field-wide leader per sector + the runner-up's bestMs.
+  hasSectors?: boolean;
+  sectorMeta?: SectorMeta | null;
 }
 
 export interface WsUpdateEvent {
