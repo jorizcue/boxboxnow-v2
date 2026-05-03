@@ -419,12 +419,24 @@ class ApexMessageParser:
             # Sector columns: emit EventType.SECTOR (carries the sector index
             # 1/2/3 via extra). The semantic — derived from the grid header's
             # data-type — already encodes which sector it is, so the c-id is
-            # never inspected here. `ti` is just a display refresh that
-            # repeats the latest tb/tn value, so we drop it to avoid
-            # duplicate events for the same sector pass. Empty `||` clears
-            # don't reach this branch (no value).
+            # never inspected here.
+            #
+            # All four LAP_CLASSES carry real sector values. Importantly,
+            # `ti` is NOT just a display refresh — Apex also uses it as
+            # the FIRST sector update when a kart's value isn't the field
+            # best (it's "an improvement over their own previous best",
+            # which was nothing). Dropping `ti` made our state miss the
+            # first ~50% of sector events for non-leader karts, so the
+            # field-best leader board only ever showed sectors that
+            # happened to be field-bests at the moment of the update.
+            #
+            # The state handler is idempotent for redundant refreshes
+            # (current_sX_ms gets re-set to the same value, best_sX_ms
+            # is min-tracked) so emitting some duplicates is harmless —
+            # the price is a slightly noisier WS stream, but per-batch
+            # broadcasting amortizes that cost.
             if semantic in ("sector_1", "sector_2", "sector_3"):
-                if action == "ti" or not value.strip():
+                if not value.strip():
                     return []
                 sector_idx = int(semantic[-1])
                 return [RaceEvent(type=EventType.SECTOR, row_id=row_id,
