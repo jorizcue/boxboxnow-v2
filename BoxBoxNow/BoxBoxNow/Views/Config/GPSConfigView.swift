@@ -7,6 +7,11 @@ struct GPSConfigView: View {
     @EnvironmentObject var toast: ToastManager
     @State private var connectingDeviceId: UUID?
 
+    /// Refresh rate (Hz) for the GPS delta cards on the driver dashboard.
+    /// Default 2 Hz. The picker writes to UserDefaults; DriverCardView reads
+    /// the same key with @AppStorage so the change applies live.
+    @AppStorage(Constants.Keys.gpsDeltaRefreshHz) private var deltaRefreshHz: Int = 2
+
     var body: some View {
         Form {
             Section("Fuente GPS") {
@@ -93,6 +98,28 @@ struct GPSConfigView: View {
 
             // The phone GPS source is no longer selectable — the entire
             // "GPS del telefono" section is intentionally removed.
+
+            // Delta refresh rate. Lives next to the RaceBox section because
+            // the GPS delta cards only render meaningful values when a
+            // RaceBox is feeding samples. Underlying `deltaBestMs` is
+            // updated at the device sample rate (~50Hz) regardless — this
+            // only controls how often the visible number changes on screen.
+            if gpsVM.source == .racebox {
+                Section {
+                    Picker("Frecuencia delta", selection: $deltaRefreshHz) {
+                        Text("1 Hz").tag(1)
+                        Text("2 Hz").tag(2)
+                        Text("4 Hz").tag(4)
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Pantalla")
+                } footer: {
+                    Text("Cuantas veces por segundo se actualiza el delta en pantalla. Mas Hz = mas reactivo, pero el ultimo decimal puede bailar mas. 2 Hz es el equilibrio recomendado.")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
 
             if gpsVM.source != .none {
                 Section("Estado") {

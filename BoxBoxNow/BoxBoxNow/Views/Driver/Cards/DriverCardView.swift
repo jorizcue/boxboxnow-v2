@@ -11,6 +11,19 @@ struct DriverCardView: View {
     var clockMs: Double = 0 // interpolated clock from TimelineView
     var lapTracker: LapTracker? = nil
 
+    /// User-configurable refresh rate (Hz) for the GPS delta cards.
+    /// Set in GPSConfigView. Default 2 Hz. Bound via @AppStorage so the
+    /// TimelineView re-renders with the new cadence as soon as the
+    /// pilot flips it in config — no need to relaunch the app.
+    @AppStorage(Constants.Keys.gpsDeltaRefreshHz) private var deltaRefreshHz: Int = 2
+
+    /// `TimelineView(by:)` is in seconds; convert from Hz with a guard
+    /// so a 0/negative value (corrupt UserDefaults) can't crash the view.
+    private var deltaRefreshInterval: TimeInterval {
+        let hz = max(1, deltaRefreshHz)
+        return 1.0 / Double(hz)
+    }
+
     // Font scale factor relative to base height of 90
     private var scale: CGFloat { min(2.0, max(0.8, cardHeight / 90)) }
 
@@ -227,13 +240,12 @@ struct DriverCardView: View {
 
         // ── Delta Best Lap — live GPS delta if available, else server-based
         // (last lap - best lap) so the card works for users without GPS.
-        // Refresh at 2Hz: the underlying `deltaBestMs` is recomputed at the
-        // RaceBox sample rate (~50Hz), but the centisecond digit shown in
-        // the UI flickers too much at 4Hz to be readable while driving. 2Hz
-        // matches the cadence of comparable telemetry apps (RaceBox app,
-        // MoTeC, Sector55) — fast enough to feel live, calm enough to read.
+        // Refresh rate is pilot-configurable (1/2/4 Hz, default 2) via
+        // GPSConfigView. Underlying `deltaBestMs` is recomputed at the
+        // RaceBox sample rate (~50Hz) regardless — this only controls
+        // how often the visible number changes on screen.
         case .deltaBestLap:
-            TimelineView(.periodic(from: .now, by: 0.5)) { _ in
+            TimelineView(.periodic(from: .now, by: deltaRefreshInterval)) { _ in
                 if gps != nil, let delta = lapTracker?.deltaBestMs {
                     VStack(spacing: 2 * scale) {
                         Text(String(format: "%@%.2fs", delta < 0 ? "" : "+", delta / 1000))
@@ -391,10 +403,10 @@ struct DriverCardView: View {
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
 
-        // ── GPS Lap Delta (vs previous lap) — refreshes at 2Hz, same
-        // cadence as `.deltaBestLap` for visual consistency.
+        // ── GPS Lap Delta (vs previous lap) — same configurable cadence
+        // as `.deltaBestLap` for visual consistency.
         case .gpsLapDelta:
-            TimelineView(.periodic(from: .now, by: 0.5)) { _ in
+            TimelineView(.periodic(from: .now, by: deltaRefreshInterval)) { _ in
                 if gps == nil {
                     Text("GPS --")
                         .font(.system(size: 16 * scale, design: .monospaced))

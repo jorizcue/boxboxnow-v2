@@ -27,5 +27,11 @@ enum Constants {
         static let orientation  = "orientation_lock"
         static let brightness   = "driver_brightness"
         static let audioEnabled = "driver_audio_enabled"
+        // Refresh rate (in Hz) for the GPS delta cards on the driver
+        // dashboard. Underlying `lapTracker.deltaBestMs/deltaPrevMs` are
+        // recomputed at the RaceBox sample rate (~50Hz); this only
+        // controls how often the on-screen number changes. Allowed
+        // values: 1, 2, 4.
+        static let gpsDeltaRefreshHz = "gps_delta_refresh_hz"
     }
 }
