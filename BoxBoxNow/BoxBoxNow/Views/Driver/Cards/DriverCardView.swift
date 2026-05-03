@@ -532,6 +532,166 @@ struct DriverCardView: View {
                         .foregroundColor(.red.opacity(0.7))
                 }
             }
+
+        // ── Δ Best S1 / S2 / S3 ──
+        // Sector index is the trailing digit in the case name; we resolve
+        // it to an Int so the same render branch covers all three sectors.
+        // The kart's `currentSNMs` and the field-best from `sectorMeta`
+        // both use the SECTOR index — backend resolved the cN→sector
+        // mapping from the live grid header. When I'm the field-best
+        // holder, show only a star + my margin over second-best (in
+        // green). Otherwise show the deficit + leader's kart number /
+        // team / driver (in red).
+        case .deltaBestS1, .deltaBestS2, .deltaBestS3:
+            sectorDeltaContent(for: sectorIdx(for: card))
+
+        // ── Vuelta teorica = sum of my own per-sector PBs ──
+        case .theoreticalBestLap:
+            theoreticalBestLapContent
+        }
+    }
+
+    /// Map a sector card to its sector index (1/2/3).
+    private func sectorIdx(for card: DriverCard) -> Int {
+        switch card {
+        case .deltaBestS1: return 1
+        case .deltaBestS2: return 2
+        case .deltaBestS3: return 3
+        default: return 0
+        }
+    }
+
+    /// Render the "Δ Best Sn" body. Reads `kart.currentSNMs` and
+    /// `raceVM.sectorMeta.sN` (which carries the field-best holder +
+    /// the runner-up's bestMs). Three states:
+    ///   1. Session has no sectors / no kart yet / no field-best → "--"
+    ///   2. I'm the field-best holder → star + "-X.XXs" green
+    ///   3. I'm not the holder → "+X.XXs" red + "#K Team / Driver"
+    @ViewBuilder
+    private func sectorDeltaContent(for sectorIdx: Int) -> some View {
+        let leader = raceVM.sectorMeta?.best(for: sectorIdx)
+        let myCurrent: Double? = {
+            switch sectorIdx {
+            case 1: return kart?.currentS1Ms
+            case 2: return kart?.currentS2Ms
+            case 3: return kart?.currentS3Ms
+            default: return nil
+            }
+        }()
+        let myBest: Double? = {
+            switch sectorIdx {
+            case 1: return kart?.bestS1Ms
+            case 2: return kart?.bestS2Ms
+            case 3: return kart?.bestS3Ms
+            default: return nil
+            }
+        }()
+
+        if !raceVM.hasSectors || leader == nil {
+            Text("--")
+                .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                .foregroundColor(Color(.systemGray3))
+        } else {
+            let isMine = (kart?.kartNumber == leader!.kartNumber)
+            // Sign convention: ALWAYS positive numbers, color encodes
+            // good/bad. When I'm the leader (green + star) the value
+            // shown is my margin over the runner-up — a positive lead.
+            // When I'm not the leader (red) the value is my deficit
+            // vs the field-best — a positive gap. Star icon plus green
+            // makes "I'm fastest" visually unmistakable without needing
+            // a minus sign that would read as "less time" but feels
+            // counter-intuitive at a glance for pilots.
+            let deltaMs: Double? = {
+                if isMine {
+                    // Margin computed off MY best (stable across the
+                    // session). If there's no runner-up yet (only me
+                    // with a sector time), margin is 0.
+                    guard let myB = myBest, myB > 0 else { return 0 }
+                    guard let second = leader!.secondBestMs, second > 0 else { return 0 }
+                    return second - myB  // positive — my lead
+                } else {
+                    // Deficit uses CURRENT (latest pass), so the card
+                    // is reactive to each lap's sector pace.
+                    guard let cur = myCurrent, cur > 0 else { return nil }
+                    return cur - leader!.bestMs  // positive — my deficit
+                }
+            }()
+
+            if let d = deltaMs {
+                VStack(spacing: 2 * scale) {
+                    HStack(spacing: 4 * scale) {
+                        if isMine {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: mainFont * 0.65))
+                                .foregroundColor(.yellow)
+                        }
+                        Text("+\(String(format: "%.2fs", abs(d) / 1000))")
+                            .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                            .foregroundColor(isMine ? .green : .red)
+                            .minimumScaleFactor(0.6)
+                            .lineLimit(1)
+                    }
+                    if !isMine, let l = leader {
+                        let label = leaderLabel(for: l)
+                        Text(label)
+                            .font(.system(size: smallFont, weight: .medium))
+                            .foregroundColor(.gray)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.55)
+                    }
+                }
+            } else {
+                Text("--")
+                    .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                    .foregroundColor(Color(.systemGray3))
+            }
+        }
+    }
+
+    /// "#K Team/Driver" label for the field-best holder. Falls back
+    /// gracefully when team/driver names are missing (some circuits
+    /// only populate one of the two columns).
+    private func leaderLabel(for leader: SectorBest) -> String {
+        let t = (leader.teamName ?? "").trimmingCharacters(in: .whitespaces)
+        let d = (leader.driverName ?? "").trimmingCharacters(in: .whitespaces)
+        if !t.isEmpty && !d.isEmpty { return "#\(leader.kartNumber) \(t)/\(d)" }
+        if !t.isEmpty { return "#\(leader.kartNumber) \(t)" }
+        if !d.isEmpty { return "#\(leader.kartNumber) \(d)" }
+        return "#\(leader.kartNumber)"
+    }
+
+    /// Theoretical best lap = sum of my session-long S1/S2/S3 PBs.
+    /// When any sector is missing (session just started or circuit
+    /// without sectors), show "--". Below the time we show the
+    /// pilot's real best so they see how much pace they leave on
+    /// the table by not stringing together their best sectors.
+    @ViewBuilder
+    private var theoreticalBestLapContent: some View {
+        let s1 = kart?.bestS1Ms ?? 0
+        let s2 = kart?.bestS2Ms ?? 0
+        let s3 = kart?.bestS3Ms ?? 0
+        let realBest = kart?.bestLapMs ?? 0
+
+        if !raceVM.hasSectors || s1 <= 0 || s2 <= 0 || s3 <= 0 {
+            Text("--")
+                .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                .foregroundColor(Color(.systemGray3))
+        } else {
+            let theoMs = s1 + s2 + s3
+            VStack(spacing: 2 * scale) {
+                Text(Formatters.msToLapTime(theoMs))
+                    .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                    .foregroundColor(.pink)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                if realBest > 0 {
+                    Text("Real: \(Formatters.msToLapTime(realBest))")
+                        .font(.system(size: smallFont, weight: .medium, design: .monospaced))
+                        .foregroundColor(.gray)
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                }
+            }
         }
     }
 
@@ -614,6 +774,30 @@ struct DriverCardView: View {
         case .currentPit:
             if kart?.pitStatus == "in_pit" { return "Pit en curso" }
             return "Pit en curso: sin datos"
+        case .deltaBestS1, .deltaBestS2, .deltaBestS3:
+            let n = sectorIdx(for: card)
+            guard raceVM.hasSectors,
+                  let leader = raceVM.sectorMeta?.best(for: n) else {
+                return "Delta sector \(n): sin datos"
+            }
+            let isMine = (kart?.kartNumber == leader.kartNumber)
+            if isMine {
+                if let myB = (n == 1 ? kart?.bestS1Ms : n == 2 ? kart?.bestS2Ms : kart?.bestS3Ms),
+                   myB > 0, let s = leader.secondBestMs, s > 0 {
+                    return "Sector \(n) lider, ventaja \(String(format: "%.2f", (s - myB) / 1000)) segundos"
+                }
+                return "Sector \(n) lider"
+            }
+            let cur = (n == 1 ? kart?.currentS1Ms : n == 2 ? kart?.currentS2Ms : kart?.currentS3Ms) ?? 0
+            if cur <= 0 { return "Delta sector \(n): sin datos" }
+            let d = (cur - leader.bestMs) / 1000
+            return "Sector \(n): +\(String(format: "%.2f", d)) segundos del lider kart \(leader.kartNumber)"
+        case .theoreticalBestLap:
+            let s1 = kart?.bestS1Ms ?? 0, s2 = kart?.bestS2Ms ?? 0, s3 = kart?.bestS3Ms ?? 0
+            guard raceVM.hasSectors, s1 > 0, s2 > 0, s3 > 0 else {
+                return "Vuelta teorica: sin datos"
+            }
+            return "Vuelta teorica: \(Formatters.msToLapTime(s1 + s2 + s3))"
         }
     }
 

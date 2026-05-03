@@ -50,6 +50,7 @@ class EventType(Enum):
     TRACK_INFO = "track_info"    # track||... (with circuit length)
     PRE_RACE_DURATION = "pre_race_duration"  # dyn1|text|HH:MM:SS
     LAP_COUNT = "lap_count"          # dyn1|text|Vuelta X/Y (lap-based races)
+    SECTOR = "sector"                # cell update on a c-column with data-type s1|s2|s3
 
 
 @dataclass
@@ -90,14 +91,20 @@ COLUMN_TYPES = {
     "pit": "pit_count",
     "sta": "status",
     "grp": "group",
-    # Sector times — mapped so they are NOT mistaken for laps
-    "s1": "sector",
-    "s2": "sector",
-    "s3": "sector",
+    # Sector times — each sector keeps its own semantic so the index is
+    # preserved through the pipeline. The grid header declares which c-id
+    # corresponds to which sector via `data-type="s1|s2|s3"`, so the
+    # column→sector mapping is per-circuit (not hardcoded).
+    "s1": "sector_1",
+    "s2": "sector_2",
+    "s3": "sector_3",
 }
 
-# Columns that should be ignored for lap counting / event generation
-IGNORED_SEMANTICS = {"sector"}
+# Columns that should be ignored for LAP / BEST_LAP event generation.
+# Sectors are NOT ignored — they emit their own EventType.SECTOR events.
+# `total_laps` is excluded from lap-time event generation in the cell
+# update handler directly (semantic == "total_laps" check).
+IGNORED_SEMANTICS: set[str] = set()
 
 # Lap time CSS classes
 LAP_CLASSES = {"tn", "ti", "tb", "to"}  # normal, improvement, best, other
@@ -409,9 +416,24 @@ class ApexMessageParser:
 
         # Lap time updates (tn=normal, ti=improvement, tb=best, to=other)
         if action in LAP_CLASSES:
-            # Skip sector and total_laps columns — they are NOT lap time events.
-            # Some circuits (e.g. Santos) send lap times with LAP_CLASS actions
-            # on the "Vueltas" column (total_laps), which would create phantom laps.
+            # Sector columns: emit EventType.SECTOR (carries the sector index
+            # 1/2/3 via extra). The semantic — derived from the grid header's
+            # data-type — already encodes which sector it is, so the c-id is
+            # never inspected here. `ti` is just a display refresh that
+            # repeats the latest tb/tn value, so we drop it to avoid
+            # duplicate events for the same sector pass. Empty `||` clears
+            # don't reach this branch (no value).
+            if semantic in ("sector_1", "sector_2", "sector_3"):
+                if action == "ti" or not value.strip():
+                    return []
+                sector_idx = int(semantic[-1])
+                return [RaceEvent(type=EventType.SECTOR, row_id=row_id,
+                                  value=value,
+                                  extra={"sectorIdx": sector_idx,
+                                         "isPb": action == "tb"})]
+            # Skip total_laps column — some circuits (Santos) send lap times
+            # with LAP_CLASS actions on the "Vueltas" column, which would
+            # create phantom laps if treated as last_lap events.
             if semantic in IGNORED_SEMANTICS or semantic == "total_laps":
                 return []
             # Determine if this is last_lap or best_lap column
@@ -425,6 +447,9 @@ class ApexMessageParser:
         # Generic "in" action - depends on column
         if action == "in":
             if semantic in IGNORED_SEMANTICS:
+                return []
+            # Sectors never use "in"; if a circuit sends one anyway, ignore it.
+            if semantic in ("sector_1", "sector_2", "sector_3"):
                 return []
             if semantic == "last_lap":
                 return [RaceEvent(type=EventType.LAP, row_id=row_id, value=value)]

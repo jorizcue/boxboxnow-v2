@@ -119,6 +119,22 @@ class KartState:
     cluster: int = 2
     driver_differential_ms: int = 0
 
+    # Sector times (only populated on circuits whose Apex grid header
+    # declares `data-type="s1|s2|s3"` columns — Campillos does, many
+    # don't). The sector index in the field name is the SECTOR index,
+    # not the column index. The parser resolves `s1|s2|s3` → semantic
+    # via the dynamic `column_map`, so the actual cN column varies per
+    # circuit. `current_sN_ms` is the last sector time we measured for
+    # this kart, used for the "Δ vs field-best" indicator. `best_sN_ms`
+    # is the kart's PB across the whole session, used to compute the
+    # field-wide best holder + theoretical-best-lap card.
+    current_s1_ms: int = 0
+    current_s2_ms: int = 0
+    current_s3_ms: int = 0
+    best_s1_ms: int = 0
+    best_s2_ms: int = 0
+    best_s3_ms: int = 0
+
     def stint_duration_s(self) -> float:
         """Stint duration in seconds, based on accumulated lap times."""
         return self.stint_elapsed_ms / 1000.0
@@ -187,6 +203,15 @@ class KartState:
                 {"lapTime": l["lapTime"], "totalLap": l["totalLap"], "driverName": l.get("driverName", "")}
                 for l in self.valid_laps[-5:]
             ],
+            # Sector times (0 when the circuit doesn't expose sectors or this
+            # kart hasn't completed a sector yet). Frontend treats 0 as "no
+            # data" and shows "--".
+            "currentS1Ms": self.current_s1_ms,
+            "currentS2Ms": self.current_s2_ms,
+            "currentS3Ms": self.current_s3_ms,
+            "bestS1Ms": self.best_s1_ms,
+            "bestS2Ms": self.best_s2_ms,
+            "bestS3Ms": self.best_s3_ms,
         }
 
 
@@ -232,6 +257,13 @@ class RaceStateManager:
         # minPits, pitTimeRefS, medianFieldSpeedMs, raceTimeS. Surfaced to
         # the frontend so the UI can show "Pits oblig.: N · Ref. pit: X.Xs".
         self.classification_meta: dict = {}
+
+        # Whether the current Apex grid exposes sector columns (s1|s2|s3
+        # data-types). Set true the first time we receive a SECTOR event
+        # in this session. Reset on EventType.INIT init/init. Frontends
+        # use this flag to auto-hide the sector-related driver cards on
+        # circuits without sector telemetry.
+        self.has_sectors: bool = False
 
         # Session metadata (auto-detected from Apex signals)
         self.category: str = ""  # title1: "70 SILVER", "85 GOLD", etc.
@@ -379,7 +411,20 @@ class RaceStateManager:
                 self._needs_snapshot = False
                 await self._broadcast(self.get_snapshot())
             elif updates:
-                await self._broadcast({"type": "update", "events": updates})
+                msg = {"type": "update", "events": updates}
+                # When this batch contained any sector event, attach the
+                # freshly-recomputed sectorMeta so clients can refresh
+                # the field-best holders + theoretical-best card without
+                # waiting for the next snapshot. Bandwidth-cheap (only
+                # fires when sectors actually changed) and avoids each
+                # client recomputing the leader board independently.
+                has_sector_event = any(
+                    e.get("event") == "sector" for e in updates
+                )
+                if has_sector_event and self.has_sectors:
+                    msg["sectorMeta"] = self._compute_sector_meta()
+                    msg["hasSectors"] = True
+                await self._broadcast(msg)
 
         # Real classification: positions only change at lap-line crossings
         # (every kart's adj_progress otherwise advances at +1 s/s in steady
@@ -513,6 +558,10 @@ class RaceStateManager:
             self.countdown_ms = 0
             self._first_countdown_ms = 0
             self._race_start_ms = 0
+            # Sector flag resets on init so circuits without sectors don't
+            # carry over the flag from a previous session in the same
+            # process (live mode keeps the same RaceStateManager).
+            self.has_sectors = False
             return None
 
         # Get or skip unknown karts
@@ -793,6 +842,42 @@ class RaceStateManager:
             return {"event": "totalLaps", "rowId": row_id,
                     "value": new_total}
 
+        elif event.type == EventType.SECTOR and kart:
+            # Sector time update (only on circuits with s1|s2|s3 columns).
+            # The sector index comes from the parser, which derived it from
+            # the grid's `data-type` declaration (not the cN column index).
+            sector_idx = event.extra.get("sectorIdx", 0)
+            if sector_idx not in (1, 2, 3):
+                return None
+            try:
+                ms = int(round(float(event.value) * 1000))
+            except (ValueError, TypeError):
+                return None
+            if ms <= 0:
+                return None
+
+            # Update kart's most-recent + own-best per sector. Field-best
+            # is computed on the fly in get_snapshot() / sectorMeta — cheap
+            # for ~30 karts and avoids keeping two sources of truth.
+            if sector_idx == 1:
+                kart.current_s1_ms = ms
+                if kart.best_s1_ms <= 0 or ms < kart.best_s1_ms:
+                    kart.best_s1_ms = ms
+            elif sector_idx == 2:
+                kart.current_s2_ms = ms
+                if kart.best_s2_ms <= 0 or ms < kart.best_s2_ms:
+                    kart.best_s2_ms = ms
+            elif sector_idx == 3:
+                kart.current_s3_ms = ms
+                if kart.best_s3_ms <= 0 or ms < kart.best_s3_ms:
+                    kart.best_s3_ms = ms
+
+            self.has_sectors = True
+            return {"event": "sector", "rowId": row_id,
+                    "kartNumber": kart.kart_number,
+                    "sectorIdx": sector_idx,
+                    "ms": ms}
+
         elif event.type == EventType.PIT_TIME and kart:
             kart.pit_time = event.value
             return {"event": "pitTime", "rowId": row_id, "value": event.value}
@@ -1044,6 +1129,44 @@ class RaceStateManager:
         self.race_finished = True
         self._needs_snapshot = True
 
+    def _compute_sector_meta(self) -> dict:
+        """Compute field-wide sector leaders (best + 2nd best per sector).
+
+        Returns a dict shaped like:
+            {
+              "s1": {"bestMs": 30428, "kartNumber": 14,
+                     "driverName": "...", "teamName": "...",
+                     "secondBestMs": 30521 or None},
+              "s2": {...} or None,
+              "s3": {...} or None,
+            }
+
+        Per-sector entries are None when no kart has registered a best
+        for that sector yet. Computed on demand each snapshot — O(n_karts)
+        per sector, negligible for a typical 30-kart field.
+        """
+        result: dict = {}
+        for s in (1, 2, 3):
+            attr = f"best_s{s}_ms"
+            ranked = sorted(
+                ((getattr(k, attr), k) for k in self.karts.values()
+                 if getattr(k, attr) > 0),
+                key=lambda pair: pair[0],
+            )
+            if not ranked:
+                result[f"s{s}"] = None
+                continue
+            best_ms, leader = ranked[0]
+            second_ms = ranked[1][0] if len(ranked) > 1 else None
+            result[f"s{s}"] = {
+                "bestMs": best_ms,
+                "kartNumber": leader.kart_number,
+                "driverName": leader.driver_name,
+                "teamName": leader.team_name,
+                "secondBestMs": second_ms,
+            }
+        return result
+
     def get_snapshot(self) -> dict:
         """Get full state snapshot for new client connections."""
         sorted_karts = sorted(self.karts.values(), key=lambda k: k.position or 999)
@@ -1062,6 +1185,8 @@ class RaceStateManager:
                 },
                 "classification": self.classification,
                 "classificationMeta": self.classification_meta,
+                "hasSectors": self.has_sectors,
+                "sectorMeta": self._compute_sector_meta() if self.has_sectors else None,
                 "config": {
                     "circuitLengthM": self.circuit_length_m,
                     "pitTimeS": self.pit_time_s,

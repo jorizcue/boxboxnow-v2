@@ -5,12 +5,14 @@ enum DriverCardGroup: String, CaseIterable {
     case race
     case box
     case gps
+    case sector
 
     var label: String {
         switch self {
-        case .race: return "Carrera"
-        case .box:  return "BOX"
-        case .gps:  return "GPS"
+        case .race:   return "Carrera"
+        case .box:    return "BOX"
+        case .gps:    return "GPS"
+        case .sector: return "Sectores"
         }
     }
 }
@@ -37,6 +39,13 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
     case pitWindow
     case pitCount
     case currentPit
+    // Sector telemetry — only meaningful on circuits whose Apex grid
+    // declares `s1|s2|s3` columns. Auto-hide via `requiresSectors` when
+    // the active session doesn't expose sectors.
+    case deltaBestS1
+    case deltaBestS2
+    case deltaBestS3
+    case theoreticalBestLap
 
     var id: String { rawValue }
 
@@ -46,6 +55,8 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
             return .box
         case .deltaBestLap, .gForceRadar, .gpsLapDelta, .gpsSpeed, .gpsGForce:
             return .gps
+        case .deltaBestS1, .deltaBestS2, .deltaBestS3, .theoreticalBestLap:
+            return .sector
         default:
             return .race
         }
@@ -74,6 +85,10 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .pitWindow:      return "Ventana de pit (open/closed)"
         case .pitCount:       return "PITS (realizados / minimos)"
         case .currentPit:     return "Pit en curso"
+        case .deltaBestS1:    return "Δ Mejor S1"
+        case .deltaBestS2:    return "Δ Mejor S2"
+        case .deltaBestS3:    return "Δ Mejor S3"
+        case .theoreticalBestLap: return "Vuelta teorica"
         }
     }
 
@@ -100,6 +115,10 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .pitWindow:      return "door.left.hand.open"
         case .pitCount:       return "number.circle"
         case .currentPit:     return "stopwatch.fill"
+        case .deltaBestS1:    return "1.circle.fill"
+        case .deltaBestS2:    return "2.circle.fill"
+        case .deltaBestS3:    return "3.circle.fill"
+        case .theoreticalBestLap: return "wand.and.stars"
         }
     }
 
@@ -109,6 +128,19 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
     var requiresGPS: Bool {
         switch self {
         case .currentLapTime, .gForceRadar, .gpsLapDelta, .gpsSpeed, .gpsGForce:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Whether this card requires the active session to expose sector
+    /// telemetry (Apex grid must declare `s1|s2|s3` data-type columns).
+    /// On circuits without sectors, the sector cards still appear in
+    /// the config picker but show "--" in place of values.
+    var requiresSectors: Bool {
+        switch self {
+        case .deltaBestS1, .deltaBestS2, .deltaBestS3, .theoreticalBestLap:
             return true
         default:
             return false
@@ -139,6 +171,10 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .pitWindow:      return "OPEN"
         case .pitCount:       return "2/4"
         case .currentPit:     return "0:45"
+        case .deltaBestS1:    return "+0.21s"
+        case .deltaBestS2:    return "-0.15s"
+        case .deltaBestS3:    return "+0.08s"
+        case .theoreticalBestLap: return "1:01.67"
         }
     }
 
@@ -166,13 +202,18 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .pitWindow:      return .green
         case .pitCount:       return .orange
         case .currentPit:     return .cyan
+        case .deltaBestS1, .deltaBestS2, .deltaBestS3: return .yellow
+        case .theoreticalBestLap: return .pink
         }
     }
 
     static let defaultVisible: [String: Bool] = {
         var dict = [String: Bool]()
         for card in DriverCard.allCases {
-            dict[card.rawValue] = !card.requiresGPS  // GPS cards off by default
+            // GPS cards and sector cards are off by default — pilots
+            // opt in via the driver config view, and sector cards only
+            // make sense on circuits with sector telemetry.
+            dict[card.rawValue] = !card.requiresGPS && !card.requiresSectors
         }
         return dict
     }()

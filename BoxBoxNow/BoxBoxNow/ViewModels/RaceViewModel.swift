@@ -39,6 +39,16 @@ final class RaceViewModel: ObservableObject {
     @Published var minStintMin: Double = 0
     @Published var minDriverTimeMin: Double = 0
 
+    // Sector telemetry — only present on circuits whose Apex grid declares
+    // `s1|s2|s3` columns. `hasSectors` flips true the first time the
+    // backend reports a sector event in this session; it gates whether
+    // the sector-related driver cards (Δ S1/S2/S3 + theoretical-best)
+    // show data or stay in the "--" placeholder. `sectorMeta` carries
+    // the field-wide leader per sector (kart number + driver/team +
+    // best ms + 2nd best ms).
+    @Published var hasSectors: Bool = false
+    @Published var sectorMeta: SectorMeta? = nil
+
     private let wsClient = WebSocketClient()
     private var cancellables = Set<AnyCancellable>()
 
@@ -311,6 +321,15 @@ final class RaceViewModel: ObservableObject {
 
                 // Box score from fifo
                 parseFifoScore(snapshotData)
+
+                // Sector telemetry (present only on circuits with sector
+                // columns). Both fields land at top level of `data` —
+                // hasSectors is a bool, sectorMeta is a dict with s1/s2/s3
+                // entries each carrying { bestMs, kartNumber, driverName,
+                // teamName, secondBestMs }. We always update both, even
+                // when null, so a session change clears stale data.
+                hasSectors = (snapshotData["hasSectors"] as? Bool) ?? false
+                sectorMeta = decodeSectorMeta(snapshotData["sectorMeta"])
             }
 
         case "update":
@@ -322,6 +341,17 @@ final class RaceViewModel: ObservableObject {
             // Update countdown/race clock from update messages
             if let countdown = asDouble(json["countdownMs"]) {
                 recalibrateServerClock(countdown)
+            }
+            // The backend attaches a fresh sectorMeta to update messages
+            // whose batch contained a sector event (skipped otherwise to
+            // save bandwidth). When present, refresh local state — the
+            // SwiftUI cards observing @Published sectorMeta animate to
+            // the new field-best automatically.
+            if let hs = json["hasSectors"] as? Bool {
+                hasSectors = hs
+            }
+            if json["sectorMeta"] != nil {
+                sectorMeta = decodeSectorMeta(json["sectorMeta"])
             }
 
         case "fifo_update":
@@ -488,9 +518,62 @@ final class RaceViewModel: ObservableObject {
             if let name = event["teamName"] as? String { karts[kartIdx].teamName = name }
         case "pitTime":
             break // display-only, not needed for calculations
+        case "sector":
+            // Per-kart sector update. The backend already sends a fresh
+            // `sectorMeta` at the top of the same update message — that
+            // refreshes the field-best leader. Here we update the kart's
+            // own currentSNMs / bestSNMs so the live "Δ vs field-best"
+            // card reflects the latest sector pass for this specific
+            // pilot. Sector index is 1, 2, or 3 — the index in the
+            // payload is the SECTOR index (resolved by the backend
+            // from the grid's data-type), not the column index.
+            guard let sectorIdx = asInt(event["sectorIdx"]),
+                  let ms = asDouble(event["ms"]), ms > 0 else { break }
+            switch sectorIdx {
+            case 1:
+                karts[kartIdx].currentS1Ms = ms
+                if karts[kartIdx].bestS1Ms == nil || ms < (karts[kartIdx].bestS1Ms ?? .infinity) {
+                    karts[kartIdx].bestS1Ms = ms
+                }
+            case 2:
+                karts[kartIdx].currentS2Ms = ms
+                if karts[kartIdx].bestS2Ms == nil || ms < (karts[kartIdx].bestS2Ms ?? .infinity) {
+                    karts[kartIdx].bestS2Ms = ms
+                }
+            case 3:
+                karts[kartIdx].currentS3Ms = ms
+                if karts[kartIdx].bestS3Ms == nil || ms < (karts[kartIdx].bestS3Ms ?? .infinity) {
+                    karts[kartIdx].bestS3Ms = ms
+                }
+            default: break
+            }
         default:
             break
         }
+    }
+
+    /// Decode the `sectorMeta` payload (top-level field on snapshots and
+    /// on update messages whose batch contained a sector event) into a
+    /// strongly-typed `SectorMeta`. Returns nil when the backend reports
+    /// `null` (circuit without sector telemetry) or the payload is
+    /// malformed.
+    private func decodeSectorMeta(_ raw: Any?) -> SectorMeta? {
+        guard let dict = raw as? [String: Any?] else { return nil }
+        func decode(_ key: String) -> SectorBest? {
+            guard let inner = dict[key] as? [String: Any] else { return nil }
+            guard let bestMs = asDouble(inner["bestMs"]),
+                  let kartNumber = asInt(inner["kartNumber"]) else { return nil }
+            return SectorBest(
+                bestMs: bestMs,
+                kartNumber: kartNumber,
+                driverName: inner["driverName"] as? String,
+                teamName: inner["teamName"] as? String,
+                secondBestMs: asDouble(inner["secondBestMs"])
+            )
+        }
+        let s1 = decode("s1"); let s2 = decode("s2"); let s3 = decode("s3")
+        if s1 == nil && s2 == nil && s3 == nil { return nil }
+        return SectorMeta(s1: s1, s2: s2, s3: s3)
     }
 
     // MARK: - JSON helpers (backend may send Int or Double)

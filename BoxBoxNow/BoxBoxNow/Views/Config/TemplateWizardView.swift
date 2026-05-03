@@ -39,9 +39,10 @@ struct TemplateWizardView: View {
 
     private func sectionTitle(_ group: DriverCardGroup) -> String {
         switch group {
-        case .race: return "Carrera"
-        case .box:  return "BOX"
-        case .gps:  return "GPS (requieren RaceBox o GPS del telefono)"
+        case .race:   return "Carrera"
+        case .box:    return "BOX"
+        case .gps:    return "GPS (requieren RaceBox o GPS del telefono)"
+        case .sector: return "Sectores (solo en circuitos con S1/S2/S3)"
         }
     }
 
