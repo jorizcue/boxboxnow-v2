@@ -151,6 +151,7 @@ fun DriverCardView(
                     boxScore = boxScore,
                     hasSectors = hasSectors,
                     sectorMeta = sectorMeta,
+                    cardHeight = cardHeight,
                     mainFont = mainFont,
                     bigFont = bigFont,
                     subFont = subFont,
@@ -243,6 +244,7 @@ private fun CardContent(
     boxScore: Int,
     hasSectors: Boolean,
     sectorMeta: SectorMeta?,
+    cardHeight: Dp,
     mainFont: TextUnit,
     bigFont: TextUnit,
     subFont: TextUnit,
@@ -539,7 +541,7 @@ private fun CardContent(
         // ── Δ Sectores: combined S1/S2/S3 deltas in 3 lines ──
         DriverCard.DeltaSectors -> DeltaSectorsContent(
             hasSectors = hasSectors, raceVM = raceVM,
-            mainFont = mainFont, scale = scale,
+            mainFont = mainFont, cardHeight = cardHeight, scale = scale,
         )
 
         // ── Apex live timing: interval to kart in front ──
@@ -767,12 +769,16 @@ private fun TheoreticalBestLapContent(
 /** Combined sector-delta card: 3 lines (S1/S2/S3), each with the
  *  sector label on the left and the delta value on the right. Reuses
  *  `RaceViewModel.sectorDelta(...)` so the math lives in a single
- *  spot (shared with the per-sector cards). */
+ *  spot (shared with the per-sector cards). Font sizes are derived
+ *  from cardHeight directly so the values grow when the pilot lays
+ *  the card alone in a single row of the grid (where the parent's
+ *  `scale` factor caps and `mainFont * 1.0` leaves dead space). */
 @Composable
 private fun DeltaSectorsContent(
     hasSectors: Boolean,
     raceVM: RaceViewModel,
     mainFont: TextUnit,
+    cardHeight: Dp,
     scale: Float,
 ) {
     if (!hasSectors) {
@@ -780,33 +786,44 @@ private fun DeltaSectorsContent(
         return
     }
 
-    val labelFontSp = (mainFont.value * 0.7f).sp
-    val valueFontSp = (mainFont.value * 1.0f).sp
+    // ~22% of card height per line keeps the value visually dominant
+    // without bumping into the line above/below. Clamped to 20–120dp
+    // so small grid cells don't wrap and tall cards don't blow up.
+    val valueFontSize = (cardHeight.value * 0.22f).coerceIn(20f, 120f)
+    val valueFontSp = valueFontSize.sp
+    val labelFontSp = (valueFontSize * 0.7f).sp
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = (6f * scale).dp),
-        verticalArrangement = Arrangement.spacedBy((4f * scale).dp, Alignment.CenterVertically),
     ) {
         for (n in 1..3) {
-            DeltaSectorsLine(
-                sectorIdx = n, raceVM = raceVM,
-                labelFontSp = labelFontSp, valueFontSp = valueFontSp, scale = scale,
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                DeltaSectorsLine(
+                    sectorIdx = n, raceVM = raceVM,
+                    labelFontSp = labelFontSp, valueFontSp = valueFontSp,
+                )
+            }
         }
     }
 }
 
 /** One row of the combined sector-delta card: "S{n}" left, value
- *  right (or "—" when there's no data yet for that sector). */
+ *  right (or "—" when there's no data yet for that sector). Fonts
+ *  arrive pre-sized from the parent so the three lines stay aligned
+ *  + scale together with the card. */
 @Composable
 private fun DeltaSectorsLine(
     sectorIdx: Int,
     raceVM: RaceViewModel,
     labelFontSp: TextUnit,
     valueFontSp: TextUnit,
-    scale: Float,
 ) {
     val r = raceVM.sectorDelta(sectorIdx)
     Row(
@@ -818,7 +835,7 @@ private fun DeltaSectorsLine(
             color = BoxBoxNowColors.SystemGray,
             fontSize = labelFontSp,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.widthIn(min = (mainFontMinWidth(labelFontSp)).dp),
+            modifier = Modifier.widthIn(min = (labelFontSp.value * 1.4f).dp),
         )
         Spacer(Modifier.weight(1f))
         if (r != null) {
@@ -833,11 +850,6 @@ private fun DeltaSectorsLine(
         }
     }
 }
-
-/** Tiny helper: minimum left-column width sized roughly to fit "S1"
- *  at the row's label font size. Just enough to keep the value
- *  column aligned across the three rows even on narrow cards. */
-private fun mainFontMinWidth(label: TextUnit): Float = label.value * 1.5f
 
 @Composable
 private fun MonoValue(text: String, color: Color, size: TextUnit) {

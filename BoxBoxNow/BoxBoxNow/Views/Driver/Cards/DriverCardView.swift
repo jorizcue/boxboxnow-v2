@@ -696,9 +696,19 @@ struct DriverCardView: View {
                 .font(.system(size: mainFont, weight: .black, design: .monospaced))
                 .foregroundColor(Color(.systemGray3))
         } else {
-            VStack(spacing: 4 * scale) {
+            // Size the value font directly off cardHeight so the rows
+            // grow when the pilot lays the three-sector card alone in
+            // a single row of the grid (where `scale` caps at 2× and
+            // `mainFont * 1.0` leaves dead space top/bottom). With 3
+            // stacked lines getting an equal vertical share, ~22% of
+            // card height per line keeps the value visually dominant
+            // without bumping into the line above/below.
+            let valueFont: CGFloat = max(20, min(120, cardHeight * 0.22))
+            let labelFont: CGFloat = valueFont * 0.7
+            VStack(spacing: 0) {
                 ForEach([1, 2, 3], id: \.self) { n in
-                    deltaSectorsLine(sectorIdx: n)
+                    deltaSectorsLine(sectorIdx: n, valueFont: valueFont, labelFont: labelFont)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -707,26 +717,28 @@ struct DriverCardView: View {
     }
 
     /// One row of the combined sector-delta card: "S{n}" left, value
-    /// right (or `—` when there's no data yet for that sector).
+    /// right (or `—` when there's no data yet for that sector). Fonts
+    /// arrive pre-sized from the parent so the three lines stay
+    /// aligned + scale together with the card.
     @ViewBuilder
-    private func deltaSectorsLine(sectorIdx n: Int) -> some View {
+    private func deltaSectorsLine(sectorIdx n: Int, valueFont: CGFloat, labelFont: CGFloat) -> some View {
         let r = raceVM.sectorDelta(ourKartNumber: ourKartNumber, sectorIdx: n)
         HStack(spacing: 8 * scale) {
             Text("S\(n)")
-                .font(.system(size: mainFont * 0.7, weight: .semibold))
+                .font(.system(size: labelFont, weight: .semibold))
                 .foregroundColor(.gray)
-                .frame(minWidth: mainFont * 1.2, alignment: .leading)
+                .frame(minWidth: labelFont * 1.4, alignment: .leading)
             Spacer(minLength: 0)
             if let d = r?.deltaMs, let isMine = r?.isMine {
                 let sign = d < 0 ? "-" : "+"
                 Text("\(sign)\(String(format: "%.2fs", abs(d) / 1000))")
-                    .font(.system(size: mainFont * 1.0, weight: .black, design: .monospaced))
+                    .font(.system(size: valueFont, weight: .black, design: .monospaced))
                     .foregroundColor(isMine ? .green : .red)
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
             } else {
                 Text("—")
-                    .font(.system(size: mainFont * 1.0, weight: .black, design: .monospaced))
+                    .font(.system(size: valueFont, weight: .black, design: .monospaced))
                     .foregroundColor(Color(.systemGray3))
             }
         }
