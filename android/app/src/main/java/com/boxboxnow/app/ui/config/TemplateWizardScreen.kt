@@ -116,6 +116,23 @@ fun TemplateWizardScreen(onBack: () -> Unit, editPresetId: Int? = null) {
             contrast = preset.contrast ?: 0.5
             orientationLock = OrientationLock.from(preset.orientation)
             audioEnabled = preset.audioEnabled ?: true
+
+            // Stale presets (saved before newer DriverCard entries
+            // existed) don't carry the new keys in cardOrder. The
+            // step-3 reorder grid iterates cardOrder, so without this
+            // migration any card added after the preset's snapshot
+            // would silently never show in the wizard preview even
+            // when the user toggles it on in step 2.
+            val allKeys = DriverCard.entries.map { it.key }
+            val missing = allKeys.filterNot { it in cardOrder }
+            if (missing.isNotEmpty()) {
+                cardOrder = cardOrder + missing
+                for (key in missing) {
+                    if (visibleCards[key] == null) {
+                        DriverCard.fromKey(key)?.let { visibleCards[key] = !it.requiresGPS }
+                    }
+                }
+            }
             initialized = true
         }
     }

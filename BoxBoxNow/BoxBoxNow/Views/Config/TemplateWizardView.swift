@@ -98,6 +98,22 @@ struct TemplateWizardView: View {
                     contrast = driverVM.brightness
                     orientation = driverVM.orientationLock
                 }
+                // Stale presets (saved before newer DriverCard cases
+                // existed) don't carry the new keys in cardOrder. The
+                // step-3 preview iterates cardOrder, so without this
+                // migration any card added after the preset's snapshot
+                // would silently never show in the wizard's reorder
+                // grid even when the user toggles it on in step 2.
+                let allIds = DriverCard.allCases.map { $0.rawValue }
+                let missing = allIds.filter { !cardOrder.contains($0) }
+                if !missing.isEmpty {
+                    cardOrder.append(contentsOf: missing)
+                    for id in missing where visibleCards[id] == nil {
+                        if let card = DriverCard(rawValue: id) {
+                            visibleCards[id] = !card.requiresGPS
+                        }
+                    }
+                }
             }
         }
     }
