@@ -696,24 +696,36 @@ struct DriverCardView: View {
                 .font(.system(size: mainFont, weight: .black, design: .monospaced))
                 .foregroundColor(Color(.systemGray3))
         } else {
-            // Size fonts off cardHeight so the rows grow on tall
-            // cards. Two clamps:
-            //   - value: 20–90pt (3 lines @ ~22% of height each;
-            //     capped at 90pt so the "+X.XXs" text fits the
-            //     ~410pt-wide cards we see in single-row layouts).
-            //   - label: 14–34pt independent cap so "S1/S2/S3" stays
-            //     a subtle identifier and doesn't crowd out the
-            //     value when cardHeight is large.
-            let valueFont: CGFloat = max(20, min(90, cardHeight * 0.22))
-            let labelFont: CGFloat = max(14, min(34, valueFont * 0.5))
-            VStack(spacing: 0) {
-                ForEach([1, 2, 3], id: \.self) { n in
-                    deltaSectorsLine(sectorIdx: n, valueFont: valueFont, labelFont: labelFont)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // GeometryReader so we can size fonts off both the actual
+            // width AND height of the card body. Earlier versions used
+            // only cardHeight and the value text was overflowing
+            // narrow-tall cards (portrait layouts) → SwiftUI fell back
+            // to truncation despite minimumScaleFactor, leaving the
+            // pilot with "+0..." in place of the actual delta.
+            //
+            // Width budget for the value text "+X.XXs" (6 chars,
+            // monospaced, char width ≈ 0.6×fontSize):
+            //   value text width ≈ font × 0.6 × 6 = font × 3.6
+            //   We want it ≤ ~70% of available width to leave room
+            //   for the label + spacer + horizontal padding.
+            //   → font ≤ 0.7 × width / 3.6 ≈ width × 0.19
+            //
+            // The 90pt overall cap is tuned so the card looks balanced
+            // in single-row layouts where 3 cards span the full screen.
+            GeometryReader { geo in
+                let w = geo.size.width
+                let h = geo.size.height
+                let valueFont: CGFloat = max(20, min(90, min(h * 0.22, w * 0.19)))
+                let labelFont: CGFloat = max(14, min(28, valueFont * 0.4))
+                VStack(spacing: 0) {
+                    ForEach([1, 2, 3], id: \.self) { n in
+                        deltaSectorsLine(sectorIdx: n, valueFont: valueFont, labelFont: labelFont)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, 6 * scale)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.horizontal, 6 * scale)
         }
     }
 
@@ -729,25 +741,19 @@ struct DriverCardView: View {
                 .font(.system(size: labelFont, weight: .semibold))
                 .foregroundColor(.gray)
                 .lineLimit(1)
-                // No minWidth — let the label hug its content so the
-                // value gets all remaining horizontal room.
+                .fixedSize(horizontal: true, vertical: false)
             Spacer(minLength: 4)
-            // layoutPriority pulls the value to its natural width before
-            // the label, so on narrow cards the value renders fully and
-            // minimumScaleFactor only kicks in if it still overflows.
             if let d = r?.deltaMs, let isMine = r?.isMine {
                 let sign = d < 0 ? "-" : "+"
                 Text("\(sign)\(String(format: "%.2fs", abs(d) / 1000))")
                     .font(.system(size: valueFont, weight: .black, design: .monospaced))
                     .foregroundColor(isMine ? .green : .red)
-                    .minimumScaleFactor(0.4)
+                    .minimumScaleFactor(0.5)
                     .lineLimit(1)
-                    .layoutPriority(1)
             } else {
                 Text("—")
                     .font(.system(size: valueFont, weight: .black, design: .monospaced))
                     .foregroundColor(Color(.systemGray3))
-                    .layoutPriority(1)
             }
         }
     }

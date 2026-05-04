@@ -786,32 +786,41 @@ private fun DeltaSectorsContent(
         return
     }
 
-    // Two independent clamps so the label stays a subtle identifier
-    // even on very tall cards: value 20-90sp (3 lines @ ~22% of height
-    // each, capped to leave width for the "+X.XXs" string), label
-    // 14-34sp (capped low because "S1/S2/S3" is just a row guide,
-    // not the focal element).
-    val valueFontSize = (cardHeight.value * 0.22f).coerceIn(20f, 90f)
-    val labelFontSize = (valueFontSize * 0.5f).coerceIn(14f, 34f)
-    val valueFontSp = valueFontSize.sp
-    val labelFontSp = labelFontSize.sp
+    // BoxWithConstraints so the value font respects BOTH the actual
+    // width AND height of the card body. Sizing only off cardHeight
+    // overflowed narrow-tall cards (portrait), where the "+X.XXs"
+    // text didn't fit and Compose truncated to "+0..." despite the
+    // value being the focal element.
+    //
+    // Width budget for "+X.XXs" (6 chars, monospaced, char width ≈
+    // 0.6×fontSize): value text ≈ font × 3.6, target ≤ ~70% of
+    // available width to leave room for label + spacer + padding.
+    // → font ≤ 0.7 × width / 3.6 ≈ width × 0.19
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val w = maxWidth.value
+        val h = maxHeight.value
+        val valueFontSize = minOf(h * 0.22f, w * 0.19f).coerceIn(20f, 90f)
+        val labelFontSize = (valueFontSize * 0.4f).coerceIn(14f, 28f)
+        val valueFontSp = valueFontSize.sp
+        val labelFontSp = labelFontSize.sp
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = (6f * scale).dp),
-    ) {
-        for (n in 1..3) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center,
-            ) {
-                DeltaSectorsLine(
-                    sectorIdx = n, raceVM = raceVM,
-                    labelFontSp = labelFontSp, valueFontSp = valueFontSp,
-                )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = (6f * scale).dp),
+        ) {
+            for (n in 1..3) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    DeltaSectorsLine(
+                        sectorIdx = n, raceVM = raceVM,
+                        labelFontSp = labelFontSp, valueFontSp = valueFontSp,
+                    )
+                }
             }
         }
     }
