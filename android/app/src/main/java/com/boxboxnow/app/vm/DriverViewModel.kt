@@ -101,20 +101,32 @@ class DriverViewModel @Inject constructor(
         // pilot hears narration the moment a preset with audio=true is applied.
         speech.enabled = _audioEnabled.value
 
-        // Migrate newly-added cards into the cached order/visible maps
+        // Migrate newly-added cards into the cached order/visible maps.
+        // Centralized so we can re-run after applyPreset (which would
+        // otherwise wipe newer cards out of cardOrder when a preset
+        // saved before the new cards is applied).
+        migrateMissingCards()
+    }
+
+    /** Append any `DriverCard.entries` key that isn't already in
+     *  `_cardOrder`, defaulting `_visibleCards` for the new entries to
+     *  "on for standard cards, off for GPS-required". Idempotent —
+     *  safe to call from init, after applyPreset, or from any other
+     *  path that overwrites cardOrder/visibleCards from external data
+     *  (e.g. a stale preset fetched from the backend). */
+    private fun migrateMissingCards() {
         val allKeys = DriverCard.entries.map { it.key }
         val missing = allKeys.filterNot { it in _cardOrder.value }
-        if (missing.isNotEmpty()) {
-            _cardOrder.value = _cardOrder.value + missing
-            val newVisible = _visibleCards.value.toMutableMap()
-            for (key in missing) {
-                if (newVisible[key] == null) {
-                    DriverCard.fromKey(key)?.let { newVisible[key] = !it.requiresGPS }
-                }
+        if (missing.isEmpty()) return
+        _cardOrder.value = _cardOrder.value + missing
+        val newVisible = _visibleCards.value.toMutableMap()
+        for (key in missing) {
+            if (newVisible[key] == null) {
+                DriverCard.fromKey(key)?.let { newVisible[key] = !it.requiresGPS }
             }
-            _visibleCards.value = newVisible
-            saveConfig()
         }
+        _visibleCards.value = newVisible
+        saveConfig()
     }
 
     fun saveConfig() {
@@ -218,6 +230,12 @@ class DriverViewModel @Inject constructor(
             _audioEnabled.value = it
             speech.enabled = it
         }
+        // Stale presets (saved before newer cards existed) don't carry
+        // their keys in cardOrder. `orderedVisibleCards` iterates
+        // cardOrder so a missing entry would silently never render —
+        // re-run the migration to append any DriverCard entries that
+        // didn't make it into the preset's snapshot.
+        migrateMissingCards()
         saveConfig()
     }
 

@@ -53,26 +53,12 @@ final class DriverViewModel: ObservableObject {
         }
 
         // Migrate cached config: ensure any newly-added DriverCard cases
-        // (e.g. pitCount, currentPit) are appended to cardOrder and visibleCards
-        // so they show up for users who had a cached config from before the new
-        // cards existed. Without this the `orderedVisibleCards` iteration would
-        // never yield them because `cardOrder` wouldn't contain their rawValue.
-        let allIds = DriverCard.allCases.map { $0.rawValue }
-        let missing = allIds.filter { !cardOrder.contains($0) }
-        if !missing.isEmpty {
-            cardOrder.append(contentsOf: missing)
-            for id in missing where visibleCards[id] == nil {
-                // Default: visible for standard cards, off for GPS-only cards
-                if let card = DriverCard(rawValue: id) {
-                    visibleCards[id] = !card.requiresGPS
-                }
-            }
-            // Persist immediately so the migration is sticky
-            if let data = try? JSONEncoder().encode(visibleCards) {
-                defaults.set(data, forKey: Constants.Keys.visibleCards)
-            }
-            defaults.set(cardOrder, forKey: Constants.Keys.cardOrder)
-        }
+        // are appended to cardOrder + visibleCards so they show up for
+        // pilots who had a cached config from before the new cards
+        // existed. Centralized in `migrateMissingCards()` so we can
+        // re-run it after `applyPreset` (which would otherwise wipe
+        // newer cards out of cardOrder when a stale preset is applied).
+        migrateMissingCards()
 
         // Load persisted finish line for GPS lap tracking
         lapTracker.loadFinishLine()
@@ -138,7 +124,35 @@ final class DriverViewModel: ObservableObject {
             orientationLock = lock
         }
         if let a = preset.audioEnabled { audioEnabled = a }
+        // Stale presets (saved before newer cards existed) don't carry
+        // their rawValues in cardOrder. `orderedVisibleCards` iterates
+        // cardOrder so a missing entry would silently never render —
+        // re-run the migration to append any DriverCard cases that
+        // didn't make it into the preset's snapshot.
+        migrateMissingCards()
         saveConfig()
+    }
+
+    /// Append any `DriverCard.allCases` rawValue that isn't already in
+    /// `cardOrder`, defaulting `visibleCards` for the new entries to
+    /// "on for standard cards, off for GPS-required". Idempotent —
+    /// safe to call from init, after applyPreset, or after any other
+    /// path that overwrites cardOrder/visibleCards from external data.
+    private func migrateMissingCards() {
+        let allIds = DriverCard.allCases.map { $0.rawValue }
+        let missing = allIds.filter { !cardOrder.contains($0) }
+        guard !missing.isEmpty else { return }
+        cardOrder.append(contentsOf: missing)
+        for id in missing where visibleCards[id] == nil {
+            if let card = DriverCard(rawValue: id) {
+                visibleCards[id] = !card.requiresGPS
+            }
+        }
+        // Persist immediately so the migration is sticky across launches.
+        if let data = try? JSONEncoder().encode(visibleCards) {
+            defaults.set(data, forKey: Constants.Keys.visibleCards)
+        }
+        defaults.set(cardOrder, forKey: Constants.Keys.cardOrder)
     }
 
     func saveAsPreset(name: String, isDefault: Bool = false) async throws {

@@ -238,12 +238,19 @@ export const useDriverConfig = create<DriverConfig>((set, get) => ({
   },
 
   applyPreset: (visibleCards, cardOrder) => {
-    set({ visibleCards, cardOrder });
+    // Stale presets (saved before newer cards existed) don't carry
+    // their ids in cardOrder. validateCardOrder appends any missing
+    // DEFAULT_CARD_ORDER ids so the new cards still render after a
+    // preset apply — and we backfill `visibleCards` with the
+    // defaultVisible value for entries the preset didn't include.
+    const fixedOrder = validateCardOrder(cardOrder);
+    const fixedVisible = { ...defaultVisible, ...visibleCards };
+    set({ visibleCards: fixedVisible, cardOrder: fixedOrder });
     saveLocalConfig(_currentUserId, get());
-    _pendingUpdate.visible_cards = visibleCards;
-    _pendingUpdate.card_order = cardOrder;
+    _pendingUpdate.visible_cards = fixedVisible;
+    _pendingUpdate.card_order = fixedOrder;
     scheduleSave();
-    broadcastDriverConfig({ visibleCards, cardOrder });
+    broadcastDriverConfig({ visibleCards: fixedVisible, cardOrder: fixedOrder });
   },
 
   hydrateForUser: (userId) => {
