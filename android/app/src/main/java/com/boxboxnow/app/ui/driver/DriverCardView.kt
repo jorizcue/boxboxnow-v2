@@ -786,12 +786,15 @@ private fun DeltaSectorsContent(
         return
     }
 
-    // ~22% of card height per line keeps the value visually dominant
-    // without bumping into the line above/below. Clamped to 20–120dp
-    // so small grid cells don't wrap and tall cards don't blow up.
-    val valueFontSize = (cardHeight.value * 0.22f).coerceIn(20f, 120f)
+    // Two independent clamps so the label stays a subtle identifier
+    // even on very tall cards: value 20-90sp (3 lines @ ~22% of height
+    // each, capped to leave width for the "+X.XXs" string), label
+    // 14-34sp (capped low because "S1/S2/S3" is just a row guide,
+    // not the focal element).
+    val valueFontSize = (cardHeight.value * 0.22f).coerceIn(20f, 90f)
+    val labelFontSize = (valueFontSize * 0.5f).coerceIn(14f, 34f)
     val valueFontSp = valueFontSize.sp
-    val labelFontSp = (valueFontSize * 0.7f).sp
+    val labelFontSp = labelFontSize.sp
 
     Column(
         modifier = Modifier
@@ -830,12 +833,14 @@ private fun DeltaSectorsLine(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Label hugs its content (no minWidth) so the value gets all
+        // remaining horizontal room on narrow cards.
         Text(
             "S$sectorIdx",
             color = BoxBoxNowColors.SystemGray,
             fontSize = labelFontSp,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.widthIn(min = (labelFontSp.value * 1.4f).dp),
+            maxLines = 1,
         )
         Spacer(Modifier.weight(1f))
         if (r != null) {

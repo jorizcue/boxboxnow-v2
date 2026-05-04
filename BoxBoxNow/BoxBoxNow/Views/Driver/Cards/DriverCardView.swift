@@ -696,15 +696,16 @@ struct DriverCardView: View {
                 .font(.system(size: mainFont, weight: .black, design: .monospaced))
                 .foregroundColor(Color(.systemGray3))
         } else {
-            // Size the value font directly off cardHeight so the rows
-            // grow when the pilot lays the three-sector card alone in
-            // a single row of the grid (where `scale` caps at 2× and
-            // `mainFont * 1.0` leaves dead space top/bottom). With 3
-            // stacked lines getting an equal vertical share, ~22% of
-            // card height per line keeps the value visually dominant
-            // without bumping into the line above/below.
-            let valueFont: CGFloat = max(20, min(120, cardHeight * 0.22))
-            let labelFont: CGFloat = valueFont * 0.7
+            // Size fonts off cardHeight so the rows grow on tall
+            // cards. Two clamps:
+            //   - value: 20–90pt (3 lines @ ~22% of height each;
+            //     capped at 90pt so the "+X.XXs" text fits the
+            //     ~410pt-wide cards we see in single-row layouts).
+            //   - label: 14–34pt independent cap so "S1/S2/S3" stays
+            //     a subtle identifier and doesn't crowd out the
+            //     value when cardHeight is large.
+            let valueFont: CGFloat = max(20, min(90, cardHeight * 0.22))
+            let labelFont: CGFloat = max(14, min(34, valueFont * 0.5))
             VStack(spacing: 0) {
                 ForEach([1, 2, 3], id: \.self) { n in
                     deltaSectorsLine(sectorIdx: n, valueFont: valueFont, labelFont: labelFont)
@@ -723,23 +724,30 @@ struct DriverCardView: View {
     @ViewBuilder
     private func deltaSectorsLine(sectorIdx n: Int, valueFont: CGFloat, labelFont: CGFloat) -> some View {
         let r = raceVM.sectorDelta(ourKartNumber: ourKartNumber, sectorIdx: n)
-        HStack(spacing: 8 * scale) {
+        HStack(spacing: 6 * scale) {
             Text("S\(n)")
                 .font(.system(size: labelFont, weight: .semibold))
                 .foregroundColor(.gray)
-                .frame(minWidth: labelFont * 1.4, alignment: .leading)
-            Spacer(minLength: 0)
+                .lineLimit(1)
+                // No minWidth — let the label hug its content so the
+                // value gets all remaining horizontal room.
+            Spacer(minLength: 4)
+            // layoutPriority pulls the value to its natural width before
+            // the label, so on narrow cards the value renders fully and
+            // minimumScaleFactor only kicks in if it still overflows.
             if let d = r?.deltaMs, let isMine = r?.isMine {
                 let sign = d < 0 ? "-" : "+"
                 Text("\(sign)\(String(format: "%.2fs", abs(d) / 1000))")
                     .font(.system(size: valueFont, weight: .black, design: .monospaced))
                     .foregroundColor(isMine ? .green : .red)
-                    .minimumScaleFactor(0.5)
+                    .minimumScaleFactor(0.4)
                     .lineLimit(1)
+                    .layoutPriority(1)
             } else {
                 Text("—")
                     .font(.system(size: valueFont, weight: .black, design: .monospaced))
                     .foregroundColor(Color(.systemGray3))
+                    .layoutPriority(1)
             }
         }
     }
