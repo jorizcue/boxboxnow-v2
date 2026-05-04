@@ -241,17 +241,21 @@ function renderSectorDeltaCard(
     : myKart.bestS3Ms;
   const isMine = leader.kartNumber === myKart.kartNumber;
 
-  // Margin (when leader): runner-up best minus my best — positive = my lead.
-  // Deficit (when not leader): my latest pass minus field-best — positive = my gap.
+  // Delta carries its own sign. When I lead the sector, it's
+  // `myBest - secondBest` which is negative (I'm faster); shown in
+  // green with a "-" prefix. When I'm trailing, `myCurrent -
+  // fieldBest` is positive (I'm slower); shown in red with "+".
+  // The sign + color pair makes leader vs trailer state unambiguous
+  // without a star icon.
   let deltaMs: number | null = null;
   if (isMine) {
     if (myBest && myBest > 0 && leader.secondBestMs && leader.secondBestMs > 0) {
-      deltaMs = leader.secondBestMs - myBest;
+      deltaMs = myBest - leader.secondBestMs;  // negative
     } else {
       deltaMs = 0;  // Only kart with sectors → no margin to show
     }
   } else if (myCurrent && myCurrent > 0) {
-    deltaMs = myCurrent - leader.bestMs;
+    deltaMs = myCurrent - leader.bestMs;  // positive
   }
 
   if (deltaMs === null) {
@@ -277,23 +281,23 @@ function renderSectorDeltaCard(
     return `#${leader.kartNumber}`;
   })();
 
+  // Layout: large delta biased toward the top of the card, leader
+  // name (when not me) at the bottom, with empty middle space that
+  // expands when the cards are stretched into a single tall row.
+  // Mirrors the iOS / Android sector-card layout.
+  const sign = deltaMs < 0 ? "-" : "+";
   return {
     label,
     accent,
     content: (
-      <div className="flex flex-col items-center">
-        <div className="flex items-baseline gap-1">
-          {isMine && (
-            <span className="text-yellow-400 text-2xl sm:text-3xl leading-none" title="Lider">★</span>
-          )}
-          <span className={`text-3xl sm:text-4xl font-mono font-black leading-none ${
-            isMine ? "text-green-400" : "text-red-400"
-          }`}>
-            +{(Math.abs(deltaMs) / 1000).toFixed(2)}s
-          </span>
-        </div>
+      <div className="flex flex-col items-center justify-between h-full py-1 w-full">
+        <span className={`text-4xl sm:text-5xl font-mono font-black leading-none ${
+          isMine ? "text-green-400" : "text-red-400"
+        }`}>
+          {sign}{(Math.abs(deltaMs) / 1000).toFixed(2)}s
+        </span>
         {!isMine && (
-          <span className="text-[9px] sm:text-[10px] text-neutral-400 uppercase tracking-wider mt-1 truncate max-w-full">
+          <span className="text-xs sm:text-sm text-neutral-300 uppercase tracking-wide font-semibold text-center px-1 line-clamp-2">
             {leaderLabel}
           </span>
         )}

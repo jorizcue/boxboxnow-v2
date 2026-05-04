@@ -503,22 +503,25 @@ private fun CardContent(
             )
         }
         // ── Sector cards ──
-        // Sign convention: ALWAYS positive numbers, color encodes
-        // good/bad. When I'm the leader (green + star) the value
-        // shown is my margin over the runner-up. When I'm not the
-        // leader (red) it's my deficit vs the field-best. The star
-        // on green makes "I'm fastest" unmistakable at a glance.
+        // The displayed delta carries its own sign: green-minus when
+        // I'm the field leader (`myBest - secondBest` is negative —
+        // I'm faster), red-plus when I'm trailing (`myCurrent -
+        // fieldBest` is positive — I'm slower). The sign + color
+        // pair disambiguates at a glance, so no star icon is needed.
         DriverCard.DeltaBestS1 -> SectorDeltaContent(
             sectorIdx = 1, hasSectors = hasSectors, sectorMeta = sectorMeta,
-            ourKart = ourKart, mainFont = mainFont, smallFont = smallFont, scale = scale,
+            ourKart = ourKart, mainFont = mainFont, bigFont = bigFont,
+            smallFont = smallFont, scale = scale,
         )
         DriverCard.DeltaBestS2 -> SectorDeltaContent(
             sectorIdx = 2, hasSectors = hasSectors, sectorMeta = sectorMeta,
-            ourKart = ourKart, mainFont = mainFont, smallFont = smallFont, scale = scale,
+            ourKart = ourKart, mainFont = mainFont, bigFont = bigFont,
+            smallFont = smallFont, scale = scale,
         )
         DriverCard.DeltaBestS3 -> SectorDeltaContent(
             sectorIdx = 3, hasSectors = hasSectors, sectorMeta = sectorMeta,
-            ourKart = ourKart, mainFont = mainFont, smallFont = smallFont, scale = scale,
+            ourKart = ourKart, mainFont = mainFont, bigFont = bigFont,
+            smallFont = smallFont, scale = scale,
         )
         DriverCard.TheoreticalBestLap -> TheoreticalBestLapContent(
             hasSectors = hasSectors, ourKart = ourKart,
@@ -531,9 +534,15 @@ private fun CardContent(
  *  field-best from `sectorMeta` (which carries the runner-up's bestMs).
  *  Three states:
  *    1. Session has no sectors / no kart yet / no field-best → "--"
- *    2. I'm the field-best holder → ★ + green "+X.XXs" (margin to 2nd)
+ *    2. I'm the field-best holder → green "-X.XXs" (margin to 2nd)
  *    3. Not the holder → red "+X.XXs" + "#K Team / Driver"
- *  Mirrors iOS DriverCardView.sectorDeltaContent exactly. */
+ *
+ *  Layout: the (large) delta is biased toward the top of the card and
+ *  the leader name toward the bottom, so the empty middle space scales
+ *  with card height — this is what makes the card readable when the
+ *  three sector cards are stacked into a single tall row. Fonts scale
+ *  with card height via the existing `scale` factor; minimumScaleFactor
+ *  on the delta backstops the narrow-card case. */
 @Composable
 private fun SectorDeltaContent(
     sectorIdx: Int,
@@ -541,6 +550,7 @@ private fun SectorDeltaContent(
     sectorMeta: SectorMeta?,
     ourKart: KartState?,
     mainFont: TextUnit,
+    bigFont: TextUnit,
     smallFont: TextUnit,
     scale: Float,
 ) {
@@ -562,15 +572,15 @@ private fun SectorDeltaContent(
     }
     val isMine = leader.kartNumber == ourKart.kartNumber
 
-    // When I'm the holder, margin is computed off MY best (stable
-    // across the session). If there's no runner-up yet (only me with
-    // a sector time), margin is 0 — still rendered green + star.
-    // When I'm not the holder, deficit uses CURRENT (latest pass), so
-    // the card is reactive to each lap's sector pace.
+    // Delta carries its own sign. When I lead the sector,
+    // `myBest - secondBest` is negative (faster); shown in green with
+    // a "-" prefix. When I'm trailing, `myCurrent - fieldBest` is
+    // positive (slower); shown in red with "+". The sign + color
+    // pair makes the leader/trailer state unambiguous without a star.
     val deltaMs: Double? = if (isMine) {
         val mb = myBest
         val sb = leader.secondBestMs
-        if (mb != null && mb > 0 && sb != null && sb > 0) sb - mb else 0.0
+        if (mb != null && mb > 0 && sb != null && sb > 0) mb - sb else 0.0
     } else if (myCurrent != null && myCurrent > 0) {
         myCurrent - leader.bestMs
     } else null
@@ -580,32 +590,33 @@ private fun SectorDeltaContent(
         return
     }
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (isMine) {
-                Icon(
-                    Icons.Filled.Star,
-                    contentDescription = "Lider",
-                    tint = Color(0xFFFFCC00),
-                    modifier = Modifier.size((mainFont.value * 0.65f).dp),
-                )
-                Spacer(Modifier.width(2.dp))
-            }
-            MonoValue(
-                "+%.2fs".format(abs(deltaMs) / 1000),
-                if (isMine) Color(0xFF30D158) else Color(0xFFFF453A),
-                mainFont,
-            )
-        }
+    val signText = if (deltaMs < 0) "-" else "+"
+    val deltaFontSp = (bigFont.value * 1.15f).sp
+    val leaderFontSp = (mainFont.value * 0.62f).sp
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(vertical = (4f * scale).dp),
+    ) {
+        MonoValue(
+            "$signText%.2fs".format(abs(deltaMs) / 1000),
+            if (isMine) Color(0xFF30D158) else Color(0xFFFF453A),
+            deltaFontSp,
+        )
+        Spacer(Modifier.weight(1f))
         if (!isMine) {
             Text(
                 leaderLabel(leader),
                 color = BoxBoxNowColors.SystemGray,
-                fontSize = smallFont,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                softWrap = false,
+                fontSize = leaderFontSp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                softWrap = true,
                 overflow = TextOverflow.Ellipsis,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.padding(horizontal = (4f * scale).dp),
             )
         }
     }

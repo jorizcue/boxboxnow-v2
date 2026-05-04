@@ -593,14 +593,14 @@ struct DriverCardView: View {
                 .foregroundColor(Color(.systemGray3))
         } else {
             let isMine = (kart?.kartNumber == leader!.kartNumber)
-            // Sign convention: ALWAYS positive numbers, color encodes
-            // good/bad. When I'm the leader (green + star) the value
-            // shown is my margin over the runner-up — a positive lead.
-            // When I'm not the leader (red) the value is my deficit
-            // vs the field-best — a positive gap. Star icon plus green
-            // makes "I'm fastest" visually unmistakable without needing
-            // a minus sign that would read as "less time" but feels
-            // counter-intuitive at a glance for pilots.
+            // Sign convention: the displayed delta carries its own
+            // sign. When I lead the sector, the value is `myBest -
+            // secondBest` which is negative (I'm faster); shown in
+            // green. When I'm behind, `myCurrent - fieldBest` is
+            // positive (I'm slower); shown in red. Pilots read the
+            // sign + color together: green-minus = "ahead by", red-
+            // plus = "behind by". No star icon — the sign + color
+            // already disambiguate at a glance.
             let deltaMs: Double? = {
                 if isMine {
                     // Margin computed off MY best (stable across the
@@ -608,7 +608,7 @@ struct DriverCardView: View {
                     // with a sector time), margin is 0.
                     guard let myB = myBest, myB > 0 else { return 0 }
                     guard let second = leader!.secondBestMs, second > 0 else { return 0 }
-                    return second - myB  // positive — my lead
+                    return myB - second  // negative — I'm faster
                 } else {
                     // Deficit uses CURRENT (latest pass), so the card
                     // is reactive to each lap's sector pace.
@@ -618,28 +618,36 @@ struct DriverCardView: View {
             }()
 
             if let d = deltaMs {
-                VStack(spacing: 2 * scale) {
-                    HStack(spacing: 4 * scale) {
-                        if isMine {
-                            Image(systemName: "star.fill")
-                                .font(.system(size: mainFont * 0.65))
-                                .foregroundColor(.yellow)
-                        }
-                        Text("+\(String(format: "%.2fs", abs(d) / 1000))")
-                            .font(.system(size: mainFont, weight: .black, design: .monospaced))
-                            .foregroundColor(isMine ? .green : .red)
-                            .minimumScaleFactor(0.6)
-                            .lineLimit(1)
-                    }
+                // Layout uses Spacers to push the (large) delta to the
+                // upper portion of the card and the leader name to the
+                // lower portion — pilot mentioned the cards have lots
+                // of dead space when laid out in a single row, so we
+                // bias the content toward the edges and bump font
+                // sizes so the delta + leader label both read at a
+                // glance. Fonts scale with the card via the existing
+                // `scale` factor; minimumScaleFactor backstops the
+                // narrow-card case so nothing wraps awkwardly.
+                let signText = d < 0 ? "-" : "+"
+                VStack(spacing: 0) {
+                    Spacer().frame(height: 4 * scale)
+                    Text("\(signText)\(String(format: "%.2fs", abs(d) / 1000))")
+                        .font(.system(size: bigFont * 1.15, weight: .black, design: .monospaced))
+                        .foregroundColor(isMine ? .green : .red)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
                     if !isMine, let l = leader {
-                        let label = leaderLabel(for: l)
-                        Text(label)
-                            .font(.system(size: smallFont, weight: .medium))
+                        Text(leaderLabel(for: l))
+                            .font(.system(size: mainFont * 0.62, weight: .semibold))
                             .foregroundColor(.gray)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.55)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                            .minimumScaleFactor(0.6)
+                            .padding(.horizontal, 4 * scale)
+                        Spacer().frame(height: 4 * scale)
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Text("--")
                     .font(.system(size: mainFont, weight: .black, design: .monospaced))
