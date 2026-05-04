@@ -272,34 +272,48 @@ function renderSectorDeltaCard(
     ? "from-green-500/25 to-green-500/5 border-green-400/50"
     : "from-red-500/25 to-red-500/5 border-red-400/50";
 
-  const leaderLabel = (() => {
+  const leaderName = (() => {
     const t = (leader.teamName ?? "").trim();
     const d = (leader.driverName ?? "").trim();
-    if (t && d) return `#${leader.kartNumber} ${t}/${d}`;
-    if (t) return `#${leader.kartNumber} ${t}`;
-    if (d) return `#${leader.kartNumber} ${d}`;
-    return `#${leader.kartNumber}`;
+    if (t && d) return `${t}/${d}`;
+    if (t) return t;
+    if (d) return d;
+    return "";
   })();
 
-  // Layout: large delta biased toward the top of the card, leader
-  // name (when not me) at the bottom, with empty middle space that
-  // expands when the cards are stretched into a single tall row.
-  // Mirrors the iOS / Android sector-card layout.
+  // Layout: three flex spacers split the card into roughly thirds —
+  // top empty, delta in upper third, mid empty, leader-block (kart
+  // number on line 1, team/driver on line 2) in lower third, bottom
+  // empty. Anchors the delta a bit below the title while keeping the
+  // leader info readable above the bottom edge. Mirrors iOS /
+  // Android sector-card layout.
   const sign = deltaMs < 0 ? "-" : "+";
   return {
     label,
     accent,
     content: (
-      <div className="flex flex-col items-center justify-between h-full py-1 w-full">
+      <div className="flex flex-col items-center h-full w-full">
+        <div className="flex-1" />
         <span className={`text-4xl sm:text-5xl font-mono font-black leading-none ${
           isMine ? "text-green-400" : "text-red-400"
         }`}>
           {sign}{(Math.abs(deltaMs) / 1000).toFixed(2)}s
         </span>
+        <div className="flex-1" />
         {!isMine && (
-          <span className="text-xs sm:text-sm text-neutral-300 uppercase tracking-wide font-semibold text-center px-1 line-clamp-2">
-            {leaderLabel}
-          </span>
+          <>
+            <div className="flex flex-col items-center text-center px-1">
+              <span className="text-base sm:text-lg text-neutral-300 font-bold leading-tight">
+                #{leader.kartNumber}
+              </span>
+              {leaderName && (
+                <span className="text-xs sm:text-sm text-neutral-300 uppercase tracking-wide font-semibold leading-tight line-clamp-2 mt-0.5">
+                  {leaderName}
+                </span>
+              )}
+            </div>
+            <div className="flex-1" />
+          </>
         )}
       </div>
     ),

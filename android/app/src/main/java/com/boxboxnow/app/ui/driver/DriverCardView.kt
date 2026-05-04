@@ -592,14 +592,21 @@ private fun SectorDeltaContent(
 
     val signText = if (deltaMs < 0) "-" else "+"
     val deltaFontSp = (bigFont.value * 1.15f).sp
-    val leaderFontSp = (mainFont.value * 0.62f).sp
+    val kartFontSp = (mainFont.value * 0.85f).sp
+    val nameFontSp = (mainFont.value * 0.62f).sp
 
+    // Three Spacer(weight=1) entries split the available height into
+    // roughly thirds: top empty, delta in upper third, mid empty,
+    // leader-block (kart # on line 1, team/driver on line 2) in
+    // lower third, bottom empty. Anchors the delta a bit below the
+    // title and keeps the leader info readable above the bottom edge.
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .fillMaxSize()
             .padding(vertical = (4f * scale).dp),
     ) {
+        Spacer(Modifier.weight(1f))
         MonoValue(
             "$signText%.2fs".format(abs(deltaMs) / 1000),
             if (isMine) Color(0xFF30D158) else Color(0xFFFF453A),
@@ -608,23 +615,37 @@ private fun SectorDeltaContent(
         Spacer(Modifier.weight(1f))
         if (!isMine) {
             Text(
-                leaderLabel(leader),
+                "#${leader.kartNumber}",
                 color = BoxBoxNowColors.SystemGray,
-                fontSize = leaderFontSp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                softWrap = true,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.padding(horizontal = (4f * scale).dp),
+                fontSize = kartFontSp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
             )
+            val name = leaderName(leader)
+            if (name.isNotEmpty()) {
+                Text(
+                    name,
+                    color = BoxBoxNowColors.SystemGray,
+                    fontSize = nameFontSp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    softWrap = true,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = (4f * scale).dp),
+                )
+            }
+            Spacer(Modifier.weight(1f))
         }
     }
 }
 
 /** "#K Team/Driver" label for the field-best holder. Falls back
  *  gracefully when team/driver names are missing (some circuits
- *  populate only one of the two columns). */
+ *  populate only one of the two columns). Reserved for any future
+ *  single-line accessibility / TalkBack rendering — visual layout
+ *  uses `leaderName(leader)` so kart # and name render on separate
+ *  lines. */
 private fun leaderLabel(leader: SectorBest): String {
     val t = (leader.teamName ?: "").trim()
     val d = (leader.driverName ?: "").trim()
@@ -633,6 +654,22 @@ private fun leaderLabel(leader: SectorBest): String {
         t.isNotEmpty() -> "#${leader.kartNumber} $t"
         d.isNotEmpty() -> "#${leader.kartNumber} $d"
         else -> "#${leader.kartNumber}"
+    }
+}
+
+/** Just the team / driver name portion (no kart prefix), used as
+ *  the second line of the sector-card leader block. Returns "" when
+ *  neither team nor driver is populated; the caller drops the second
+ *  Text in that case so the kart number isn't followed by a blank
+ *  line. */
+private fun leaderName(leader: SectorBest): String {
+    val t = (leader.teamName ?: "").trim()
+    val d = (leader.driverName ?: "").trim()
+    return when {
+        t.isNotEmpty() && d.isNotEmpty() -> "$t/$d"
+        t.isNotEmpty() -> t
+        d.isNotEmpty() -> d
+        else -> ""
     }
 }
 

@@ -618,33 +618,42 @@ struct DriverCardView: View {
             }()
 
             if let d = deltaMs {
-                // Layout uses Spacers to push the (large) delta to the
-                // upper portion of the card and the leader name to the
-                // lower portion — pilot mentioned the cards have lots
-                // of dead space when laid out in a single row, so we
-                // bias the content toward the edges and bump font
-                // sizes so the delta + leader label both read at a
-                // glance. Fonts scale with the card via the existing
-                // `scale` factor; minimumScaleFactor backstops the
-                // narrow-card case so nothing wraps awkwardly.
+                // Three Spacers split the available vertical space
+                // into roughly thirds: top empty, delta in upper third,
+                // mid empty, leader-block (kart # + name on separate
+                // lines) in lower third, bottom empty. This keeps the
+                // delta visually anchored a bit below the title while
+                // keeping the leader info readable above the bottom
+                // edge. The two-line leader block is more legible at
+                // a glance than the single-line "#K Team/Driver" we
+                // had before.
                 let signText = d < 0 ? "-" : "+"
                 VStack(spacing: 0) {
-                    Spacer().frame(height: 4 * scale)
+                    Spacer()
                     Text("\(signText)\(String(format: "%.2fs", abs(d) / 1000))")
                         .font(.system(size: bigFont * 1.15, weight: .black, design: .monospaced))
                         .foregroundColor(isMine ? .green : .red)
                         .minimumScaleFactor(0.5)
                         .lineLimit(1)
-                    Spacer(minLength: 0)
+                    Spacer()
                     if !isMine, let l = leader {
-                        Text(leaderLabel(for: l))
-                            .font(.system(size: mainFont * 0.62, weight: .semibold))
-                            .foregroundColor(.gray)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.center)
-                            .minimumScaleFactor(0.6)
-                            .padding(.horizontal, 4 * scale)
-                        Spacer().frame(height: 4 * scale)
+                        VStack(spacing: 2 * scale) {
+                            Text("#\(l.kartNumber)")
+                                .font(.system(size: mainFont * 0.85, weight: .bold))
+                                .foregroundColor(.gray)
+                                .lineLimit(1)
+                            let name = leaderName(for: l)
+                            if !name.isEmpty {
+                                Text(name)
+                                    .font(.system(size: mainFont * 0.62, weight: .semibold))
+                                    .foregroundColor(.gray)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.center)
+                                    .minimumScaleFactor(0.6)
+                            }
+                        }
+                        .padding(.horizontal, 4 * scale)
+                        Spacer()
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -658,7 +667,9 @@ struct DriverCardView: View {
 
     /// "#K Team/Driver" label for the field-best holder. Falls back
     /// gracefully when team/driver names are missing (some circuits
-    /// only populate one of the two columns).
+    /// only populate one of the two columns). Used by the
+    /// accessibility text — visual rendering uses `leaderName(for:)`
+    /// to render the kart number and the name on separate lines.
     private func leaderLabel(for leader: SectorBest) -> String {
         let t = (leader.teamName ?? "").trimmingCharacters(in: .whitespaces)
         let d = (leader.driverName ?? "").trimmingCharacters(in: .whitespaces)
@@ -666,6 +677,19 @@ struct DriverCardView: View {
         if !t.isEmpty { return "#\(leader.kartNumber) \(t)" }
         if !d.isEmpty { return "#\(leader.kartNumber) \(d)" }
         return "#\(leader.kartNumber)"
+    }
+
+    /// Just the team / driver name portion (no kart prefix), used as
+    /// the second line of the sector-card leader block. Returns an
+    /// empty string when neither team nor driver is populated, in
+    /// which case the visual layout drops the second line entirely.
+    private func leaderName(for leader: SectorBest) -> String {
+        let t = (leader.teamName ?? "").trimmingCharacters(in: .whitespaces)
+        let d = (leader.driverName ?? "").trimmingCharacters(in: .whitespaces)
+        if !t.isEmpty && !d.isEmpty { return "\(t)/\(d)" }
+        if !t.isEmpty { return t }
+        if !d.isEmpty { return d }
+        return ""
     }
 
     /// Theoretical best lap = sum of my session-long S1/S2/S3 PBs.
