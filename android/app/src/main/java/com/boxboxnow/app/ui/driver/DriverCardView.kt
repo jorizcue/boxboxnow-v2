@@ -518,22 +518,28 @@ private fun CardContent(
         // pair disambiguates at a glance, so no star icon is needed.
         DriverCard.DeltaBestS1 -> SectorDeltaContent(
             sectorIdx = 1, hasSectors = hasSectors, sectorMeta = sectorMeta,
-            ourKart = ourKart, mainFont = mainFont, bigFont = bigFont,
+            ourKart = ourKart, raceVM = raceVM, mainFont = mainFont, bigFont = bigFont,
             smallFont = smallFont, scale = scale,
         )
         DriverCard.DeltaBestS2 -> SectorDeltaContent(
             sectorIdx = 2, hasSectors = hasSectors, sectorMeta = sectorMeta,
-            ourKart = ourKart, mainFont = mainFont, bigFont = bigFont,
+            ourKart = ourKart, raceVM = raceVM, mainFont = mainFont, bigFont = bigFont,
             smallFont = smallFont, scale = scale,
         )
         DriverCard.DeltaBestS3 -> SectorDeltaContent(
             sectorIdx = 3, hasSectors = hasSectors, sectorMeta = sectorMeta,
-            ourKart = ourKart, mainFont = mainFont, bigFont = bigFont,
+            ourKart = ourKart, raceVM = raceVM, mainFont = mainFont, bigFont = bigFont,
             smallFont = smallFont, scale = scale,
         )
         DriverCard.TheoreticalBestLap -> TheoreticalBestLapContent(
             hasSectors = hasSectors, ourKart = ourKart,
             mainFont = mainFont, smallFont = smallFont,
+        )
+
+        // ── Δ Sectores: combined S1/S2/S3 deltas in 3 lines ──
+        DriverCard.DeltaSectors -> DeltaSectorsContent(
+            hasSectors = hasSectors, raceVM = raceVM,
+            mainFont = mainFont, scale = scale,
         )
 
         // ── Apex live timing: interval to kart in front ──
@@ -613,6 +619,7 @@ private fun SectorDeltaContent(
     hasSectors: Boolean,
     sectorMeta: SectorMeta?,
     ourKart: KartState?,
+    raceVM: RaceViewModel,
     mainFont: TextUnit,
     bigFont: TextUnit,
     smallFont: TextUnit,
@@ -624,35 +631,19 @@ private fun SectorDeltaContent(
         return
     }
 
-    val myCurrent = when (sectorIdx) {
-        1 -> ourKart.currentS1Ms
-        2 -> ourKart.currentS2Ms
-        else -> ourKart.currentS3Ms
-    }
-    val myBest = when (sectorIdx) {
-        1 -> ourKart.bestS1Ms
-        2 -> ourKart.bestS2Ms
-        else -> ourKart.bestS3Ms
-    }
-    val isMine = leader.kartNumber == ourKart.kartNumber
-
-    // Delta carries its own sign. When I lead the sector,
-    // `myBest - secondBest` is negative (faster); shown in green with
-    // a "-" prefix. When I'm trailing, `myCurrent - fieldBest` is
-    // positive (slower); shown in red with "+". The sign + color
-    // pair makes the leader/trailer state unambiguous without a star.
-    val deltaMs: Double? = if (isMine) {
-        val mb = myBest
-        val sb = leader.secondBestMs
-        if (mb != null && mb > 0 && sb != null && sb > 0) mb - sb else 0.0
-    } else if (myCurrent != null && myCurrent > 0) {
-        myCurrent - leader.bestMs
-    } else null
-
-    if (deltaMs == null) {
+    // Delta math centralized in RaceViewModel.sectorDelta — reused by
+    // the combined `Δ Sectores` card too. When I lead, `myBest -
+    // secondBest` is negative (faster) and renders green with a "-"
+    // prefix. When I'm trailing, `myCurrent - fieldBest` is positive
+    // and renders red with "+". Sign + color pair makes leader vs.
+    // trailer state unambiguous without a star icon.
+    val result = raceVM.sectorDelta(sectorIdx)
+    if (result == null) {
         MonoValue("--", BoxBoxNowColors.SystemGray3, mainFont)
         return
     }
+    val isMine = result.isMine
+    val deltaMs = result.deltaMs
 
     val signText = if (deltaMs < 0) "-" else "+"
     val deltaFontSp = (bigFont.value * 1.15f).sp
@@ -772,6 +763,81 @@ private fun TheoreticalBestLapContent(
         }
     }
 }
+
+/** Combined sector-delta card: 3 lines (S1/S2/S3), each with the
+ *  sector label on the left and the delta value on the right. Reuses
+ *  `RaceViewModel.sectorDelta(...)` so the math lives in a single
+ *  spot (shared with the per-sector cards). */
+@Composable
+private fun DeltaSectorsContent(
+    hasSectors: Boolean,
+    raceVM: RaceViewModel,
+    mainFont: TextUnit,
+    scale: Float,
+) {
+    if (!hasSectors) {
+        MonoValue("--", BoxBoxNowColors.SystemGray3, mainFont)
+        return
+    }
+
+    val labelFontSp = (mainFont.value * 0.7f).sp
+    val valueFontSp = (mainFont.value * 1.0f).sp
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = (6f * scale).dp),
+        verticalArrangement = Arrangement.spacedBy((4f * scale).dp, Alignment.CenterVertically),
+    ) {
+        for (n in 1..3) {
+            DeltaSectorsLine(
+                sectorIdx = n, raceVM = raceVM,
+                labelFontSp = labelFontSp, valueFontSp = valueFontSp, scale = scale,
+            )
+        }
+    }
+}
+
+/** One row of the combined sector-delta card: "S{n}" left, value
+ *  right (or "—" when there's no data yet for that sector). */
+@Composable
+private fun DeltaSectorsLine(
+    sectorIdx: Int,
+    raceVM: RaceViewModel,
+    labelFontSp: TextUnit,
+    valueFontSp: TextUnit,
+    scale: Float,
+) {
+    val r = raceVM.sectorDelta(sectorIdx)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "S$sectorIdx",
+            color = BoxBoxNowColors.SystemGray,
+            fontSize = labelFontSp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.widthIn(min = (mainFontMinWidth(labelFontSp)).dp),
+        )
+        Spacer(Modifier.weight(1f))
+        if (r != null) {
+            val sign = if (r.deltaMs < 0) "-" else "+"
+            MonoValue(
+                "$sign%.2fs".format(abs(r.deltaMs) / 1000),
+                if (r.isMine) Color(0xFF30D158) else Color(0xFFFF453A),
+                valueFontSp,
+            )
+        } else {
+            MonoValue("—", BoxBoxNowColors.SystemGray3, valueFontSp)
+        }
+    }
+}
+
+/** Tiny helper: minimum left-column width sized roughly to fit "S1"
+ *  at the row's label font size. Just enough to keep the value
+ *  column aligned across the three rows even on narrow cards. */
+private fun mainFontMinWidth(label: TextUnit): Float = label.value * 1.5f
 
 @Composable
 private fun MonoValue(text: String, color: Color, size: TextUnit) {

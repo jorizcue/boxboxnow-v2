@@ -559,6 +559,10 @@ struct DriverCardView: View {
         case .theoreticalBestLap:
             theoreticalBestLapContent
 
+        // ── Δ Sectores: combined S1/S2/S3 deltas in 3 lines ──
+        case .deltaSectors:
+            deltaSectorsContent
+
         // ── Apex live timing: interval to kart in front ──
         // myKart.interval IS the gap to the kart in front. Empty when
         // the local pilot leads the apex order — show "LIDER" sentinel
@@ -629,97 +633,100 @@ struct DriverCardView: View {
     ///   3. I'm not the holder → "+X.XXs" red + "#K Team / Driver"
     @ViewBuilder
     private func sectorDeltaContent(for sectorIdx: Int) -> some View {
+        // Cálculo del delta centralizado en RaceViewModel.sectorDelta —
+        // reutilizado por la card combinada `deltaSectors` (3 líneas
+        // S1/S2/S3 sin nombres de líder).
         let leader = raceVM.sectorMeta?.best(for: sectorIdx)
-        let myCurrent: Double? = {
-            switch sectorIdx {
-            case 1: return kart?.currentS1Ms
-            case 2: return kart?.currentS2Ms
-            case 3: return kart?.currentS3Ms
-            default: return nil
-            }
-        }()
-        let myBest: Double? = {
-            switch sectorIdx {
-            case 1: return kart?.bestS1Ms
-            case 2: return kart?.bestS2Ms
-            case 3: return kart?.bestS3Ms
-            default: return nil
-            }
-        }()
+        let result = raceVM.sectorDelta(ourKartNumber: ourKartNumber, sectorIdx: sectorIdx)
 
-        if !raceVM.hasSectors || leader == nil {
+        if !raceVM.hasSectors || leader == nil || result == nil {
             Text("--")
                 .font(.system(size: mainFont, weight: .black, design: .monospaced))
                 .foregroundColor(Color(.systemGray3))
         } else {
-            let isMine = (kart?.kartNumber == leader!.kartNumber)
-            // Sign convention: the displayed delta carries its own
-            // sign. When I lead the sector, the value is `myBest -
-            // secondBest` which is negative (I'm faster); shown in
-            // green. When I'm behind, `myCurrent - fieldBest` is
-            // positive (I'm slower); shown in red. Pilots read the
-            // sign + color together: green-minus = "ahead by", red-
-            // plus = "behind by". No star icon — the sign + color
-            // already disambiguate at a glance.
-            let deltaMs: Double? = {
-                if isMine {
-                    // Margin computed off MY best (stable across the
-                    // session). If there's no runner-up yet (only me
-                    // with a sector time), margin is 0.
-                    guard let myB = myBest, myB > 0 else { return 0 }
-                    guard let second = leader!.secondBestMs, second > 0 else { return 0 }
-                    return myB - second  // negative — I'm faster
-                } else {
-                    // Deficit uses CURRENT (latest pass), so the card
-                    // is reactive to each lap's sector pace.
-                    guard let cur = myCurrent, cur > 0 else { return nil }
-                    return cur - leader!.bestMs  // positive — my deficit
-                }
-            }()
-
-            if let d = deltaMs {
-                // Three Spacers split the available vertical space
-                // into roughly thirds: top empty, delta in upper third,
-                // mid empty, leader-block (kart # + name on separate
-                // lines) in lower third, bottom empty. This keeps the
-                // delta visually anchored a bit below the title while
-                // keeping the leader info readable above the bottom
-                // edge. The two-line leader block is more legible at
-                // a glance than the single-line "#K Team/Driver" we
-                // had before.
-                let signText = d < 0 ? "-" : "+"
-                VStack(spacing: 0) {
-                    Spacer()
-                    Text("\(signText)\(String(format: "%.2fs", abs(d) / 1000))")
-                        .font(.system(size: bigFont * 1.15, weight: .black, design: .monospaced))
-                        .foregroundColor(isMine ? .green : .red)
-                        .minimumScaleFactor(0.5)
-                        .lineLimit(1)
-                    Spacer()
-                    if !isMine, let l = leader {
-                        VStack(spacing: 2 * scale) {
-                            Text("#\(l.kartNumber)")
-                                .font(.system(size: mainFont * 0.85, weight: .bold))
+            let isMine = result!.isMine
+            let d = result!.deltaMs
+            // Three Spacers split the available vertical space into
+            // roughly thirds: top empty, delta in upper third, mid
+            // empty, leader-block (kart # + name on separate lines)
+            // in lower third, bottom empty. Keeps the delta visually
+            // anchored a bit below the title while keeping the leader
+            // info readable above the bottom edge.
+            let signText = d < 0 ? "-" : "+"
+            VStack(spacing: 0) {
+                Spacer()
+                Text("\(signText)\(String(format: "%.2fs", abs(d) / 1000))")
+                    .font(.system(size: bigFont * 1.15, weight: .black, design: .monospaced))
+                    .foregroundColor(isMine ? .green : .red)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+                Spacer()
+                if !isMine, let l = leader {
+                    VStack(spacing: 2 * scale) {
+                        Text("#\(l.kartNumber)")
+                            .font(.system(size: mainFont * 0.85, weight: .bold))
+                            .foregroundColor(.gray)
+                            .lineLimit(1)
+                        let name = leaderName(for: l)
+                        if !name.isEmpty {
+                            Text(name)
+                                .font(.system(size: mainFont * 0.62, weight: .semibold))
                                 .foregroundColor(.gray)
-                                .lineLimit(1)
-                            let name = leaderName(for: l)
-                            if !name.isEmpty {
-                                Text(name)
-                                    .font(.system(size: mainFont * 0.62, weight: .semibold))
-                                    .foregroundColor(.gray)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.center)
-                                    .minimumScaleFactor(0.6)
-                            }
+                                .lineLimit(2)
+                                .multilineTextAlignment(.center)
+                                .minimumScaleFactor(0.6)
                         }
-                        .padding(.horizontal, 4 * scale)
-                        Spacer()
                     }
+                    .padding(.horizontal, 4 * scale)
+                    Spacer()
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    /// Render del cuerpo de la card combinada `Δ Sectores` — 3 líneas
+    /// `S1/S2/S3` con etiqueta a la izquierda y delta a la derecha.
+    /// Reusa `RaceViewModel.sectorDelta(...)` así que la matemática
+    /// vive en un solo sitio (compartida con las cards individuales).
+    @ViewBuilder
+    private var deltaSectorsContent: some View {
+        if !raceVM.hasSectors {
+            Text("--")
+                .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                .foregroundColor(Color(.systemGray3))
+        } else {
+            VStack(spacing: 4 * scale) {
+                ForEach([1, 2, 3], id: \.self) { n in
+                    deltaSectorsLine(sectorIdx: n)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 6 * scale)
+        }
+    }
+
+    /// One row of the combined sector-delta card: "S{n}" left, value
+    /// right (or `—` when there's no data yet for that sector).
+    @ViewBuilder
+    private func deltaSectorsLine(sectorIdx n: Int) -> some View {
+        let r = raceVM.sectorDelta(ourKartNumber: ourKartNumber, sectorIdx: n)
+        HStack(spacing: 8 * scale) {
+            Text("S\(n)")
+                .font(.system(size: mainFont * 0.7, weight: .semibold))
+                .foregroundColor(.gray)
+                .frame(minWidth: mainFont * 1.2, alignment: .leading)
+            Spacer(minLength: 0)
+            if let d = r?.deltaMs, let isMine = r?.isMine {
+                let sign = d < 0 ? "-" : "+"
+                Text("\(sign)\(String(format: "%.2fs", abs(d) / 1000))")
+                    .font(.system(size: mainFont * 1.0, weight: .black, design: .monospaced))
+                    .foregroundColor(isMine ? .green : .red)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
             } else {
-                Text("--")
-                    .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                Text("—")
+                    .font(.system(size: mainFont * 1.0, weight: .black, design: .monospaced))
                     .foregroundColor(Color(.systemGray3))
             }
         }
@@ -906,6 +913,18 @@ struct DriverCardView: View {
                 return "Posicion Apex: P\(ap.pos) de \(ap.total)"
             }
             return "Posicion Apex: sin datos"
+        case .deltaSectors:
+            if !raceVM.hasSectors { return "Delta sectores: sin datos" }
+            var parts: [String] = []
+            for n in 1...3 {
+                if let r = raceVM.sectorDelta(ourKartNumber: ourKartNumber, sectorIdx: n) {
+                    let sign = r.deltaMs < 0 ? "menos" : "más"
+                    parts.append("S\(n) \(sign) \(String(format: "%.2f", abs(r.deltaMs) / 1000)) segundos")
+                } else {
+                    parts.append("S\(n) sin datos")
+                }
+            }
+            return "Delta sectores: \(parts.joined(separator: ", "))"
         }
     }
 

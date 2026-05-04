@@ -44,6 +44,12 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
     case deltaBestS2
     case deltaBestS3
     case theoreticalBestLap
+    /// Combined view of S1/S2/S3 deltas in three lines on a single
+    /// card — same colored-by-sign math as `deltaBestS1/2/3` but
+    /// without the leader's kart number / team / driver. Saves grid
+    /// real estate when the pilot wants the three-sector summary at
+    /// a glance.
+    case deltaSectors
     // Raw Apex live timing — these surface the values straight from
     // the live timing grid (column `data-type="int"` / `data-type="rk"`),
     // distinct from the existing `gapAhead`/`gapBehind`/`position` cards
@@ -99,6 +105,7 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .intervalAhead:  return "Intervalo kart delantero"
         case .intervalBehind: return "Intervalo kart trasero"
         case .apexPosition:   return "Posicion Apex"
+        case .deltaSectors:   return "Δ Sectores"
         }
     }
 
@@ -132,6 +139,7 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .intervalAhead:  return "chevron.up.2"
         case .intervalBehind: return "chevron.down.2"
         case .apexPosition:   return "list.number"
+        case .deltaSectors:   return "square.stack.3d.up.fill"
         }
     }
 
@@ -153,7 +161,7 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
     /// the config picker but show "--" in place of values.
     var requiresSectors: Bool {
         switch self {
-        case .deltaBestS1, .deltaBestS2, .deltaBestS3, .theoreticalBestLap:
+        case .deltaBestS1, .deltaBestS2, .deltaBestS3, .theoreticalBestLap, .deltaSectors:
             return true
         default:
             return false
@@ -191,6 +199,7 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .intervalAhead:  return "0.968s"
         case .intervalBehind: return "0.973s"
         case .apexPosition:   return "P4/12"
+        case .deltaSectors:   return "S1 -0.04s"
         }
     }
 
@@ -223,6 +232,7 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .intervalAhead:   return .red    // matches gapAhead semantics
         case .intervalBehind:  return .green  // matches gapBehind semantics
         case .apexPosition:    return .purple // distinct from "position" (.purple) and "realPos" (.accentColor)
+        case .deltaSectors:    return .yellow // same family as deltaBestS1/2/3
         }
     }
 

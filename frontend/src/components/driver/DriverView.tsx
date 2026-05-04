@@ -210,6 +210,45 @@ function useBoxAlert() {
 // icon on green = "you're the leader" — no minus sign needed for the
 // pilot to read it at a glance.
 
+/** Result of the sector-delta computation, shared by the per-sector
+ *  cards (`Δ Mejor Sn`) and the combined `Δ Sectores` card. `deltaMs`
+ *  is signed: negative when the local pilot leads the sector,
+ *  positive when trailing. `null` when there's no data yet. */
+type SectorDeltaResult = { deltaMs: number; isMine: boolean } | null;
+
+/** Pure cálculo del delta vs field-best para un sector concreto. */
+function computeSectorDelta(
+  sectorIdx: 1 | 2 | 3,
+  hasSectors: boolean,
+  sectorMeta: SectorMeta | null,
+  myKart: KartState | null,
+): SectorDeltaResult {
+  if (!hasSectors || !sectorMeta || !myKart) return null;
+  const leader = sectorIdx === 1 ? sectorMeta.s1
+    : sectorIdx === 2 ? sectorMeta.s2
+    : sectorMeta.s3;
+  if (!leader) return null;
+
+  const myCurrent = sectorIdx === 1 ? myKart.currentS1Ms
+    : sectorIdx === 2 ? myKart.currentS2Ms
+    : myKart.currentS3Ms;
+  const myBest = sectorIdx === 1 ? myKart.bestS1Ms
+    : sectorIdx === 2 ? myKart.bestS2Ms
+    : myKart.bestS3Ms;
+  const isMine = leader.kartNumber === myKart.kartNumber;
+
+  if (isMine) {
+    if (myBest && myBest > 0 && leader.secondBestMs && leader.secondBestMs > 0) {
+      return { deltaMs: myBest - leader.secondBestMs, isMine: true };  // negative
+    }
+    return { deltaMs: 0, isMine: true };  // only kart with sectors → no margin yet
+  }
+  if (myCurrent && myCurrent > 0) {
+    return { deltaMs: myCurrent - leader.bestMs, isMine: false };  // positive
+  }
+  return null;
+}
+
 function renderSectorDeltaCard(
   sectorIdx: 1 | 2 | 3,
   hasSectors: boolean,
@@ -222,8 +261,9 @@ function renderSectorDeltaCard(
   const leader = sectorMeta
     ? (sectorIdx === 1 ? sectorMeta.s1 : sectorIdx === 2 ? sectorMeta.s2 : sectorMeta.s3)
     : null;
+  const result = computeSectorDelta(sectorIdx, hasSectors, sectorMeta, myKart);
 
-  if (!hasSectors || !leader || !myKart) {
+  if (!hasSectors || !leader || !myKart || !result) {
     return {
       label,
       accent: stubAccent,
@@ -233,40 +273,7 @@ function renderSectorDeltaCard(
     };
   }
 
-  const myCurrent = sectorIdx === 1 ? myKart.currentS1Ms
-    : sectorIdx === 2 ? myKart.currentS2Ms
-    : myKart.currentS3Ms;
-  const myBest = sectorIdx === 1 ? myKart.bestS1Ms
-    : sectorIdx === 2 ? myKart.bestS2Ms
-    : myKart.bestS3Ms;
-  const isMine = leader.kartNumber === myKart.kartNumber;
-
-  // Delta carries its own sign. When I lead the sector, it's
-  // `myBest - secondBest` which is negative (I'm faster); shown in
-  // green with a "-" prefix. When I'm trailing, `myCurrent -
-  // fieldBest` is positive (I'm slower); shown in red with "+".
-  // The sign + color pair makes leader vs trailer state unambiguous
-  // without a star icon.
-  let deltaMs: number | null = null;
-  if (isMine) {
-    if (myBest && myBest > 0 && leader.secondBestMs && leader.secondBestMs > 0) {
-      deltaMs = myBest - leader.secondBestMs;  // negative
-    } else {
-      deltaMs = 0;  // Only kart with sectors → no margin to show
-    }
-  } else if (myCurrent && myCurrent > 0) {
-    deltaMs = myCurrent - leader.bestMs;  // positive
-  }
-
-  if (deltaMs === null) {
-    return {
-      label,
-      accent: stubAccent,
-      content: (
-        <span className="text-3xl sm:text-4xl font-mono font-black text-neutral-600 leading-none">--</span>
-      ),
-    };
-  }
+  const { deltaMs, isMine } = result;
 
   const accent = isMine
     ? "from-green-500/25 to-green-500/5 border-green-400/50"
@@ -356,6 +363,58 @@ function renderTheoreticalBestLapCard(
             Real: {msToLapTime(realBest)}
           </span>
         )}
+      </div>
+    ),
+  };
+}
+
+/** Combined sector-delta card: 3 lines (S1/S2/S3), each with the
+ *  sector label on the left and the delta value on the right. Reuses
+ *  `computeSectorDelta` so the math is shared with the per-sector
+ *  cards. Same red/green color logic; no leader name to keep the
+ *  card compact. */
+function renderDeltaSectorsCard(
+  hasSectors: boolean,
+  sectorMeta: SectorMeta | null,
+  myKart: KartState | null,
+): { label: string; content: React.ReactNode; accent: string } {
+  const label = "Δ Sectores";
+  const stubAccent = "from-neutral-500/15 to-neutral-500/5 border-neutral-500/30";
+  if (!hasSectors) {
+    return {
+      label,
+      accent: stubAccent,
+      content: (
+        <span className="text-3xl sm:text-4xl font-mono font-black text-neutral-600 leading-none">--</span>
+      ),
+    };
+  }
+  return {
+    label,
+    accent: "from-yellow-500/20 to-yellow-500/5 border-yellow-500/30",
+    content: (
+      <div className="flex flex-col items-stretch h-full w-full justify-center gap-1 sm:gap-1.5 px-2">
+        {([1, 2, 3] as const).map((n) => {
+          const r = computeSectorDelta(n, hasSectors, sectorMeta, myKart);
+          return (
+            <div key={n} className="flex items-center justify-between">
+              <span className="text-xs sm:text-sm font-semibold text-neutral-400 tracking-wide w-7">
+                S{n}
+              </span>
+              {r ? (
+                <span className={`text-lg sm:text-xl md:text-2xl font-mono font-black leading-none ${
+                  r.isMine ? "text-green-400" : "text-red-400"
+                }`}>
+                  {r.deltaMs < 0 ? "-" : "+"}{(Math.abs(r.deltaMs) / 1000).toFixed(2)}s
+                </span>
+              ) : (
+                <span className="text-lg sm:text-xl md:text-2xl font-mono font-black leading-none text-neutral-600">
+                  —
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     ),
   };
@@ -1271,6 +1330,7 @@ export function DriverView() {
     deltaBestS2: renderSectorDeltaCard(2, hasSectors, sectorMeta, ourKartObj),
     deltaBestS3: renderSectorDeltaCard(3, hasSectors, sectorMeta, ourKartObj),
     theoreticalBestLap: renderTheoreticalBestLapCard(hasSectors, ourKartObj),
+    deltaSectors: renderDeltaSectorsCard(hasSectors, sectorMeta, ourKartObj),
     // ── Raw Apex live timing cards ──
     // intervalAhead = myKart.interval (gap to kart in front per Apex)
     // intervalBehind = interval reported by kart at apexPos+1 (their gap to me)

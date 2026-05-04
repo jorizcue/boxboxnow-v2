@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AvTimer
+import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.FormatListNumbered
@@ -70,6 +71,14 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
     DeltaBestS2("deltaBestS2", "Δ Mejor S2", "-0.15s"),
     DeltaBestS3("deltaBestS3", "Δ Mejor S3", "+0.08s"),
     TheoreticalBestLap("theoreticalBestLap", "Vuelta teorica", "1:01.67"),
+    /** Combined view of S1/S2/S3 deltas in three lines on a single
+     *  card — same colored-by-sign math as DeltaBestS1/2/3 but
+     *  without the leader's kart number / team / driver. Saves grid
+     *  real estate when the pilot wants the three-sector summary at
+     *  a glance. Lives in the Carrera group alongside the individual
+     *  sector cards; auto-hides on circuits without sector telemetry
+     *  via `requiresGPS` is irrelevant — gated by hasSectors instead. */
+    DeltaSectors("deltaSectors", "Δ Sectores", "S1 -0.04s"),
     // Raw Apex live timing values — distinct from gapAhead/gapBehind
     // (which derive from the adjusted classification) and from Position
     // (avg-pace) / RealPos (adjusted). These surface the values straight
@@ -115,6 +124,7 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
         PitCount -> Color(0xFFFF9F0A)         // warningOrange
         CurrentPit -> Color(0xFF00BCD4)       // cyan
         DeltaBestS1, DeltaBestS2, DeltaBestS3 -> Color(0xFFFFCC00)  // yellow
+        DeltaSectors -> Color(0xFFFFCC00)     // yellow, same family as DeltaBestS1/2/3
         TheoreticalBestLap -> Color(0xFFFF4081)                     // pink
         IntervalAhead -> Color(0xFFFF453A)    // red, mirrors GapAhead
         IntervalBehind -> Color(0xFF30D158)   // green, mirrors GapBehind
@@ -150,6 +160,7 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
         IntervalAhead -> Icons.Filled.KeyboardDoubleArrowUp
         IntervalBehind -> Icons.Filled.KeyboardDoubleArrowDown
         ApexPosition -> Icons.Filled.FormatListNumbered
+        DeltaSectors -> Icons.Filled.ViewAgenda  // 3 stacked rows, matches the layout
     }
 
     companion object {

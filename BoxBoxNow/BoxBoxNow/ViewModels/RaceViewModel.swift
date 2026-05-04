@@ -238,6 +238,58 @@ final class RaceViewModel: ObservableObject {
         return s
     }
 
+    /// Result of computing the sector delta vs the field-best for a
+    /// given sector. `deltaMs` is signed: negative when the local
+    /// pilot leads the sector (= my best minus the runner-up's best,
+    /// so I'm faster), positive when trailing (= my latest pass minus
+    /// the field's best, so I'm slower). `isMine` flags the leader
+    /// case so the renderer can pick the right color and sign label
+    /// without re-running the same comparison.
+    struct SectorDelta {
+        let deltaMs: Double
+        let isMine: Bool
+    }
+
+    /// Pure cálculo del delta vs field-best para un sector concreto.
+    /// Centralized so the per-sector cards (`deltaBestS1/2/3`) and the
+    /// combined `deltaSectors` card don't duplicate the formula. Returns
+    /// `nil` when sectors aren't available for the active session, the
+    /// kart isn't on track yet, the field-best for the sector is empty,
+    /// or the local pilot doesn't have data for the sector yet.
+    func sectorDelta(ourKartNumber: Int, sectorIdx: Int) -> SectorDelta? {
+        guard hasSectors,
+              let leader = sectorMeta?.best(for: sectorIdx),
+              let kart = karts.first(where: { $0.kartNumber == ourKartNumber })
+        else { return nil }
+
+        let myCurrent: Double?
+        let myBest: Double?
+        switch sectorIdx {
+        case 1: myCurrent = kart.currentS1Ms; myBest = kart.bestS1Ms
+        case 2: myCurrent = kart.currentS2Ms; myBest = kart.bestS2Ms
+        case 3: myCurrent = kart.currentS3Ms; myBest = kart.bestS3Ms
+        default: return nil
+        }
+
+        let isMine = (kart.kartNumber == leader.kartNumber)
+        if isMine {
+            // Margin off MY best (stable across the session). When the
+            // runner-up hasn't logged a sector yet, render 0 — still
+            // green, conveys "leader without anyone close enough to
+            // measure".
+            guard let myB = myBest, myB > 0 else { return SectorDelta(deltaMs: 0, isMine: true) }
+            guard let second = leader.secondBestMs, second > 0 else {
+                return SectorDelta(deltaMs: 0, isMine: true)
+            }
+            return SectorDelta(deltaMs: myB - second, isMine: true)
+        } else {
+            // Deficit uses CURRENT (latest pass) so the value reacts
+            // to each sector crossing.
+            guard let cur = myCurrent, cur > 0 else { return nil }
+            return SectorDelta(deltaMs: cur - leader.bestMs, isMine: false)
+        }
+    }
+
     /// Laps to max stint — web: lines 433-459
     struct StintCalc {
         let lapsToMax: Double?

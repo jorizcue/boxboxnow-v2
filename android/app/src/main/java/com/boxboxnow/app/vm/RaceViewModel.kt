@@ -288,6 +288,50 @@ class RaceViewModel @Inject constructor(
         return if (s.toDoubleOrNull() != null) "${s}s" else s
     }
 
+    /** Result of computing the sector delta vs the field-best for a
+     *  given sector. `deltaMs` is signed: negative when the local
+     *  pilot leads the sector (myBest − secondBest), positive when
+     *  trailing (myCurrent − fieldBest). `isMine` flags the leader
+     *  case so the renderer can pick the right color/sign label
+     *  without re-running the same comparison. */
+    data class SectorDelta(val deltaMs: Double, val isMine: Boolean)
+
+    /** Pure cálculo del delta vs field-best para un sector concreto.
+     *  Centralizado para que las cards individuales (DeltaBestS1/2/3)
+     *  y la card combinada (DeltaSectors, 3 líneas en una sola
+     *  tarjeta) compartan la fórmula sin duplicación. Devuelve `null`
+     *  cuando no hay datos suficientes (sectores no expuestos en el
+     *  circuito, kart no localizado, sin field-best aún o sin valor
+     *  del piloto local para ese sector). */
+    fun sectorDelta(sectorIdx: Int): SectorDelta? {
+        if (!_hasSectors.value) return null
+        val ourKart = _ourKartNumber.value
+        if (ourKart <= 0) return null
+        val leader = _sectorMeta.value?.bestFor(sectorIdx) ?: return null
+        val kart = _karts.value.firstOrNull { it.kartNumber == ourKart } ?: return null
+
+        val (myCurrent, myBest) = when (sectorIdx) {
+            1 -> kart.currentS1Ms to kart.bestS1Ms
+            2 -> kart.currentS2Ms to kart.bestS2Ms
+            3 -> kart.currentS3Ms to kart.bestS3Ms
+            else -> return null
+        }
+
+        val isMine = kart.kartNumber == leader.kartNumber
+        return if (isMine) {
+            val mb = myBest
+            val sb = leader.secondBestMs
+            // Margin off MY best (stable). Without runner-up, render 0.
+            val d = if (mb != null && mb > 0 && sb != null && sb > 0) mb - sb else 0.0
+            SectorDelta(d, isMine = true)
+        } else {
+            // Deficit uses CURRENT (latest pass) so the value reacts to
+            // each sector crossing.
+            if (myCurrent != null && myCurrent > 0) SectorDelta(myCurrent - leader.bestMs, isMine = false)
+            else null
+        }
+    }
+
     data class StintCalc(val lapsToMax: Double?, val realMaxStintMin: Double?)
 
     fun computeStintCalc(clockMs: Double = 0.0): StintCalc {
