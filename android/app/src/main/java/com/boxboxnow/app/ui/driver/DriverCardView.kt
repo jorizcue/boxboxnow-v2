@@ -1,5 +1,10 @@
 package com.boxboxnow.app.ui.driver
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -32,9 +37,13 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import com.boxboxnow.app.models.DriverCard
 import com.boxboxnow.app.models.GPSSample
 import com.boxboxnow.app.models.KartState
+import com.boxboxnow.app.models.SectorBest
+import com.boxboxnow.app.models.SectorMeta
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.util.Formatters
 import com.boxboxnow.app.vm.RaceViewModel
@@ -62,6 +71,8 @@ fun DriverCardView(
     deltaBestMs: Double?,
     gps: GPSSample?,
     boxScore: Int,
+    hasSectors: Boolean,
+    sectorMeta: SectorMeta?,
     cardHeight: Dp,
     modifier: Modifier = Modifier,
 ) {
@@ -138,6 +149,8 @@ fun DriverCardView(
                     deltaBestMs = deltaBestMs,
                     gps = gps,
                     boxScore = boxScore,
+                    hasSectors = hasSectors,
+                    sectorMeta = sectorMeta,
                     mainFont = mainFont,
                     bigFont = bigFont,
                     subFont = subFont,
@@ -220,6 +233,8 @@ private fun CardContent(
     deltaBestMs: Double?,
     gps: GPSSample?,
     boxScore: Int,
+    hasSectors: Boolean,
+    sectorMeta: SectorMeta?,
     mainFont: TextUnit,
     bigFont: TextUnit,
     subFont: TextUnit,
@@ -485,6 +500,162 @@ private fun CardContent(
                 color = BoxBoxNowColors.SystemGray,
                 fontSize = mainFont,
                 fontWeight = FontWeight.Black,
+            )
+        }
+        // ── Sector cards ──
+        // Sign convention: ALWAYS positive numbers, color encodes
+        // good/bad. When I'm the leader (green + star) the value
+        // shown is my margin over the runner-up. When I'm not the
+        // leader (red) it's my deficit vs the field-best. The star
+        // on green makes "I'm fastest" unmistakable at a glance.
+        DriverCard.DeltaBestS1 -> SectorDeltaContent(
+            sectorIdx = 1, hasSectors = hasSectors, sectorMeta = sectorMeta,
+            ourKart = ourKart, mainFont = mainFont, smallFont = smallFont, scale = scale,
+        )
+        DriverCard.DeltaBestS2 -> SectorDeltaContent(
+            sectorIdx = 2, hasSectors = hasSectors, sectorMeta = sectorMeta,
+            ourKart = ourKart, mainFont = mainFont, smallFont = smallFont, scale = scale,
+        )
+        DriverCard.DeltaBestS3 -> SectorDeltaContent(
+            sectorIdx = 3, hasSectors = hasSectors, sectorMeta = sectorMeta,
+            ourKart = ourKart, mainFont = mainFont, smallFont = smallFont, scale = scale,
+        )
+        DriverCard.TheoreticalBestLap -> TheoreticalBestLapContent(
+            hasSectors = hasSectors, ourKart = ourKart,
+            mainFont = mainFont, smallFont = smallFont,
+        )
+    }
+}
+
+/** Render the "Δ Best Sn" body. Reads `kart.currentSnMs` and the
+ *  field-best from `sectorMeta` (which carries the runner-up's bestMs).
+ *  Three states:
+ *    1. Session has no sectors / no kart yet / no field-best → "--"
+ *    2. I'm the field-best holder → ★ + green "+X.XXs" (margin to 2nd)
+ *    3. Not the holder → red "+X.XXs" + "#K Team / Driver"
+ *  Mirrors iOS DriverCardView.sectorDeltaContent exactly. */
+@Composable
+private fun SectorDeltaContent(
+    sectorIdx: Int,
+    hasSectors: Boolean,
+    sectorMeta: SectorMeta?,
+    ourKart: KartState?,
+    mainFont: TextUnit,
+    smallFont: TextUnit,
+    scale: Float,
+) {
+    val leader = sectorMeta?.bestFor(sectorIdx)
+    if (!hasSectors || leader == null || ourKart == null) {
+        MonoValue("--", BoxBoxNowColors.SystemGray3, mainFont)
+        return
+    }
+
+    val myCurrent = when (sectorIdx) {
+        1 -> ourKart.currentS1Ms
+        2 -> ourKart.currentS2Ms
+        else -> ourKart.currentS3Ms
+    }
+    val myBest = when (sectorIdx) {
+        1 -> ourKart.bestS1Ms
+        2 -> ourKart.bestS2Ms
+        else -> ourKart.bestS3Ms
+    }
+    val isMine = leader.kartNumber == ourKart.kartNumber
+
+    // When I'm the holder, margin is computed off MY best (stable
+    // across the session). If there's no runner-up yet (only me with
+    // a sector time), margin is 0 — still rendered green + star.
+    // When I'm not the holder, deficit uses CURRENT (latest pass), so
+    // the card is reactive to each lap's sector pace.
+    val deltaMs: Double? = if (isMine) {
+        val mb = myBest
+        val sb = leader.secondBestMs
+        if (mb != null && mb > 0 && sb != null && sb > 0) sb - mb else 0.0
+    } else if (myCurrent != null && myCurrent > 0) {
+        myCurrent - leader.bestMs
+    } else null
+
+    if (deltaMs == null) {
+        MonoValue("--", BoxBoxNowColors.SystemGray3, mainFont)
+        return
+    }
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (isMine) {
+                Icon(
+                    Icons.Filled.Star,
+                    contentDescription = "Lider",
+                    tint = Color(0xFFFFCC00),
+                    modifier = Modifier.size((mainFont.value * 0.65f).dp),
+                )
+                Spacer(Modifier.width(2.dp))
+            }
+            MonoValue(
+                "+%.2fs".format(abs(deltaMs) / 1000),
+                if (isMine) Color(0xFF30D158) else Color(0xFFFF453A),
+                mainFont,
+            )
+        }
+        if (!isMine) {
+            Text(
+                leaderLabel(leader),
+                color = BoxBoxNowColors.SystemGray,
+                fontSize = smallFont,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** "#K Team/Driver" label for the field-best holder. Falls back
+ *  gracefully when team/driver names are missing (some circuits
+ *  populate only one of the two columns). */
+private fun leaderLabel(leader: SectorBest): String {
+    val t = (leader.teamName ?: "").trim()
+    val d = (leader.driverName ?: "").trim()
+    return when {
+        t.isNotEmpty() && d.isNotEmpty() -> "#${leader.kartNumber} $t/$d"
+        t.isNotEmpty() -> "#${leader.kartNumber} $t"
+        d.isNotEmpty() -> "#${leader.kartNumber} $d"
+        else -> "#${leader.kartNumber}"
+    }
+}
+
+/** Theoretical best lap = sum of MY session-long S1/S2/S3 PBs.
+ *  Falls back to "--" when any sector is missing. Below the time we
+ *  show the pilot's real best so they see how much pace they leave
+ *  on the table by not stringing together their best sectors. */
+@Composable
+private fun TheoreticalBestLapContent(
+    hasSectors: Boolean,
+    ourKart: KartState?,
+    mainFont: TextUnit,
+    smallFont: TextUnit,
+) {
+    val s1 = ourKart?.bestS1Ms ?: 0.0
+    val s2 = ourKart?.bestS2Ms ?: 0.0
+    val s3 = ourKart?.bestS3Ms ?: 0.0
+    val realBest = ourKart?.bestLapMs ?: 0.0
+
+    if (!hasSectors || s1 <= 0 || s2 <= 0 || s3 <= 0) {
+        MonoValue("--", BoxBoxNowColors.SystemGray3, mainFont)
+        return
+    }
+
+    val theoMs = s1 + s2 + s3
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        MonoValue(Formatters.msToLapTime(theoMs), Color(0xFFFF4081), mainFont)
+        if (realBest > 0) {
+            Text(
+                "Real: ${Formatters.msToLapTime(realBest)}",
+                color = BoxBoxNowColors.SystemGray,
+                fontSize = smallFont,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
             )
         }
     }

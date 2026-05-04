@@ -25,5 +25,11 @@ object Constants {
         const val BRIGHTNESS = "driver_brightness"
         const val AUDIO_ENABLED = "driver_audio_enabled"
         const val FINISH_LINE = "bbn_finish_line"
+        // Refresh rate (in Hz) for the GPS delta cards on the driver
+        // dashboard. The underlying deltaBestMs flow on LapTracker is
+        // recomputed at the RaceBox sample rate (~50Hz); this only
+        // controls how often the on-screen number changes. Allowed
+        // values: 1, 2, 4. Matches iOS Constants.Keys.gpsDeltaRefreshHz.
+        const val GPS_DELTA_REFRESH_HZ = "gps_delta_refresh_hz"
     }
 }

@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.boxboxnow.app.imu.ImuCalibrator
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
+import com.boxboxnow.app.vm.DriverViewModel
 import com.boxboxnow.app.vm.GpsSource
 import com.boxboxnow.app.vm.GpsViewModel
 
@@ -57,6 +58,10 @@ import com.boxboxnow.app.vm.GpsViewModel
 @Composable
 fun GpsConfigScreen(onBack: () -> Unit) {
     val vm: GpsViewModel = hiltViewModel()
+    // Picker for the GPS delta refresh rate (1/2/4 Hz) lives in
+    // DriverViewModel so the delta cards can observe the same flow
+    // and re-sample their value stream live without a restart.
+    val driverVM: DriverViewModel = hiltViewModel()
     val source by vm.source.collectAsState()
     val isConnected by vm.isConnected.collectAsState()
     val signal by vm.signalQuality.collectAsState()
@@ -68,6 +73,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
     val battery by vm.bleManager.batteryPercent.collectAsState()
     val calibratorPhase by vm.calibrator.phase.collectAsState()
     val calibratorProgress by vm.calibrator.progress.collectAsState()
+    val deltaRefreshHz by driverVM.gpsDeltaRefreshHz.collectAsState()
 
     Scaffold(
         containerColor = Color.Black,
@@ -253,6 +259,53 @@ fun GpsConfigScreen(onBack: () -> Unit) {
 
             // The phone GPS source is no longer selectable — the entire
             // "GPS del telefono" section is intentionally removed.
+
+            // ── Section: Pantalla (delta refresh rate, RaceBox-only) ──
+            // The delta cards on the driver dashboard render meaningful
+            // values only when a RaceBox is feeding samples, so the
+            // picker is hidden otherwise. The underlying delta on
+            // LapTracker is recomputed at the device sample rate
+            // (~50Hz); this only controls how often the visible Text
+            // flips. Mirrors iOS GPSConfigView.
+            if (source == GpsSource.RACEBOX) {
+                SectionCard(title = "Pantalla") {
+                    Text(
+                        "Frecuencia delta",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        listOf(1, 2, 4).forEach { hz ->
+                            FilterChip(
+                                selected = deltaRefreshHz == hz,
+                                onClick = { driverVM.setGpsDeltaRefreshHz(hz) },
+                                label = {
+                                    Text(
+                                        "$hz Hz",
+                                        fontWeight = if (deltaRefreshHz == hz) FontWeight.SemiBold else FontWeight.Normal,
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = BoxBoxNowColors.SystemGray4,
+                                    selectedLabelColor = Color.White,
+                                    containerColor = BoxBoxNowColors.SystemGray6,
+                                    labelColor = Color.White,
+                                ),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Cuantas veces por segundo se actualiza el delta en pantalla. Mas Hz = mas reactivo, pero el ultimo decimal puede bailar mas. 2 Hz es el equilibrio recomendado.",
+                        color = BoxBoxNowColors.SystemGray,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
 
             // ── Section: Estado (when source is not NONE) ──
             if (source != GpsSource.NONE) {

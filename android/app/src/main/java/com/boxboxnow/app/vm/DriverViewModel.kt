@@ -67,6 +67,16 @@ class DriverViewModel @Inject constructor(
     private val _gpsData = MutableStateFlow<GPSSample?>(null)
     val gpsData = _gpsData.asStateFlow()
 
+    /** Refresh rate (Hz) for the GPS delta cards on the driver dashboard.
+     *  Default 2 Hz, allowed values 1/2/4. The underlying delta on
+     *  LapTracker is recomputed at the RaceBox sample rate (~50Hz);
+     *  this only controls how often the on-screen number flips. The
+     *  driver-view sample()s the delta flow at this period to decouple
+     *  the visible Text from the parent's high-frequency recomposition,
+     *  matching iOS `.task(id: refreshHz)` decoupling. */
+    private val _gpsDeltaRefreshHz = MutableStateFlow(2)
+    val gpsDeltaRefreshHz = _gpsDeltaRefreshHz.asStateFlow()
+
     init {
         prefs.getString(Constants.Keys.VISIBLE_CARDS)?.let { raw ->
             runCatching {
@@ -80,6 +90,12 @@ class DriverViewModel @Inject constructor(
         _orientationLock.value = OrientationLock.from(prefs.getString(Constants.Keys.ORIENTATION))
         if (prefs.contains(Constants.Keys.AUDIO_ENABLED)) {
             _audioEnabled.value = prefs.getBoolean(Constants.Keys.AUDIO_ENABLED, true)
+        }
+        if (prefs.contains(Constants.Keys.GPS_DELTA_REFRESH_HZ)) {
+            // Clamp to the allowed set in case a future build expands or
+            // restricts the option range — defends against stale prefs.
+            val stored = prefs.getInt(Constants.Keys.GPS_DELTA_REFRESH_HZ, 2)
+            _gpsDeltaRefreshHz.value = if (stored in setOf(1, 2, 4)) stored else 2
         }
         // Keep the TTS service in sync with the persisted/preset flag so the
         // pilot hears narration the moment a preset with audio=true is applied.
@@ -110,6 +126,15 @@ class DriverViewModel @Inject constructor(
         prefs.putDouble(Constants.Keys.BRIGHTNESS, _brightness.value)
         prefs.putString(Constants.Keys.ORIENTATION, _orientationLock.value.raw)
         prefs.putBoolean(Constants.Keys.AUDIO_ENABLED, _audioEnabled.value)
+        prefs.putInt(Constants.Keys.GPS_DELTA_REFRESH_HZ, _gpsDeltaRefreshHz.value)
+    }
+
+    /** Set the GPS delta refresh rate (1/2/4 Hz). Persisted immediately
+     *  so the driver-view picks it up next time it opens. */
+    fun setGpsDeltaRefreshHz(hz: Int) {
+        if (hz !in setOf(1, 2, 4)) return
+        _gpsDeltaRefreshHz.value = hz
+        saveConfig()
     }
 
     fun setAudioEnabled(enabled: Boolean) {

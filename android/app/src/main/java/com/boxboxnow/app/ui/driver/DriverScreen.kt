@@ -4,6 +4,11 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -18,6 +23,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -55,6 +61,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.boxboxnow.app.models.DriverCard
 import com.boxboxnow.app.models.FinishLine
 import com.boxboxnow.app.models.GeoPoint
+import com.boxboxnow.app.models.SectorMeta
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.vm.AuthViewModel
 import com.boxboxnow.app.vm.ConfigViewModel
@@ -62,7 +69,9 @@ import com.boxboxnow.app.vm.DriverViewModel
 import com.boxboxnow.app.vm.GpsViewModel
 import com.boxboxnow.app.vm.OrientationLock
 import com.boxboxnow.app.vm.RaceViewModel
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.sample
 
 /**
  * The pilot view — mirrors iOS `DriverView`:
@@ -74,6 +83,7 @@ import kotlinx.coroutines.delay
  *   - Keeps the screen awake, forces brightness to max, applies orientation lock
  *   - Hides status bar / navigation bar for full-screen immersion
  */
+@OptIn(FlowPreview::class)
 @Composable
 fun DriverScreen(onBack: () -> Unit) {
     val driverVM: DriverViewModel = hiltViewModel()
@@ -92,7 +102,28 @@ fun DriverScreen(onBack: () -> Unit) {
     val boxCall by raceVM.boxCallActive.collectAsState()
     val lastLap by driverVM.lapTracker.lastLapMs.collectAsState()
     val bestLap by driverVM.lapTracker.bestLapMs.collectAsState()
-    val deltaBest by driverVM.lapTracker.deltaBestMs.collectAsState()
+
+    // GPS delta: sample the underlying flow at the user-configured rate
+    // so the visible Text only flips at 1/2/4 Hz, not at the RaceBox
+    // sample rate (~50 Hz). Without this the parent recomposes 50x/sec
+    // because LapTracker.deltaBestMs is a MutableStateFlow that emits
+    // per sample, causing the whole card grid to re-render and the
+    // last-decimal of the delta to flicker. Mirrors iOS
+    // `.task(id: refreshHz)` decoupling. `remember(refreshHz)` rebuilds
+    // the sampled flow when the pilot moves the picker so the cadence
+    // change applies live.
+    val refreshHz by driverVM.gpsDeltaRefreshHz.collectAsState()
+    val deltaBestSampled = remember(refreshHz) {
+        driverVM.lapTracker.deltaBestMs.sample(
+            (1000L / refreshHz.coerceAtLeast(1)).coerceAtLeast(50L)
+        )
+    }
+    val deltaBest by deltaBestSampled.collectAsState(
+        initial = driverVM.lapTracker.deltaBestMs.value,
+    )
+
+    val hasSectors by raceVM.hasSectors.collectAsState()
+    val sectorMeta by raceVM.sectorMeta.collectAsState()
     val orientation by driverVM.orientationLock.collectAsState()
     val audioEnabled by driverVM.audioEnabled.collectAsState()
     val brightness by driverVM.brightness.collectAsState()
@@ -295,6 +326,8 @@ fun DriverScreen(onBack: () -> Unit) {
                     deltaBestMs = deltaBest,
                     gps = gps,
                     boxScore = boxScore.toInt(),
+                    hasSectors = hasSectors,
+                    sectorMeta = sectorMeta,
                 )
             }
         }
@@ -422,6 +455,8 @@ private fun CardsGrid(
     deltaBestMs: Double?,
     gps: com.boxboxnow.app.models.GPSSample?,
     boxScore: Int,
+    hasSectors: Boolean,
+    sectorMeta: SectorMeta?,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isLandscape = maxWidth > maxHeight
@@ -460,6 +495,8 @@ private fun CardsGrid(
                                 deltaBestMs = deltaBestMs,
                                 gps = gps,
                                 boxScore = boxScore,
+                                hasSectors = hasSectors,
+                                sectorMeta = sectorMeta,
                                 cardHeight = cardHeight,
                                 modifier = Modifier.weight(1f),
                             )
@@ -491,6 +528,8 @@ private fun CardsGrid(
                                 deltaBestMs = deltaBestMs,
                                 gps = gps,
                                 boxScore = boxScore,
+                                hasSectors = hasSectors,
+                                sectorMeta = sectorMeta,
                                 cardHeight = 90.dp,
                                 modifier = Modifier.weight(1f),
                             )

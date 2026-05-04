@@ -27,6 +27,9 @@ class PreferencesStore @Inject constructor(context: Context) {
     fun getBoolean(key: String, default: Boolean = false): Boolean =
         prefs.getBoolean(key, default)
 
+    fun putInt(key: String, value: Int) = prefs.edit { putInt(key, value) }
+    fun getInt(key: String, default: Int = 0): Int = prefs.getInt(key, default)
+
     fun putStringList(key: String, value: List<String>) = prefs.edit {
         putString(key, value.joinToString("\u0001"))
     }

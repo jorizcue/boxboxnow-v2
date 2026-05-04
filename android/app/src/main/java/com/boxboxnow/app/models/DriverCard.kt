@@ -3,11 +3,14 @@ package com.boxboxnow.app.models
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AvTimer
 import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.GpsFixed
+import androidx.compose.material.icons.filled.Looks3
 import androidx.compose.material.icons.filled.LooksOne
+import androidx.compose.material.icons.filled.LooksTwo
 import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material.icons.filled.MultilineChart
 import androidx.compose.material.icons.filled.OpenWith
@@ -54,11 +57,23 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
     LapsToMaxStint("lapsToMaxStint", "Vueltas hasta stint maximo", "5.2"),
     PitWindow("pitWindow", "Ventana de pit (open/closed)", "OPEN"),
     PitCount("pitCount", "PITS (realizados / minimos)", "2/4"),
-    CurrentPit("currentPit", "Pit en curso", "0:45");
+    CurrentPit("currentPit", "Pit en curso", "0:45"),
+    // Sector telemetry — only meaningful on circuits whose Apex grid
+    // declares `s1|s2|s3` columns. The cards self-handle the "no
+    // sector data" state with a "--" stub, so they're safe to leave
+    // visible by default. Live alongside the other race-pace cards
+    // in the Carrera group, matching the iOS layout.
+    DeltaBestS1("deltaBestS1", "Δ Mejor S1", "+0.21s"),
+    DeltaBestS2("deltaBestS2", "Δ Mejor S2", "-0.15s"),
+    DeltaBestS3("deltaBestS3", "Δ Mejor S3", "+0.08s"),
+    TheoreticalBestLap("theoreticalBestLap", "Vuelta teorica", "1:01.67");
 
     val group: DriverCardGroup get() = when (this) {
         BoxScore, PitCount, CurrentPit, PitWindow -> DriverCardGroup.BOX
         DeltaBestLap, GForceRadar, GpsLapDelta, GpsSpeed, GpsGForce -> DriverCardGroup.GPS
+        // Sector cards live alongside other race-pace cards rather
+        // than in their own group — pilots think of sector deltas as
+        // race telemetry, not a separate device feature.
         else -> DriverCardGroup.RACE
     }
 
@@ -89,6 +104,8 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
         PitWindow -> Color(0xFF30D158)        // successGreen
         PitCount -> Color(0xFFFF9F0A)         // warningOrange
         CurrentPit -> Color(0xFF00BCD4)       // cyan
+        DeltaBestS1, DeltaBestS2, DeltaBestS3 -> Color(0xFFFFCC00)  // yellow
+        TheoreticalBestLap -> Color(0xFFFF4081)                     // pink
     }
 
     val iconMaterial: ImageVector get() = when (this) {
@@ -113,6 +130,10 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
         PitWindow -> Icons.Filled.MeetingRoom
         PitCount -> Icons.Filled.LooksOne
         CurrentPit -> Icons.Filled.AvTimer
+        DeltaBestS1 -> Icons.Filled.LooksOne
+        DeltaBestS2 -> Icons.Filled.LooksTwo
+        DeltaBestS3 -> Icons.Filled.Looks3
+        TheoreticalBestLap -> Icons.Filled.AutoAwesome
     }
 
     companion object {

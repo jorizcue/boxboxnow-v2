@@ -3,6 +3,8 @@ package com.boxboxnow.app.vm
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.boxboxnow.app.models.KartState
+import com.boxboxnow.app.models.SectorBest
+import com.boxboxnow.app.models.SectorMeta
 import com.boxboxnow.app.net.WebSocketClient
 import com.boxboxnow.app.store.SecureTokenStore
 import com.boxboxnow.app.util.Constants
@@ -105,6 +107,22 @@ class RaceViewModel @Inject constructor(
 
     private val _minDriverTimeMin = MutableStateFlow(0.0)
     val minDriverTimeMin = _minDriverTimeMin.asStateFlow()
+
+    /** Whether the active session's Apex grid declares sector columns
+     *  (s1|s2|s3 data-types). Set true the first time we see a sector
+     *  payload from the backend in this session. The driver-view
+     *  sector cards check this flag to decide whether to render
+     *  data or a "--" stub. */
+    private val _hasSectors = MutableStateFlow(false)
+    val hasSectors = _hasSectors.asStateFlow()
+
+    /** Field-wide leader per sector (kart number + driver/team + bestMs
+     *  + 2nd best). Backend recomputes on every sector event and
+     *  bundles in snapshot/analytics frames + on update messages
+     *  whose batch contained a sector event. Null on circuits
+     *  without sector telemetry. */
+    private val _sectorMeta = MutableStateFlow<SectorMeta?>(null)
+    val sectorMeta = _sectorMeta.asStateFlow()
 
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
@@ -284,6 +302,22 @@ class RaceViewModel @Inject constructor(
                 }
 
                 (data["fifo"] as? JsonObject)?.get("score")?.asDoubleOrNull()?.let { _boxScore.value = it }
+
+                // Sector telemetry. CRITICAL: only overwrite when the
+                // keys are actually present in the payload — older
+                // backends (and edge cases like a cluster-only broadcast
+                // that doesn't bundle sectors) would otherwise reset
+                // hasSectors → false between every analytics tick,
+                // making the driver-view sector cards flicker to "--"
+                // every ~10-30s. Genuine clears come through
+                // `hasSectors: false` explicitly, which is what the
+                // backend sends on session change.
+                if (data.containsKey("hasSectors")) {
+                    _hasSectors.value = data["hasSectors"]?.asBoolOrNull() ?: false
+                }
+                if (data.containsKey("sectorMeta")) {
+                    _sectorMeta.value = parseSectorMeta(data["sectorMeta"])
+                }
             }
 
             "update" -> {
@@ -291,6 +325,17 @@ class RaceViewModel @Inject constructor(
                     (evt as? JsonObject)?.let { applyUpdateEvent(it) }
                 }
                 el["countdownMs"]?.asDoubleOrNull()?.let { recalibrate(it) }
+                // Backend bundles a fresh sectorMeta + hasSectors at the
+                // top level of update messages whose batch contained a
+                // sector event (skipped otherwise to save bandwidth).
+                // Same defensive containsKey check as above so unrelated
+                // updates don't wipe cached state.
+                if (el.containsKey("hasSectors")) {
+                    _hasSectors.value = el["hasSectors"]?.asBoolOrNull() ?: false
+                }
+                if (el.containsKey("sectorMeta")) {
+                    _sectorMeta.value = parseSectorMeta(el["sectorMeta"])
+                }
             }
 
             "fifo_update" -> {
@@ -400,10 +445,65 @@ class RaceViewModel @Inject constructor(
             )
             "driver" -> k.copy(driverName = evt["driverName"]?.jsonPrimitive?.contentOrNull ?: k.driverName)
             "team" -> k.copy(teamName = evt["teamName"]?.jsonPrimitive?.contentOrNull ?: k.teamName)
+            "sector" -> {
+                // Per-kart sector update. Backend also bundles a fresh
+                // sectorMeta at the top level of the same update message
+                // (handled in handleMessage) — this branch only updates
+                // the kart's own currentSnMs / bestSnMs so the live
+                // "Δ vs field-best" card reflects the latest sector
+                // pass for this specific pilot. sectorIdx is 1, 2 or 3
+                // — the SECTOR index, resolved by the backend from the
+                // grid's data-type, never from the cN column index.
+                val sectorIdx = evt["sectorIdx"]?.asIntOrNull()
+                val ms = evt["ms"]?.asDoubleOrNull()
+                if (sectorIdx == null || ms == null || ms <= 0.0) {
+                    k
+                } else when (sectorIdx) {
+                    1 -> k.copy(
+                        currentS1Ms = ms,
+                        bestS1Ms = if (k.bestS1Ms == null || ms < k.bestS1Ms) ms else k.bestS1Ms,
+                    )
+                    2 -> k.copy(
+                        currentS2Ms = ms,
+                        bestS2Ms = if (k.bestS2Ms == null || ms < k.bestS2Ms) ms else k.bestS2Ms,
+                    )
+                    3 -> k.copy(
+                        currentS3Ms = ms,
+                        bestS3Ms = if (k.bestS3Ms == null || ms < k.bestS3Ms) ms else k.bestS3Ms,
+                    )
+                    else -> k
+                }
+            }
             else -> k
         }
         current[idx] = updated
         _karts.value = current
+    }
+
+    /** Decode the `sectorMeta` payload (top-level field on snapshots,
+     *  analytics frames and on update messages whose batch contained a
+     *  sector event) into a strongly-typed `SectorMeta`. Returns null
+     *  when the backend reports `null` (circuit without sectors) or
+     *  the payload is malformed. */
+    private fun parseSectorMeta(el: JsonElement?): SectorMeta? {
+        val obj = el as? JsonObject ?: return null
+        fun decode(key: String): SectorBest? {
+            val inner = obj[key] as? JsonObject ?: return null
+            val bestMs = inner["bestMs"]?.asDoubleOrNull() ?: return null
+            val kartNumber = inner["kartNumber"]?.asIntOrNull() ?: return null
+            return SectorBest(
+                bestMs = bestMs,
+                kartNumber = kartNumber,
+                driverName = inner["driverName"]?.jsonPrimitive?.contentOrNull,
+                teamName = inner["teamName"]?.jsonPrimitive?.contentOrNull,
+                secondBestMs = inner["secondBestMs"]?.asDoubleOrNull(),
+            )
+        }
+        val s1 = decode("s1")
+        val s2 = decode("s2")
+        val s3 = decode("s3")
+        if (s1 == null && s2 == null && s3 == null) return null
+        return SectorMeta(s1, s2, s3)
     }
 }
 

@@ -129,6 +129,20 @@ data class KartState(
     val driverName: String? = null,
     val teamName: String? = null,
     val driverDifferentialMs: Double? = null,
+    // Sector times — only populated on circuits whose Apex grid declares
+    // `s1|s2|s3` data-type columns (Campillos, etc.). The "1/2/3" in the
+    // field names is the SECTOR index, not the column index — backend
+    // resolves the cN→sector mapping per-circuit from the live grid
+    // header. `currentSnMs` is the latest sector pass for this kart
+    // (drives the live "Δ vs field-best" indicator). `bestSnMs` is the
+    // kart's session-long PB per sector, used for the theoretical-best-
+    // lap card.
+    val currentS1Ms: Double? = null,
+    val currentS2Ms: Double? = null,
+    val currentS3Ms: Double? = null,
+    val bestS1Ms: Double? = null,
+    val bestS2Ms: Double? = null,
+    val bestS3Ms: Double? = null,
 ) {
     val id: String get() = rowId ?: kartNumber.toString()
     val isInPit: Boolean get() = pitStatus == "in_pit"
@@ -139,6 +153,46 @@ data class KartState(
 
     val gapBehindMs: Double? get() =
         interval?.replace("s", "")?.trim()?.toDoubleOrNull()?.let { it * 1000 }
+}
+
+/**
+ * Field-wide leader for one sector. Sent by the backend inside
+ * `sectorMeta` on snapshot/analytics frames + on update messages whose
+ * batch contains a sector event. The `bestMs` is from the kart's
+ * session-long PB for that sector — not the latest pass — so the
+ * indicator stays stable while the kart laps. `secondBestMs` is the
+ * runner-up's session-long PB, used only when the local pilot IS the
+ * field-best holder so the driver-view card can display their margin
+ * over the chaser instead of always 0.00s.
+ */
+@Serializable
+data class SectorBest(
+    val bestMs: Double,
+    val kartNumber: Int,
+    val driverName: String? = null,
+    val teamName: String? = null,
+    val secondBestMs: Double? = null,
+)
+
+/**
+ * Field-wide sector leaders. Each `sN` is optional because a sector
+ * may not have any registered times yet (very first minute of the
+ * session). The whole `SectorMeta` is `null` on circuits without
+ * sector telemetry — clients gate the sector-related driver cards
+ * on the parallel `hasSectors` flag from the same payload.
+ */
+@Serializable
+data class SectorMeta(
+    val s1: SectorBest? = null,
+    val s2: SectorBest? = null,
+    val s3: SectorBest? = null,
+) {
+    fun bestFor(sectorIdx: Int): SectorBest? = when (sectorIdx) {
+        1 -> s1
+        2 -> s2
+        3 -> s3
+        else -> null
+    }
 }
 
 // ───────────────────────── GPS ─────────────────────────
