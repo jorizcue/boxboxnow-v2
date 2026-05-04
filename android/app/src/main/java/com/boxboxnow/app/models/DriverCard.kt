@@ -7,7 +7,10 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AvTimer
 import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.GpsFixed
+import androidx.compose.material.icons.filled.KeyboardDoubleArrowDown
+import androidx.compose.material.icons.filled.KeyboardDoubleArrowUp
 import androidx.compose.material.icons.filled.Looks3
 import androidx.compose.material.icons.filled.LooksOne
 import androidx.compose.material.icons.filled.LooksTwo
@@ -66,7 +69,14 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
     DeltaBestS1("deltaBestS1", "Δ Mejor S1", "+0.21s"),
     DeltaBestS2("deltaBestS2", "Δ Mejor S2", "-0.15s"),
     DeltaBestS3("deltaBestS3", "Δ Mejor S3", "+0.08s"),
-    TheoreticalBestLap("theoreticalBestLap", "Vuelta teorica", "1:01.67");
+    TheoreticalBestLap("theoreticalBestLap", "Vuelta teorica", "1:01.67"),
+    // Raw Apex live timing values — distinct from gapAhead/gapBehind
+    // (which derive from the adjusted classification) and from Position
+    // (avg-pace) / RealPos (adjusted). These surface the values straight
+    // from Apex's `data-type="int"` and `data-type="rk"` columns.
+    IntervalAhead("intervalAhead", "Intervalo kart delantero", "0.968s"),
+    IntervalBehind("intervalBehind", "Intervalo kart trasero", "0.973s"),
+    ApexPosition("apexPosition", "Posicion Apex", "P4/12");
 
     val group: DriverCardGroup get() = when (this) {
         BoxScore, PitCount, CurrentPit, PitWindow -> DriverCardGroup.BOX
@@ -106,6 +116,9 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
         CurrentPit -> Color(0xFF00BCD4)       // cyan
         DeltaBestS1, DeltaBestS2, DeltaBestS3 -> Color(0xFFFFCC00)  // yellow
         TheoreticalBestLap -> Color(0xFFFF4081)                     // pink
+        IntervalAhead -> Color(0xFFFF453A)    // red, mirrors GapAhead
+        IntervalBehind -> Color(0xFF30D158)   // green, mirrors GapBehind
+        ApexPosition -> Color(0xFF9C27B0)     // purple, distinct from RealPos accent
     }
 
     val iconMaterial: ImageVector get() = when (this) {
@@ -134,6 +147,9 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
         DeltaBestS2 -> Icons.Filled.LooksTwo
         DeltaBestS3 -> Icons.Filled.Looks3
         TheoreticalBestLap -> Icons.Filled.AutoAwesome
+        IntervalAhead -> Icons.Filled.KeyboardDoubleArrowUp
+        IntervalBehind -> Icons.Filled.KeyboardDoubleArrowDown
+        ApexPosition -> Icons.Filled.FormatListNumbered
     }
 
     companion object {

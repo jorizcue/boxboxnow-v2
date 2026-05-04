@@ -44,6 +44,13 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
     case deltaBestS2
     case deltaBestS3
     case theoreticalBestLap
+    // Raw Apex live timing — these surface the values straight from
+    // the live timing grid (column `data-type="int"` / `data-type="rk"`),
+    // distinct from the existing `gapAhead`/`gapBehind`/`position` cards
+    // that derive from the adjusted classification or avg-lap pace.
+    case intervalAhead   // Apex interval to kart in front (myKart.interval)
+    case intervalBehind  // Apex interval reported by the kart behind me
+    case apexPosition    // Raw Apex live timing position (e.g. "4/7")
 
     var id: String { rawValue }
 
@@ -89,6 +96,9 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .deltaBestS2:    return "Δ Mejor S2"
         case .deltaBestS3:    return "Δ Mejor S3"
         case .theoreticalBestLap: return "Vuelta teorica"
+        case .intervalAhead:  return "Intervalo kart delantero"
+        case .intervalBehind: return "Intervalo kart trasero"
+        case .apexPosition:   return "Posicion Apex"
         }
     }
 
@@ -119,6 +129,9 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .deltaBestS2:    return "2.circle.fill"
         case .deltaBestS3:    return "3.circle.fill"
         case .theoreticalBestLap: return "wand.and.stars"
+        case .intervalAhead:  return "chevron.up.2"
+        case .intervalBehind: return "chevron.down.2"
+        case .apexPosition:   return "list.number"
         }
     }
 
@@ -175,6 +188,9 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .deltaBestS2:    return "-0.15s"
         case .deltaBestS3:    return "+0.08s"
         case .theoreticalBestLap: return "1:01.67"
+        case .intervalAhead:  return "0.968s"
+        case .intervalBehind: return "0.973s"
+        case .apexPosition:   return "P4/12"
         }
     }
 
@@ -204,6 +220,9 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .currentPit:     return .cyan
         case .deltaBestS1, .deltaBestS2, .deltaBestS3: return .yellow
         case .theoreticalBestLap: return .pink
+        case .intervalAhead:   return .red    // matches gapAhead semantics
+        case .intervalBehind:  return .green  // matches gapBehind semantics
+        case .apexPosition:    return .purple // distinct from "position" (.purple) and "realPos" (.accentColor)
         }
     }
 

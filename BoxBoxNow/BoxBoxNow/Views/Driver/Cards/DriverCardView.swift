@@ -115,6 +115,16 @@ struct DriverCardView: View {
                 return "\(card.displayName) · V\(lapNum)"
             }
             return card.displayName
+        case .intervalAhead:
+            if let ahead = raceVM.apexNeighbor(ourKartNumber: ourKartNumber, offset: -1) {
+                return "\(card.displayName) · K\(ahead.kartNumber)"
+            }
+            return card.displayName
+        case .intervalBehind:
+            if let behind = raceVM.apexNeighbor(ourKartNumber: ourKartNumber, offset: 1) {
+                return "\(card.displayName) · K\(behind.kartNumber)"
+            }
+            return card.displayName
         default:
             return card.displayName
         }
@@ -548,6 +558,56 @@ struct DriverCardView: View {
         // ── Vuelta teorica = sum of my own per-sector PBs ──
         case .theoreticalBestLap:
             theoreticalBestLapContent
+
+        // ── Apex live timing: interval to kart in front ──
+        // myKart.interval IS the gap to the kart in front. Empty when
+        // the local pilot leads the apex order — show "LIDER" sentinel
+        // in that case (per pilot feedback, "—" reads as "no data").
+        case .intervalAhead:
+            let raw = kart?.interval
+            let display = raceVM.formatApexInterval(raw, leaderSentinel: "LIDER")
+            Text(display)
+                .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                .foregroundColor(display == "LIDER" ? .yellow : .white)
+                .minimumScaleFactor(0.5)
+                .lineLimit(1)
+
+        // ── Apex live timing: interval reported by kart behind me ──
+        // The apex `interval` field for any kart measures THEIR distance
+        // to the kart immediately ahead. So the kart at position+1 in
+        // the live timing has its own `.interval` field equal to its
+        // gap to me — exactly what we want to show on the local card.
+        case .intervalBehind:
+            let behind = raceVM.apexNeighbor(ourKartNumber: ourKartNumber, offset: 1)
+            let raw = behind?.interval
+            let display: String = behind == nil
+                ? "—"  // I'm last; nothing behind to measure
+                : raceVM.formatApexInterval(raw, leaderSentinel: "—")
+            Text(display)
+                .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                .foregroundColor(.white)
+                .minimumScaleFactor(0.5)
+                .lineLimit(1)
+
+        // ── Apex live timing: raw position (P{n}/{total}) ──
+        // Distinct from `position` (avg-pace) and `realPos` (adjusted
+        // classification) — this surfaces the value straight from
+        // Apex's `data-type="rk"` column.
+        case .apexPosition:
+            HStack(alignment: .lastTextBaseline, spacing: 1) {
+                if let ap = raceVM.apexPosition(ourKartNumber: ourKartNumber) {
+                    Text("P\(ap.pos)")
+                        .font(.system(size: bigFont, weight: .black, design: .rounded))
+                        .foregroundColor(.white)
+                    Text("/\(ap.total)")
+                        .font(.system(size: 14 * scale, weight: .semibold))
+                        .foregroundColor(Color(.systemGray))
+                } else {
+                    Text("—")
+                        .font(.system(size: bigFont, weight: .black, design: .rounded))
+                        .foregroundColor(Color(.systemGray3))
+                }
+            }
         }
     }
 
@@ -830,6 +890,22 @@ struct DriverCardView: View {
                 return "Vuelta teorica: sin datos"
             }
             return "Vuelta teorica: \(Formatters.msToLapTime(s1 + s2 + s3))"
+        case .intervalAhead:
+            let raw = (kart?.interval ?? "").trimmingCharacters(in: .whitespaces)
+            if raw.isEmpty { return "Intervalo kart delantero: lider" }
+            return "Intervalo kart delantero: \(raw)"
+        case .intervalBehind:
+            guard let behind = raceVM.apexNeighbor(ourKartNumber: ourKartNumber, offset: 1) else {
+                return "Intervalo kart trasero: sin datos"
+            }
+            let raw = (behind.interval ?? "").trimmingCharacters(in: .whitespaces)
+            if raw.isEmpty { return "Intervalo kart trasero: sin datos" }
+            return "Intervalo kart trasero: \(raw), kart \(behind.kartNumber)"
+        case .apexPosition:
+            if let ap = raceVM.apexPosition(ourKartNumber: ourKartNumber) {
+                return "Posicion Apex: P\(ap.pos) de \(ap.total)"
+            }
+            return "Posicion Apex: sin datos"
         }
     }
 

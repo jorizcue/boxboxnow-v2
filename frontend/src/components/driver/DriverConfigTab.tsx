@@ -345,6 +345,9 @@ const CARD_ACCENTS: Record<DriverCardId, string> = {
   deltaBestS2: "from-yellow-500/20 to-yellow-500/5 border-yellow-500/30",
   deltaBestS3: "from-yellow-500/20 to-yellow-500/5 border-yellow-500/30",
   theoreticalBestLap: "from-pink-500/20 to-pink-500/5 border-pink-500/30",
+  intervalAhead: "from-red-500/20 to-red-500/5 border-red-500/30",
+  intervalBehind: "from-green-500/20 to-green-500/5 border-green-500/30",
+  apexPosition: "from-purple-500/20 to-purple-500/5 border-purple-500/30",
 };
 
 const CARD_SAMPLE_VALUES: Record<DriverCardId, string> = {
@@ -373,6 +376,9 @@ const CARD_SAMPLE_VALUES: Record<DriverCardId, string> = {
   deltaBestS2: "-0.15s",
   deltaBestS3: "+0.08s",
   theoreticalBestLap: "1:01.67",
+  intervalAhead: "0.968s",
+  intervalBehind: "0.973s",
+  apexPosition: "P4/12",
 };
 
 /* ------------------------------------------------------------------ */

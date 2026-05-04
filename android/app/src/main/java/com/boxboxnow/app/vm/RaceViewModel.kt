@@ -250,6 +250,44 @@ class RaceViewModel @Inject constructor(
         return if (idx < 0) null else RacePosition(idx + 1, sorted.size)
     }
 
+    /** Raw Apex live timing position (kart.position straight from the
+     *  grid `data-type="rk"` column), distinct from [racePosition]
+     *  which orders by avg-lap pace. Returns `(pos, total)` where
+     *  total is the count of karts that have a position assigned. */
+    fun apexPosition(): RacePosition? {
+        val ourKart = _ourKartNumber.value
+        if (ourKart <= 0 || _karts.value.isEmpty()) return null
+        val withPos = _karts.value.filter { it.position > 0 }
+        val kart = withPos.firstOrNull { it.kartNumber == ourKart } ?: return null
+        return RacePosition(kart.position, withPos.size)
+    }
+
+    /** Returns the kart at `offset` from our kart in the Apex live
+     *  timing order. offset=-1 is the kart immediately ahead, +1 the
+     *  kart immediately behind. `null` when our kart isn't placed yet
+     *  or the requested neighbor doesn't exist (e.g. ahead of leader). */
+    fun apexNeighbor(offset: Int): KartState? {
+        val ourKart = _ourKartNumber.value
+        if (ourKart <= 0 || _karts.value.isEmpty()) return null
+        val sorted = _karts.value.filter { it.position > 0 }.sortedBy { it.position }
+        val idx = sorted.indexOfFirst { it.kartNumber == ourKart }
+        if (idx < 0) return null
+        return sorted.getOrNull(idx + offset)
+    }
+
+    /** Format an Apex `interval` string for the driver dashboard.
+     *  Apex sends three shapes:
+     *   - "0.659" → numeric seconds → render as "0.659s"
+     *   - "1:05.279" → m:ss.fff time → render as-is
+     *   - "1 Tour" / "1L" → laps-down marker → render as-is
+     *  Empty / null falls back to [leaderSentinel] (callers pick "LIDER"
+     *  for the front-card path or "—" for the rear-card path). */
+    fun formatApexInterval(raw: String?, leaderSentinel: String = "LIDER"): String {
+        val s = (raw ?: "").trim()
+        if (s.isEmpty()) return leaderSentinel
+        return if (s.toDoubleOrNull() != null) "${s}s" else s
+    }
+
     data class StintCalc(val lapsToMax: Double?, val realMaxStintMin: Double?)
 
     fun computeStintCalc(clockMs: Double = 0.0): StintCalc {

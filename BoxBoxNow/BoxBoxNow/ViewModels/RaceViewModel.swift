@@ -196,6 +196,48 @@ final class RaceViewModel: ObservableObject {
         return (pos: idx + 1, total: sorted.count)
     }
 
+    /// Raw Apex live timing position for `ourKartNumber` (kart.position
+    /// straight from the grid `data-type="rk"` column), distinct from
+    /// `racePosition` which orders by avg-lap pace. Returns
+    /// `(pos, total)` where total is the number of karts that have a
+    /// position assigned. `nil` until the first ranking arrives.
+    func apexPosition(ourKartNumber: Int) -> (pos: Int, total: Int)? {
+        guard ourKartNumber > 0, !karts.isEmpty else { return nil }
+        let withPos = karts.filter { $0.position > 0 }
+        guard let kart = withPos.first(where: { $0.kartNumber == ourKartNumber }) else { return nil }
+        return (pos: kart.position, total: withPos.count)
+    }
+
+    /// Returns the kart at offset N from `ourKartNumber` in the Apex
+    /// live timing order (sorted by `kart.position`). offset=-1 is the
+    /// kart immediately ahead, offset=+1 the kart immediately behind.
+    /// `nil` when our kart isn't placed yet, or the requested neighbor
+    /// doesn't exist (e.g. asking for ahead of the leader).
+    func apexNeighbor(ourKartNumber: Int, offset: Int) -> KartState? {
+        guard ourKartNumber > 0, !karts.isEmpty else { return nil }
+        let sorted = karts.filter { $0.position > 0 }.sorted { $0.position < $1.position }
+        guard let idx = sorted.firstIndex(where: { $0.kartNumber == ourKartNumber }) else { return nil }
+        let target = idx + offset
+        guard target >= 0, target < sorted.count else { return nil }
+        return sorted[target]
+    }
+
+    /// Format an Apex `interval` string for display on the driver
+    /// dashboard. Apex sends three shapes:
+    ///   - "0.659"  → numeric seconds → render as "0.659s"
+    ///   - "1:05.279" → minute-second time → render as-is (already readable)
+    ///   - "1 Tour" / "1L" → text marker for laps-down → render as-is
+    /// Empty / nil values render as the leader sentinel "LIDER" — the
+    /// caller decides which sentinel to use depending on context (the
+    /// `intervalAhead` card always sees an empty value when the local
+    /// pilot leads, so "LIDER" is the right read).
+    func formatApexInterval(_ raw: String?, leaderSentinel: String = "LIDER") -> String {
+        let s = (raw ?? "").trimmingCharacters(in: .whitespaces)
+        if s.isEmpty { return leaderSentinel }
+        if Double(s) != nil { return "\(s)s" }
+        return s
+    }
+
     /// Laps to max stint — web: lines 433-459
     struct StintCalc {
         let lapsToMax: Double?

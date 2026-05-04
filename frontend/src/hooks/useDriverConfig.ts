@@ -39,7 +39,14 @@ export type DriverCardId =
   | "deltaBestS1"
   | "deltaBestS2"
   | "deltaBestS3"
-  | "theoreticalBestLap";
+  | "theoreticalBestLap"
+  // Raw Apex live timing — distinct from gapAhead/gapBehind (which
+  // derive from the adjusted classification) and from position
+  // (avg-pace) / realPos (adjusted). These surface the values
+  // straight from Apex's `data-type="int"` and `data-type="rk"`.
+  | "intervalAhead"
+  | "intervalBehind"
+  | "apexPosition";
 
 export type DriverCardGroup = "race" | "box" | "gps";
 
@@ -69,6 +76,13 @@ export const ALL_DRIVER_CARDS: {
   { id: "deltaBestS2", label: "Δ Mejor S2", requiresGps: false, group: "race" },
   { id: "deltaBestS3", label: "Δ Mejor S3", requiresGps: false, group: "race" },
   { id: "theoreticalBestLap", label: "Vuelta teórica", requiresGps: false, group: "race" },
+  // Raw Apex live timing cards — distinct from gapAhead/gapBehind
+  // (adjusted classification) and from position/realPos (avg pace /
+  // adjusted). Mirrors what the pilot would see on the Apex live
+  // timing screen, no client-side recomputation.
+  { id: "intervalAhead", label: "Intervalo kart delantero", requiresGps: false, group: "race" },
+  { id: "intervalBehind", label: "Intervalo kart trasero", requiresGps: false, group: "race" },
+  { id: "apexPosition", label: "Posición Apex", requiresGps: false, group: "race" },
   // --- BOX group (alphabetical by label) ---
   { id: "currentPit", label: "Pit en curso", requiresGps: false, group: "box" },
   { id: "pitCount", label: "PITS (realizados / mínimos)", requiresGps: false, group: "box" },

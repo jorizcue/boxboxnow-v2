@@ -362,6 +362,130 @@ function renderTheoreticalBestLapCard(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Apex live timing card renderers                                    */
+/* ------------------------------------------------------------------ */
+//
+// All three cards surface values straight from the Apex live timing
+// grid (`data-type="int"` and `data-type="rk"` columns). Distinct from
+// gapAhead/gapBehind (which derive from the adjusted classification)
+// and from position/realPos (avg-pace / adjusted classification).
+//
+// Apex's `interval` field for each kart measures THAT kart's distance
+// to the kart immediately ahead. So "my interval to the front" =
+// myKart.interval, and "the kart behind me's interval to me" = the
+// `interval` field of the kart at apex_pos + 1.
+
+/** Format a raw apex-timing interval string for display.
+ *  - "0.659"     numeric seconds → render "0.659s"
+ *  - "1:05.279"  m:ss.fff time → as-is
+ *  - "1 Tour"    laps-down marker → as-is
+ *  - empty/null  → leaderSentinel ("LIDER" or "—")
+ */
+function formatApexInterval(raw: string | undefined | null, leaderSentinel: string): string {
+  const s = (raw ?? "").trim();
+  if (!s) return leaderSentinel;
+  // Numeric (with optional decimals)
+  if (!Number.isNaN(Number(s)) && /^\d*\.?\d+$/.test(s)) return `${s}s`;
+  return s;
+}
+
+function renderApexIntervalAheadCard(
+  myKart: KartState | null,
+  ahead: KartState | null,
+): { label: string; content: React.ReactNode; accent: string } {
+  // Header includes the kart number of the kart in front so the pilot
+  // knows who they're chasing without consulting the timing tower.
+  const label = ahead != null
+    ? `Intervalo kart delantero · K${ahead.kartNumber}`
+    : "Intervalo kart delantero";
+  const stubAccent = "from-neutral-500/15 to-neutral-500/5 border-neutral-500/30";
+  if (!myKart) {
+    return {
+      label,
+      accent: stubAccent,
+      content: (
+        <span className="text-3xl sm:text-4xl font-mono font-black text-neutral-600 leading-none">—</span>
+      ),
+    };
+  }
+  const display = formatApexInterval(myKart.interval, "LIDER");
+  const isLeader = display === "LIDER";
+  return {
+    label,
+    accent: isLeader
+      ? "from-yellow-500/25 to-yellow-500/5 border-yellow-400/50"
+      : "from-red-500/25 to-red-500/5 border-red-400/50",
+    content: (
+      <span className={`text-3xl sm:text-4xl font-mono font-black leading-none ${
+        isLeader ? "text-yellow-400" : "text-white"
+      }`}>
+        {display}
+      </span>
+    ),
+  };
+}
+
+function renderApexIntervalBehindCard(
+  behind: KartState | null,
+): { label: string; content: React.ReactNode; accent: string } {
+  const label = behind != null
+    ? `Intervalo kart trasero · K${behind.kartNumber}`
+    : "Intervalo kart trasero";
+  const stubAccent = "from-neutral-500/15 to-neutral-500/5 border-neutral-500/30";
+  if (!behind) {
+    return {
+      label,
+      accent: stubAccent,
+      content: (
+        <span className="text-3xl sm:text-4xl font-mono font-black text-neutral-600 leading-none">—</span>
+      ),
+    };
+  }
+  const display = formatApexInterval(behind.interval, "—");
+  return {
+    label,
+    accent: "from-green-500/25 to-green-500/5 border-green-400/50",
+    content: (
+      <span className="text-3xl sm:text-4xl font-mono font-black text-white leading-none">
+        {display}
+      </span>
+    ),
+  };
+}
+
+function renderApexPositionCard(
+  myKart: KartState | null,
+  karts: KartState[],
+): { label: string; content: React.ReactNode; accent: string } {
+  const label = "Posición Apex";
+  const stubAccent = "from-neutral-500/15 to-neutral-500/5 border-neutral-500/30";
+  if (!myKart || myKart.position <= 0) {
+    return {
+      label,
+      accent: stubAccent,
+      content: (
+        <span className="text-4xl sm:text-5xl font-mono font-black text-neutral-600 leading-none">—</span>
+      ),
+    };
+  }
+  const total = karts.filter((k) => k.position > 0).length;
+  return {
+    label,
+    accent: "from-purple-500/20 to-purple-500/5 border-purple-500/30",
+    content: (
+      <div className="flex items-baseline">
+        <span className="text-4xl sm:text-5xl font-black text-white leading-none">
+          P{myKart.position}
+        </span>
+        <span className="text-base sm:text-lg font-semibold text-neutral-400 leading-none ml-0.5">
+          /{total}
+        </span>
+      </div>
+    ),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -725,6 +849,23 @@ export function DriverView() {
     const sec = s % 60;
     return `${m}:${String(sec).padStart(2, "0")}`;
   })();
+
+  // Apex live-timing neighbors (sorted by raw `kart.position`, not by
+  // adjusted classification). Used by the new intervalAhead /
+  // intervalBehind cards: my own `interval` is my gap to the kart
+  // ahead, but to display the gap from the kart BEHIND me I need to
+  // read THEIR `interval` (which measures their distance to me).
+  // Memoized for stable ref + cheap re-renders during a 50Hz GPS push.
+  const { apexAhead, apexBehind } = useMemo(() => {
+    if (ourKart <= 0 || karts.length === 0) return { apexAhead: null, apexBehind: null };
+    const sorted = karts.filter((k) => k.position > 0).sort((a, b) => a.position - b.position);
+    const idx = sorted.findIndex((k) => k.kartNumber === ourKart);
+    if (idx < 0) return { apexAhead: null, apexBehind: null };
+    return {
+      apexAhead: idx > 0 ? sorted[idx - 1] : null,
+      apexBehind: idx < sorted.length - 1 ? sorted[idx + 1] : null,
+    };
+  }, [karts, ourKart]);
 
   const cards: Record<DriverCardId, { label: string; content: React.ReactNode; accent: string }> = {
     raceTimer: {
@@ -1130,6 +1271,13 @@ export function DriverView() {
     deltaBestS2: renderSectorDeltaCard(2, hasSectors, sectorMeta, ourKartObj),
     deltaBestS3: renderSectorDeltaCard(3, hasSectors, sectorMeta, ourKartObj),
     theoreticalBestLap: renderTheoreticalBestLapCard(hasSectors, ourKartObj),
+    // ── Raw Apex live timing cards ──
+    // intervalAhead = myKart.interval (gap to kart in front per Apex)
+    // intervalBehind = interval reported by kart at apexPos+1 (their gap to me)
+    // apexPosition = myKart.position + total karts (raw Apex live ranking)
+    intervalAhead: renderApexIntervalAheadCard(ourKartObj, apexAhead),
+    intervalBehind: renderApexIntervalBehindCard(apexBehind),
+    apexPosition: renderApexPositionCard(ourKartObj, karts),
   };
 
   // Count visible cards to calculate grid rows

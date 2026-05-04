@@ -179,6 +179,14 @@ private fun cardLabel(
         val behind = raceVM.computeOurData()?.behindKart
         if (behind != null) "${card.display} · K${behind.kartNumber}" else card.display
     }
+    DriverCard.IntervalAhead -> {
+        val ahead = raceVM.apexNeighbor(-1)
+        if (ahead != null) "${card.display} · K${ahead.kartNumber}" else card.display
+    }
+    DriverCard.IntervalBehind -> {
+        val behind = raceVM.apexNeighbor(1)
+        if (behind != null) "${card.display} · K${behind.kartNumber}" else card.display
+    }
     else -> card.display
 }
 
@@ -527,6 +535,62 @@ private fun CardContent(
             hasSectors = hasSectors, ourKart = ourKart,
             mainFont = mainFont, smallFont = smallFont,
         )
+
+        // ── Apex live timing: interval to kart in front ──
+        // myKart.interval IS the gap to the kart in front. Empty when
+        // we lead the apex order — show "LIDER" sentinel in that case
+        // (per pilot feedback, "—" reads as "no data" not "leader").
+        DriverCard.IntervalAhead -> {
+            val display = raceVM.formatApexInterval(ourKart?.interval, leaderSentinel = "LIDER")
+            MonoValue(
+                display,
+                if (display == "LIDER") Color(0xFFFFCC00) else Color.White,
+                mainFont,
+            )
+        }
+
+        // ── Apex live timing: interval reported by kart behind me ──
+        // The apex `interval` field for any kart measures THEIR distance
+        // to the kart immediately ahead. So the kart at position+1 in
+        // the apex sort has its own `.interval` equal to its gap to me
+        // — exactly what the local card needs to show.
+        DriverCard.IntervalBehind -> {
+            val behind = raceVM.apexNeighbor(1)
+            val display = if (behind == null) "—"
+                else raceVM.formatApexInterval(behind.interval, leaderSentinel = "—")
+            MonoValue(display, Color.White, mainFont)
+        }
+
+        // ── Apex live timing: raw position (P{n}/{total}) ──
+        // Distinct from Position (avg-pace) and RealPos (adjusted
+        // classification) — surfaces the value straight from Apex's
+        // `data-type="rk"` column.
+        DriverCard.ApexPosition -> {
+            val ap = raceVM.apexPosition()
+            Row(verticalAlignment = Alignment.Bottom) {
+                if (ap != null) {
+                    Text(
+                        "P${ap.pos}",
+                        color = Color.White,
+                        fontSize = bigFont,
+                        fontWeight = FontWeight.Black,
+                    )
+                    Text(
+                        "/${ap.total}",
+                        color = BoxBoxNowColors.SystemGray,
+                        fontSize = (14f * scale).sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                } else {
+                    Text(
+                        "—",
+                        color = BoxBoxNowColors.SystemGray3,
+                        fontSize = bigFont,
+                        fontWeight = FontWeight.Black,
+                    )
+                }
+            }
+        }
     }
 }
 
