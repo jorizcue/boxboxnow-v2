@@ -80,7 +80,20 @@ class AuthViewModel @Inject constructor(
                 // `upgradeRequired` and shows a blocking update screen.
                 _upgradeRequired.value = e
             } catch (e: Throwable) {
-                _errorMessage.value = e.message ?: "Error de conexion"
+                // Surface the underlying message + exception type so an
+                // emulator-side problem (no internet, TLS failure, DNS,
+                // clock skew) is visible at a glance instead of always
+                // collapsing to a vague "Error de conexion". The Ktor
+                // CIO engine populates `message` for HTTP failures but
+                // many connection-level exceptions (UnknownHostException,
+                // ConnectException, SSLException) leave it null.
+                android.util.Log.e("BBN/Login", "login failed", e)
+                _errorMessage.value = buildString {
+                    append(e.message?.takeIf { it.isNotBlank() } ?: "Error de conexion")
+                    append(" (")
+                    append(e.javaClass.simpleName)
+                    append(")")
+                }
             } finally {
                 _isLoading.value = false
             }

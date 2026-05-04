@@ -1,17 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    BBN launcher icon foreground — same shape as splash_icon.xml,
+    proportionally scaled for the adaptive icon. Two white "B"s with a
+    real left spine + two right lobes each, and a green "N" with two
+    verticals + a diagonal stroke. Replaces the previous "stacked
+    half-D shapes" rendering that read as commas instead of letters.
+
+    Sized for Android adaptive icon safe area: 108dp viewport with
+    inner ~66dp circle guaranteed visible. The BBN block spans
+    x=31..77 and y=39..69, well inside that area.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- "BB" in white, "N" in accent green — matches iOS branding -->
+
+    <!-- B 1 (white): spine + top lobe + bottom lobe -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M30,34 h12 a10,10 0 0 1 0,20 h-12 z M30,54 h14 a10,10 0 0 1 0,20 h-14 z" />
+        android:pathData="M31,39 h5 v30 h-5 z M36,39 h3 a7.5,7 0 0,1 0,14 h-3 z M36,55 h3 a7.5,7 0 0,1 0,14 h-3 z" />
+
+    <!-- B 2 (white): same shape, shifted +16 -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M54,34 h12 a10,10 0 0 1 0,20 h-12 z M54,54 h14 a10,10 0 0 1 0,20 h-14 z" />
+        android:pathData="M47,39 h5 v30 h-5 z M52,39 h3 a7.5,7 0 0,1 0,14 h-3 z M52,55 h3 a7.5,7 0 0,1 0,14 h-3 z" />
+
+    <!-- N (accent green): left vertical + right vertical + diagonal -->
     <path
         android:fillColor="#41D238"
-        android:pathData="M78,34 h8 v40 h-6 l-16,-22 v22 h-8 v-40 h6 l16,22 z" />
+        android:pathData="M63,39 h5 v30 h-5 z M72,39 h5 v30 h-5 z M68,39 h4 l4,30 h-4 z" />
 </vector>
