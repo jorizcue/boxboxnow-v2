@@ -16,7 +16,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy import select
 from app.api.auth_routes import decode_token
 from app.models.database import async_session
-from app.models.schemas import DeviceSession, ProductTabConfig, Subscription, User
+from app.models.schemas import DeviceSession, ProductTabConfig, Subscription, User, UserCircuitAccess
 
 logger = logging.getLogger(__name__)
 
@@ -178,24 +178,30 @@ async def race_websocket(
         await websocket.close(code=4001, reason="Session terminated")
         return
 
-    # Active subscription gate. Race telemetry is paid content; reject any
-    # client whose subscription has expired / been cancelled before we
-    # accept the WS handshake. Admins bypass automatically. Mirrors the
-    # `require_active_subscription` HTTP dependency. Close code 4003
-    # ("policy violation"-ish) is what we already use for max-devices.
+    # Active subscription + circuit-access gate. Race telemetry is paid
+    # content AND circuit-bound; reject any client whose subscription
+    # has expired/been cancelled, OR who has no currently-valid
+    # UserCircuitAccess row, before we accept the WS handshake. Admins
+    # bypass both checks. Mirrors the `require_active_subscription` +
+    # `require_active_circuit_access` HTTP dependencies. Close code
+    # 4003 ("policy violation"-ish) is what we already use for
+    # max-devices; reason text differs so the client can tell apart
+    # which gate fired.
     async with async_session() as db:
         u_row = await db.execute(
             select(User.is_admin).where(User.id == user_id)
         )
         is_admin_check = bool(u_row.scalar() or False)
         if not is_admin_check:
+            now = datetime.now(timezone.utc)
+
+            # 1. Subscription
             sub_q = await db.execute(
                 select(Subscription.status, Subscription.current_period_end).where(
                     Subscription.user_id == user_id,
                     Subscription.status.in_(("active", "trialing")),
                 )
             )
-            now = datetime.now(timezone.utc)
             has_active_sub = False
             for status_, period_end in sub_q.all():
                 if period_end is not None and period_end.tzinfo is None:
@@ -206,6 +212,31 @@ async def race_websocket(
             if not has_active_sub:
                 logger.warning(f"WS rejected: no active subscription (user={user_id})")
                 await websocket.close(code=4003, reason="Active subscription required")
+                return
+
+            # 2. Circuit access — at least one row must cover `now`. We
+            # could fold this into a single SQL with EXISTS, but the
+            # round-trip cost is negligible at handshake time and the
+            # split makes the close-code reason actionable for the
+            # client (the SPA already differentiates these on the HTTP
+            # side via /auth/me's `has_active_circuit_access` flag).
+            ca_q = await db.execute(
+                select(UserCircuitAccess.valid_from, UserCircuitAccess.valid_until).where(
+                    UserCircuitAccess.user_id == user_id,
+                )
+            )
+            has_circuit = False
+            for vf, vu in ca_q.all():
+                if vf is not None and vf.tzinfo is None:
+                    vf = vf.replace(tzinfo=timezone.utc)
+                if vu is not None and vu.tzinfo is None:
+                    vu = vu.replace(tzinfo=timezone.utc)
+                if (vf is None or vf <= now) and (vu is None or vu > now):
+                    has_circuit = True
+                    break
+            if not has_circuit:
+                logger.warning(f"WS rejected: no active circuit access (user={user_id})")
+                await websocket.close(code=4003, reason="No active circuit access")
                 return
 
     # Enforce max concurrent WS connections per user, split by device type.

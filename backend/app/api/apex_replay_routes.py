@@ -15,7 +15,7 @@ from sqlalchemy import select
 from app.apex.replay import parse_log_file
 from app.api.auth_routes import decode_token
 from app.models.database import async_session
-from app.models.schemas import DeviceSession, Subscription, User
+from app.models.schemas import DeviceSession, Subscription, User, UserCircuitAccess
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/apex-replay", tags=["apex-replay"])
@@ -105,10 +105,11 @@ def _resolve_log_path(filename: str, circuit_dir: str | None = None) -> str | No
 
 
 async def _ws_authenticate(token: str | None) -> int | None:
-    """Validate the JWT, alive device session, and active subscription
-    for an Apex-replay WS handshake. Returns user_id on success, None
-    on any failure. Mirrors `/ws/race`'s checks so this endpoint can't
-    be used as a back-door to read race data without a paid account.
+    """Validate the JWT, alive device session, active subscription, AND
+    at least one currently-valid UserCircuitAccess row for an Apex-replay
+    WS handshake. Returns user_id on success, None on any failure.
+    Mirrors `/ws/race`'s checks so this endpoint can't be used as a
+    back-door to read race data without a paid account + circuit grant.
     """
     if not token:
         return None
@@ -129,23 +130,43 @@ async def _ws_authenticate(token: str | None) -> int | None:
         if not ds_q.scalar_one_or_none():
             return None
 
-        # Active/trialing subscription required (admins bypass).
+        # Admins bypass both gates.
         u_q = await db.execute(select(User.is_admin).where(User.id == user_id))
         is_admin_user = bool(u_q.scalar() or False)
         if is_admin_user:
             return user_id
 
+        now = datetime.now(timezone.utc)
+
+        # Active/trialing subscription required.
         sub_q = await db.execute(
             select(Subscription.current_period_end).where(
                 Subscription.user_id == user_id,
                 Subscription.status.in_(("active", "trialing")),
             )
         )
-        now = datetime.now(timezone.utc)
+        has_active_sub = False
         for (period_end,) in sub_q.all():
             if period_end is not None and period_end.tzinfo is None:
                 period_end = period_end.replace(tzinfo=timezone.utc)
             if period_end is None or period_end > now:
+                has_active_sub = True
+                break
+        if not has_active_sub:
+            return None
+
+        # At least one currently-valid circuit grant required.
+        ca_q = await db.execute(
+            select(UserCircuitAccess.valid_from, UserCircuitAccess.valid_until).where(
+                UserCircuitAccess.user_id == user_id,
+            )
+        )
+        for vf, vu in ca_q.all():
+            if vf is not None and vf.tzinfo is None:
+                vf = vf.replace(tzinfo=timezone.utc)
+            if vu is not None and vu.tzinfo is None:
+                vu = vu.replace(tzinfo=timezone.utc)
+            if (vf is None or vf <= now) and (vu is None or vu > now):
                 return user_id
         return None
 
