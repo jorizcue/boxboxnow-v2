@@ -826,9 +826,15 @@ function UsersManager() {
                   </div>
                 )}
 
-                {/* Existing access list with editable dates + revoke button */}
+                {/* Existing access list with editable dates + revoke button.
+                    No max-height + overflow on the wrapper — the CalendarPicker's
+                    absolute-positioned popup gets clipped inside any scrolling
+                    ancestor (overflow-y:auto silently turns overflow-x into
+                    auto too, so neither axis is `visible`). The list grows
+                    with the user's circuit count; the page itself handles
+                    scroll if it gets long. */}
                 {access.length > 0 && (
-                  <div className="space-y-1 max-h-56 overflow-y-auto scrollbar-none">
+                  <div className="space-y-1">
                     {access.map((a) => {
                       // CalendarPicker is the same component used by the
                       // "grant access" form; it expects "yyyy-MM-dd". The
@@ -837,29 +843,29 @@ function UsersManager() {
                       const fromYmd = a.valid_from ? new Date(a.valid_from).toISOString().slice(0, 10) : "";
                       const untilYmd = a.valid_until ? new Date(a.valid_until).toISOString().slice(0, 10) : "";
                       return (
-                        <div key={a.id} className="flex items-center gap-2 text-[10px] bg-black/30 rounded-lg px-2 py-1.5 border border-border/50 hover:border-border transition-colors">
+                        <div key={a.id} className="flex items-center gap-2 text-xs bg-black/30 rounded-lg px-2 py-1.5 border border-border/50 hover:border-border transition-colors flex-wrap">
                           {/* Revoke */}
                           <button
                             onClick={() => revokeAccess(a.id)}
                             title={t("admin.revoke") || "Quitar circuito"}
-                            className="text-red-500/60 hover:text-red-400 text-base leading-none flex-shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-red-500/10 transition-colors"
+                            className="text-red-500/60 hover:text-red-400 text-lg leading-none flex-shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-red-500/10 transition-colors"
                             aria-label="Eliminar circuito"
                           >×</button>
                           {/* Circuit name */}
-                          <span className="text-neutral-200 font-medium flex-1 truncate min-w-0" title={a.circuit_name || ""}>
+                          <span className="text-neutral-200 font-medium flex-1 truncate min-w-[80px]" title={a.circuit_name || ""}>
                             {a.circuit_name}
                           </span>
                           {/* Date range — each picker patches independently */}
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            <div className="w-[110px]">
+                            <div className="w-[140px]">
                               <CalendarPicker
                                 value={fromYmd}
                                 onChange={(v) => v && v !== fromYmd && updateAccessDates(a.id, { valid_from: v })}
                                 placeholder={t("admin.from") || "Desde"}
                               />
                             </div>
-                            <span className="text-neutral-600">→</span>
-                            <div className="w-[110px]">
+                            <span className="text-neutral-600 px-0.5">→</span>
+                            <div className="w-[140px]">
                               <CalendarPicker
                                 value={untilYmd}
                                 onChange={(v) => v && v !== untilYmd && updateAccessDates(a.id, { valid_until: v })}
