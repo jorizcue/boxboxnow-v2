@@ -1174,13 +1174,22 @@ async def oauth_exchange(request: Request, db: AsyncSession = Depends(get_db)):
     # Build the response and burn the cookie. Setting Max-Age=0 with the
     # same path tells the browser to drop it, so a second exchange call
     # fails — the handoff is one-shot.
+    #
+    # We assemble a `LoginResponse` so the shape is byte-for-byte the
+    # same as /login (the SPA's setAuth() consumer assumes it). Then
+    # `jsonable_encoder` walks the Pydantic tree and turns datetimes
+    # into ISO strings — `JSONResponse` uses plain `json.dumps`, which
+    # tripped on `model_dump()` raw datetimes (TypeError: Object of
+    # type datetime is not JSON serializable, observed live on prod
+    # after the OAuth-handoff refactor).
     from fastapi.responses import JSONResponse
-    body = {
-        "access_token": raw_token,
-        "session_token": session_token,
-        "user": _user_out(user).model_dump(),
-    }
-    response = JSONResponse(body)
+    from fastapi.encoders import jsonable_encoder
+    payload = LoginResponse(
+        access_token=raw_token,
+        session_token=session_token,
+        user=_user_out(user),
+    )
+    response = JSONResponse(jsonable_encoder(payload))
     response.delete_cookie(key="bbn_oauth_handoff", path="/api/auth")
     return response
 
