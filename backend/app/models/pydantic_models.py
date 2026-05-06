@@ -34,6 +34,14 @@ class UserOut(BaseModel):
     has_active_subscription: bool = False
     subscription_plan: str | None = None
     trial_ends_at: str | None = None  # ISO string if on trial
+    # True iff the user has at least one UserCircuitAccess row whose
+    # window covers "right now" (valid_from <= now < valid_until). Admins
+    # always pass. Distinct from `has_active_subscription` — a user can
+    # be paying but have zero circuits granted, in which case the SPA
+    # should land them on a "no circuits" gate page rather than the
+    # dashboard. False default keeps it backward-compatible with older
+    # serialized payloads (admins / fresh sessions).
+    has_active_circuit_access: bool = False
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}

@@ -186,6 +186,15 @@ export default function DashboardPage() {
     return <NoSubscription username={user?.username || ""} />;
   }
 
+  // Circuit-access gate: a paying user with zero currently-valid
+  // UserCircuitAccess rows lands on a "no circuits" page instead of an
+  // empty dashboard. Backend mirrors this with router-level
+  // `require_active_circuit_access` so even a hand-crafted API call
+  // can't bypass.
+  if (!user?.is_admin && !user?.has_active_circuit_access) {
+    return <NoCircuitAccess username={user?.username || ""} />;
+  }
+
   return (
     <ConfirmProvider>
       <Dashboard activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -369,6 +378,74 @@ function NoSubscription({ username }: { username: string }) {
           >
             Gestionar suscripcion existente
           </button>
+        </div>
+
+        <button
+          onClick={handleLogout}
+          className="text-neutral-500 hover:text-neutral-300 text-sm transition-colors"
+        >
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Gate page for users whose UserCircuitAccess rows are all expired (or
+ *  never granted). Distinct from <NoSubscription /> — billing is fine,
+ *  the missing piece is per-circuit access which only an admin can
+ *  grant. Copy reflects that by directing the user to contact support
+ *  / their team admin instead of pricing pages. */
+function NoCircuitAccess({ username }: { username: string }) {
+  const { logout } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      const { api } = await import("@/lib/api");
+      await api.logout();
+    } catch (e) {
+      console.error("[logout] backend logout failed; clearing local state anyway", e);
+    }
+    logout();
+    router.push("/");
+  };
+
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center px-4">
+      <div className="max-w-md w-full text-center">
+        <div className="mb-8">
+          <div className="inline-flex items-center gap-0 mb-2">
+            <span className="text-4xl font-bold text-white">BB</span>
+            <span className="text-4xl font-bold text-accent">N</span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-wider text-white">
+            BOXBOX<span className="text-accent">NOW</span>
+          </h1>
+        </div>
+
+        <div className="bg-surface rounded-2xl p-6 sm:p-8 border border-border mb-6">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-yellow-400/10 flex items-center justify-center">
+            {/* clock-with-stop icon — your access window has elapsed */}
+            <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">
+            Hola, {username}
+          </h2>
+          <p className="text-neutral-400 text-sm mb-6">
+            Tu suscripcion sigue activa, pero no tienes acceso a ningun
+            circuito en este momento. Contacta con tu administrador o con
+            soporte para que renueven tu acceso.
+          </p>
+
+          <a
+            href="mailto:soporte@boxboxnow.com"
+            className="block w-full bg-accent hover:bg-accent-hover text-black font-semibold py-3 rounded-lg transition-colors tracking-wide"
+          >
+            Contactar con soporte
+          </a>
         </div>
 
         <button

@@ -8,19 +8,23 @@ import asyncio
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from app.models.schemas import User
-from app.api.auth_routes import get_current_user, require_active_subscription
+from app.api.auth_routes import get_current_user, require_active_subscription, require_active_circuit_access
 
 logger = logging.getLogger(__name__)
 
-# Router-level subscription gate: every endpoint here requires both a valid
-# JWT (via get_current_user, transitively) AND an active/trialing
-# subscription. Admins bypass automatically via user.is_admin inside the
-# dependency. Keeping the gate at the router level rather than per-endpoint
-# means new routes can't accidentally ship without the check.
+# Router-level access gate: every endpoint here requires a valid JWT AND
+# an active/trialing subscription AND at least one currently-valid
+# UserCircuitAccess row. Admins bypass automatically via user.is_admin
+# inside the dependency. Keeping the gate at the router level rather
+# than per-endpoint means new routes can't accidentally ship without
+# the check.
 router = APIRouter(
     prefix="/api/race",
     tags=["race"],
-    dependencies=[Depends(require_active_subscription)],
+    dependencies=[
+        Depends(require_active_subscription),
+        Depends(require_active_circuit_access),
+    ],
 )
 
 

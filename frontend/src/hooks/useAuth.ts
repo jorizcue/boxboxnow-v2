@@ -17,6 +17,11 @@ interface AuthUser {
   has_active_subscription?: boolean;
   subscription_plan?: string | null;
   trial_ends_at?: string | null;
+  /** True iff the user has at least one UserCircuitAccess row whose
+   *  window covers "right now". Admins are always true. The dashboard
+   *  uses this alongside `has_active_subscription` to decide whether
+   *  to render the app or a "no circuits" gate page. */
+  has_active_circuit_access?: boolean;
 }
 
 interface AuthStore {

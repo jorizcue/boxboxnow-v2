@@ -18,18 +18,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from app.models.database import get_db
 from app.models.schemas import RaceSession, Circuit, TeamPosition, User
-from app.api.auth_routes import get_current_user, require_active_subscription
+from app.api.auth_routes import get_current_user, require_active_subscription, require_active_circuit_access
 from app.apex.replay import ReplayEngine
 
 logger = logging.getLogger(__name__)
 
-# Router-level subscription gate. Replays are recorded race data — paid
-# content. Per-endpoint ownership / admin checks (e.g. owner_id) still
-# apply on top of the gate.
+# Router-level access gate. Replays are recorded race data — paid +
+# circuit-bound content. Per-endpoint ownership / admin checks (e.g.
+# owner_id) still apply on top of these gates.
 router = APIRouter(
     prefix="/api/replay",
     tags=["replay"],
-    dependencies=[Depends(require_active_subscription)],
+    dependencies=[
+        Depends(require_active_subscription),
+        Depends(require_active_circuit_access),
+    ],
 )
 
 LOGS_BASE_DIR = "data/logs"

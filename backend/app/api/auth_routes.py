@@ -390,7 +390,15 @@ async def get_current_user(
 
     # Get user with tab_access
     result = await db.execute(
-        select(User).where(User.id == user_id).options(selectinload(User.tab_access), selectinload(User.subscriptions))
+        select(User).where(User.id == user_id).options(
+            selectinload(User.tab_access),
+            selectinload(User.subscriptions),
+            # Eager-load circuit_access so user_has_active_circuit_access
+            # and the /me payload can both check it without an extra
+            # round-trip per request. Same shape as subscriptions —
+            # downstream helpers must tolerate naive datetimes (SQLite).
+            selectinload(User.circuit_access),
+        )
     )
     user = result.scalar_one_or_none()
     if not user:
@@ -463,6 +471,7 @@ def _user_out(user: User) -> UserOut:
         has_active_subscription=has_sub,
         subscription_plan=sub_plan,
         trial_ends_at=trial_ends_at,
+        has_active_circuit_access=user_has_active_circuit_access(user),
         created_at=user.created_at,
     )
 
@@ -522,6 +531,59 @@ async def require_active_subscription(
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
             "Active subscription required.",
+        )
+    return user
+
+
+def user_has_active_circuit_access(user: User) -> bool:
+    """Synchronous check: does this user have at least one UserCircuitAccess
+    row whose window covers "right now"?
+
+    Reads from `user.circuit_access` which `get_current_user` eager-loads
+    via `selectinload(User.circuit_access)` — no extra DB query. A row
+    counts as currently valid when `valid_from <= now < valid_until`,
+    treating naive datetimes (SQLite) as UTC-aware.
+
+    Admins always pass even with no circuit-access rows so the platform
+    stays manageable when an admin's own access lapses.
+    """
+    if user.is_admin:
+        return True
+    now = datetime.now(timezone.utc)
+    from sqlalchemy import inspect as sa_inspect
+    try:
+        state = sa_inspect(user)
+        if 'circuit_access' not in state.dict:
+            # Relationship wasn't eager-loaded for this code path. Be
+            # safe: deny rather than risk an async DB call here.
+            return False
+    except Exception:
+        return False
+    for row in (user.circuit_access or []):
+        vf = row.valid_from
+        vu = row.valid_until
+        if vf and vf.tzinfo is None:
+            vf = vf.replace(tzinfo=timezone.utc)
+        if vu and vu.tzinfo is None:
+            vu = vu.replace(tzinfo=timezone.utc)
+        if (vf is None or vf <= now) and (vu is None or vu > now):
+            return True
+    return False
+
+
+async def require_active_circuit_access(
+    user: User = Depends(get_current_user),
+) -> User:
+    """Dependency: 403 unless the caller has at least one currently-valid
+    UserCircuitAccess row. Use alongside `require_active_subscription` on
+    every router that surfaces circuit-bound data — a paying user with
+    no current circuit grants would otherwise hit empty endpoints
+    silently. Admins bypass automatically.
+    """
+    if not user_has_active_circuit_access(user):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "No active circuit access.",
         )
     return user
 

@@ -9,15 +9,19 @@ from sqlalchemy import select, func, desc, or_
 from app.models.database import get_db
 from app.models.schemas import GpsTelemetryLap, RaceSession, User
 from app.models.pydantic_models import GpsLapCreate, GpsLapOut, GpsLapBatchCreate
-from app.api.auth_routes import get_current_user, require_active_subscription
+from app.api.auth_routes import get_current_user, require_active_subscription, require_active_circuit_access
 
-# Router-level subscription gate (see race_routes.py for the same pattern).
-# GPS telemetry is paid content; non-subscribers must not be able to read
-# or write laps even if they previously had access.
+# Router-level access gate (see race_routes.py for the same pattern).
+# GPS telemetry is paid content + circuit-bound; non-subscribers OR
+# users without a current circuit grant must not be able to read or
+# write laps even if they previously had access.
 router = APIRouter(
     prefix="/api/gps",
     tags=["gps-telemetry"],
-    dependencies=[Depends(require_active_subscription)],
+    dependencies=[
+        Depends(require_active_subscription),
+        Depends(require_active_circuit_access),
+    ],
 )
 
 
