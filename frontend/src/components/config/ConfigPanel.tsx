@@ -87,6 +87,31 @@ function RaceSessionEditor() {
         setSession(sessionData);
         applySession(sessionData);
       }
+
+      // If the user has exactly one accessible circuit, pre-select it
+      // in the race-session form so the dropdown isn't blank on entry.
+      // Covers two situations the user runs into in practice:
+      //   1. Brand-new pilot with no saved session yet — the dropdown
+      //      defaulted to "0" / placeholder and they had to pick it
+      //      manually even though there was only one option.
+      //   2. Existing pilot whose saved session points at a circuit
+      //      that's no longer in their access list (admin revoked it,
+      //      trial expired, etc.). The previous loadData kept the
+      //      stale circuit_id; we now snap to the only valid choice.
+      // We don't auto-PATCH the session — just pre-fill the form. The
+      // pilot still hits Save to persist, which preserves the existing
+      // "explicit save" flow and lets them bail with a refresh if the
+      // pre-selection is wrong (e.g. multi-circuit user temporarily
+      // narrowed by an outage).
+      if (circuitsData.length === 1) {
+        const only = circuitsData[0];
+        const sessionHasIt = sessionData?.circuit_id === only.id;
+        if (!sessionHasIt) {
+          setCircuitId(only.id);
+          if (only.pit_time_s) setPitTime(only.pit_time_s);
+          setName(only.name);
+        }
+      }
     } catch {}
     setLoading(false);
   };
