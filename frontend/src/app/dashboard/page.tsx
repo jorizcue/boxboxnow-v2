@@ -53,6 +53,26 @@ export default function DashboardPage() {
     return <MaintenancePage />;
   }
 
+  // Always refresh user state once per dashboard mount so admin-side
+  // changes (subscription edits, circuit-access grants/revokes) reach
+  // the SPA without forcing the user to log out and back in. Without
+  // this, the cached `user` from the last login can keep
+  // has_active_circuit_access=false even after an admin granted a new
+  // circuit, leaving the user stranded on <NoCircuitAccess /> despite
+  // the backend already reporting access. Single fetch — the Stripe
+  // checkout-success retry loop below still handles the async webhook
+  // case independently.
+  useEffect(() => {
+    if (!_hydrated || !token) return;
+    import("@/lib/api").then(({ api }) =>
+      api.getMe().then(updateUser).catch(() => {
+        // 401 / network errors fall through; the existing token-watch
+        // logic elsewhere will redirect to /login if the session is
+        // genuinely dead.
+      })
+    );
+  }, [_hydrated, token, updateUser]);
+
   // Refresh user data after Stripe checkout success.
   // Uses a retry loop because the Stripe webhook that activates the
   // subscription is asynchronous — a single immediate fetch often races
