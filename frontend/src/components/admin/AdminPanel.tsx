@@ -356,6 +356,31 @@ function UsersManager() {
     } catch {}
   };
 
+  /** Optimistically PATCH a single date on an access window. Reloads
+   *  on failure to roll back the local state. Both dates are stored
+   *  in the API as ISO strings; CalendarPicker emits "yyyy-MM-dd"
+   *  which the backend parses fine since UserCircuitAccess.valid_from
+   *  / valid_until are typed as datetime + accept date-only ISO. */
+  const updateAccessDates = async (
+    accessId: number,
+    patch: { valid_from?: string; valid_until?: string },
+  ) => {
+    // Optimistic local update so the picker closes without flicker.
+    setAccess((prev) => prev.map((a) => a.id === accessId ? {
+      ...a,
+      valid_from: patch.valid_from ?? a.valid_from,
+      valid_until: patch.valid_until ?? a.valid_until,
+    } : a));
+    try {
+      await api.updateAccess(accessId, patch);
+    } catch {
+      // Roll back to server truth on failure.
+      if (selectedUser) {
+        setAccess(await api.getUserAccess(selectedUser));
+      }
+    }
+  };
+
   const toggleNewTab = (tab: string) => {
     setNewTabs((prev) => prev.includes(tab) ? prev.filter((t) => t !== tab) : [...prev, tab]);
   };
@@ -801,15 +826,50 @@ function UsersManager() {
                   </div>
                 )}
 
-                {/* Existing access list with dates */}
+                {/* Existing access list with editable dates + revoke button */}
                 {access.length > 0 && (
-                  <div className="space-y-1 max-h-40 overflow-y-auto scrollbar-none">
-                    {access.map((a) => (
-                      <div key={a.id} className="flex items-center gap-2 text-[10px] text-neutral-500">
-                        <span className="text-neutral-300 font-medium">{a.circuit_name}</span>
-                        <span>{new Date(a.valid_from).toLocaleDateString()} - {new Date(a.valid_until).toLocaleDateString()}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-1 max-h-56 overflow-y-auto scrollbar-none">
+                    {access.map((a) => {
+                      // CalendarPicker is the same component used by the
+                      // "grant access" form; it expects "yyyy-MM-dd". The
+                      // values from the API are full ISO datetimes — slice
+                      // off the date part to feed the picker.
+                      const fromYmd = a.valid_from ? new Date(a.valid_from).toISOString().slice(0, 10) : "";
+                      const untilYmd = a.valid_until ? new Date(a.valid_until).toISOString().slice(0, 10) : "";
+                      return (
+                        <div key={a.id} className="flex items-center gap-2 text-[10px] bg-black/30 rounded-lg px-2 py-1.5 border border-border/50 hover:border-border transition-colors">
+                          {/* Revoke */}
+                          <button
+                            onClick={() => revokeAccess(a.id)}
+                            title={t("admin.revoke") || "Quitar circuito"}
+                            className="text-red-500/60 hover:text-red-400 text-base leading-none flex-shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-red-500/10 transition-colors"
+                            aria-label="Eliminar circuito"
+                          >×</button>
+                          {/* Circuit name */}
+                          <span className="text-neutral-200 font-medium flex-1 truncate min-w-0" title={a.circuit_name || ""}>
+                            {a.circuit_name}
+                          </span>
+                          {/* Date range — each picker patches independently */}
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <div className="w-[110px]">
+                              <CalendarPicker
+                                value={fromYmd}
+                                onChange={(v) => v && v !== fromYmd && updateAccessDates(a.id, { valid_from: v })}
+                                placeholder={t("admin.from") || "Desde"}
+                              />
+                            </div>
+                            <span className="text-neutral-600">→</span>
+                            <div className="w-[110px]">
+                              <CalendarPicker
+                                value={untilYmd}
+                                onChange={(v) => v && v !== untilYmd && updateAccessDates(a.id, { valid_until: v })}
+                                placeholder={t("admin.until") || "Hasta"}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

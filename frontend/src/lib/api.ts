@@ -145,6 +145,10 @@ export const api = {
   getUserAccess: (userId: number) => fetchApi<any[]>(`/api/admin/access/user/${userId}`),
   grantAccess: (data: any) =>
     fetchApi<any>("/api/admin/access", { method: "POST", body: JSON.stringify(data) }),
+  /** Update an existing circuit-access window. Both dates optional —
+   *  send only what's changing. Backend already accepts partial PATCH. */
+  updateAccess: (id: number, data: { valid_from?: string; valid_until?: string }) =>
+    fetchApi<any>(`/api/admin/access/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   revokeAccess: (id: number) =>
     fetchApi<any>(`/api/admin/access/${id}`, { method: "DELETE" }),
 
