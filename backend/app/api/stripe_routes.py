@@ -338,11 +338,11 @@ async def create_checkout_session(
     # Force the user to tick "I accept the terms of service" before pay.
     # The Terms URL is read from dashboard.stripe.com/settings/public
     # ("Terms of service URL") — make sure it's set there, otherwise
-    # Stripe rejects this param with a 400. The promotional consent is
-    # set to "none": we don't want a marketing opt-in checkbox.
+    # Stripe rejects this param with a 400. We deliberately omit
+    # `promotions` here: it's only available for US/CA accounts and
+    # Stripe rejects ES accounts with "not available in your country".
     session_params["consent_collection"] = {
         "terms_of_service": "required",
-        "promotions": "none",
     }
 
     # Custom text in the checkout. Markdown is supported (links, bold).
