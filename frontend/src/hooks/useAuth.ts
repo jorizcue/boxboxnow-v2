@@ -9,6 +9,12 @@ interface AuthUser {
   username: string;
   email?: string;
   is_admin: boolean;
+  /** Internal staff/partner accounts that bypass the active-subscription
+   *  gate but still need active circuit access to enter. Orthogonal to
+   *  `is_admin` — admins already bypass every gate. Optional in the type
+   *  for backward-compat with payloads from older backends; treat as
+   *  false when missing. */
+  is_internal?: boolean;
   max_devices: number;
   mfa_enabled: boolean;
   mfa_required: boolean;

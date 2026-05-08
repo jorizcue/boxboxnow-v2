@@ -44,6 +44,7 @@ async def create_user(data: UserCreate, admin: User = Depends(require_admin), db
         username=data.username,
         password_hash=hash_password(data.password),
         is_admin=data.is_admin,
+        is_internal=data.is_internal,
         max_devices=data.max_devices,
     )
     db.add(user)
@@ -78,6 +79,8 @@ async def update_user(user_id: int, data: UserUpdate, admin: User = Depends(requ
         user.max_devices = data.max_devices
     if data.is_admin is not None:
         user.is_admin = data.is_admin
+    if data.is_internal is not None:
+        user.is_internal = data.is_internal
     if data.mfa_required is not None:
         user.mfa_required = data.mfa_required
     # For the concurrency overrides, we intentionally use model_fields_set

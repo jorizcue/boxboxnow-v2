@@ -201,12 +201,16 @@ export default function DashboardPage() {
     return <CircuitSelector plan={pendingPlan} onSelect={handleCircuitSelected} onCancel={() => setPendingPlan(null)} />;
   }
 
-  // Subscription gate: non-admin users without active subscription see upgrade page
-  if (!user?.is_admin && !user?.has_active_subscription) {
+  // Subscription gate: non-admin, non-internal users without active
+  // subscription see the upgrade page. Internal staff/partner accounts
+  // skip this gate (no payment) but still go through the circuit-access
+  // gate below — same way the backend mirrors it in
+  // `user_has_active_subscription` + the WS handshake gates.
+  if (!user?.is_admin && !user?.is_internal && !user?.has_active_subscription) {
     return <NoSubscription username={user?.username || ""} />;
   }
 
-  // Circuit-access gate: a paying user with zero currently-valid
+  // Circuit-access gate: a paying or internal user with zero currently-valid
   // UserCircuitAccess rows lands on a "no circuits" page instead of an
   // empty dashboard. Backend mirrors this with router-level
   // `require_active_circuit_access` so even a hand-crafted API call

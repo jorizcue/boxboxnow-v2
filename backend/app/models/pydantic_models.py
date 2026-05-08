@@ -22,6 +22,10 @@ class UserOut(BaseModel):
     username: str
     email: str | None = None
     is_admin: bool
+    # Internal users skip the active-subscription gate but still need a
+    # currently-valid UserCircuitAccess row to enter. Default False keeps
+    # legacy serialized payloads compatible.
+    is_internal: bool = False
     max_devices: int = 1
     # Per-user concurrency overrides. None means "fall back to the plan /
     # max_devices". Exposed in the admin panel for manual tweaking.
@@ -123,6 +127,7 @@ class UserCreate(BaseModel):
     username: str
     password: str
     is_admin: bool = False
+    is_internal: bool = False
     max_devices: int = 1
 
     @field_validator("password")
@@ -141,6 +146,7 @@ class UserUpdate(BaseModel):
     username: str | None = None
     password: str | None = None
     is_admin: bool | None = None
+    is_internal: bool | None = None
     max_devices: int | None = None
     # Optional per-user concurrency overrides. Clients can send 0 or null to
     # clear the override (fall back to plan), or a positive int to pin.

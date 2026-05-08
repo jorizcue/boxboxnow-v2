@@ -11,6 +11,14 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
+    # "Internal" users bypass the active-subscription gate (they don't pay)
+    # but still need at least one currently-valid UserCircuitAccess row to
+    # enter the platform — same circuit-window check that paying users get.
+    # Used for staff / partner accounts that operate on a circuit without
+    # going through Stripe. Orthogonal to is_admin: an internal user is NOT
+    # automatically an admin, and an admin doesn't need is_internal=True
+    # (admins already bypass every gate).
+    is_internal = Column(Boolean, default=False, nullable=False)
     max_devices = Column(Integer, default=1, nullable=False)
     # Per-user concurrency overrides. When set, they take priority over the
     # subscription plan's ProductTabConfig.concurrency_{web,mobile} and over

@@ -426,13 +426,18 @@ ALL_TABS = [
 
 def _user_out(user: User) -> UserOut:
     """Build UserOut with tab_access. Admins always get all tabs."""
+    is_internal = bool(getattr(user, 'is_internal', False) or False)
+
     if user.is_admin:
         tabs = ALL_TABS
     else:
         tabs = [ta.tab for ta in (user.tab_access or [])]
 
-    # Check active subscription (only if relationship is already loaded to avoid MissingGreenlet)
-    has_sub = user.is_admin  # admins always have access
+    # Check active subscription (only if relationship is already loaded to avoid MissingGreenlet).
+    # Admins AND internal users bypass the subscription gate — internal accounts
+    # are non-paying staff/partner users that are still required to have a valid
+    # circuit grant to enter (enforced separately via `has_active_circuit_access`).
+    has_sub = user.is_admin or is_internal
     sub_plan: str | None = None
     trial_ends_at: str | None = None
 
@@ -461,6 +466,7 @@ def _user_out(user: User) -> UserOut:
         username=user.username,
         email=getattr(user, 'email', None),
         is_admin=user.is_admin,
+        is_internal=is_internal,
         max_devices=user.max_devices,
         concurrency_web=getattr(user, 'concurrency_web', None),
         concurrency_mobile=getattr(user, 'concurrency_mobile', None),
@@ -495,9 +501,11 @@ def user_has_active_subscription(user: User) -> bool:
     "past_due", "unpaid", "incomplete", "expired", and friends do not.
 
     Admins always pass even with no subscription record so we can keep
-    operating the platform without paying ourselves.
+    operating the platform without paying ourselves. Internal users (staff /
+    partner accounts) also bypass — they don't pay but still need active
+    circuit access via `require_active_circuit_access` to enter.
     """
-    if user.is_admin:
+    if user.is_admin or bool(getattr(user, 'is_internal', False) or False):
         return True
     now = datetime.now(timezone.utc)
     for sub in (user.subscriptions or []):

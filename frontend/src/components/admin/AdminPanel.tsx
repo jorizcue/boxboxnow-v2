@@ -12,6 +12,11 @@ interface UserRow {
   id: number;
   username: string;
   is_admin: boolean;
+  // "Internal" users are staff / partner accounts that bypass the active-
+  // subscription gate but still need active circuit access. Rendered as a
+  // separate badge + checkbox in this panel; the dashboard uses the same
+  // flag to decide whether to skip the <NoSubscription /> upsell page.
+  is_internal: boolean;
   max_devices: number;
   // Per-user concurrency overrides. When null, the backend falls back to the
   // subscription plan's ProductTabConfig.concurrency_{web,mobile}, then to
@@ -248,6 +253,7 @@ function UsersManager() {
   const [resetPasswordSaving, setResetPasswordSaving] = useState(false);
   const [resetPasswordFeedback, setResetPasswordFeedback] = useState<string | null>(null);
   const [newIsAdmin, setNewIsAdmin] = useState(false);
+  const [newIsInternal, setNewIsInternal] = useState(false);
   const [newMaxDevices, setNewMaxDevices] = useState(1);
   const [newTabs, setNewTabs] = useState<string[]>(ALL_TAB_OPTIONS.map(([k]) => k));
   const [selectedUser, setSelectedUser] = useState<number | null>(null);
@@ -270,7 +276,13 @@ function UsersManager() {
   const createUser = async () => {
     if (!newUsername || !newPassword) return;
     try {
-      await api.createUser({ username: newUsername, password: newPassword, is_admin: newIsAdmin, max_devices: newMaxDevices });
+      await api.createUser({
+        username: newUsername,
+        password: newPassword,
+        is_admin: newIsAdmin,
+        is_internal: newIsInternal,
+        max_devices: newMaxDevices,
+      });
       // Set tab access and circuit access for the new user
       const created = (await api.getUsers()).find((u: UserRow) => u.username === newUsername);
       if (created) {
@@ -288,7 +300,9 @@ function UsersManager() {
           }
         }
       }
-      setNewUsername(""); setNewPassword(""); setNewIsAdmin(false); setNewMaxDevices(1);
+      setNewUsername(""); setNewPassword("");
+      setNewIsAdmin(false); setNewIsInternal(false);
+      setNewMaxDevices(1);
       setNewTabs(ALL_TAB_OPTIONS.map(([k]) => k));
       setNewCircuitIds([]);
       setShowCreate(false);
@@ -430,6 +444,7 @@ function UsersManager() {
                 <div className={`text-sm font-medium truncate ${selectedUser === u.id ? "text-accent" : "text-white"}`}>
                   {u.username}
                   {u.is_admin && <span className="ml-1.5 text-[9px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-semibold uppercase">Admin</span>}
+                  {!u.is_admin && u.is_internal && <span className="ml-1.5 text-[9px] bg-sky-500/20 text-sky-300 px-1.5 py-0.5 rounded font-semibold uppercase">Interno</span>}
                   {u.mfa_enabled && <span className="ml-1 text-[9px] bg-green-500/15 text-green-400 px-1.5 py-0.5 rounded font-semibold uppercase">MFA</span>}
                   {u.mfa_required && !u.mfa_enabled && <span className="ml-1 text-[9px] bg-yellow-500/15 text-yellow-400 px-1.5 py-0.5 rounded font-semibold uppercase">MFA pendiente</span>}
                 </div>
@@ -481,7 +496,7 @@ function UsersManager() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 max-w-xs">
+                <div className="grid grid-cols-3 gap-4 max-w-md">
                   <div>
                     <label className="block text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">{t("admin.devicesTitle")}</label>
                     <input
@@ -495,8 +510,31 @@ function UsersManager() {
                   </div>
                   <div className="flex items-end pb-1">
                     <label className="flex items-center gap-2 text-sm text-neutral-200 cursor-pointer">
-                      <input type="checkbox" checked={newIsAdmin} onChange={(e) => setNewIsAdmin(e.target.checked)} className="accent-accent w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={newIsAdmin}
+                        onChange={(e) => {
+                          const v = e.target.checked;
+                          setNewIsAdmin(v);
+                          // Admin already bypasses every gate, so flagging
+                          // both "Admin" + "Interno" is meaningless.
+                          if (v) setNewIsInternal(false);
+                        }}
+                        className="accent-accent w-4 h-4"
+                      />
                       Admin
+                    </label>
+                  </div>
+                  <div className="flex items-end pb-1">
+                    <label className={`flex items-center gap-2 text-sm cursor-pointer ${newIsAdmin ? "text-neutral-500" : "text-neutral-200"}`} title="Acceso sin requerir suscripción (sigue necesitando circuito activo)">
+                      <input
+                        type="checkbox"
+                        checked={newIsInternal}
+                        disabled={newIsAdmin}
+                        onChange={(e) => setNewIsInternal(e.target.checked)}
+                        className="accent-accent w-4 h-4"
+                      />
+                      Interno
                     </label>
                   </div>
                 </div>
@@ -638,6 +676,60 @@ function UsersManager() {
                         {resetPasswordFeedback}
                       </p>
                     )}
+                  </div>
+                );
+              })()}
+
+              {/* Role toggles — Admin / Interno. Admin already bypasses every
+                  gate, so flipping it on disables the "Interno" checkbox and
+                  silently clears it server-side via the same PATCH. Interno
+                  users skip the active-subscription gate but still need
+                  active circuit access (mirrors the WS + dashboard gates). */}
+              {(() => {
+                const su = users.find((u) => u.id === selectedUser);
+                if (!su) return null;
+                return (
+                  <div>
+                    <label className="block text-[10px] text-neutral-400 mb-2 uppercase tracking-wider">Rol</label>
+                    <div className="flex flex-wrap gap-3">
+                      <label className="flex items-center gap-2 text-xs text-neutral-300 cursor-pointer bg-black/30 rounded-lg px-3 py-2 border border-border hover:border-neutral-600 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={su.is_admin}
+                          onChange={async (e) => {
+                            const v = e.target.checked;
+                            try {
+                              // When promoting to admin we ALSO clear is_internal:
+                              // admin already bypasses every gate, the flag would
+                              // become misleading in the UI badges.
+                              await api.updateUser(su.id, v
+                                ? { is_admin: true, is_internal: false }
+                                : { is_admin: false }
+                              );
+                              loadUsers();
+                            } catch (err: any) { alert(err?.message || "Error"); }
+                          }}
+                          className="accent-accent w-4 h-4"
+                        />
+                        Admin
+                      </label>
+                      <label className={`flex items-center gap-2 text-xs cursor-pointer bg-black/30 rounded-lg px-3 py-2 border border-border hover:border-neutral-600 transition-colors ${su.is_admin ? "text-neutral-500" : "text-neutral-300"}`} title="Acceso sin requerir suscripción (sigue necesitando circuito activo)">
+                        <input
+                          type="checkbox"
+                          checked={su.is_internal}
+                          disabled={su.is_admin}
+                          onChange={async (e) => {
+                            const v = e.target.checked;
+                            try {
+                              await api.updateUser(su.id, { is_internal: v });
+                              loadUsers();
+                            } catch (err: any) { alert(err?.message || "Error"); }
+                          }}
+                          className="accent-accent w-4 h-4"
+                        />
+                        Interno
+                      </label>
+                    </div>
                   </div>
                 );
               })()}

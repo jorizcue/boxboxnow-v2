@@ -105,11 +105,12 @@ def _resolve_log_path(filename: str, circuit_dir: str | None = None) -> str | No
 
 
 async def _ws_authenticate(token: str | None) -> int | None:
-    """Validate the JWT, alive device session, active subscription, AND
-    at least one currently-valid UserCircuitAccess row for an Apex-replay
-    WS handshake. Returns user_id on success, None on any failure.
-    Mirrors `/ws/race`'s checks so this endpoint can't be used as a
-    back-door to read race data without a paid account + circuit grant.
+    """Validate the JWT, alive device session, active subscription (unless
+    internal), AND at least one currently-valid UserCircuitAccess row for
+    an Apex-replay WS handshake. Returns user_id on success, None on any
+    failure. Mirrors `/ws/race`'s checks so this endpoint can't be used
+    as a back-door to read race data without proper access. Admins bypass
+    every gate; internal users bypass only the subscription check.
     """
     if not token:
         return None
@@ -130,32 +131,39 @@ async def _ws_authenticate(token: str | None) -> int | None:
         if not ds_q.scalar_one_or_none():
             return None
 
-        # Admins bypass both gates.
-        u_q = await db.execute(select(User.is_admin).where(User.id == user_id))
-        is_admin_user = bool(u_q.scalar() or False)
+        # Admins bypass every gate.
+        u_q = await db.execute(
+            select(User.is_admin, User.is_internal).where(User.id == user_id)
+        )
+        u_row = u_q.first()
+        is_admin_user = bool(u_row[0]) if u_row else False
+        is_internal_user = bool(u_row[1]) if u_row else False
         if is_admin_user:
             return user_id
 
         now = datetime.now(timezone.utc)
 
-        # Active/trialing subscription required.
-        sub_q = await db.execute(
-            select(Subscription.current_period_end).where(
-                Subscription.user_id == user_id,
-                Subscription.status.in_(("active", "trialing")),
+        # Active/trialing subscription required — except for internal users,
+        # who don't pay but still need a current circuit grant below.
+        if not is_internal_user:
+            sub_q = await db.execute(
+                select(Subscription.current_period_end).where(
+                    Subscription.user_id == user_id,
+                    Subscription.status.in_(("active", "trialing")),
+                )
             )
-        )
-        has_active_sub = False
-        for (period_end,) in sub_q.all():
-            if period_end is not None and period_end.tzinfo is None:
-                period_end = period_end.replace(tzinfo=timezone.utc)
-            if period_end is None or period_end > now:
-                has_active_sub = True
-                break
-        if not has_active_sub:
-            return None
+            has_active_sub = False
+            for (period_end,) in sub_q.all():
+                if period_end is not None and period_end.tzinfo is None:
+                    period_end = period_end.replace(tzinfo=timezone.utc)
+                if period_end is None or period_end > now:
+                    has_active_sub = True
+                    break
+            if not has_active_sub:
+                return None
 
-        # At least one currently-valid circuit grant required.
+        # At least one currently-valid circuit grant required (paying AND
+        # internal users alike).
         ca_q = await db.execute(
             select(UserCircuitAccess.valid_from, UserCircuitAccess.valid_until).where(
                 UserCircuitAccess.user_id == user_id,

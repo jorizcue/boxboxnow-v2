@@ -442,6 +442,17 @@ async def init_db():
             except Exception:
                 pass
 
+        # "Internal" users — bypass the subscription gate (no payment) but
+        # still need active circuit access to enter. Default 0 keeps every
+        # existing user as a regular paying user, no behavioural change on
+        # rollout.
+        try:
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN is_internal BOOLEAN NOT NULL DEFAULT 0"
+            ))
+        except Exception:
+            pass
+
         # Record the installed app version + platform for each device
         # session. Populated from the `X-App-Platform` / `X-App-Version`
         # request headers (mobile clients only; blank for web). Lets the

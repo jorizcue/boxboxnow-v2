@@ -182,41 +182,46 @@ async def race_websocket(
     # content AND circuit-bound; reject any client whose subscription
     # has expired/been cancelled, OR who has no currently-valid
     # UserCircuitAccess row, before we accept the WS handshake. Admins
-    # bypass both checks. Mirrors the `require_active_subscription` +
-    # `require_active_circuit_access` HTTP dependencies. Close code
-    # 4003 ("policy violation"-ish) is what we already use for
-    # max-devices; reason text differs so the client can tell apart
-    # which gate fired.
+    # bypass both checks; internal users (`is_internal=True`) bypass
+    # ONLY the subscription check (still need circuit access). Mirrors
+    # the `require_active_subscription` + `require_active_circuit_access`
+    # HTTP dependencies. Close code 4003 ("policy violation"-ish) is what
+    # we already use for max-devices; reason text differs so the client
+    # can tell apart which gate fired.
     async with async_session() as db:
         u_row = await db.execute(
-            select(User.is_admin).where(User.id == user_id)
+            select(User.is_admin, User.is_internal).where(User.id == user_id)
         )
-        is_admin_check = bool(u_row.scalar() or False)
+        u_flags = u_row.first()
+        is_admin_check = bool(u_flags[0]) if u_flags else False
+        is_internal_check = bool(u_flags[1]) if u_flags else False
         if not is_admin_check:
             now = datetime.now(timezone.utc)
 
-            # 1. Subscription
-            sub_q = await db.execute(
-                select(Subscription.status, Subscription.current_period_end).where(
-                    Subscription.user_id == user_id,
-                    Subscription.status.in_(("active", "trialing")),
+            # 1. Subscription — internal users skip this gate (they don't pay).
+            if not is_internal_check:
+                sub_q = await db.execute(
+                    select(Subscription.status, Subscription.current_period_end).where(
+                        Subscription.user_id == user_id,
+                        Subscription.status.in_(("active", "trialing")),
+                    )
                 )
-            )
-            has_active_sub = False
-            for status_, period_end in sub_q.all():
-                if period_end is not None and period_end.tzinfo is None:
-                    period_end = period_end.replace(tzinfo=timezone.utc)
-                if period_end is None or period_end > now:
-                    has_active_sub = True
-                    break
-            if not has_active_sub:
-                logger.warning(f"WS rejected: no active subscription (user={user_id})")
-                await websocket.close(code=4003, reason="Active subscription required")
-                return
+                has_active_sub = False
+                for status_, period_end in sub_q.all():
+                    if period_end is not None and period_end.tzinfo is None:
+                        period_end = period_end.replace(tzinfo=timezone.utc)
+                    if period_end is None or period_end > now:
+                        has_active_sub = True
+                        break
+                if not has_active_sub:
+                    logger.warning(f"WS rejected: no active subscription (user={user_id})")
+                    await websocket.close(code=4003, reason="Active subscription required")
+                    return
 
-            # 2. Circuit access — at least one row must cover `now`. We
-            # could fold this into a single SQL with EXISTS, but the
-            # round-trip cost is negligible at handshake time and the
+            # 2. Circuit access — at least one row must cover `now`. ALL
+            # non-admin users (including internal ones) go through this
+            # gate. We could fold this into a single SQL with EXISTS, but
+            # the round-trip cost is negligible at handshake time and the
             # split makes the close-code reason actionable for the
             # client (the SPA already differentiates these on the HTTP
             # side via /auth/me's `has_active_circuit_access` flag).
