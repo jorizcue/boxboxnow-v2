@@ -843,6 +843,30 @@ export function DriverView() {
     speechEnabled
   );
 
+  // Apex live-timing neighbors (sorted by raw `kart.position`, not by
+  // adjusted classification). Used by the new intervalAhead /
+  // intervalBehind cards: my own `interval` is my gap to the kart
+  // ahead, but to display the gap from the kart BEHIND me I need to
+  // read THEIR `interval` (which measures their distance to me).
+  // Memoized for stable ref + cheap re-renders during a 50Hz GPS push.
+  // CRITICAL: this hook MUST stay above the `hasReceivedData` /
+  // `ourKart <= 0` early returns below, otherwise React sees a
+  // different hook count between the "no data yet" render (when the
+  // popup first opens against an empty WS) and the post-data render,
+  // and throws Minified React error #310 ("Rendered more hooks than
+  // during the previous render"). The internal guards already handle
+  // the empty case so it's safe to call unconditionally.
+  const { apexAhead, apexBehind } = useMemo(() => {
+    if (ourKart <= 0 || karts.length === 0) return { apexAhead: null, apexBehind: null };
+    const sorted = karts.filter((k) => k.position > 0).sort((a, b) => a.position - b.position);
+    const idx = sorted.findIndex((k) => k.kartNumber === ourKart);
+    if (idx < 0) return { apexAhead: null, apexBehind: null };
+    return {
+      apexAhead: idx > 0 ? sorted[idx - 1] : null,
+      apexBehind: idx < sorted.length - 1 ? sorted[idx + 1] : null,
+    };
+  }, [karts, ourKart]);
+
   /* ---------- Waiting for data / no kart ---------- */
   const hasReceivedData = karts.length > 0 || config.ourKartNumber > 0;
 
@@ -908,23 +932,6 @@ export function DriverView() {
     const sec = s % 60;
     return `${m}:${String(sec).padStart(2, "0")}`;
   })();
-
-  // Apex live-timing neighbors (sorted by raw `kart.position`, not by
-  // adjusted classification). Used by the new intervalAhead /
-  // intervalBehind cards: my own `interval` is my gap to the kart
-  // ahead, but to display the gap from the kart BEHIND me I need to
-  // read THEIR `interval` (which measures their distance to me).
-  // Memoized for stable ref + cheap re-renders during a 50Hz GPS push.
-  const { apexAhead, apexBehind } = useMemo(() => {
-    if (ourKart <= 0 || karts.length === 0) return { apexAhead: null, apexBehind: null };
-    const sorted = karts.filter((k) => k.position > 0).sort((a, b) => a.position - b.position);
-    const idx = sorted.findIndex((k) => k.kartNumber === ourKart);
-    if (idx < 0) return { apexAhead: null, apexBehind: null };
-    return {
-      apexAhead: idx > 0 ? sorted[idx - 1] : null,
-      apexBehind: idx < sorted.length - 1 ? sorted[idx + 1] : null,
-    };
-  }, [karts, ourKart]);
 
   const cards: Record<DriverCardId, { label: string; content: React.ReactNode; accent: string }> = {
     raceTimer: {
