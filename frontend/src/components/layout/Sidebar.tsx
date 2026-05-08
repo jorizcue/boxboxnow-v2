@@ -417,6 +417,23 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs, username }:
               {!collapsed && (
                 <>
                   <span className="text-sm font-medium truncate flex-1 text-left">{t("nav.driver")}</span>
+                  {/* Open driver view in a popup window. We render this as a
+                      span (not a nested button) because the parent is already
+                      a <button> — nested buttons are invalid HTML. The
+                      onClick uses stopPropagation so toggling the section
+                      open/closed doesn't fire when the user clicks the icon.
+                      The handler (openDriverPopup, defined above) also
+                      detects iOS and offers Bluefy for RaceBox support. */}
+                  <span
+                    role="button"
+                    onClick={openDriverPopup}
+                    className="shrink-0 p-0.5 rounded hover:bg-white/10 text-neutral-500 hover:text-accent transition-colors"
+                    title={t("driver.openWindow")}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                    </svg>
+                  </span>
                   <svg
                     className={clsx(
                       "w-3.5 h-3.5 shrink-0 transition-transform duration-200",
