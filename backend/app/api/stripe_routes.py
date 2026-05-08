@@ -317,6 +317,18 @@ async def create_checkout_session(
     # Requires Stripe Tax to be enabled in the dashboard.
     session_params["automatic_tax"] = {"enabled": True}
 
+    # Promotion codes — Stripe renders an "Add promotion code" field in the
+    # embedded checkout. Users type a code (e.g. "LANZAMIENTO50") and Stripe
+    # validates it against the active Promotion Codes / Coupons configured
+    # in dashboard.stripe.com/promotion-codes. Discount and IVA recalc
+    # happen server-side in Stripe; the resulting `amount_discount` shows
+    # up on `session.total_details` in the checkout.session.completed
+    # webhook. Coupons handle expiry / max-redemptions / product
+    # restrictions natively, so no local validation needed.
+    # Note: incompatible with passing `discounts=[…]` directly — would
+    # need to be removed if we add pre-applied promo codes via URL later.
+    session_params["allow_promotion_codes"] = True
+
     checkout_session = s.checkout.Session.create(**session_params)
 
     return {"client_secret": checkout_session.client_secret, "session_id": checkout_session.id}
