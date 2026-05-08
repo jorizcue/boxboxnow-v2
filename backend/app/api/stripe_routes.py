@@ -296,6 +296,12 @@ async def create_checkout_session(
     # Use embedded UI mode — returns client_secret for frontend Stripe.js
     session_params["ui_mode"] = "embedded_page"
     session_params["return_url"] = f"{settings.frontend_url}/dashboard?checkout=success&session_id={{CHECKOUT_SESSION_ID}}"
+    # Force the checkout UI into Spanish regardless of the browser's
+    # Accept-Language header. In embedded mode, `locale` is set
+    # server-side at session creation; the Stripe.js EmbeddedCheckout
+    # provider doesn't accept a `locale` option (only the redirect mode
+    # does). Currency formatting still respects the user's locale.
+    session_params["locale"] = "es"
     # Remove success/cancel URLs (not used in embedded mode)
     session_params.pop("success_url", None)
     session_params.pop("cancel_url", None)
@@ -328,6 +334,38 @@ async def create_checkout_session(
     # Note: incompatible with passing `discounts=[…]` directly — would
     # need to be removed if we add pre-applied promo codes via URL later.
     session_params["allow_promotion_codes"] = True
+
+    # Force the user to tick "I accept the terms of service" before pay.
+    # The Terms URL is read from dashboard.stripe.com/settings/public
+    # ("Terms of service URL") — make sure it's set there, otherwise
+    # Stripe rejects this param with a 400. The promotional consent is
+    # set to "none": we don't want a marketing opt-in checkbox.
+    session_params["consent_collection"] = {
+        "terms_of_service": "required",
+        "promotions": "none",
+    }
+
+    # Custom text in the checkout. Markdown is supported (links, bold).
+    # `submit.message` shows below the pay button — good place to
+    # reassure with activation timing / cancellation policy. The
+    # terms_of_service_acceptance message overrides Stripe's default
+    # checkbox label so we keep it in castellano regardless of locale
+    # quirks and link straight to our own pages.
+    session_params["custom_text"] = {
+        "submit": {
+            "message": (
+                "Activación inmediata tras el pago. "
+                "Recibirás un email de confirmación con el detalle de tu plan."
+            ),
+        },
+        "terms_of_service_acceptance": {
+            "message": (
+                "He leído y acepto los "
+                "[Términos de servicio](https://boxboxnow.com/terminos) "
+                "y la [Política de privacidad](https://boxboxnow.com/privacidad)."
+            ),
+        },
+    }
 
     checkout_session = s.checkout.Session.create(**session_params)
 
