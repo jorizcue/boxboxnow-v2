@@ -257,17 +257,22 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
     ? !pitStatusFromBackend.isOpen
     : localPitIsClosed;
 
-  // Subtitle / tooltip text for the badge. For driver_min_time we
-  // substitute the blocking driver's name + remaining minutes so the
-  // strategist can act on the message: "Matías necesita 9 min más".
+  // Subtitle / tooltip text for the badge. Whenever the backend surfaces
+  // a `blockingDriver` (currently for stint_too_short AND driver_min_time
+  // close reasons) we render the personalized template:
+  //   "Matías necesita 12 min más"
+  // The blocking-driver-remaining-ms already represents the binding
+  // constraint between (stint mín. restante) and (tiempo mín. piloto
+  // restante) — backend computes the max of the two so the badge stays
+  // consistent as Matías keeps driving and the binding constraint shifts
+  // from "stint mín." to "tiempo mín. piloto" without the number jumping
+  // up unexpectedly.
   const pitCloseSubtitle: string | null = (() => {
     if (!pitStatusFromBackend || pitStatusFromBackend.isOpen) return null;
     const reason = pitStatusFromBackend.closeReason;
-    if (reason === "driver_min_time" && pitStatusFromBackend.blockingDriver) {
-      const remMin = Math.max(
-        1,
-        Math.ceil((pitStatusFromBackend.blockingDriverRemainingMs || 0) / 60000),
-      );
+    const rem = pitStatusFromBackend.blockingDriverRemainingMs || 0;
+    if (pitStatusFromBackend.blockingDriver && rem > 0) {
+      const remMin = Math.max(1, Math.ceil(rem / 60000));
       return t("status.pitReason.driver_min_time_long")
         .replace("{driver}", pitStatusFromBackend.blockingDriver)
         .replace("{minutes}", String(remMin));

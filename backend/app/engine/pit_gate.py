@@ -282,37 +282,38 @@ def compute_pit_status(state) -> PitStatus:
     real_min_stint_s = max(min_stint_s, t_start_s - pit_time_s - max_reserve_s)
     real_max_stint_s = min(max_stint_s, t_start_s - pit_time_s - min_reserve_s)
 
-    if stint_sec < real_min_stint_s:
-        # Pitting now would force every future stint to be longer than
-        # max_stint — infeasible. Same condition the web "tooEarly" flag
-        # captures, formalized here.
-        return PitStatus(is_open=False, close_reason="stint_too_short")
-    if stint_sec > real_max_stint_s + 1:
-        # We've already overrun. Symmetric case: pitting now would leave
-        # too much time for the remaining stints at min length. Surface
-        # it explicitly so the UI knows to switch to "URGENT — pit now".
-        # (Threshold +1s avoids flapping on rounding.)
-        return PitStatus(is_open=False, close_reason="stint_too_long")
-
-    # Driver-minimum-time feasibility.
+    # ─── Common: what the CURRENT driver still needs ────────────────────────
+    #
+    # The strategist's actionable view is "how many more minutes must the
+    # current pilot keep driving before they can pit safely?". That number
+    # is the max of two pending constraints:
+    #
+    #   (a) stint duration must reach realMinStint (the "stint_too_short"
+    #       constraint — pitting earlier forces future avg stint > max).
+    #   (b) the pilot's total race time must reach min_driver_time
+    #       (the "driver_min_time" constraint — pitting earlier would
+    #       leave the team unable to satisfy per-driver minimums).
+    #
+    # We compute both up-front so the badge text stays consistent: a
+    # single "{driver} necesita X min más" surfaces the binding one.
+    current_driver = getattr(our_kart, "driver_name", "") or None
+    stint_elapsed_ms = getattr(our_kart, "stint_elapsed_ms", 0) or 0
     min_driver_time_min = getattr(state, "min_driver_time_min", 0) or 0
     team_drivers_count = getattr(state, "team_drivers_count", 0) or 0
+    min_driver_time_ms = min_driver_time_min * 60 * 1000
+
+    # Per-driver pair list (including the current driver's in-progress stint).
     drivers_pairs: list[tuple[str, int]] = []
     drivers_info_list: list[DriverTimeInfo] = []
+    current_driver_race_remaining_ms = 0
 
     if min_driver_time_min > 0:
-        min_driver_time_ms = min_driver_time_min * 60 * 1000
-
-        # Pull each driver's accumulated time (including in-progress stint).
-        stint_elapsed_ms = getattr(our_kart, "stint_elapsed_ms", 0)
-        current_driver = getattr(our_kart, "driver_name", "") or None
         drivers_pairs = _driver_times_for_kart(
             getattr(our_kart, "driver_total_ms", {}),
             stint_elapsed_ms,
             current_driver,
             team_drivers_count,
         )
-
         drivers_info_list = [
             DriverTimeInfo(
                 name=name,
@@ -321,13 +322,51 @@ def compute_pit_status(state) -> PitStatus:
             )
             for name, acc in drivers_pairs
         ]
+        if current_driver:
+            current_acc = next((acc for n, acc in drivers_pairs if n == current_driver), 0)
+            current_driver_race_remaining_ms = max(0, min_driver_time_ms - current_acc)
 
+    # Stint-based remaining (only positive when stint_too_short would fire).
+    stint_pending_ms = max(0, int(real_min_stint_s * 1000) - int(stint_sec * 1000))
+
+    # The unified actionable remaining for the current pilot.
+    current_driver_blocker_ms = max(stint_pending_ms, current_driver_race_remaining_ms)
+
+    # ─── Stint-length checks ────────────────────────────────────────────────
+    if stint_sec < real_min_stint_s:
+        # Pitting now would force every future stint to be longer than
+        # max_stint — infeasible. Same condition the web "tooEarly" flag
+        # captures, formalized here. We surface the current pilot as the
+        # blocker (with the max of stint-pending and race-pending) so the
+        # badge can render "{driver} necesita X min más" instead of a
+        # generic "stint minimum not reached" string.
+        return PitStatus(
+            is_open=False,
+            close_reason="stint_too_short",
+            blocking_driver=current_driver,
+            blocking_driver_remaining_ms=int(current_driver_blocker_ms),
+            drivers=drivers_info_list,
+        )
+    if stint_sec > real_max_stint_s + 1:
+        # We've already overrun. Symmetric case: pitting now would leave
+        # too much time for the remaining stints at min length. Surface
+        # it explicitly so the UI knows to switch to "URGENT — pit now".
+        # (Threshold +1s avoids flapping on rounding.)
+        return PitStatus(
+            is_open=False,
+            close_reason="stint_too_long",
+            blocking_driver=current_driver,
+            drivers=drivers_info_list,
+        )
+
+    # ─── Driver-minimum-time feasibility ────────────────────────────────────
+    if min_driver_time_min > 0:
         # Drive time remaining AFTER current pit, summed across future stints.
         drive_remaining_s = (countdown_ms / 1000.0) - pit_time_s * (pending_pits_after_this + 1)
         if drive_remaining_s < 0:
             drive_remaining_s = 0
 
-        feasible, blocker, blocker_rem = _is_driver_min_feasible(
+        feasible, algo_blocker, algo_blocker_rem = _is_driver_min_feasible(
             drivers_pairs,
             n_future_stints,
             int(drive_remaining_s * 1000),
@@ -337,16 +376,30 @@ def compute_pit_status(state) -> PitStatus:
         )
 
         if not feasible:
+            # Pick the most ACTIONABLE blocker for the badge:
+            #
+            #   Priority 1: the current pilot if they still have unmet need
+            #               (race-min or stint-min). This is the strategist's
+            #               natural mental model — "Matías hasn't met his
+            #               minimum yet, so keep him on track".
+            #   Priority 2: fall back to the worst remaining driver from the
+            #               feasibility algorithm. Used when the current
+            #               pilot is already done but the team still can't
+            #               fit (e.g. a ghost driver who hasn't started yet).
+            if current_driver and current_driver_blocker_ms > 0:
+                blocker_name = current_driver
+                blocker_rem = current_driver_blocker_ms
+            else:
+                blocker_name = algo_blocker
+                blocker_rem = algo_blocker_rem
             # Predict when the gate will open next (best-effort): step the
             # countdown forward in 10 s slices and re-check. Stop at race
             # end or after 1 h of simulated future.
-            next_open_ms = _predict_next_open_countdown_ms(
-                state, our_kart,
-            )
+            next_open_ms = _predict_next_open_countdown_ms(state, our_kart)
             return PitStatus(
                 is_open=False,
                 close_reason="driver_min_time",
-                blocking_driver=blocker,
+                blocking_driver=blocker_name,
                 blocking_driver_remaining_ms=int(blocker_rem),
                 next_open_countdown_ms=next_open_ms,
                 drivers=drivers_info_list,
