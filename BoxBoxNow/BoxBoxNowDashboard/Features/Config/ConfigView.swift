@@ -106,6 +106,7 @@ private struct SessionEditor: View {
     @State private var minPits: Int = 2
     @State private var pitTimeS: Int = 180
     @State private var minDriverTimeMin: Int = 60
+    @State private var teamDriversCount: Int = 0
     @State private var pitClosedStartMin: Int = 5
     @State private var pitClosedEndMin: Int = 5
     @State private var boxLines: Int = 1
@@ -214,6 +215,8 @@ private struct SessionEditor: View {
             NumTile(label: "STINT MIN (MIN)", value: $minStintMin, range: 0...120)
             NumTile(label: "STINT MAX (MIN)", value: $maxStintMin, range: 0...240)
             NumTile(label: "MIN PILOTO (MIN)", value: $minDriverTimeMin, range: 0...600)
+            // Drives the pit-gate feasibility check from lap 1; 0 = fallback to Apex.
+            NumTile(label: "PILOTOS EQUIPO", value: $teamDriversCount, range: 0...20)
             NumTile(label: "PIT CERR. INI (MIN)", value: $pitClosedStartMin, range: 0...120)
             NumTile(label: "PIT CERR. FIN (MIN)", value: $pitClosedEndMin, range: 0...120)
             NumTile(label: "LINEAS DE BOX", value: $boxLines, range: 1...10)
@@ -256,6 +259,7 @@ private struct SessionEditor: View {
         minPits = s.minPits
         pitTimeS = s.pitTimeS
         minDriverTimeMin = s.minDriverTimeMin
+        teamDriversCount = s.teamDriversCount ?? 0
         pitClosedStartMin = s.pitClosedStartMin
         pitClosedEndMin = s.pitClosedEndMin
         boxLines = s.boxLines
@@ -278,7 +282,8 @@ private struct SessionEditor: View {
             pitClosedStartMin: pitClosedStartMin, pitClosedEndMin: pitClosedEndMin,
             boxLines: boxLines, boxKarts: boxKarts, ourKartNumber: ourKartNumber,
             refreshIntervalS: refreshIntervalS, isActive: true,
-            autoLoadTeams: existing?.autoLoadTeams
+            autoLoadTeams: existing?.autoLoadTeams,
+            teamDriversCount: teamDriversCount
         )
         if let saved = await app.config.saveSession(draft) { apply(saved) }
     }
@@ -711,7 +716,8 @@ private struct TeamsEditor: View {
             pitClosedStartMin: existing.pitClosedStartMin, pitClosedEndMin: existing.pitClosedEndMin,
             boxLines: existing.boxLines, boxKarts: existing.boxKarts, ourKartNumber: existing.ourKartNumber,
             refreshIntervalS: existing.refreshIntervalS, isActive: true,
-            autoLoadTeams: value
+            autoLoadTeams: value,
+            teamDriversCount: existing.teamDriversCount
         )
         _ = await app.config.saveSession(draftSession)
     }

@@ -3,6 +3,7 @@ package com.boxboxnow.app.vm
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.boxboxnow.app.models.KartState
+import com.boxboxnow.app.models.PitStatus
 import com.boxboxnow.app.models.SectorBest
 import com.boxboxnow.app.models.SectorMeta
 import com.boxboxnow.app.net.WebSocketClient
@@ -30,6 +31,8 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
+import kotlinx.serialization.json.longOrNull
 import javax.inject.Inject
 
 /**
@@ -107,6 +110,17 @@ class RaceViewModel @Inject constructor(
 
     private val _minDriverTimeMin = MutableStateFlow(0.0)
     val minDriverTimeMin = _minDriverTimeMin.asStateFlow()
+
+    private val _teamDriversCount = MutableStateFlow(0)
+    val teamDriversCount = _teamDriversCount.asStateFlow()
+
+    /** Pit-gate decision pushed by the backend (snapshot / analytics /
+     *  fifo_update). Combines regulation windows, stint-length bounds
+     *  AND driver-min-time feasibility into a single is_open/closed
+     *  verdict + reason. Null while the very first WS frame hasn't
+     *  arrived yet — driver-view falls back to the legacy local check. */
+    private val _pitStatus = MutableStateFlow<PitStatus?>(null)
+    val pitStatus = _pitStatus.asStateFlow()
 
     /** Whether the active session's Apex grid declares sector columns
      *  (s1|s2|s3 data-types). Set true the first time we see a sector
@@ -381,6 +395,7 @@ class RaceViewModel @Inject constructor(
                     cfg["maxStintMin"]?.asDoubleOrNull()?.let { _maxStintMin.value = it }
                     cfg["minStintMin"]?.asDoubleOrNull()?.let { _minStintMin.value = it }
                     cfg["minDriverTimeMin"]?.asDoubleOrNull()?.let { _minDriverTimeMin.value = it }
+                    cfg["teamDriversCount"]?.asIntOrNull()?.let { _teamDriversCount.value = it }
                 }
 
                 (data["fifo"] as? JsonObject)?.get("score")?.asDoubleOrNull()?.let { _boxScore.value = it }
@@ -399,6 +414,13 @@ class RaceViewModel @Inject constructor(
                 }
                 if (data.containsKey("sectorMeta")) {
                     _sectorMeta.value = parseSectorMeta(data["sectorMeta"])
+                }
+                // Pit-gate decision pushed by backend. Same defensive
+                // containsKey check as sectors — analytics frames from
+                // older backends omit the field, and we must not reset
+                // the cached state in that case.
+                if (data.containsKey("pitStatus")) {
+                    _pitStatus.value = parsePitStatus(data["pitStatus"])
                 }
             }
 
@@ -421,8 +443,15 @@ class RaceViewModel @Inject constructor(
             }
 
             "fifo_update" -> {
-                (el["data"] as? JsonObject)?.get("fifo")?.jsonObject?.get("score")
+                val data = el["data"] as? JsonObject
+                data?.get("fifo")?.jsonObject?.get("score")
                     ?.asDoubleOrNull()?.let { _boxScore.value = it }
+                // Backend bundles the recomputed pit-gate state on every
+                // fifo_update so the badge reacts immediately to a pit-in
+                // shifting driver totals.
+                if (data?.containsKey("pitStatus") == true) {
+                    _pitStatus.value = parsePitStatus(data["pitStatus"])
+                }
             }
 
             "replay_status" -> {
@@ -587,6 +616,36 @@ class RaceViewModel @Inject constructor(
         if (s1 == null && s2 == null && s3 == null) return null
         return SectorMeta(s1, s2, s3)
     }
+
+    /** Decode the `pitStatus` payload (top-level field on snapshots,
+     *  analytics frames and fifo_update messages) into a strongly-typed
+     *  `PitStatus`. Returns null when the backend reports `null` or the
+     *  payload is malformed; callers fall back to the prior local pit-
+     *  window heuristic in that case. */
+    private fun parsePitStatus(el: JsonElement?): PitStatus? {
+        val obj = el as? JsonObject ?: return null
+        val isOpen = obj["is_open"]?.asBoolOrNull() ?: true
+        val closeReason = obj["close_reason"]?.jsonPrimitive?.contentOrNull
+        val blockingDriver = obj["blocking_driver"]?.jsonPrimitive?.contentOrNull
+        val blockingRem = obj["blocking_driver_remaining_ms"]?.asLongOrNull()
+        val nextOpen = obj["next_open_countdown_ms"]?.asLongOrNull()
+        val driversArr = obj["drivers"] as? JsonArray
+        val drivers = driversArr?.mapNotNull { it as? JsonObject }?.map { d ->
+            PitStatus.DriverTimeInfo(
+                name = d["name"]?.jsonPrimitive?.contentOrNull ?: "",
+                accumulatedMs = d["accumulated_ms"]?.asLongOrNull() ?: 0L,
+                remainingMs = d["remaining_ms"]?.asLongOrNull() ?: 0L,
+            )
+        }
+        return PitStatus(
+            isOpen = isOpen,
+            closeReason = closeReason,
+            blockingDriver = blockingDriver,
+            blockingDriverRemainingMs = blockingRem,
+            nextOpenCountdownMs = nextOpen,
+            drivers = drivers,
+        )
+    }
 }
 
 // ── JSON helpers ──
@@ -597,6 +656,12 @@ private fun JsonElement.asDoubleOrNull(): Double? = runCatching {
 
 private fun JsonElement.asIntOrNull(): Int? = runCatching {
     jsonPrimitive.intOrNull ?: jsonPrimitive.doubleOrNull?.toInt()
+}.getOrNull()
+
+private fun JsonElement.asLongOrNull(): Long? = runCatching {
+    jsonPrimitive.longOrNull
+        ?: jsonPrimitive.intOrNull?.toLong()
+        ?: jsonPrimitive.doubleOrNull?.toLong()
 }.getOrNull()
 
 private fun JsonElement.asBoolOrNull(): Boolean? = runCatching {

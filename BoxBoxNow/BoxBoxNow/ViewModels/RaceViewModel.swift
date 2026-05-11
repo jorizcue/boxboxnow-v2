@@ -38,6 +38,14 @@ final class RaceViewModel: ObservableObject {
     @Published var maxStintMin: Double = 0
     @Published var minStintMin: Double = 0
     @Published var minDriverTimeMin: Double = 0
+    @Published var teamDriversCount: Int = 0
+
+    /// Pit-gate decision pushed by the backend on every snapshot /
+    /// analytics / fifo_update. Combines regulation windows, stint
+    /// length feasibility AND driver-min-time feasibility into one
+    /// is_open/closed verdict + reason. nil while the very first frame
+    /// hasn't arrived yet — views fall back to the legacy local check.
+    @Published var pitStatus: PitStatus? = nil
 
     // Sector telemetry — only present on circuits whose Apex grid declares
     // `s1|s2|s3` columns. `hasSectors` flips true the first time the
@@ -324,6 +332,17 @@ final class RaceViewModel: ObservableObject {
 
     /// Pit window open/closed — web: lines 462-483
     func computePitWindowOpen(ourKartNumber: Int, clockMs: Double = 0) -> Bool? {
+        // Authoritative source is the backend's pit_gate result. When the
+        // WS has pushed a pitStatus we trust it — it already considers
+        // regulation windows, stint-length bounds AND the new driver-min-
+        // time feasibility check (see backend/app/engine/pit_gate.py).
+        if let status = pitStatus {
+            return status.isOpen
+        }
+
+        // Fallback: the legacy local heuristic, used when the very first
+        // WS frame hasn't arrived yet or when talking to an older backend
+        // that doesn't emit pitStatus.
         let clock = clockMs > 0 ? clockMs : raceTimerMs
         guard ourKartNumber > 0, clock > 0, !raceFinished else { return nil }
         guard let kart = karts.first(where: { $0.kartNumber == ourKartNumber }) else { return nil }
@@ -410,6 +429,7 @@ final class RaceViewModel: ObservableObject {
                     maxStintMin = asDouble(cfg["maxStintMin"]) ?? maxStintMin
                     minStintMin = asDouble(cfg["minStintMin"]) ?? minStintMin
                     minDriverTimeMin = asDouble(cfg["minDriverTimeMin"]) ?? minDriverTimeMin
+                    teamDriversCount = asInt(cfg["teamDriversCount"]) ?? teamDriversCount
                     print("[RaceVM] Config from WS: kart=\(ourKartNumber), circuitLength=\(circuitLengthM), minPits=\(minPits)")
                 }
 
@@ -431,6 +451,13 @@ final class RaceViewModel: ObservableObject {
                 }
                 if snapshotData.keys.contains("sectorMeta") {
                     sectorMeta = decodeSectorMeta(snapshotData["sectorMeta"])
+                }
+                // Pit-gate decision (server-side authoritative). Only
+                // overwrite when the key is present, same logic as
+                // sectors — guards against analytics frames that omit
+                // it on older backends.
+                if snapshotData.keys.contains("pitStatus") {
+                    pitStatus = decodePitStatus(snapshotData["pitStatus"])
                 }
             }
 
@@ -459,6 +486,14 @@ final class RaceViewModel: ObservableObject {
         case "fifo_update":
             if let msgData = json["data"] as? [String: Any] {
                 parseFifoScore(msgData)
+                // Backend bundles the recomputed pit-gate state on every
+                // fifo_update so the badge reacts immediately to a pit-in
+                // shifting driver totals. Same guard as elsewhere: only
+                // overwrite when the key is actually present so older
+                // backends keep working.
+                if msgData.keys.contains("pitStatus") {
+                    pitStatus = decodePitStatus(msgData["pitStatus"])
+                }
             }
 
         case "replay_status":
@@ -676,6 +711,37 @@ final class RaceViewModel: ObservableObject {
         let s1 = decode("s1"); let s2 = decode("s2"); let s3 = decode("s3")
         if s1 == nil && s2 == nil && s3 == nil { return nil }
         return SectorMeta(s1: s1, s2: s2, s3: s3)
+    }
+
+    /// Decode the `pitStatus` payload (top-level field on snapshots,
+    /// analytics frames and fifo_update messages) into a strongly-typed
+    /// `PitStatus`. Returns nil when the backend reports `null` or the
+    /// payload is malformed; callers fall back to the prior local
+    /// pit-window heuristic in that case.
+    private func decodePitStatus(_ raw: Any?) -> PitStatus? {
+        guard let dict = raw as? [String: Any] else { return nil }
+        let isOpen = (dict["is_open"] as? Bool) ?? true
+        let closeReason = dict["close_reason"] as? String
+        let blockingDriver = dict["blocking_driver"] as? String
+        let blockingRem = asInt(dict["blocking_driver_remaining_ms"])
+        let nextOpen = asInt(dict["next_open_countdown_ms"])
+        var drivers: [PitStatus.DriverTimeInfo] = []
+        if let arr = dict["drivers"] as? [[String: Any]] {
+            for d in arr {
+                let name = (d["name"] as? String) ?? ""
+                let acc = asInt(d["accumulated_ms"]) ?? 0
+                let rem = asInt(d["remaining_ms"]) ?? 0
+                drivers.append(.init(name: name, accumulatedMs: acc, remainingMs: rem))
+            }
+        }
+        return PitStatus(
+            isOpen: isOpen,
+            closeReason: closeReason,
+            blockingDriver: blockingDriver,
+            blockingDriverRemainingMs: blockingRem,
+            nextOpenCountdownMs: nextOpen,
+            drivers: drivers
+        )
     }
 
     // MARK: - JSON helpers (backend may send Int or Double)

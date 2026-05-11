@@ -296,6 +296,10 @@ class RaceStateManager:
         self.box_lines: int = 2
         self.box_karts: int = 30
         self.duration_min: int = 180
+        # Number of drivers in the team. 0 = not configured; the pit-gate
+        # falls back to Apex-observed drivers. Set from RaceSession by
+        # _apply_session_config.
+        self.team_drivers_count: int = 0
         self.finish_lat1: float | None = None
         self.finish_lon1: float | None = None
         self.finish_lat2: float | None = None
@@ -1198,6 +1202,7 @@ class RaceStateManager:
                     "boxLines": self.box_lines,
                     "boxKarts": self.box_karts,
                     "minDriverTimeMin": self.min_driver_time_min,
+                    "teamDriversCount": self.team_drivers_count,
                     "pitClosedStartMin": self.pit_closed_start_min,
                     "pitClosedEndMin": self.pit_closed_end_min,
                     "rain": self.rain_mode,
@@ -1206,11 +1211,30 @@ class RaceStateManager:
                     "finishLat2": self.finish_lat2,
                     "finishLon2": self.finish_lon2,
                 },
+                # Pit-gate decision computed server-side so every client
+                # (web, iPad dashboard, iOS / Android driver apps) sees the
+                # same open/close + reason + predicted-open-at countdown.
+                "pitStatus": self._compute_pit_status_dict(),
                 "durationMs": getattr(self, '_first_countdown_ms', 0) or self.duration_min * 60 * 1000,
                 "raceCurrentLap": self.race_current_lap,
                 "raceTotalLaps": self.race_total_laps,
             },
         }
+
+    def _compute_pit_status_dict(self) -> dict:
+        """Wrapper that calls into `app.engine.pit_gate.compute_pit_status`
+        and returns the result as a plain dict ready for JSON serialization.
+        Failures are swallowed: the pit-gate is non-critical telemetry, we
+        don't want a bug in the feasibility check to take down the WS
+        broadcast for the rest of the race state.
+        """
+        try:
+            from app.engine.pit_gate import compute_pit_status
+            return compute_pit_status(self).to_dict()
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("pit_gate compute failed")
+            return {"is_open": True, "close_reason": None, "drivers": []}
 
     async def _broadcast(self, message: dict):
         """Send message to all connected browser clients."""

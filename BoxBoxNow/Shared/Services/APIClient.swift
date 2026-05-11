@@ -123,6 +123,7 @@ final class APIClient {
             "min_pits": session.minPits,
             "pit_time_s": session.pitTimeS,
             "min_driver_time_min": session.minDriverTimeMin,
+            "team_drivers_count": session.teamDriversCount ?? 0,
             "rain": session.rain,
             "pit_closed_start_min": session.pitClosedStartMin,
             "pit_closed_end_min": session.pitClosedEndMin,

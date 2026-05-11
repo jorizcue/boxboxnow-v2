@@ -453,6 +453,18 @@ async def init_db():
         except Exception:
             pass
 
+        # Team driver count for the pit-gate feasibility check. 0 means
+        # "not configured": the gate falls back to the Apex-observed
+        # driver count from kart.driver_total_ms. Strategists set this
+        # in advance so the gate can enforce min_driver_time_min from
+        # the first stint.
+        try:
+            await conn.execute(text(
+                "ALTER TABLE race_sessions ADD COLUMN team_drivers_count INTEGER NOT NULL DEFAULT 0"
+            ))
+        except Exception:
+            pass
+
         # Record the installed app version + platform for each device
         # session. Populated from the `X-App-Platform` / `X-App-Version`
         # request headers (mobile clients only; blank for web). Lets the

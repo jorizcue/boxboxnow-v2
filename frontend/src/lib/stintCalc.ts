@@ -96,10 +96,24 @@ export function computeStintMetrics(
 
   const timeRemainingFromStintStartSec = stintStart / 1000;
   const pendingPits = Math.max(0, config.minPits - kart.pitCount);
-  const reservePerPitSec =
+  // realMaxStint and realMinStint reserve different "budgets" for what
+  // happens AFTER the current pit. The former asks "what's the maximum
+  // I can extend this stint such that remaining stints can still be
+  // ≥ minStint each?", so the reserve uses minStint. The latter asks
+  // "what's the minimum I MUST run such that remaining stints don't
+  // need to be > maxStint each?", so the reserve uses maxStint. Using
+  // minStint in both (the previous bug) made realMinStint blow up to
+  // values like 80+ minutes during early-race feasibility checks, which
+  // didn't match the actual pit-open logic in StatusBar.tsx. Authoritative
+  // source is now backend `pit_gate.py` but the local helper still has
+  // to match for the legacy widget readouts ("realMinStint", driver-view
+  // pitWindow card) that hadn't been ported yet.
+  const reserveMinPerPitSec =
     pendingPits > 0 ? (config.pitTimeS + config.minStintMin * 60) * pendingPits : 0;
+  const reserveMaxPerPitSec =
+    pendingPits > 0 ? (config.pitTimeS + config.maxStintMin * 60) * pendingPits : 0;
 
-  const availableSec = timeRemainingFromStintStartSec - reservePerPitSec;
+  const availableSec = timeRemainingFromStintStartSec - reserveMinPerPitSec;
   const realMaxStintSec = Math.min(config.maxStintMin * 60, Math.max(0, availableSec));
   const realMaxStintMin = realMaxStintSec / 60;
 
@@ -109,7 +123,7 @@ export function computeStintMetrics(
 
   const realMinStintMin = Math.max(
     config.minStintMin,
-    timeRemainingFromStintStartSec / 60 - reservePerPitSec / 60,
+    timeRemainingFromStintStartSec / 60 - reserveMaxPerPitSec / 60,
   );
 
   const pitWindowOpen = running ? stintSec / 60 >= realMinStintMin : null;

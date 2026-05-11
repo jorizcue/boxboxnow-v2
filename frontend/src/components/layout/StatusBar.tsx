@@ -223,20 +223,27 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   }, [raceStarted, durationMs, Math.floor(raceClockMs / 60000)]); // recalc every ~1min
 
-  // Pit window status: closed during first/last N minutes AND during min stint after pit out
+  // Pit window status: the backend's `pitStatus` is now the source of
+  // truth. It combines regulation windows, stint-length feasibility AND
+  // the new driver-min-time feasibility check (see
+  // `backend/app/engine/pit_gate.py`). We still compute the legacy
+  // formulas for callers that need a fallback if `pitStatus` hasn't
+  // arrived yet (initial WS frame race condition).
   const ourKart = ourKartNumber > 0 ? karts.find((k) => k.kartNumber === ourKartNumber) : undefined;
   const hasPitWindow = raceStarted && (pitClosedStartMin > 0 || pitClosedEndMin > 0 || minStintMin > 0);
-  const pitIsClosed = (() => {
+  const pitStatusFromBackend = useRaceStore((s) => s.pitStatus);
+
+  // Local fallback: only used when backend hasn't pushed a pitStatus yet
+  // (very first paint, or older backend). Same formula StatusBar shipped
+  // with — kept verbatim for behavioural compatibility.
+  const localPitIsClosed = (() => {
     if (!raceStarted || raceClockMs === 0 || durationMs === 0) return false;
     const elapsedMin = (durationMs - raceClockMs) / 60000;
     const remainingMin = raceClockMs / 60000;
-    // Regulation window: first/last N minutes
     if (pitClosedStartMin > 0 && elapsedMin < pitClosedStartMin) return true;
     if (pitClosedEndMin > 0 && remainingMin < pitClosedEndMin) return true;
-    // Min stint lockout: after our kart's pit out, closed until realMinStint elapsed
     if (minStintMin > 0 && ourKart && ourKart.pitStatus === "racing" && ourKart.stintStartCountdownMs > 0) {
       const stintElapsedMin = (ourKart.stintStartCountdownMs - raceClockMs) / 60000;
-      // Real min stint: max(minStintConfig, timeFromStintStartToEnd - (pitTime + maxStint) × pendingPits)
       const pendingPits = Math.max(0, minPitsConfig - ourKart.pitCount);
       const timeFromStintStartToEndMin = ourKart.stintStartCountdownMs / 1000 / 60;
       const reservePerPitMin = pendingPits > 0 ? (pitTimeS / 60 + maxStintMin) * pendingPits : 0;
@@ -244,6 +251,31 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
       if (stintElapsedMin >= 0 && stintElapsedMin < realMinStintMin) return true;
     }
     return false;
+  })();
+
+  const pitIsClosed = pitStatusFromBackend
+    ? !pitStatusFromBackend.isOpen
+    : localPitIsClosed;
+
+  // Subtitle / tooltip text for the badge. For driver_min_time we
+  // substitute the blocking driver's name + remaining minutes so the
+  // strategist can act on the message: "Matías necesita 9 min más".
+  const pitCloseSubtitle: string | null = (() => {
+    if (!pitStatusFromBackend || pitStatusFromBackend.isOpen) return null;
+    const reason = pitStatusFromBackend.closeReason;
+    if (reason === "driver_min_time" && pitStatusFromBackend.blockingDriver) {
+      const remMin = Math.max(
+        1,
+        Math.ceil((pitStatusFromBackend.blockingDriverRemainingMs || 0) / 60000),
+      );
+      return t("status.pitReason.driver_min_time_long")
+        .replace("{driver}", pitStatusFromBackend.blockingDriver)
+        .replace("{minutes}", String(remMin));
+    }
+    if (reason && reason !== "no_active_kart" && reason !== "not_running") {
+      return t(`status.pitReason.${reason}`);
+    }
+    return null;
   })();
 
   return (
@@ -409,13 +441,23 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
             )}
             {hasPitWindow && !raceFinished && (
               <span
-                className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                className={`flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                   pitIsClosed
                     ? "bg-red-500/20 text-red-400 border border-red-500/30"
                     : "bg-green-500/20 text-green-400 border border-green-500/30"
                 }`}
+                title={pitCloseSubtitle ?? undefined}
               >
-                {pitIsClosed ? t("status.pitClosed") : t("status.pitOpen")}
+                <span>{pitIsClosed ? t("status.pitClosed") : t("status.pitOpen")}</span>
+                {/* On wider viewports we render the close reason inline
+                    next to the badge so the strategist sees WHY without
+                    hovering. On narrow screens the title= tooltip is the
+                    fallback. */}
+                {pitCloseSubtitle && (
+                  <span className="hidden md:inline normal-case font-medium text-red-300/80">
+                    · {pitCloseSubtitle}
+                  </span>
+                )}
               </span>
             )}
           </div>

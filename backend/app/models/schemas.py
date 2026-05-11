@@ -174,6 +174,15 @@ class RaceSession(Base):
     # Team auto-load
     auto_load_teams = Column(Boolean, default=True, nullable=False)
 
+    # Number of drivers in the team. Used by the pit-gate feasibility check
+    # (pit_gate.py) to decide whether pitting now still allows every driver
+    # to reach `min_driver_time_min`. When 0 or NULL the gate falls back to
+    # the count observed in `kart.driver_total_ms` (Apex-discovered drivers),
+    # which means the check only kicks in after a driver change has been
+    # registered. Configurable up-front by the strategist to enforce the
+    # constraint from lap 1.
+    team_drivers_count = Column(Integer, default=0, nullable=False)
+
     # State
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())

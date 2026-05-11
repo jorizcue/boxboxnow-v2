@@ -250,6 +250,7 @@ class ApiClient @Inject constructor(
             put("min_pits", session.minPits)
             put("pit_time_s", session.pitTimeS)
             put("min_driver_time_min", session.minDriverTimeMin)
+            put("team_drivers_count", session.teamDriversCount)
             put("rain", session.rain)
             put("pit_closed_start_min", session.pitClosedStartMin)
             put("pit_closed_end_min", session.pitClosedEndMin)

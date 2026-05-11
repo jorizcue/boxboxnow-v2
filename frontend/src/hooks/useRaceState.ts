@@ -10,6 +10,7 @@ import type {
   RaceSnapshot,
   SectorMeta,
   WsUpdateEvent,
+  PitStatus,
 } from "@/types/race";
 
 interface RaceStore {
@@ -31,6 +32,12 @@ interface RaceStore {
   // cards check this to decide whether to render data or a "--" stub.
   hasSectors: boolean;
   sectorMeta: SectorMeta | null;
+
+  /** Backend-computed pit-gate state. null while the snapshot hasn't
+   *  arrived yet (initial mount). StatusBar reads this to decide
+   *  between PIT ABIERTO / PIT CERRADO + reason; the FifoQueue uses
+   *  `nextOpenCountdownMs` to render "Pit abre en …". */
+  pitStatus: PitStatus | null;
 
   // Apex connection status (persists across tab changes)
   apexConnected: boolean;
@@ -84,6 +91,28 @@ interface RaceStore {
 }
 
 const defaultFifo: FifoState = { queue: [], score: 0, history: [] };
+
+/** Normalize the snake_case pit_status dict sent by the backend (Python
+ *  dataclass field names) into the camelCase `PitStatus` shape used by
+ *  the rest of the frontend. Returns null when the input is missing or
+ *  malformed so callers can fall back to "no opinion" rendering. */
+function normalizePitStatus(raw: any): PitStatus | null {
+  if (!raw || typeof raw !== "object") return null;
+  return {
+    isOpen: !!raw.is_open,
+    closeReason: raw.close_reason ?? null,
+    blockingDriver: raw.blocking_driver ?? null,
+    blockingDriverRemainingMs: raw.blocking_driver_remaining_ms ?? 0,
+    nextOpenCountdownMs: raw.next_open_countdown_ms ?? null,
+    drivers: Array.isArray(raw.drivers)
+      ? raw.drivers.map((d: any) => ({
+          name: d.name ?? "",
+          accumulatedMs: d.accumulated_ms ?? 0,
+          remainingMs: d.remaining_ms ?? 0,
+        }))
+      : [],
+  };
+}
 const defaultConfig: RaceConfig = {
   circuitLengthM: 1100,
   pitTimeS: 120,
@@ -118,6 +147,7 @@ export const useRaceStore = create<RaceStore>((set) => ({
   config: defaultConfig,
   hasSectors: false,
   sectorMeta: null,
+  pitStatus: null,
 
   apexConnected: false,
   apexStatusMsg: "",
@@ -186,6 +216,13 @@ export const useRaceStore = create<RaceStore>((set) => ({
       }
       if (Object.prototype.hasOwnProperty.call(snapshot, "sectorMeta")) {
         out.sectorMeta = snapshot.sectorMeta ?? null;
+      }
+      // Pit-gate decision: when present, replace; when absent, keep
+      // whatever we already had so transient frames without pitStatus
+      // don't blank out the badge.
+      const anySnap = snapshot as any;
+      if (Object.prototype.hasOwnProperty.call(anySnap, "pitStatus")) {
+        out.pitStatus = normalizePitStatus(anySnap.pitStatus);
       }
       return out as RaceStore;
     }),
@@ -303,9 +340,15 @@ export const useRaceStore = create<RaceStore>((set) => ({
     }),
 
   applyFifoUpdate: (data) =>
-    set({
+    set((state) => ({
       fifo: data.fifo || { queue: [], score: 0, history: [] },
-    }),
+      // Backend bundles the recomputed pit-gate state on every
+      // fifo_update so the badge reacts immediately to a pit-in / pit-
+      // out shifting driver totals. Missing field → keep previous value.
+      pitStatus: Object.prototype.hasOwnProperty.call(data, "pitStatus")
+        ? normalizePitStatus(data.pitStatus)
+        : state.pitStatus,
+    })),
 
   applyAnalytics: (data) =>
     set((state) => {
@@ -326,6 +369,9 @@ export const useRaceStore = create<RaceStore>((set) => ({
       }
       if (Object.prototype.hasOwnProperty.call(data, "sectorMeta")) {
         out.sectorMeta = data.sectorMeta ?? null;
+      }
+      if (Object.prototype.hasOwnProperty.call(data, "pitStatus")) {
+        out.pitStatus = normalizePitStatus(data.pitStatus);
       }
       return out as RaceStore;
     }),

@@ -25,6 +25,12 @@ struct RaceSession: Codable {
     /// default `nil` also keeps existing memberwise initializer call sites
     /// working without requiring explicit values.
     var autoLoadTeams: Bool? = nil
+    /// Number of drivers in the team. 0 = "not configured": the pit gate
+    /// falls back to counting Apex-observed drivers. Strategists set this
+    /// up-front to enforce min_driver_time_min from lap 1. Optional for
+    /// decoding backward compatibility with payloads that predate the
+    /// pit_gate feature.
+    var teamDriversCount: Int? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, name, rain
@@ -44,6 +50,7 @@ struct RaceSession: Codable {
         case refreshIntervalS = "refresh_interval_s"
         case isActive = "is_active"
         case autoLoadTeams = "auto_load_teams"
+        case teamDriversCount = "team_drivers_count"
     }
 
     static let empty = RaceSession(
@@ -52,8 +59,56 @@ struct RaceSession: Codable {
         pitTimeS: 180, minDriverTimeMin: 60, rain: false,
         pitClosedStartMin: 5, pitClosedEndMin: 5, boxLines: 1, boxKarts: 1,
         ourKartNumber: 1, refreshIntervalS: 3, isActive: false,
-        autoLoadTeams: false
+        autoLoadTeams: false,
+        teamDriversCount: 0
     )
+}
+
+/// Pit-gate decision computed server-side (see
+/// `backend/app/engine/pit_gate.py`). Surfaced on every WS snapshot,
+/// analytics frame and fifo_update so the dashboard and driver apps
+/// render the same badge.
+///
+/// Replaces the prior client-side pit-window logic which only considered
+/// stint length, not the minimum per-driver time constraint.
+struct PitStatus: Codable, Equatable {
+    var isOpen: Bool
+    /// One of: "regulation_start" | "regulation_end" | "stint_too_short"
+    /// | "stint_too_long" | "driver_min_time" | "no_active_kart"
+    /// | "not_running" | nil
+    var closeReason: String?
+    /// Driver who's blocking the gate (only when closeReason ==
+    /// "driver_min_time"). Drives the badge subtitle ("Matías needs
+    /// 9 more min").
+    var blockingDriver: String?
+    var blockingDriverRemainingMs: Int?
+    /// Countdown value at which the pit will open next, or nil when the
+    /// gate is already open or no feasible moment was found within the
+    /// 1-hour prediction horizon. Drives the "Pit abre en HH:MM:SS" card.
+    var nextOpenCountdownMs: Int?
+    /// Per-driver detail surfaced to UI tooltips / detail views.
+    var drivers: [DriverTimeInfo]?
+
+    enum CodingKeys: String, CodingKey {
+        case isOpen = "is_open"
+        case closeReason = "close_reason"
+        case blockingDriver = "blocking_driver"
+        case blockingDriverRemainingMs = "blocking_driver_remaining_ms"
+        case nextOpenCountdownMs = "next_open_countdown_ms"
+        case drivers
+    }
+
+    struct DriverTimeInfo: Codable, Equatable {
+        var name: String
+        var accumulatedMs: Int
+        var remainingMs: Int
+
+        enum CodingKeys: String, CodingKey {
+            case name
+            case accumulatedMs = "accumulated_ms"
+            case remainingMs = "remaining_ms"
+        }
+    }
 }
 
 struct Circuit: Codable, Identifiable, Hashable {
@@ -179,6 +234,10 @@ struct RaceConfig: Codable, Hashable {
     var boxLines: Int
     var boxKarts: Int
     var minDriverTimeMin: Int
+    /// Configured driver count for the team. 0 = fallback to Apex-observed
+    /// drivers in the pit-gate check. Optional so older snapshots still
+    /// decode cleanly (treated as 0 by call sites).
+    var teamDriversCount: Int?
     var pitClosedStartMin: Int
     var pitClosedEndMin: Int
     /// Optional so a config payload that omits `rain` (older backend builds,

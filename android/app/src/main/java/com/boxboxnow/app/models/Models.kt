@@ -73,10 +73,48 @@ data class RaceSession(
     @SerialName("refresh_interval_s") val refreshIntervalS: Int = 3,
     @SerialName("is_active") val isActive: Boolean = false,
     @SerialName("auto_load_teams") val autoLoadTeams: Boolean = false,
+    // Number of drivers in the team. 0 = not configured: the pit-gate
+    // feasibility check falls back to counting Apex-observed drivers
+    // (kart.driver_total_ms). Strategists set this up-front so the
+    // driver-min-time constraint fires from lap 1.
+    @SerialName("team_drivers_count") val teamDriversCount: Int = 0,
 ) {
     companion object {
         val EMPTY = RaceSession()
     }
+}
+
+/**
+ * Pit-gate decision computed server-side (see backend `pit_gate.py`).
+ * Surfaced on every WS snapshot / analytics frame / fifo_update so
+ * the driver app renders the same badge as the web dashboard.
+ *
+ * Replaces the prior local pit-window heuristic which only considered
+ * stint length. The driver-min-time constraint is the new addition.
+ */
+@Serializable
+data class PitStatus(
+    @SerialName("is_open") val isOpen: Boolean = true,
+    /** One of: "regulation_start" | "regulation_end" |
+     *  "stint_too_short" | "stint_too_long" | "driver_min_time" |
+     *  "no_active_kart" | "not_running" | null */
+    @SerialName("close_reason") val closeReason: String? = null,
+    /** Driver who's blocking the gate (only when
+     *  closeReason == "driver_min_time"). Drives the badge subtitle. */
+    @SerialName("blocking_driver") val blockingDriver: String? = null,
+    @SerialName("blocking_driver_remaining_ms") val blockingDriverRemainingMs: Long? = null,
+    /** Countdown value at which the gate will open next, or null
+     *  when the gate is already open or no feasible moment found
+     *  within the 1-hour prediction horizon. */
+    @SerialName("next_open_countdown_ms") val nextOpenCountdownMs: Long? = null,
+    val drivers: List<DriverTimeInfo>? = null,
+) {
+    @Serializable
+    data class DriverTimeInfo(
+        val name: String = "",
+        @SerialName("accumulated_ms") val accumulatedMs: Long = 0,
+        @SerialName("remaining_ms") val remainingMs: Long = 0,
+    )
 }
 
 @Serializable

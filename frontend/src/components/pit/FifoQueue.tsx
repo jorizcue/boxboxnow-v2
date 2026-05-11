@@ -20,7 +20,20 @@ export function FifoQueue() {
   const raceClockMs = useRaceClock();
   const durationMs = useRaceStore((s) => s.durationMs);
   const raceStarted = useRaceStore((s) => s.raceStarted);
+  const pitStatus = useRaceStore((s) => s.pitStatus);
   const [selectedEntry, setSelectedEntry] = useState<FifoEntry | null>(null);
+
+  // Seconds until the pit gate opens next, based on the backend's
+  // predictive simulation. null when the gate is already open, the
+  // backend didn't report a prediction, or the moment is beyond
+  // pit_gate's 1-hour horizon.
+  const pitOpensInSec: number | null = (() => {
+    if (!pitStatus || pitStatus.isOpen) return null;
+    const target = pitStatus.nextOpenCountdownMs;
+    if (target == null || target <= 0) return null;
+    const remainingMs = Math.max(0, raceClockMs - target);
+    return Math.round(remainingMs / 1000);
+  })();
 
   const boxLines = config.boxLines || 2;
   const boxKarts = config.boxKarts || 4;
@@ -486,6 +499,19 @@ export function FifoQueue() {
           value={avgFutureStint ? secondsToHMS(Math.round(avgFutureStint.avgMin * 60)) : "-"}
           warn={avgFutureStint ? avgFutureStint.warn : false}
         />
+        {/* Predicted next pit-open moment. The backend computes this
+            when the pit gate is closed by stepping forward in 10 s
+            slices and rerunning the feasibility check (see
+            pit_gate.py::_predict_next_open_countdown_ms). The card is
+            only shown when the gate is closed AND a feasible moment
+            was found within the 1-hour horizon. */}
+        {pitOpensInSec !== null && (
+          <PitCard
+            label={t("pit.openIn")}
+            value={secondsToHMS(pitOpensInSec)}
+            warn={false}
+          />
+        )}
         {/* Box lines (+/-) */}
         <AdjustableCard
           label={t("config.boxLines")}

@@ -37,6 +37,20 @@ const translations: Record<string, Record<Language, string>> = {
   "status.replayPaused": { es: "Replay (pausa)", en: "Replay (paused)", it: "Replay (pausa)", de: "Replay (Pause)" },
   "status.pitClosed": { es: "PIT CERRADO", en: "PIT CLOSED", it: "PIT CHIUSO", de: "PIT GESCHL." },
   "status.pitOpen": { es: "PIT ABIERTO", en: "PIT OPEN", it: "PIT APERTO", de: "PIT OFFEN" },
+  "status.pitReason.regulation_start": { es: "Ventana inicial", en: "Opening window", it: "Finestra iniziale", de: "Startfenster" },
+  "status.pitReason.regulation_end": { es: "Ventana final", en: "Closing window", it: "Finestra finale", de: "Endfenster" },
+  "status.pitReason.stint_too_short": { es: "Stint mínimo no alcanzado", en: "Stint min not reached", it: "Stint min non raggiunto", de: "Stint-Min nicht erreicht" },
+  "status.pitReason.stint_too_long": { es: "¡Pita ya! Stint máximo superado", en: "Pit now! Stint max exceeded", it: "Box ora! Stint max superato", de: "Sofort Box! Stint-Max überschritten" },
+  "status.pitReason.driver_min_time_short": { es: "tiempo mínimo piloto", en: "min driver time", it: "tempo min pilota", de: "Min Fahrerzeit" },
+  // Used as a subtitle when closeReason == "driver_min_time". Receives the
+  // blocking driver name + remaining minutes via simple substitution.
+  "status.pitReason.driver_min_time_long": {
+    es: "{driver} necesita {minutes} min más",
+    en: "{driver} needs {minutes} more min",
+    it: "{driver} ha bisogno di {minutes} min in più",
+    de: "{driver} braucht {minutes} Min mehr",
+  },
+  "pit.openIn": { es: "Pit abre en", en: "Pit opens in", it: "Box apre tra", de: "Box öffnet in" },
 
   // === Navbar ===
   "nav.race": { es: "Carrera", en: "Race", it: "Gara", de: "Rennen" },
@@ -188,6 +202,7 @@ const translations: Record<string, Record<Language, string>> = {
   "config.minPits": { es: "Pits minimos", en: "Min pits", it: "Pit minimi", de: "Min Pits" },
   "config.pitTime": { es: "Tiempo pit (s)", en: "Pit time (s)", it: "Tempo pit (s)", de: "Pit-Zeit (s)" },
   "config.minDriverTime": { es: "Tiempo min piloto (min)", en: "Min driver time (min)", it: "Tempo min pilota (min)", de: "Min Fahrerzeit (Min)" },
+  "config.teamDriversCount": { es: "Pilotos del equipo", en: "Team drivers", it: "Piloti del team", de: "Team-Fahrer" },
   "config.refresh": { es: "Refresh (s)", en: "Refresh (s)", it: "Refresh (s)", de: "Refresh (s)" },
   "config.boxLines": { es: "Lineas box", en: "Box lines", it: "Linee box", de: "Box-Reihen" },
   "config.boxKarts": { es: "Karts en box", en: "Karts in box", it: "Kart nel box", de: "Karts in Box" },

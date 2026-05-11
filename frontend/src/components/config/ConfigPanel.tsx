@@ -26,6 +26,7 @@ interface RaceSession {
   min_pits: number;
   pit_time_s: number;
   min_driver_time_min: number;
+  team_drivers_count: number;
   rain: boolean;
   pit_closed_start_min: number;
   pit_closed_end_min: number;
@@ -65,6 +66,12 @@ function RaceSessionEditor() {
   const [minPits, setMinPits] = useState(3);
   const [pitTime, setPitTime] = useState(120);
   const [minDriverTime, setMinDriverTime] = useState(30);
+  // Number of drivers in the team. 0 = "not configured": the pit gate
+  // falls back to counting Apex-observed drivers, which means the
+  // driver-min-time constraint won't fire until at least one driver
+  // change has happened. Setting it up-front to the real roster size
+  // makes the gate enforce the constraint from lap 1.
+  const [teamDriversCount, setTeamDriversCount] = useState(0);
   const [rain, setRain] = useState(false);
   const [pitClosedStart, setPitClosedStart] = useState(0);
   const [pitClosedEnd, setPitClosedEnd] = useState(0);
@@ -125,6 +132,7 @@ function RaceSessionEditor() {
     setMinPits(s.min_pits);
     setPitTime(s.pit_time_s);
     setMinDriverTime(s.min_driver_time_min);
+    setTeamDriversCount(s.team_drivers_count ?? 0);
     setRain(s.rain);
     setPitClosedStart(s.pit_closed_start_min ?? 0);
     setPitClosedEnd(s.pit_closed_end_min ?? 0);
@@ -163,6 +171,7 @@ function RaceSessionEditor() {
         min_pits: minPits,
         pit_time_s: pitTime,
         min_driver_time_min: minDriverTime,
+        team_drivers_count: teamDriversCount,
         rain,
         pit_closed_start_min: pitClosedStart,
         pit_closed_end_min: pitClosedEnd,
@@ -198,6 +207,7 @@ function RaceSessionEditor() {
           boxLines: boxLines,
           boxKarts: boxKarts,
           minDriverTimeMin: minDriverTime,
+          teamDriversCount,
           pitClosedStartMin: pitClosedStart,
           pitClosedEndMin: pitClosedEnd,
           rain,
@@ -283,6 +293,7 @@ function RaceSessionEditor() {
           <ConfigCard label={t("config.minStint")} value={minStint} onChange={setMinStint} />
           <ConfigCard label={t("config.maxStint")} value={maxStint} onChange={setMaxStint} />
           <ConfigCard label={t("config.minDriverTime")} value={minDriverTime} onChange={setMinDriverTime} />
+          <ConfigCard label={t("config.teamDriversCount")} value={teamDriversCount} onChange={setTeamDriversCount} />
         </ConfigSection>
 
         {/* Save button */}

@@ -103,6 +103,18 @@ struct SessionConfigView: View {
                                 range: 0...300,
                                 tooltip: "Tiempo minimo total que cada piloto debe conducir durante la carrera"
                             )
+                            // Pilot count used by the pit-gate feasibility
+                            // check (see backend/app/engine/pit_gate.py).
+                            // 0 = fallback to Apex-observed drivers.
+                            NumberCard(
+                                title: "PILOTOS\nDEL EQUIPO",
+                                value: Binding(
+                                    get: { configVM.session.teamDriversCount ?? 0 },
+                                    set: { configVM.session.teamDriversCount = $0 }
+                                ),
+                                range: 0...20,
+                                tooltip: "Numero de pilotos del equipo. 0 = se cuentan automaticamente segun aparecen en Apex."
+                            )
                         }
                     }
 

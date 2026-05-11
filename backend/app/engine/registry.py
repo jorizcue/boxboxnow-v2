@@ -355,7 +355,8 @@ class UserSession:
                   pit_closed_start_min: int = 0, pit_closed_end_min: int = 0,
                   finish_lat1: float | None = None, finish_lon1: float | None = None,
                   finish_lat2: float | None = None, finish_lon2: float | None = None,
-                  warmup_laps_to_skip: int = 3):
+                  warmup_laps_to_skip: int = 3,
+                  team_drivers_count: int = 0):
         """Apply race session config to state and fifo."""
         self.state.circuit_length_m = circuit_length_m or 1100
         self.state.pit_time_s = pit_time_s or 120
@@ -368,6 +369,7 @@ class UserSession:
         self.state.max_stint_min = max_stint_min
         self.state.min_stint_min = min_stint_min
         self.state.min_driver_time_min = min_driver_time_min
+        self.state.team_drivers_count = max(0, int(team_drivers_count or 0))
         self.state.pit_closed_start_min = pit_closed_start_min
         self.state.pit_closed_end_min = pit_closed_end_min
         self.state.box_lines = box_lines
@@ -550,7 +552,11 @@ class UserSession:
             self._team_positions = new_team_positions
 
     async def _broadcast_fifo(self):
-        """Broadcast only FIFO data immediately after a pit entry."""
+        """Broadcast FIFO data plus the recomputed pit-gate state to all
+        WS clients. Pit-in events are the natural trigger for re-evaluating
+        the pit gate (driver_total_ms just shifted, real_min_stint shifts
+        too) so we always piggyback the pit status on these frames.
+        """
         if not self.state._ws_clients:
             return
         msg = json.dumps({
@@ -561,6 +567,7 @@ class UserSession:
                     "score": self.state.fifo_score,
                     "history": self.state.fifo_history[-10:],
                 },
+                "pitStatus": self.state._compute_pit_status_dict(),
             },
         })
         dead = set()
@@ -623,6 +630,7 @@ class UserSession:
                                     "boxLines": self.state.box_lines,
                                     "boxKarts": self.state.box_karts,
                                     "minDriverTimeMin": self.state.min_driver_time_min,
+                                    "teamDriversCount": self.state.team_drivers_count,
                                     "pitClosedStartMin": self.state.pit_closed_start_min,
                                     "pitClosedEndMin": self.state.pit_closed_end_min,
                                     # `rain` must be present in every config payload
@@ -646,6 +654,11 @@ class UserSession:
                                     self.state._compute_sector_meta()
                                     if self.state.has_sectors else None
                                 ),
+                                # Pit-gate decision — recomputed every
+                                # analytics tick so the badge / next-open
+                                # countdown stay current even between pit
+                                # events.
+                                "pitStatus": self.state._compute_pit_status_dict(),
                             },
                         }
                         data = json.dumps(update)
@@ -942,6 +955,7 @@ class ReplaySession:
         self.state.min_pits = _val(session.min_pits, 3)
         self.state.pit_time_s = _val(session.pit_time_s, 120)
         self.state.min_driver_time_min = _val(session.min_driver_time_min, 30)
+        self.state.team_drivers_count = max(0, int(_val(getattr(session, 'team_drivers_count', 0), 0) or 0))
         self.state.rain_mode = _val(getattr(session, 'rain', False), False)
         self.state.pit_closed_start_min = _val(getattr(session, 'pit_closed_start_min', 0), 0)
         self.state.pit_closed_end_min = _val(getattr(session, 'pit_closed_end_min', 0), 0)
@@ -961,6 +975,7 @@ class ReplaySession:
         self.state.update_duration(session.duration_min)
         self.state.pit_time_s = session.pit_time_s
         self.state.min_driver_time_min = session.min_driver_time_min
+        self.state.team_drivers_count = max(0, int(getattr(session, 'team_drivers_count', 0) or 0))
         self.state.rain_mode = getattr(session, 'rain', False) or False
         self.state.pit_closed_start_min = getattr(session, 'pit_closed_start_min', 0) or 0
         self.state.pit_closed_end_min = getattr(session, 'pit_closed_end_min', 0) or 0
@@ -981,6 +996,7 @@ class ReplaySession:
                     "score": self.state.fifo_score,
                     "history": self.state.fifo_history[-10:],
                 },
+                "pitStatus": self.state._compute_pit_status_dict(),
             },
         })
         dead = set()
@@ -1030,6 +1046,7 @@ class ReplaySession:
                                     "boxLines": self.state.box_lines,
                                     "boxKarts": self.state.box_karts,
                                     "minDriverTimeMin": self.state.min_driver_time_min,
+                                    "teamDriversCount": self.state.team_drivers_count,
                                     "pitClosedStartMin": self.state.pit_closed_start_min,
                                     "pitClosedEndMin": self.state.pit_closed_end_min,
                                     # `rain` must be present in every config payload
@@ -1053,6 +1070,7 @@ class ReplaySession:
                                     self.state._compute_sector_meta()
                                     if self.state.has_sectors else None
                                 ),
+                                "pitStatus": self.state._compute_pit_status_dict(),
                             },
                         }
                         data = json.dumps(update)

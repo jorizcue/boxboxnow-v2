@@ -305,6 +305,9 @@ class RaceSessionOut(BaseModel):
     our_kart_number: int
     refresh_interval_s: int
     auto_load_teams: bool = True
+    # Number of drivers in the team. 0 = not configured; the pit-gate
+    # feasibility check falls back to counting Apex-observed drivers.
+    team_drivers_count: int = 0
     is_active: bool
     team_positions: list["TeamPositionOut"] = []
 
@@ -328,6 +331,7 @@ class RaceSessionCreate(BaseModel):
     our_kart_number: int = 0
     refresh_interval_s: int = 30
     auto_load_teams: bool = True
+    team_drivers_count: int = 0
 
 
 class RaceSessionUpdate(BaseModel):
@@ -347,6 +351,7 @@ class RaceSessionUpdate(BaseModel):
     our_kart_number: int | None = None
     refresh_interval_s: int | None = None
     auto_load_teams: bool | None = None
+    team_drivers_count: int | None = None
 
 
 # --- User Preferences (driver view config) ---

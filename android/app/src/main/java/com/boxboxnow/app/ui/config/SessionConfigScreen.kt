@@ -243,6 +243,16 @@ fun SessionConfigScreen(onBack: () -> Unit) {
                         onValueChange = { vm.updateSession { s -> s.copy(minDriverTimeMin = it) } },
                         modifier = Modifier.weight(1f),
                     )
+                    // Pilot count used by the pit-gate feasibility check
+                    // (see backend/app/engine/pit_gate.py). 0 falls back
+                    // to counting Apex-observed drivers.
+                    NumberCard(
+                        title = "PILOTOS\nDEL EQUIPO",
+                        value = session.teamDriversCount,
+                        tooltip = "Numero de pilotos del equipo. 0 = automatico segun Apex.",
+                        onValueChange = { vm.updateSession { s -> s.copy(teamDriversCount = it) } },
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
 

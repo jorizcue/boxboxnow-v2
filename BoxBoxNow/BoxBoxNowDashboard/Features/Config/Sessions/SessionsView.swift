@@ -241,7 +241,11 @@ struct SessionsView: View {
             boxKarts: boxKarts,
             ourKartNumber: ourKartNumber,
             refreshIntervalS: refreshIntervalS,
-            isActive: true
+            isActive: true,
+            // Carry over existing team_drivers_count to avoid blanking
+            // it when the strategist edits other fields in this older
+            // SessionsView UI (which doesn't expose the field yet).
+            teamDriversCount: app.config.activeSession?.teamDriversCount
         )
         if let saved = await app.config.saveSession(draft) {
             apply(saved)

@@ -142,6 +142,11 @@ export interface RaceConfig {
   boxLines: number;
   boxKarts: number;
   minDriverTimeMin: number;
+  /** Configured number of drivers in the team. When > 0 the pit gate
+   *  enforces driver-min-time feasibility from lap 1; when 0 it falls
+   *  back to the count observed in `kart.driverTotalMs` (Apex-discovered
+   *  drivers). Strategists set this in the SessionConfig form. */
+  teamDriversCount?: number;
   pitClosedStartMin: number;
   pitClosedEndMin: number;
   rain: boolean;
@@ -149,6 +154,47 @@ export interface RaceConfig {
   finishLon1?: number | null;
   finishLat2?: number | null;
   finishLon2?: number | null;
+}
+
+/** Backend-computed pit-gate decision. Surfaced on every snapshot,
+ *  analytics frame and fifo_update so every client (web, iPad
+ *  dashboard, iOS / Android driver apps) renders the same badge.
+ *
+ *  Replaces the old "compute locally from realMinStint" approach. The
+ *  feasibility check in `app/engine/pit_gate.py` considers regulation
+ *  windows, stint bounds AND the minimum per-driver time — the latter
+ *  is the new constraint that was missing before. */
+export interface PitStatus {
+  isOpen: boolean;
+  /** One of:
+   *    "regulation_start" | "regulation_end"
+   *    "stint_too_short"  (pit would force future stints > max — too early)
+   *    "stint_too_long"   (we've overrun — pit URGENT)
+   *    "driver_min_time"  (some driver wouldn't reach min)
+   *    "no_active_kart"   (no our_kart configured)
+   *    "not_running"      (race not started / already finished)
+   *    null               (gate is open)
+   */
+  closeReason:
+    | "regulation_start"
+    | "regulation_end"
+    | "stint_too_short"
+    | "stint_too_long"
+    | "driver_min_time"
+    | "no_active_kart"
+    | "not_running"
+    | null;
+  /** Name of the driver who's blocking the gate (closeReason ==
+   *  "driver_min_time"). Drives the badge subtitle. */
+  blockingDriver?: string | null;
+  blockingDriverRemainingMs?: number;
+  /** Predicted countdown value at which the gate will open next.
+   *  null when the gate is already open or no feasible future moment
+   *  was found within 1 h of horizon. Drives the "Pit abre en
+   *  HH:MM:SS" card in the Box tab. */
+  nextOpenCountdownMs?: number | null;
+  /** Per-driver detail surfaced for the tooltip / detail row. */
+  drivers?: { name: string; accumulatedMs: number; remainingMs: number }[];
 }
 
 export interface RaceSnapshot {
