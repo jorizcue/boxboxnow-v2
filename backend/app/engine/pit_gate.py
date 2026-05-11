@@ -329,22 +329,56 @@ def compute_pit_status(state) -> PitStatus:
     # Stint-based remaining (only positive when stint_too_short would fire).
     stint_pending_ms = max(0, int(real_min_stint_s * 1000) - int(stint_sec * 1000))
 
-    # The unified actionable remaining for the current pilot.
-    current_driver_blocker_ms = max(stint_pending_ms, current_driver_race_remaining_ms)
+    # Fallback "current pilot remaining" used only when the predictive
+    # next-open simulation can't find a feasible future moment within the
+    # 1-hour horizon. The predictor is the preferred source — it knows
+    # that "Pablo Reh needs 44 min for his personal min" can in practice
+    # be satisfied across multiple future stints, so the pit can actually
+    # open in just 9 min when his current stint hits the 10-min mark.
+    current_driver_blocker_fallback_ms = max(stint_pending_ms, current_driver_race_remaining_ms)
+
+    # ─── Predicted next-open countdown (cached) ─────────────────────────────
+    #
+    # Re-used as the SOURCE OF TRUTH for the "minutes until pit opens"
+    # surface — both the badge subtitle ({driver} necesita X min más) AND
+    # the "Pit abre en HH:MM:SS" card. Single computation per call.
+    _next_open_cache: list = []
+
+    def get_next_open_ms() -> int | None:
+        if not _next_open_cache:
+            try:
+                _next_open_cache.append(_predict_next_open_countdown_ms(state, our_kart))
+            except Exception:
+                _next_open_cache.append(None)
+        return _next_open_cache[0]
+
+    def time_until_open_ms(fallback_ms: int) -> int:
+        """Minutes (in ms) the current pilot must keep driving before the
+        pit can open, derived from the predictive simulation. When the
+        predictor finds no feasible moment in the horizon, falls back to
+        the caller-supplied estimate (the legacy max(stint_pending,
+        race_pending) value)."""
+        nxt = get_next_open_ms()
+        if nxt is None or nxt >= countdown_ms:
+            return int(max(0, fallback_ms))
+        return int(max(0, countdown_ms - nxt))
 
     # ─── Stint-length checks ────────────────────────────────────────────────
     if stint_sec < real_min_stint_s:
         # Pitting now would force every future stint to be longer than
-        # max_stint — infeasible. Same condition the web "tooEarly" flag
-        # captures, formalized here. We surface the current pilot as the
-        # blocker (with the max of stint-pending and race-pending) so the
-        # badge can render "{driver} necesita X min más" instead of a
-        # generic "stint minimum not reached" string.
+        # max_stint. We surface the current pilot as the blocker so the
+        # badge renders "{driver} necesita X min más". X is the predicted
+        # time to next open — which often equals stint_pending_ms (e.g.
+        # right after a driver change, when the only constraint is "wait
+        # until current stint reaches min_stint"), but can be larger if
+        # the driver-min-time feasibility check would still fail at that
+        # moment.
         return PitStatus(
             is_open=False,
             close_reason="stint_too_short",
             blocking_driver=current_driver,
-            blocking_driver_remaining_ms=int(current_driver_blocker_ms),
+            blocking_driver_remaining_ms=time_until_open_ms(stint_pending_ms),
+            next_open_countdown_ms=get_next_open_ms(),
             drivers=drivers_info_list,
         )
     if stint_sec > real_max_stint_s + 1:
@@ -376,32 +410,28 @@ def compute_pit_status(state) -> PitStatus:
         )
 
         if not feasible:
-            # Pick the most ACTIONABLE blocker for the badge:
+            # The current pilot is always the one whose action unblocks
+            # the gate: they're the one in the kart, the only way to
+            # change driver is to pit, and pit is what's blocked. So the
+            # actionable message ALWAYS references the current driver
+            # (when we have one) — the predictor's prediction tells us
+            # how many minutes they need to keep driving.
             #
-            #   Priority 1: the current pilot if they still have unmet need
-            #               (race-min or stint-min). This is the strategist's
-            #               natural mental model — "Matías hasn't met his
-            #               minimum yet, so keep him on track".
-            #   Priority 2: fall back to the worst remaining driver from the
-            #               feasibility algorithm. Used when the current
-            #               pilot is already done but the team still can't
-            #               fit (e.g. a ghost driver who hasn't started yet).
-            if current_driver and current_driver_blocker_ms > 0:
+            # The algorithm-picked "worst driver" is only useful as a
+            # fallback when there's no current_driver (e.g. driver name
+            # not yet known from Apex).
+            if current_driver:
                 blocker_name = current_driver
-                blocker_rem = current_driver_blocker_ms
+                fallback_ms = current_driver_blocker_fallback_ms
             else:
                 blocker_name = algo_blocker
-                blocker_rem = algo_blocker_rem
-            # Predict when the gate will open next (best-effort): step the
-            # countdown forward in 10 s slices and re-check. Stop at race
-            # end or after 1 h of simulated future.
-            next_open_ms = _predict_next_open_countdown_ms(state, our_kart)
+                fallback_ms = algo_blocker_rem
             return PitStatus(
                 is_open=False,
                 close_reason="driver_min_time",
                 blocking_driver=blocker_name,
-                blocking_driver_remaining_ms=int(blocker_rem),
-                next_open_countdown_ms=next_open_ms,
+                blocking_driver_remaining_ms=time_until_open_ms(fallback_ms),
+                next_open_countdown_ms=get_next_open_ms(),
                 drivers=drivers_info_list,
             )
 
