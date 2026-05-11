@@ -804,29 +804,33 @@ export function DriverView() {
     return { lapsToMaxStint: laps, realMaxStintMin: realMax };
   }, [karts, ourKart, raceClock, durationMs, raceFinished, config.maxStintMin, config.minPits, config.pitTimeS, config.minStintMin]);
 
-  // Pit window open/closed (uses real min stint)
+  // Pit window open/closed. Authoritative source is the backend's
+  // `pitStatus.isOpen` — that's the same verdict the StatusBar badge
+  // uses, and it includes the driver-min-time feasibility check that
+  // the local fallback below doesn't. The fallback is kept for the
+  // brief moment between mount and the first WS frame (and for older
+  // backends that don't emit `pitStatus`).
+  const pitStatusFromBackend = useRaceStore((s) => s.pitStatus);
   const pitWindowOpen = useMemo(() => {
+    if (pitStatusFromBackend) return pitStatusFromBackend.isOpen;
+
+    // Fallback (legacy local heuristic — stint-length only)
     if (!ourKart || ourKart <= 0 || raceClock === 0 || raceFinished) return null;
     const kart = karts.find((k) => k.kartNumber === ourKart);
     if (!kart) return null;
 
-    // Time elapsed in current stint (seconds)
     const stintStart = kart.stintStartCountdownMs || durationMs || raceClock;
     const stintSec = Math.max(0, stintStart - raceClock) / 1000;
     const stintMin = stintSec / 60;
 
-    // Real min stint: max(minStintConfig, timeFromStintStartToEnd - (pitTime + maxStint) × pendingPits)
     const pendingPits = Math.max(0, config.minPits - kart.pitCount);
     const timeFromStintStartToEndMin = stintStart / 1000 / 60;
     const reservePerPitMin = pendingPits > 0 ? (config.pitTimeS / 60 + config.maxStintMin) * pendingPits : 0;
     const realMinStintMin = Math.max(config.minStintMin, timeFromStintStartToEndMin - reservePerPitMin);
 
-    // Pit closed if stint < realMinStintMin
     if (stintMin < realMinStintMin) return false;
-
-    // Pit open
     return true;
-  }, [karts, ourKart, raceClock, durationMs, raceFinished, config.minStintMin, config.minPits, config.pitTimeS, config.maxStintMin]);
+  }, [pitStatusFromBackend, karts, ourKart, raceClock, durationMs, raceFinished, config.minStintMin, config.minPits, config.pitTimeS, config.maxStintMin]);
 
   // Audio speech narration
   const [speechEnabled, setSpeechEnabled] = useState(false);
