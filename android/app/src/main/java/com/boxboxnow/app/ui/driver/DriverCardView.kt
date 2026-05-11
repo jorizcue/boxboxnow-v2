@@ -26,6 +26,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -505,12 +507,51 @@ private fun CardContent(
             }
         }
         DriverCard.PitWindow -> {
-            Text(
-                "--",
-                color = BoxBoxNowColors.SystemGray,
-                fontSize = mainFont,
-                fontWeight = FontWeight.Black,
-            )
+            // Authoritative source: backend `pitStatus.isOpen`. Same
+            // verdict the web StatusBar / driver-view card use, includes
+            // the driver-min-time feasibility check (see
+            // `backend/app/engine/pit_gate.py`).
+            //
+            // When the gate is closed and the backend identifies a
+            // blocker (current pilot still needs X minutes), show the
+            // remaining minutes as a small subtitle — same pattern as
+            // iOS DriverCardView's "pitWindowFullText + remaining".
+            val ps by raceVM.pitStatus.collectAsState()
+            val text: String
+            val color: Color
+            val cur = ps
+            when {
+                cur == null -> { text = "--"; color = BoxBoxNowColors.SystemGray }
+                cur.isOpen  -> { text = "OPEN";   color = BoxBoxNowColors.SuccessGreen }
+                else        -> { text = "CLOSED"; color = BoxBoxNowColors.ErrorRed }
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text,
+                    color = color,
+                    fontSize = mainFont,
+                    fontWeight = FontWeight.Black,
+                )
+                // Subtitle: "Matías · 6 min" — only when CLOSED and we
+                // have a remaining-time hint from the backend. Compact
+                // form because the card is small.
+                if (cur != null && !cur.isOpen) {
+                    val rem = cur.blockingDriverRemainingMs ?: 0L
+                    val remMin = if (rem > 0) ((rem + 59_999L) / 60_000L).toInt() else 0
+                    if (!cur.blockingDriver.isNullOrEmpty() && remMin > 0) {
+                        Text(
+                            "${cur.blockingDriver} · ${remMin} min",
+                            color = BoxBoxNowColors.ErrorRed.copy(alpha = 0.7f),
+                            fontSize = subFont,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
         }
         // ── Sector cards ──
         // The displayed delta carries its own sign: green-minus when
