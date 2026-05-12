@@ -243,9 +243,16 @@ fun SessionConfigScreen(onBack: () -> Unit) {
                         onValueChange = { vm.updateSession { s -> s.copy(minDriverTimeMin = it) } },
                         modifier = Modifier.weight(1f),
                     )
-                    // Pilot count used by the pit-gate feasibility check
-                    // (see backend/app/engine/pit_gate.py). 0 falls back
-                    // to counting Apex-observed drivers.
+                }
+                // Pilot count goes in a second row — adding it as a 4th card
+                // to the row above crowded the phone width and the new card
+                // ended up cropped off-screen. 1/3 width with 2 spacers
+                // keeps it visually aligned with the cards above.
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
                     NumberCard(
                         title = "PILOTOS\nDEL EQUIPO",
                         value = session.teamDriversCount,
@@ -253,6 +260,8 @@ fun SessionConfigScreen(onBack: () -> Unit) {
                         onValueChange = { vm.updateSession { s -> s.copy(teamDriversCount = it) } },
                         modifier = Modifier.weight(1f),
                     )
+                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
 

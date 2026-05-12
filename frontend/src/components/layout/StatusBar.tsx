@@ -10,6 +10,7 @@ import { useReplayTime } from "@/hooks/useReplayTime";
 import { api } from "@/lib/api";
 import { StyledSelect } from "@/components/shared/StyledSelect";
 import { SessionManager } from "@/components/auth/SessionManager";
+import { RainToggle } from "@/components/shared/RainToggle";
 
 /** Parse HH:MM:SS (or HH:MM) into total seconds; returns -1 on failure. */
 function parseHMS(t: string): number {
@@ -470,6 +471,10 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
           {/* Right: actions. Username used to live here but moved to
               the sidebar account row at the bottom. */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Rain-mode toggle. Lives here so the strategist can flip
+                lluvia on/off from any tab without scrolling back to the
+                metric grid (where it used to live as a card). */}
+            <RainToggle />
             <select
               value={lang}
               onChange={(e) => setLang(e.target.value as any)}

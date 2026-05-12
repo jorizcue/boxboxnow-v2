@@ -8,7 +8,9 @@ import { msToLapTime, secondsToStint, secondsToHMS, tierHex, formatDifferential 
 import { getDriverInfoForKart, DriverDetailsRow } from "@/components/shared/DriverDetails";
 import { sendBoxCall } from "@/lib/driverChannel";
 import { api } from "@/lib/api";
-import { RainToggle } from "@/components/shared/RainToggle";
+// RainToggle was moved to the StatusBar (icon button) — no longer
+// rendered as a card in this view. Keep the import path documented
+// in case the legacy card layout needs to be restored.
 import clsx from "clsx";
 
 const COL_COUNT = 13; // number of <th> columns
@@ -164,6 +166,28 @@ export function RaceTable() {
     return "border-border";
   })();
 
+  // Average future stint length — duplicated from FifoQueue.tsx so the
+  // top metric grid carries the same signal without the strategist
+  // having to switch to the Box tab. Formula:
+  //   (configuredDuration − elapsed − futurePitTime) / remainingPits
+  // Uses config.durationMin (user-configured) rather than the Apex
+  // countdown, which may reflect a single heat in multi-session events.
+  const avgFutureStint = (() => {
+    if (!ourKart || raceClockMs === 0 || raceFinished) return null;
+    const remainingPits = Math.max(0, config.minPits - ourKart.pitCount);
+    if (remainingPits <= 0) return null;
+    const totalRaceMin = config.durationMin;
+    const elapsedMs = durationMs > 0 ? Math.max(0, durationMs - raceClockMs) : 0;
+    const elapsedMin = elapsedMs / 1000 / 60;
+    const futureTimeInPitMin = remainingPits * config.pitTimeS / 60;
+    const availableRaceMin = totalRaceMin - elapsedMin - futureTimeInPitMin;
+    if (availableRaceMin <= 0) return null;
+    const avgMin = availableRaceMin / remainingPits;
+    const tooEarly = avgMin > config.maxStintMin;
+    const tooLate = avgMin <= config.minStintMin + 5;
+    return { avgMin, warn: tooEarly || tooLate };
+  })();
+
   if (sorted.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-neutral-400">
@@ -261,6 +285,23 @@ export function RaceTable() {
             </span>
           </div>
 
+          {/* Average future stint — moved here from the Box tab's lower
+              grid so the strategist sees future-stint feasibility next
+              to lapsToMaxStint without switching tabs. */}
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
+              {t("pit.avgFutureStint")}
+            </span>
+            <span className={clsx(
+              "text-lg sm:text-xl font-mono font-black leading-none",
+              avgFutureStint?.warn ? "text-orange-400" : "text-neutral-200"
+            )}>
+              {avgFutureStint
+                ? secondsToHMS(Math.round(avgFutureStint.avgMin * 60))
+                : "-"}
+            </span>
+          </div>
+
           {/* Karts near pit */}
           <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
@@ -276,9 +317,6 @@ export function RaceTable() {
 
           {/* BOX call button */}
           <BoxCallButton />
-
-          {/* Rain toggle */}
-          <RainToggle />
         </div>
       </div>
 
@@ -494,4 +532,3 @@ function SortTh({ children, colKey, current, dir, onSort, align, title, classNam
   );
 }
 
-/* RainToggle imported from @/components/shared/RainToggle */

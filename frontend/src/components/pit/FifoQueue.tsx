@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 import type { FifoEntry } from "@/types/race";
 import clsx from "clsx";
 import { useT } from "@/lib/i18n";
-import { RainToggle } from "@/components/shared/RainToggle";
+// RainToggle moved to the global StatusBar (icon button).
 
 export function FifoQueue() {
   const { fifo, config, karts } = useRaceStore();
@@ -313,6 +313,24 @@ export function FifoQueue() {
             </span>
           </div>
 
+          {/* Average future stint — promoted to the top grid so it sits
+              next to lapsToMaxStint / kartsNearPit. The lower-grid copy
+              has been removed to avoid duplicating the same value twice
+              in one screen. */}
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
+            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
+              {t("pit.avgFutureStint")}
+            </span>
+            <span className={clsx(
+              "text-lg sm:text-xl font-mono font-black leading-none",
+              avgFutureStint?.warn ? "text-orange-400" : "text-neutral-200"
+            )}>
+              {avgFutureStint
+                ? secondsToHMS(Math.round(avgFutureStint.avgMin * 60))
+                : "-"}
+            </span>
+          </div>
+
           {/* Karts near pit */}
           <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
@@ -328,9 +346,6 @@ export function FifoQueue() {
 
           {/* BOX call button */}
           <BoxCallButton />
-
-          {/* Rain toggle */}
-          <RainToggle />
         </div>
       </div>
 
@@ -493,12 +508,11 @@ export function FifoQueue() {
           label={t("metric.maxStint")}
           value={secondsToHMS(config.maxStintMin * 60)}
         />
-        {/* Average future stint */}
-        <PitCard
-          label={t("pit.avgFutureStint")}
-          value={avgFutureStint ? secondsToHMS(Math.round(avgFutureStint.avgMin * 60)) : "-"}
-          warn={avgFutureStint ? avgFutureStint.warn : false}
-        />
+        {/* "Average future stint" used to live here. It's now in the
+            top metric grid (next to lapsToMaxStint / kartsNearPit) so
+            the strategist sees future-stint feasibility at a glance
+            from any tab. Removed from this lower grid to avoid showing
+            the same value twice in the same screen. */}
         {/* Predicted next pit-open moment. The backend computes this
             when the pit gate is closed by stepping forward in 10 s
             slices and rerunning the feasibility check (see
