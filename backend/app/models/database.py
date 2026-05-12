@@ -465,6 +465,18 @@ async def init_db():
         except Exception:
             pass
 
+        # Per-plan whitelist of driver-view cards. Empty string ('[]')
+        # is treated as "every card" by the user_out resolver so the
+        # column rollout doesn't suddenly strip every existing user of
+        # their pilot-view cards; admins narrow it manually from the
+        # Platform → Productos UI as they refresh each plan.
+        try:
+            await conn.execute(text(
+                "ALTER TABLE product_tab_config ADD COLUMN allowed_cards TEXT NOT NULL DEFAULT '[]'"
+            ))
+        except Exception:
+            pass
+
         # Record the installed app version + platform for each device
         # session. Populated from the `X-App-Platform` / `X-App-Version`
         # request headers (mobile clients only; blank for web). Lets the

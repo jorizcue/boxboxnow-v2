@@ -31,7 +31,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 
 enum class DriverCardGroup(val label: String) {
-    RACE("Carrera"),
+    // Race split into Apex (raw live-timing values) and BBN (BoxBoxNow
+    // analytics) so the pilot can tell at a glance whether a card
+    // comes straight from Apex or from our own computations. Card
+    // `key`s are unchanged — only the group classification and a few
+    // display labels were tweaked to match the spec.
+    RACE_APEX("Carrera - Apex"),
+    RACE_BBN("Carrera - BBN"),
     BOX("BOX"),
     GPS("GPS"),
 }
@@ -48,10 +54,10 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
     GForceRadar("gForceRadar", "G-Force (diana)", "G"),
     Position("position", "Posicion (tiempos medios)", "P3/12"),
     RealPos("realPos", "Posicion (clasif. real)", "P5/12"),
-    GapAhead("gapAhead", "Gap kart delante", "-1.2s"),
-    GapBehind("gapBehind", "Gap kart detras", "+0.8s"),
+    GapAhead("gapAhead", "Gap Real Kart delante", "-1.2s"),
+    GapBehind("gapBehind", "Gap Real Kart detras", "+0.8s"),
     AvgLap20("avgLap20", "Vuelta media (20v)", "1:03.120"),
-    Best3("best3", "Mejor 3 (3V)", "1:01.890"),
+    Best3("best3", "Media Mejor 3 v", "1:01.890"),
     AvgFutureStint("avgFutureStint", "Media stint futuro", "0:38:20"),
     BoxScore("boxScore", "Puntuacion Box", "87"),
     BestStintLap("bestStintLap", "Mejor vuelta stint", "1:01.234"),
@@ -70,7 +76,7 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
     DeltaBestS1("deltaBestS1", "Δ Mejor S1", "+0.21s"),
     DeltaBestS2("deltaBestS2", "Δ Mejor S2", "-0.15s"),
     DeltaBestS3("deltaBestS3", "Δ Mejor S3", "+0.08s"),
-    TheoreticalBestLap("theoreticalBestLap", "Vuelta teorica", "1:01.67"),
+    TheoreticalBestLap("theoreticalBestLap", "Mejor vuelta teorica sectores", "1:01.67"),
     /** Combined view of S1/S2/S3 deltas in three lines on a single
      *  card — same colored-by-sign math as DeltaBestS1/2/3 but
      *  without the leader's kart number / team / driver. Saves grid
@@ -83,17 +89,21 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
     // (which derive from the adjusted classification) and from Position
     // (avg-pace) / RealPos (adjusted). These surface the values straight
     // from Apex's `data-type="int"` and `data-type="rk"` columns.
-    IntervalAhead("intervalAhead", "Intervalo kart delantero", "0.968s"),
-    IntervalBehind("intervalBehind", "Intervalo kart trasero", "0.973s"),
+    IntervalAhead("intervalAhead", "Intervalo kart delante", "0.968s"),
+    IntervalBehind("intervalBehind", "Intervalo kart detras", "0.973s"),
     ApexPosition("apexPosition", "Posicion Apex", "P4/12");
 
     val group: DriverCardGroup get() = when (this) {
         BoxScore, PitCount, CurrentPit, PitWindow -> DriverCardGroup.BOX
         DeltaBestLap, GForceRadar, GpsLapDelta, GpsSpeed, GpsGForce -> DriverCardGroup.GPS
-        // Sector cards live alongside other race-pace cards rather
-        // than in their own group — pilots think of sector deltas as
-        // race telemetry, not a separate device feature.
-        else -> DriverCardGroup.RACE
+        // Carrera - Apex: raw Apex live-timing values, mirrors what
+        // the pilot would see on Apex's own live timing screen.
+        RaceTimer, LastLap, BestStintLap, ApexPosition,
+        IntervalAhead, IntervalBehind -> DriverCardGroup.RACE_APEX
+        // Carrera - BBN: BoxBoxNow-derived analytics (avg pace,
+        // adjusted classification, sector deltas, future-stint
+        // estimates, etc.).
+        else -> DriverCardGroup.RACE_BBN
     }
 
     val requiresGPS: Boolean get() = when (this) {

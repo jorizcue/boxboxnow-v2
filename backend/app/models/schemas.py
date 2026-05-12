@@ -325,6 +325,12 @@ class ProductTabConfig(Base):
     stripe_price_id = Column(String(255), unique=True, nullable=False, index=True)  # Unique per price (source of truth)
     plan_type = Column(String(50), nullable=False)  # Label: may repeat across rows (e.g. two products both tagged "basic_monthly")
     tabs = Column(Text, nullable=False, default="[]")  # JSON array of tab slugs
+    # JSON array of driver-card ids the plan exposes in the pilot view's
+    # preset editor (e.g. ["raceTimer","lastLap","gpsSpeed",…]). Empty
+    # string defaults to "every card" via the resolver in auth_routes.py
+    # so existing plans don't suddenly hide cards from active users —
+    # admins narrow the list manually as they refresh each plan.
+    allowed_cards = Column(Text, nullable=False, default="[]")
     max_devices = Column(Integer, nullable=False, default=1)  # DEPRECATED: kept for backward compat, fallback when web/mobile not set
     concurrency_web = Column(Integer, nullable=True)  # Max concurrent browser sessions (NULL = use max_devices)
     concurrency_mobile = Column(Integer, nullable=True)  # Max concurrent mobile-app sessions (NULL = use max_devices)

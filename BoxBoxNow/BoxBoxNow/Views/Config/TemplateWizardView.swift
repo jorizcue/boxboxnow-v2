@@ -34,14 +34,23 @@ struct TemplateWizardView: View {
     }
 
     private func cards(in group: DriverCardGroup) -> [DriverCard] {
-        DriverCard.allCases.filter { $0.group == group }
+        // Plan-aware filter (same as CardVisibilityView). Empty / nil
+        // `allowedCards` => fall back to the full catalog so we don't
+        // strip the wizard down to nothing for users without a plan
+        // match (admins, trial, older clients).
+        let allowed = auth.user?.allowedCards
+        let allowedSet: Set<String>? = (allowed?.isEmpty == false) ? Set(allowed!) : nil
+        return DriverCard.allCases.filter { card in
+            card.group == group && (allowedSet?.contains(card.rawValue) ?? true)
+        }
     }
 
     private func sectionTitle(_ group: DriverCardGroup) -> String {
         switch group {
-        case .race: return "Carrera"
-        case .box:  return "BOX"
-        case .gps:  return "GPS (requieren RaceBox o GPS del telefono)"
+        case .raceApex: return "Carrera - Apex"
+        case .raceBbn:  return "Carrera - BBN"
+        case .box:      return "BOX"
+        case .gps:      return "GPS (requieren RaceBox o GPS del telefono)"
         }
     }
 

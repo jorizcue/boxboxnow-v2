@@ -46,6 +46,12 @@ class UserOut(BaseModel):
     # dashboard. False default keeps it backward-compatible with older
     # serialized payloads (admins / fresh sessions).
     has_active_circuit_access: bool = False
+    # Driver-view cards the user can pick in the preset editor. Derived
+    # on-the-fly from the user's active subscription's
+    # `ProductTabConfig.allowed_cards`. Admins get every card. Empty
+    # list (no active sub) means the client should fall back to the
+    # local catalog for trial-mode rendering.
+    allowed_cards: list[str] = []
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
@@ -550,6 +556,11 @@ class ProductTabConfigOut(BaseModel):
     stripe_price_id: str
     plan_type: str
     tabs: list[str] = []
+    # Driver-view cards the plan exposes in the pilot-view preset
+    # editor. Empty list resolves to "every card" in UserOut (see
+    # auth_routes._user_out) so existing plans don't suddenly strip
+    # cards from users who already purchased them.
+    allowed_cards: list[str] = []
     max_devices: int = 1
     concurrency_web: int | None = None
     concurrency_mobile: int | None = None
@@ -572,6 +583,7 @@ class ProductTabConfigCreate(BaseModel):
     stripe_price_id: str
     plan_type: str
     tabs: list[str] = []
+    allowed_cards: list[str] = []
     max_devices: int = 1
     concurrency_web: int | None = None
     concurrency_mobile: int | None = None
@@ -592,6 +604,7 @@ class ProductTabConfigUpdate(BaseModel):
     stripe_price_id: str | None = None
     plan_type: str | None = None
     tabs: list[str] | None = None
+    allowed_cards: list[str] | None = None
     max_devices: int | None = None
     concurrency_web: int | None = None
     concurrency_mobile: int | None = None

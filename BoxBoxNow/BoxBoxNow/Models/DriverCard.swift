@@ -2,15 +2,22 @@ import Foundation
 import SwiftUI
 
 enum DriverCardGroup: String, CaseIterable {
-    case race
+    // Race split into Apex (raw live-timing values) and BBN (BoxBoxNow
+    // analytics) so the pilot can tell at a glance whether a card
+    // comes straight from Apex or from our own computations. Card
+    // `rawValue`s are unchanged — only the group classification and
+    // a few display labels were tweaked to match the spec.
+    case raceApex
+    case raceBbn
     case box
     case gps
 
     var label: String {
         switch self {
-        case .race: return "Carrera"
-        case .box:  return "BOX"
-        case .gps:  return "GPS"
+        case .raceApex: return "Carrera - Apex"
+        case .raceBbn:  return "Carrera - BBN"
+        case .box:      return "BOX"
+        case .gps:      return "GPS"
         }
     }
 }
@@ -66,12 +73,17 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
             return .box
         case .deltaBestLap, .gForceRadar, .gpsLapDelta, .gpsSpeed, .gpsGForce:
             return .gps
+        // Carrera - Apex: raw Apex live-timing values, no client-side
+        // recomputation, mirrors what the pilot would see on Apex's
+        // own live timing screen.
+        case .raceTimer, .lastLap, .bestStintLap, .apexPosition,
+             .intervalAhead, .intervalBehind:
+            return .raceApex
         default:
-            // Sector cards (deltaBestS1/S2/S3, theoreticalBestLap) live
-            // alongside the race-pace cards rather than in their own
-            // group — pilots think of them as race indicators, not as
-            // a separate device feature.
-            return .race
+            // Carrera - BBN: BoxBoxNow-derived analytics (avg pace,
+            // adjusted classification, sector deltas, future-stint
+            // estimates, etc.).
+            return .raceBbn
         }
     }
 
@@ -84,10 +96,10 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .gForceRadar:    return "G-Force (diana)"
         case .position:       return "Posicion (tiempos medios)"
         case .realPos:        return "Posicion (clasif. real)"
-        case .gapAhead:       return "Gap kart delante"
-        case .gapBehind:      return "Gap kart detras"
+        case .gapAhead:       return "Gap Real Kart delante"
+        case .gapBehind:      return "Gap Real Kart detras"
         case .avgLap20:       return "Vuelta media (20v)"
-        case .best3:          return "Mejor 3 (3V)"
+        case .best3:          return "Media Mejor 3 v"
         case .avgFutureStint: return "Media stint futuro"
         case .boxScore:       return "Puntuacion Box"
         case .bestStintLap:   return "Mejor vuelta stint"
@@ -101,9 +113,9 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .deltaBestS1:    return "Δ Mejor S1"
         case .deltaBestS2:    return "Δ Mejor S2"
         case .deltaBestS3:    return "Δ Mejor S3"
-        case .theoreticalBestLap: return "Vuelta teorica"
-        case .intervalAhead:  return "Intervalo kart delantero"
-        case .intervalBehind: return "Intervalo kart trasero"
+        case .theoreticalBestLap: return "Mejor vuelta teorica sectores"
+        case .intervalAhead:  return "Intervalo kart delante"
+        case .intervalBehind: return "Intervalo kart detras"
         case .apexPosition:   return "Posicion Apex"
         case .deltaSectors:   return "Δ Sectores"
         }

@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { CalendarPicker } from "@/components/shared/CalendarPicker";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
+import { ALL_DRIVER_CARDS, DRIVER_CARD_GROUPS } from "@/hooks/useDriverConfig";
 
 const FinishLineMap = lazy(() => import("@/components/admin/FinishLineMap"));
 
@@ -1631,6 +1632,11 @@ function PlatformSettingsManager() {
     stripe_product_id: "",
     plan_type: "",
     tabs: [] as string[],
+    // Driver-view cards the plan exposes. [] means "no opinion" → the
+    // backend resolves it to "all cards" so legacy rows don't strip
+    // users mid-flight. Admins narrow it explicitly per plan from the
+    // UI below.
+    allowed_cards: [] as string[],
     max_devices: 1,
     concurrency_web: null as number | null,
     concurrency_mobile: null as number | null,
@@ -1665,6 +1671,7 @@ function PlatformSettingsManager() {
       stripe_product_id: c.stripe_product_id,
       plan_type: c.plan_type,
       tabs: c.tabs || [],
+      allowed_cards: c.allowed_cards || [],
       max_devices: c.max_devices,
       concurrency_web: c.concurrency_web ?? null,
       concurrency_mobile: c.concurrency_mobile ?? null,
@@ -1693,6 +1700,19 @@ function PlatformSettingsManager() {
         ? prev.tabs.filter((t) => t !== tab)
         : [...prev.tabs, tab],
     }));
+  };
+
+  const handleConfigCardToggle = (cardId: string) => {
+    setConfigForm((prev) => ({
+      ...prev,
+      allowed_cards: prev.allowed_cards.includes(cardId)
+        ? prev.allowed_cards.filter((c) => c !== cardId)
+        : [...prev.allowed_cards, cardId],
+    }));
+  };
+
+  const setAllowedCardsBulk = (ids: string[]) => {
+    setConfigForm((prev) => ({ ...prev, allowed_cards: ids }));
   };
 
   const saveConfig = async () => {
@@ -2260,6 +2280,99 @@ function PlatformSettingsManager() {
                             >
                               {label}
                             </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Tarjetas que otorga — driver-view card whitelist
+                        for this plan. Empty list means "no opinion" →
+                        the backend resolver maps it to "all cards", so
+                        legacy / unconfigured plans behave like before.
+                        Admins narrow it explicitly per plan. */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs text-neutral-400 uppercase">
+                          Tarjetas que otorga
+                        </label>
+                        <div className="flex gap-2 text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => setAllowedCardsBulk(ALL_DRIVER_CARDS.map((c) => c.id as string))}
+                            className="text-neutral-400 hover:text-accent uppercase tracking-wider"
+                          >
+                            Todas
+                          </button>
+                          <span className="text-neutral-700">·</span>
+                          <button
+                            type="button"
+                            onClick={() => setAllowedCardsBulk([])}
+                            className="text-neutral-400 hover:text-accent uppercase tracking-wider"
+                          >
+                            Ninguna
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-neutral-500 mb-3">
+                        Si no seleccionas ninguna, se entienden TODAS (compatibilidad con planes existentes).
+                      </p>
+                      <div className="space-y-3">
+                        {DRIVER_CARD_GROUPS.map((group) => {
+                          const groupCards = ALL_DRIVER_CARDS
+                            .filter((c) => c.group === group.id)
+                            .sort((a, b) =>
+                              a.label.localeCompare(b.label, "es", { sensitivity: "base" }),
+                            );
+                          if (groupCards.length === 0) return null;
+                          const groupIds: string[] = groupCards.map((c) => c.id);
+                          const allActive = groupIds.every((id) =>
+                            configForm.allowed_cards.includes(id),
+                          );
+                          const toggleGroup = () => {
+                            setConfigForm((prev) => ({
+                              ...prev,
+                              allowed_cards: allActive
+                                ? prev.allowed_cards.filter((id) => !groupIds.includes(id))
+                                : Array.from(new Set([...prev.allowed_cards, ...groupIds])),
+                            }));
+                          };
+                          return (
+                            <div key={group.id} className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-semibold uppercase tracking-widest text-accent/80">
+                                  {group.label}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={toggleGroup}
+                                  className="text-[9px] text-neutral-500 hover:text-accent uppercase tracking-wider"
+                                >
+                                  {allActive ? "Quitar grupo" : "Marcar grupo"}
+                                </button>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {groupCards.map((card) => {
+                                  const active = configForm.allowed_cards.includes(card.id);
+                                  return (
+                                    <button
+                                      key={card.id}
+                                      type="button"
+                                      onClick={() => handleConfigCardToggle(card.id)}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                                        active
+                                          ? "bg-accent/20 border-accent/50 text-accent"
+                                          : "bg-black border-border text-neutral-500 hover:border-neutral-600"
+                                      }`}
+                                    >
+                                      {card.label}
+                                      {card.requiresGps && (
+                                        <span className="ml-1 text-cyan-600 text-[9px]">GPS</span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           );
                         })}
                       </div>

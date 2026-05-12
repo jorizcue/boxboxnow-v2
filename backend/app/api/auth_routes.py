@@ -424,8 +424,97 @@ ALL_TABS = [
 ]
 
 
-def _user_out(user: User) -> UserOut:
-    """Build UserOut with tab_access. Admins always get all tabs."""
+async def _resolve_allowed_cards(
+    user: User, db: AsyncSession | None
+) -> list[str]:
+    """Resolve the user's driver-view card whitelist on-the-fly.
+
+    Source of truth is `ProductTabConfig.allowed_cards` for the user's
+    active subscription. Admins always get every card. Users with no
+    active sub (or no sub matching a ProductTabConfig row) also get
+    every card — that's the "no opinion, don't strip the client" path
+    that the empty default depends on, matching the resolver in
+    `app.services.driver_cards.resolve_allowed_cards`.
+
+    Synchronous callers (the few that don't have a DB session handy)
+    should pass `db=None`; they get the full catalog. Live endpoints
+    pass the request's session for real resolution.
+    """
+    from app.services.driver_cards import (
+        ALL_DRIVER_CARD_IDS,
+        resolve_allowed_cards as _resolve,
+    )
+
+    is_internal = bool(getattr(user, 'is_internal', False) or False)
+    if user.is_admin or is_internal:
+        return list(ALL_DRIVER_CARD_IDS)
+    if db is None:
+        # Caller didn't supply a session — give the full catalog so the
+        # client isn't accidentally stripped of every card.
+        return list(ALL_DRIVER_CARD_IDS)
+
+    # Pick the active sub's stripe_price_id (or plan_type as fallback)
+    # to look up the matching ProductTabConfig.
+    now = datetime.now(timezone.utc)
+    active_price_id: str | None = None
+    active_plan_type: str | None = None
+    for s in (user.subscriptions or []):
+        if s.status not in ("active", "trialing"):
+            continue
+        period_end = s.current_period_end
+        if period_end and period_end.tzinfo is None:
+            period_end = period_end.replace(tzinfo=timezone.utc)
+        if period_end is not None and period_end <= now:
+            continue
+        active_price_id = s.stripe_price_id
+        active_plan_type = s.plan_type
+        break
+
+    if not active_price_id and not active_plan_type:
+        return list(ALL_DRIVER_CARD_IDS)
+
+    # Prefer matching by stripe_price_id (canonical, unique). Fall back
+    # to plan_type if the sub didn't capture a price id (legacy rows).
+    cfg = None
+    if active_price_id:
+        row = await db.execute(
+            select(ProductTabConfig.allowed_cards).where(
+                ProductTabConfig.stripe_price_id == active_price_id
+            )
+        )
+        cfg = row.scalar_one_or_none()
+    if cfg is None and active_plan_type:
+        row = await db.execute(
+            select(ProductTabConfig.allowed_cards)
+            .where(ProductTabConfig.plan_type == active_plan_type)
+            .order_by(ProductTabConfig.id)
+            .limit(1)
+        )
+        cfg = row.scalar_one_or_none()
+
+    if cfg is None:
+        return list(ALL_DRIVER_CARD_IDS)
+
+    # Stored as JSON text per the column type.
+    try:
+        import json as _json
+        parsed = _json.loads(cfg) if cfg else []
+        if not isinstance(parsed, list):
+            parsed = []
+    except Exception:
+        parsed = []
+    return _resolve(parsed)
+
+
+async def _user_out(user: User, db: AsyncSession | None = None) -> UserOut:
+    """Build UserOut with tab_access. Admins always get all tabs.
+
+    `db` is optional: when supplied (every live endpoint), the user's
+    `allowed_cards` is resolved from the active subscription's
+    ProductTabConfig. When not supplied (defensive code path used in
+    rare offline / migration tools), `allowed_cards` falls back to the
+    full catalog so callers don't accidentally strip the client.
+    """
     is_internal = bool(getattr(user, 'is_internal', False) or False)
 
     if user.is_admin:
@@ -461,6 +550,8 @@ def _user_out(user: User) -> UserOut:
         except Exception:
             pass
 
+    allowed_cards = await _resolve_allowed_cards(user, db)
+
     return UserOut(
         id=user.id,
         username=user.username,
@@ -478,6 +569,7 @@ def _user_out(user: User) -> UserOut:
         subscription_plan=sub_plan,
         trial_ends_at=trial_ends_at,
         has_active_circuit_access=user_has_active_circuit_access(user),
+        allowed_cards=allowed_cards,
         created_at=user.created_at,
     )
 
@@ -765,7 +857,7 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
     return LoginResponse(
         access_token=access_token,
         session_token=session_token,
-        user=_user_out(user),
+        user=await _user_out(user, db),
     )
 
 
@@ -941,7 +1033,7 @@ async def login(
     return LoginResponse(
         access_token=access_token,
         session_token=session_token,
-        user=_user_out(user),
+        user=await _user_out(user, db),
     )
 
 
@@ -1257,7 +1349,7 @@ async def oauth_exchange(request: Request, db: AsyncSession = Depends(get_db)):
     payload = LoginResponse(
         access_token=raw_token,
         session_token=session_token,
-        user=_user_out(user),
+        user=await _user_out(user, db),
     )
     response = JSONResponse(jsonable_encoder(payload))
     response.delete_cookie(key="bbn_oauth_handoff", path="/api/auth")
@@ -1447,8 +1539,11 @@ async def google_callback_ipad(code: str, request: Request, db: AsyncSession = D
 # --- Session Management (user) ---
 
 @router.get("/me", response_model=UserOut)
-async def get_me(user: User = Depends(get_current_user)):
-    return _user_out(user)
+async def get_me(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await _user_out(user, db)
 
 
 @router.get("/sessions", response_model=list[DeviceSessionOut])

@@ -16,6 +16,12 @@ data class User(
     @SerialName("tab_access") val tabAccess: List<String>? = null,
     @SerialName("has_active_subscription") val hasActiveSubscription: Boolean? = null,
     @SerialName("subscription_plan") val subscriptionPlan: String? = null,
+    /** Driver-view card `key`s the user's plan exposes in the preset
+     *  editor. Resolved on-the-fly by the backend from the active
+     *  subscription's `ProductTabConfig.allowed_cards`. Empty or null
+     *  means "no opinion" → the client falls back to the full local
+     *  catalog. */
+    @SerialName("allowed_cards") val allowedCards: List<String>? = null,
 ) {
     val displayName: String get() = username
 }

@@ -266,7 +266,14 @@ export function DriverConfigTab() {
         <p className="text-[11px] text-neutral-500">Selecciona las tarjetas que quieres ver en la vista del piloto.</p>
 
         {visibleGroups.map((group) => {
-          const groupCards = ALL_DRIVER_CARDS.filter((c) => c.group === group.id)
+          // Plan-aware filter: only show cards in `user.allowed_cards`.
+          // Empty / missing list = fall back to the full catalog (older
+          // backends, admins, trial users without a plan match).
+          const allowed = user?.allowed_cards;
+          const allowedSet = allowed && allowed.length > 0 ? new Set(allowed) : null;
+          const groupCards = ALL_DRIVER_CARDS
+            .filter((c) => c.group === group.id)
+            .filter((c) => !allowedSet || allowedSet.has(c.id))
             .sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
           if (groupCards.length === 0) return null;
           const isGps = group.id === "gps";

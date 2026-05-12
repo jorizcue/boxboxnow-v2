@@ -30,7 +30,8 @@ async def list_users(admin: User = Depends(require_admin), db: AsyncSession = De
     result = await db.execute(
         select(User).options(selectinload(User.tab_access), selectinload(User.subscriptions)).order_by(User.username)
     )
-    return [_user_out(u) for u in result.scalars().all()]
+    users = result.scalars().all()
+    return [await _user_out(u, db) for u in users]
 
 
 @router.post("/users", response_model=UserOut)
@@ -61,7 +62,7 @@ async def create_user(data: UserCreate, admin: User = Depends(require_admin), db
         select(User).options(selectinload(User.tab_access), selectinload(User.subscriptions)).where(User.id == user.id)
     )
     user = result.scalar_one()
-    return _user_out(user)
+    return await _user_out(user, db)
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
@@ -101,7 +102,7 @@ async def update_user(user_id: int, data: UserUpdate, admin: User = Depends(requ
         select(User).options(selectinload(User.tab_access), selectinload(User.subscriptions)).where(User.id == user_id)
     )
     user = result.scalar_one()
-    return _user_out(user)
+    return await _user_out(user, db)
 
 
 @router.post("/users/{user_id}/mfa/reset")
@@ -564,6 +565,7 @@ def _serialize_config(c, _json) -> dict:
         "stripe_price_id": c.stripe_price_id,
         "plan_type": c.plan_type,
         "tabs": _json.loads(c.tabs) if c.tabs else [],
+        "allowed_cards": _json.loads(c.allowed_cards) if c.allowed_cards else [],
         "max_devices": c.max_devices,
         "concurrency_web": c.concurrency_web,
         "concurrency_mobile": c.concurrency_mobile,
@@ -611,6 +613,7 @@ async def create_product_config(request: Request, admin: User = Depends(require_
         stripe_price_id=price_id,
         plan_type=plan_type,
         tabs=_json.dumps(body.get("tabs", [])),
+        allowed_cards=_json.dumps(body.get("allowed_cards", [])),
         max_devices=body.get("max_devices", 1),
         concurrency_web=body.get("concurrency_web"),
         concurrency_mobile=body.get("concurrency_mobile"),
@@ -663,6 +666,8 @@ async def update_product_config(config_id: int, request: Request, admin: User = 
             setattr(config, field, body[field])
     if "tabs" in body:
         config.tabs = _json.dumps(body["tabs"])
+    if "allowed_cards" in body:
+        config.allowed_cards = _json.dumps(body["allowed_cards"])
     if "features" in body:
         config.features = _json.dumps(body["features"])
     for field in ("max_devices", "concurrency_web", "concurrency_mobile", "sort_order"):

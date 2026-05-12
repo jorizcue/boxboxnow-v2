@@ -116,7 +116,16 @@ export function DriverConfigPanel({ onClose }: { onClose: () => void }) {
         <label className="text-[10px] text-neutral-400 uppercase tracking-wider">Tarjetas visibles</label>
         {DRIVER_CARD_GROUPS.map((group) => {
           if (group.id === "box" && !canBox) return null;
-          const groupCards = ALL_DRIVER_CARDS.filter((c) => c.group === group.id)
+          // Filter the catalog by the user's plan-allowed cards. If the
+          // backend didn't provide a list (older clients / trial users
+          // / admins), `allowed_cards` is empty/undefined and we fall
+          // back to the full catalog so we don't accidentally strip
+          // the editor down to nothing.
+          const allowed = user?.allowed_cards;
+          const allowedSet = allowed && allowed.length > 0 ? new Set(allowed) : null;
+          const groupCards = ALL_DRIVER_CARDS
+            .filter((c) => c.group === group.id)
+            .filter((c) => !allowedSet || allowedSet.has(c.id))
             .sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
           if (groupCards.length === 0) return null;
           return (

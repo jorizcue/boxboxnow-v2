@@ -15,14 +15,24 @@ struct CardVisibilityView: View {
     }
 
     private func cards(in group: DriverCardGroup) -> [DriverCard] {
-        DriverCard.allCases.filter { $0.group == group }
+        // Plan-aware filter: only show cards present in the user's
+        // `allowed_cards` whitelist resolved by the backend from the
+        // active subscription's ProductTabConfig. Empty / nil list
+        // falls back to the full catalog so older clients / admins /
+        // trial users don't end up with an empty editor.
+        let allowed = auth.user?.allowedCards
+        let allowedSet: Set<String>? = (allowed?.isEmpty == false) ? Set(allowed!) : nil
+        return DriverCard.allCases.filter { card in
+            card.group == group && (allowedSet?.contains(card.rawValue) ?? true)
+        }
     }
 
     private func sectionTitle(_ group: DriverCardGroup) -> String {
         switch group {
-        case .race: return "Carrera"
-        case .box:  return "BOX"
-        case .gps:  return "GPS (requieren RaceBox o GPS del telefono)"
+        case .raceApex: return "Carrera - Apex"
+        case .raceBbn:  return "Carrera - BBN"
+        case .box:      return "BOX"
+        case .gps:      return "GPS (requieren RaceBox o GPS del telefono)"
         }
     }
 

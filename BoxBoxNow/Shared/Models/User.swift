@@ -11,6 +11,12 @@ struct User: Codable, Identifiable {
     let hasActiveSubscription: Bool?
     let subscriptionPlan: String?
     let subscriptionStatus: String?
+    /// Driver-view card `rawValue`s the user's plan exposes in the
+    /// preset editor. Resolved on-the-fly by the backend from the
+    /// active subscription's `ProductTabConfig.allowed_cards`. Empty
+    /// or nil means "no opinion" → fall back to the full local
+    /// catalog so older builds / trial users don't get stripped.
+    let allowedCards: [String]?
     // Kept as String (ISO-8601) rather than Date? so APIClient.execute can
     // decode it with a bare JSONDecoder (no .iso8601 strategy). The backend
     // serializes UserOut.created_at as an ISO-8601 string via Pydantic.
@@ -27,6 +33,7 @@ struct User: Codable, Identifiable {
         case hasActiveSubscription = "has_active_subscription"
         case subscriptionPlan = "subscription_plan"
         case subscriptionStatus = "subscription_status"
+        case allowedCards = "allowed_cards"
         case createdAt = "created_at"
     }
 }

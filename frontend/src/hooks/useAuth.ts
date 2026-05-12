@@ -28,6 +28,12 @@ interface AuthUser {
    *  uses this alongside `has_active_subscription` to decide whether
    *  to render the app or a "no circuits" gate page. */
   has_active_circuit_access?: boolean;
+  /** Driver-view card ids the user's active plan exposes. Resolved
+   *  on-the-fly by the backend from the active subscription's
+   *  `ProductTabConfig.allowed_cards`. Empty / missing => fall back
+   *  to the full local catalog (legacy / trial / admin path).
+   *  Drives which cards the preset editor renders as selectable. */
+  allowed_cards?: string[];
 }
 
 interface AuthStore {

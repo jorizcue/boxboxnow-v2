@@ -62,11 +62,22 @@ fun CardVisibilityScreen(onBack: () -> Unit) {
     val canShowBox = user?.isAdmin == true ||
         user?.tabAccess?.contains("app-config-box") == true
 
+    // Plan-aware allow-list: only show cards the user's active
+    // subscription exposes via ProductTabConfig.allowed_cards
+    // (resolved server-side). Empty / null => no opinion, fall back
+    // to the full catalog so admins / trial users / older builds
+    // don't end up with an empty editor.
+    val allowed: Set<String>? = user?.allowedCards
+        ?.takeIf { it.isNotEmpty() }
+        ?.toSet()
+
     val grouped: List<Pair<DriverCardGroup, List<DriverCard>>> =
         DriverCardGroup.entries.mapNotNull { group ->
             if (!canShowBox && group == DriverCardGroup.BOX) return@mapNotNull null
             // Use sortedByGroupAndName so cards appear alphabetically within each group
-            val cards = DriverCard.sortedByGroupAndName.filter { it.group == group }
+            val cards = DriverCard.sortedByGroupAndName
+                .filter { it.group == group }
+                .filter { allowed == null || allowed.contains(it.key) }
             if (cards.isEmpty()) null else group to cards
         }
 

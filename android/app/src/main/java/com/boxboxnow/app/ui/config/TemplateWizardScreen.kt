@@ -88,9 +88,17 @@ private const val TOTAL_STEPS = 4
 @Composable
 fun TemplateWizardScreen(onBack: () -> Unit, editPresetId: Int? = null) {
     val driverVM: DriverViewModel = hiltViewModel()
+    val authVM: com.boxboxnow.app.vm.AuthViewModel = hiltViewModel()
     val presets by driverVM.presets.collectAsState()
+    val user by authVM.user.collectAsState()
     val editingPreset: DriverConfigPreset? = editPresetId?.let { id -> presets.firstOrNull { it.id == id } }
     val isEditMode = editPresetId != null
+    // Plan-aware whitelist surfaced by /auth/me. Null / empty list =>
+    // fall back to the full catalog so admins / trial users see every
+    // card while the backend resolution hasn't matched their plan.
+    val allowedCards: Set<String>? = user?.allowedCards
+        ?.takeIf { it.isNotEmpty() }
+        ?.toSet()
 
     var step by remember { mutableIntStateOf(1) }
     var templateName by remember { mutableStateOf("") }
@@ -186,6 +194,7 @@ fun TemplateWizardScreen(onBack: () -> Unit, editPresetId: Int? = null) {
                     onToggle = { key, checked -> visibleCards[key] = checked },
                     onBack = { step = 1 },
                     onNext = { step = 3 },
+                    allowedCards = allowedCards,
                 )
                 3 -> StepCardOrder(
                     visibleCards = visibleCards,
@@ -326,10 +335,13 @@ private fun StepCardVisibility(
     onToggle: (String, Boolean) -> Unit,
     onBack: () -> Unit,
     onNext: () -> Unit,
+    allowedCards: Set<String>? = null,
 ) {
     val grouped: List<Pair<DriverCardGroup, List<DriverCard>>> =
         DriverCardGroup.entries.mapNotNull { group ->
-            val cards = DriverCard.entries.filter { it.group == group }
+            val cards = DriverCard.entries
+                .filter { it.group == group }
+                .filter { allowedCards == null || allowedCards.contains(it.key) }
             if (cards.isEmpty()) null else group to cards
         }
 
