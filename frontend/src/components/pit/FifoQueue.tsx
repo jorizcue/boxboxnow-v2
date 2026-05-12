@@ -74,20 +74,37 @@ export function FifoQueue() {
   const rows = useMemo(() => {
     const queue = fifo.queue.slice(0, boxKarts);
     const result: (FifoEntry | number)[][] = Array.from({ length: boxLines }, () => []);
-    const realByLine: (FifoEntry)[][] = Array.from({ length: boxLines }, () => []);
+    const realByLine: FifoEntry[][] = Array.from({ length: boxLines }, () => []);
     const defaults: (FifoEntry | number)[] = [];
 
-    // Separate real entries (with line) from defaults
+    // Separate real pit entries from race-start placeholders. We
+    // intentionally IGNORE the `line` field that the backend stamps
+    // on each entry: it's assigned at pit-in time using the box_lines
+    // value of THAT moment, which becomes stale the instant the
+    // strategist changes box_lines mid-race. The symptom was that
+    // dropping from 2 rows to 1 left every line=1 entry treated as a
+    // "default" (since line >= new boxLines), which then got dumped
+    // to the LEFT of the row before the real entries — losing the
+    // chronological ordering the strategist relies on to decide which
+    // kart is closest to its next pit. Instead, we re-bucket by
+    // chronological position % boxLines so the order is always
+    // consistent with the current box_lines value.
+    const realEntries: FifoEntry[] = [];
     for (const entry of queue) {
-      const line = typeof entry === "object" && entry?.line !== undefined && entry.line >= 0 ? entry.line : -1;
-      if (line >= 0 && line < boxLines) {
-        realByLine[line].push(entry);
+      const kartNumber = typeof entry === "object" && entry?.kartNumber ? entry.kartNumber : 0;
+      if (kartNumber > 0) {
+        realEntries.push(entry as FifoEntry);
       } else {
         defaults.push(entry);
       }
     }
+    realEntries.forEach((entry, idx) => {
+      realByLine[idx % boxLines].push(entry);
+    });
 
     // Build each row: defaults on the left, real entries on the right
+    // so the right-most slot of each row is always the most recent
+    // pit-in (visually the "freshest" kart in the box).
     for (let r = 0; r < boxLines; r++) {
       const realCount = realByLine[r].length;
       const defaultCount = kartsPerRow - realCount;
