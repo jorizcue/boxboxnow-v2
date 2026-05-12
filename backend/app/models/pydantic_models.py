@@ -104,6 +104,11 @@ class RegisterRequest(BaseModel):
 class CheckoutSessionRequest(BaseModel):
     price_id: str
     circuit_id: int | None = None
+    # Multi-circuit purchases: when the product config has
+    # circuits_to_select > 1 the frontend sends the full list of selected
+    # circuit IDs here. The legacy `circuit_id` is still accepted for
+    # single-circuit purchases (backward-compat with older clients).
+    circuit_ids: list[int] | None = None
 
 
 class CheckoutSessionResponse(BaseModel):
@@ -565,6 +570,12 @@ class ProductTabConfigOut(BaseModel):
     concurrency_web: int | None = None
     concurrency_mobile: int | None = None
     per_circuit: bool = True
+    # When per_circuit=True, the number of circuits the buyer must pick
+    # during the purchase flow. 1 = legacy single-circuit checkout; >1 =
+    # multi-circuit selector that grants N UserCircuitAccess rows per
+    # Stripe payment. Defaults to 1 so existing serialized payloads stay
+    # backward compatible.
+    circuits_to_select: int = 1
     display_name: str = ""
     description: str | None = None
     features: list[str] = []
@@ -588,6 +599,7 @@ class ProductTabConfigCreate(BaseModel):
     concurrency_web: int | None = None
     concurrency_mobile: int | None = None
     per_circuit: bool = True
+    circuits_to_select: int = 1
     display_name: str = ""
     description: str | None = None
     features: list[str] = []
@@ -609,6 +621,7 @@ class ProductTabConfigUpdate(BaseModel):
     concurrency_web: int | None = None
     concurrency_mobile: int | None = None
     per_circuit: bool | None = None
+    circuits_to_select: int | None = None
     display_name: str | None = None
     description: str | None = None
     features: list[str] | None = None
@@ -630,3 +643,8 @@ class PlanPublicOut(BaseModel):
     is_popular: bool = False
     sort_order: int = 0
     per_circuit: bool = True
+    # Mirrors ProductTabConfig.circuits_to_select. Exposed publicly so the
+    # checkout-circuit-selection UI knows whether to render a single-pick
+    # radio list or a multi-pick checkbox grid (and how many circuits the
+    # buyer must select).
+    circuits_to_select: int = 1

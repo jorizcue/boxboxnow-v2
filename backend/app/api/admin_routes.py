@@ -570,6 +570,7 @@ def _serialize_config(c, _json) -> dict:
         "concurrency_web": c.concurrency_web,
         "concurrency_mobile": c.concurrency_mobile,
         "per_circuit": bool(c.per_circuit) if c.per_circuit is not None else True,
+        "circuits_to_select": int(c.circuits_to_select) if c.circuits_to_select else 1,
         "display_name": c.display_name,
         "description": c.description,
         "features": _json.loads(c.features) if c.features else [],
@@ -618,6 +619,7 @@ async def create_product_config(request: Request, admin: User = Depends(require_
         concurrency_web=body.get("concurrency_web"),
         concurrency_mobile=body.get("concurrency_mobile"),
         per_circuit=body.get("per_circuit", True),
+        circuits_to_select=max(1, int(body.get("circuits_to_select", 1) or 1)),
         display_name=body.get("display_name", ""),
         description=body.get("description"),
         features=_json.dumps(body.get("features", [])),
@@ -675,6 +677,11 @@ async def update_product_config(config_id: int, request: Request, admin: User = 
             setattr(config, field, body[field])
     if "per_circuit" in body:
         config.per_circuit = bool(body["per_circuit"])
+    if "circuits_to_select" in body:
+        try:
+            config.circuits_to_select = max(1, int(body["circuits_to_select"] or 1))
+        except (TypeError, ValueError):
+            config.circuits_to_select = 1
     for field in ("price_amount",):
         if field in body:
             setattr(config, field, body[field])

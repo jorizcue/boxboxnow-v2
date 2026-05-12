@@ -529,6 +529,18 @@ async def init_db():
         except Exception:
             pass
 
+        # Number of circuits the buyer must pick when the plan is sold per
+        # circuit (per_circuit=True). Default 1 reproduces the legacy
+        # single-circuit checkout. Values > 1 unlock the multi-circuit
+        # selector in the purchase flow and the webhook grants N
+        # UserCircuitAccess rows for the same Stripe payment.
+        try:
+            await conn.execute(text(
+                "ALTER TABLE product_tab_config ADD COLUMN circuits_to_select INTEGER NOT NULL DEFAULT 1"
+            ))
+        except Exception:
+            pass
+
         # Waitlist table for pre-launch lead capture
         await conn.execute(text("""
             CREATE TABLE IF NOT EXISTS waitlist_entry (

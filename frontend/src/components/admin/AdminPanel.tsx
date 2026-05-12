@@ -1641,6 +1641,10 @@ function PlatformSettingsManager() {
     concurrency_web: null as number | null,
     concurrency_mobile: null as number | null,
     per_circuit: true,
+    // Number of circuits the buyer must pick when per_circuit=true.
+    // 1 = legacy single-pick radio list. >1 = checkbox grid that
+    // requires exactly N selections before continue unlocks.
+    circuits_to_select: 1,
     display_name: "",
     description: "",
     features: [] as string[],
@@ -1676,6 +1680,9 @@ function PlatformSettingsManager() {
       concurrency_web: c.concurrency_web ?? null,
       concurrency_mobile: c.concurrency_mobile ?? null,
       per_circuit: c.per_circuit !== false,
+      circuits_to_select: typeof c.circuits_to_select === "number" && c.circuits_to_select > 0
+        ? c.circuits_to_select
+        : 1,
       display_name: c.display_name || "",
       description: c.description || "",
       features: c.features || [],
@@ -2450,6 +2457,32 @@ function PlatformSettingsManager() {
                         Si esta activo, el usuario elige el circuito en la compra.
                         Si no, el plan concede acceso a todos los circuitos.
                       </p>
+
+                      {configForm.per_circuit && (
+                        <div className="mt-3 ml-6 flex items-center gap-3">
+                          <label className="text-xs text-neutral-400 uppercase">
+                            Nº de circuitos a elegir
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="50"
+                            value={configForm.circuits_to_select}
+                            onChange={(e) =>
+                              setConfigForm((p) => ({
+                                ...p,
+                                circuits_to_select: Math.max(1, parseInt(e.target.value) || 1),
+                              }))
+                            }
+                            className="w-20 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
+                          />
+                          <span className="text-xs text-neutral-500">
+                            {configForm.circuits_to_select === 1
+                              ? "Compra de 1 circuito (radio button)"
+                              : `Compra de ${configForm.circuits_to_select} circuitos (multi-seleccion)`}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <div>

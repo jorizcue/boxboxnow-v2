@@ -56,6 +56,7 @@ async def list_plans(db: AsyncSession = Depends(get_db)):
             "is_popular": c.is_popular,
             "sort_order": c.sort_order,
             "per_circuit": bool(c.per_circuit) if c.per_circuit is not None else True,
+            "circuits_to_select": int(c.circuits_to_select) if c.circuits_to_select else 1,
         }
         for c in configs
     ]

@@ -154,13 +154,22 @@ async def list_circuits_for_checkout(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List circuits available for subscription — excludes circuits the user already has an active subscription for."""
-    # Get circuit IDs with active subscriptions
+    """List circuits available for purchase — excludes circuits the user
+    already has currently-valid access to.
+
+    Source of truth is UserCircuitAccess (not Subscription) because
+    multi-circuit subscriptions only store ONE primary circuit_id on the
+    Subscription row but grant N UserCircuitAccess rows. Using
+    UserCircuitAccess also covers admin-granted / internal-user access
+    that has no backing Subscription, so the checkout selector can't
+    accidentally let a user re-buy a circuit they already have.
+    """
+    now = datetime.now(timezone.utc)
     active_result = await db.execute(
-        select(Subscription.circuit_id).where(
-            Subscription.user_id == user.id,
-            Subscription.status.in_(("active", "trialing")),
-            Subscription.circuit_id.isnot(None),
+        select(UserCircuitAccess.circuit_id).where(
+            UserCircuitAccess.user_id == user.id,
+            UserCircuitAccess.valid_from <= now,
+            UserCircuitAccess.valid_until > now,
         )
     )
     active_circuit_ids = {row[0] for row in active_result.fetchall()}
@@ -182,8 +191,32 @@ async def create_checkout_session(
     body = await request.json()
     price_id = body.get("price_id")
     plan = body.get("plan")  # Legacy: accept plan label like "pro_monthly" (resolved via DB)
-    circuit_id = body.get("circuit_id")
+    # Legacy single-circuit field — kept for backward compat with older
+    # clients that still send `circuit_id`. New clients always send
+    # `circuit_ids` (list), even for single-circuit plans.
+    circuit_id_legacy = body.get("circuit_id")
+    raw_circuit_ids = body.get("circuit_ids")
     event_dates = body.get("event_dates")  # e.g. ["2026-04-15"] or ["2026-04-15", "2026-04-16"]
+
+    # Normalize circuit_ids into a deduped, sorted list of ints.
+    circuit_ids: list[int] = []
+    if isinstance(raw_circuit_ids, list):
+        seen: set[int] = set()
+        for raw in raw_circuit_ids:
+            try:
+                cid = int(raw)
+            except (TypeError, ValueError):
+                continue
+            if cid > 0 and cid not in seen:
+                seen.add(cid)
+                circuit_ids.append(cid)
+    if not circuit_ids and circuit_id_legacy:
+        try:
+            cid = int(circuit_id_legacy)
+            if cid > 0:
+                circuit_ids = [cid]
+        except (TypeError, ValueError):
+            pass
 
     # Legacy plan-label path — find the first matching row with that label
     if not price_id and plan:
@@ -202,24 +235,56 @@ async def create_checkout_session(
 
     plan_type = config.plan_type
     needs_circuit = _config_is_per_circuit(config)
+    required_count = max(1, int(config.circuits_to_select or 1)) if needs_circuit else 0
     is_one_time = (config.billing_interval or "").lower() in ("one_time", "event")
 
-    if needs_circuit and not circuit_id:
-        raise HTTPException(400, "circuit_id required")
-    if not needs_circuit:
-        circuit_id = None  # Ignore any circuit hint for cross-circuit products
+    if needs_circuit:
+        if not circuit_ids:
+            raise HTTPException(400, "circuit_id required")
+        if len(circuit_ids) != required_count:
+            raise HTTPException(
+                400,
+                f"Este plan requiere seleccionar exactamente {required_count} "
+                f"circuito{'s' if required_count != 1 else ''}",
+            )
+        # Validate every circuit id exists
+        existing_rows = await db.execute(
+            select(Circuit.id).where(Circuit.id.in_(circuit_ids))
+        )
+        existing_circuit_ids = {row[0] for row in existing_rows.all()}
+        missing = [cid for cid in circuit_ids if cid not in existing_circuit_ids]
+        if missing:
+            raise HTTPException(400, f"Circuito desconocido: {missing[0]}")
+    else:
+        circuit_ids = []  # Ignore any circuit hint for cross-circuit products
+
+    # Primary circuit kept on the Subscription row (the DB column is
+    # singular; the rest of the selection lives in metadata + the
+    # UserCircuitAccess grants below). Source of truth for "what circuits
+    # is this user allowed on" is UserCircuitAccess, NOT Subscription.
+    circuit_id = circuit_ids[0] if circuit_ids else None
 
     # Prevent duplicate subscription for same circuit (only meaningful for per-circuit plans)
     if needs_circuit:
-        existing = await db.execute(
-            select(Subscription).where(
-                Subscription.user_id == user.id,
-                Subscription.circuit_id == circuit_id,
-                Subscription.status.in_(("active", "trialing")),
+        # Block when the user already has an ACTIVE access window for any of
+        # the requested circuits — covers both Subscription rows AND
+        # manually-granted UserCircuitAccess rows (admins / internal users).
+        now = datetime.now(timezone.utc)
+        access_rows = await db.execute(
+            select(UserCircuitAccess.circuit_id).where(
+                UserCircuitAccess.user_id == user.id,
+                UserCircuitAccess.circuit_id.in_(circuit_ids),
+                UserCircuitAccess.valid_from <= now,
+                UserCircuitAccess.valid_until > now,
             )
         )
-        if existing.scalar_one_or_none():
-            raise HTTPException(400, "Ya tienes una suscripcion activa para este circuito")
+        already_owned = {row[0] for row in access_rows.all()}
+        if already_owned:
+            raise HTTPException(
+                400,
+                "Ya tienes acceso activo a "
+                + ("uno de los circuitos seleccionados" if len(circuit_ids) > 1 else "este circuito"),
+            )
     else:
         # For global plans, prevent duplicate active subscription at the same price
         existing = await db.execute(
@@ -269,7 +334,13 @@ async def create_checkout_session(
         "user_id": str(user.id),
         "plan_type": plan_type or "unknown",
         "stripe_price_id": price_id,
+        # Single-circuit fallback for downstream code that only looks at
+        # circuit_id (still used by the Subscription row's circuit_id col).
         "circuit_id": str(circuit_id) if circuit_id else "",
+        # Full list — comma-joined because Stripe metadata values must be
+        # strings. The webhook splits it back into a list to grant N
+        # UserCircuitAccess rows.
+        "circuit_ids": ",".join(str(c) for c in circuit_ids) if circuit_ids else "",
     }
     if is_one_time and event_dates:
         metadata["event_dates"] = ",".join(event_dates)
@@ -290,6 +361,7 @@ async def create_checkout_session(
                 "plan_type": plan_type or "unknown",
                 "stripe_price_id": price_id,
                 "circuit_id": str(circuit_id) if circuit_id else "",
+                "circuit_ids": ",".join(str(c) for c in circuit_ids) if circuit_ids else "",
             }
         }
 
@@ -415,10 +487,46 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     return {"received": True}
 
 
+def _parse_metadata_circuit_ids(metadata: dict) -> tuple[int | None, list[int]]:
+    """Extract primary circuit_id + full circuit_ids list from session metadata.
+
+    Returns (primary_circuit_id, list_of_circuit_ids). The primary id is
+    the first element (kept on Subscription.circuit_id, which stays
+    singular because the column doesn't support N circuits). The full
+    list drives the UserCircuitAccess grants — that table IS the source
+    of truth for "what circuits this user is allowed on".
+
+    Falls back to the legacy single `circuit_id` metadata key when
+    `circuit_ids` isn't present (older checkout flows + manual reissues).
+    """
+    raw_ids = (metadata.get("circuit_ids") or "").strip()
+    ids: list[int] = []
+    if raw_ids:
+        for part in raw_ids.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                cid = int(part)
+            except ValueError:
+                continue
+            if cid > 0 and cid not in ids:
+                ids.append(cid)
+    if not ids and metadata.get("circuit_id"):
+        try:
+            cid = int(metadata["circuit_id"])
+            if cid > 0:
+                ids = [cid]
+        except (TypeError, ValueError):
+            pass
+    primary = ids[0] if ids else None
+    return primary, ids
+
+
 async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
     metadata = session_data.get("metadata", {})
     user_id = int(metadata.get("user_id", 0))
-    circuit_id = int(metadata.get("circuit_id")) if metadata.get("circuit_id") else None
+    circuit_id, circuit_ids = _parse_metadata_circuit_ids(metadata)
     # Prefer the explicit stripe_price_id stamped into metadata at checkout.
     stripe_price_id = metadata.get("stripe_price_id") or None
 
@@ -467,10 +575,16 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
             )
             db.add(sub)
 
-            # Grant circuit access: either the selected circuit, or all circuits
-            # when the plan is sold cross-circuit (per_circuit=false).
-            if circuit_id:
-                await _grant_circuit_access(db, user_id, circuit_id, config=config)
+            # Grant circuit access:
+            #   * per-circuit + N selected circuits → one UserCircuitAccess
+            #     per circuit (Subscription.circuit_id keeps the primary
+            #     one for display; UserCircuitAccess is the source of
+            #     truth for entitlements).
+            #   * cross-circuit plan (per_circuit=false) → grant access to
+            #     every circuit currently in the catalog.
+            if circuit_ids:
+                for cid in circuit_ids:
+                    await _grant_circuit_access(db, user_id, cid, config=config)
             elif not _config_is_per_circuit(config):
                 await _grant_all_circuits_access(
                     db, user_id, config=config, period_end=period_end
@@ -538,11 +652,12 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
         )
         db.add(sub)
 
-        if circuit_id:
-            await _grant_circuit_access(
-                db, user_id, circuit_id, config=config,
-                event_start=event_start, event_end=event_end,
-            )
+        if circuit_ids:
+            for cid in circuit_ids:
+                await _grant_circuit_access(
+                    db, user_id, cid, config=config,
+                    event_start=event_start, event_end=event_end,
+                )
         elif not _config_is_per_circuit(config):
             await _grant_all_circuits_access(
                 db, user_id, config=config,
@@ -589,6 +704,12 @@ async def _handle_invoice_paid(invoice_data: dict, db: AsyncSession):
 
     # Resolve current config — starts from whatever price is on the subscription row
     config = await _get_config_by_price(db, sub.stripe_price_id)
+    # Multi-circuit subscriptions carry the full circuit list in their
+    # Stripe subscription metadata (set at checkout). We always rebuild
+    # the list from there so admin revokes propagate naturally — the
+    # source of truth for grants stays UserCircuitAccess, but the
+    # "expected at renewal" set comes from the original purchase.
+    renewal_circuit_ids: list[int] = []
 
     try:
         stripe_sub = s.Subscription.retrieve(sub_id, expand=["items"])
@@ -596,6 +717,15 @@ async def _handle_invoice_paid(invoice_data: dict, db: AsyncSession):
             sub.current_period_start = datetime.fromtimestamp(stripe_sub.start_date, tz=timezone.utc)
         else:
             sub.current_period_start = now
+
+        sub_meta = getattr(stripe_sub, "metadata", None) or {}
+        # stripe-python may surface metadata as a dict-like StripeObject —
+        # normalize to a plain dict before parsing.
+        try:
+            sub_meta = dict(sub_meta)
+        except Exception:
+            sub_meta = {}
+        _, renewal_circuit_ids = _parse_metadata_circuit_ids(sub_meta)
 
         # Sync config from Stripe's current price (handles deferred plan switches)
         items = stripe_sub.items.data if stripe_sub.items else []
@@ -629,12 +759,19 @@ async def _handle_invoice_paid(invoice_data: dict, db: AsyncSession):
 
     sub.status = "active"
 
+    # Fall back to the singular Subscription.circuit_id if metadata didn't
+    # surface any list (older subs created before the multi-circuit
+    # rollout, or non-Stripe code paths).
+    if not renewal_circuit_ids and sub.circuit_id:
+        renewal_circuit_ids = [sub.circuit_id]
+
     # Extend circuit access with new period end
-    if sub.circuit_id and sub.current_period_end:
-        await _grant_circuit_access(
-            db, sub.user_id, sub.circuit_id, config=config,
-            period_end=sub.current_period_end,
-        )
+    if renewal_circuit_ids and sub.current_period_end:
+        for cid in renewal_circuit_ids:
+            await _grant_circuit_access(
+                db, sub.user_id, cid, config=config,
+                period_end=sub.current_period_end,
+            )
     elif sub.current_period_end and not _config_is_per_circuit(config):
         await _grant_all_circuits_access(
             db, sub.user_id, config=config,
@@ -644,7 +781,8 @@ async def _handle_invoice_paid(invoice_data: dict, db: AsyncSession):
     await db.commit()
     logger.info(
         f"Invoice paid: user={sub.user_id} plan={sub.plan_type} "
-        f"circuit={sub.circuit_id} until={sub.current_period_end}"
+        f"circuits={renewal_circuit_ids or sub.circuit_id} "
+        f"until={sub.current_period_end}"
     )
 
 
@@ -669,13 +807,22 @@ async def _handle_subscription_updated(sub_data: dict, db: AsyncSession):
 
         config = await _get_config_by_price(db, sub.stripe_price_id)
 
+        # Multi-circuit subscription: read the full circuit list from the
+        # Stripe sub's metadata (set at checkout). Fall back to the
+        # singular Subscription.circuit_id for legacy/single-circuit subs.
+        meta_payload = sub_data.get("metadata") or {}
+        _, multi_circuit_ids = _parse_metadata_circuit_ids(meta_payload)
+        if not multi_circuit_ids and sub.circuit_id:
+            multi_circuit_ids = [sub.circuit_id]
+
         # Sync circuit access if subscription is still active
         if sub.current_period_end and sub.status in ("active", "trialing"):
-            if sub.circuit_id:
-                await _grant_circuit_access(
-                    db, sub.user_id, sub.circuit_id, config=config,
-                    period_end=sub.current_period_end,
-                )
+            if multi_circuit_ids:
+                for cid in multi_circuit_ids:
+                    await _grant_circuit_access(
+                        db, sub.user_id, cid, config=config,
+                        period_end=sub.current_period_end,
+                    )
             elif not _config_is_per_circuit(config):
                 await _grant_all_circuits_access(
                     db, sub.user_id, config=config,
@@ -696,20 +843,31 @@ async def _handle_subscription_deleted(sub_data: dict, db: AsyncSession):
     if sub:
         sub.status = "canceled"
 
-        # Expire circuit access (set valid_until to now — immediate revocation)
-        if sub.circuit_id:
-            access_result = await db.execute(
+        # Revoke access on every circuit this subscription paid for.
+        # Pull the full list from Stripe metadata (multi-circuit subs);
+        # fall back to the singular Subscription.circuit_id for legacy
+        # single-circuit subs.
+        meta_payload = sub_data.get("metadata") or {}
+        _, revoked_circuit_ids = _parse_metadata_circuit_ids(meta_payload)
+        if not revoked_circuit_ids and sub.circuit_id:
+            revoked_circuit_ids = [sub.circuit_id]
+
+        if revoked_circuit_ids:
+            now = datetime.now(timezone.utc)
+            access_rows = await db.execute(
                 select(UserCircuitAccess).where(
                     UserCircuitAccess.user_id == sub.user_id,
-                    UserCircuitAccess.circuit_id == sub.circuit_id,
+                    UserCircuitAccess.circuit_id.in_(revoked_circuit_ids),
                 )
             )
-            access = access_result.scalar_one_or_none()
-            if access:
-                access.valid_until = datetime.now(timezone.utc)
+            for access in access_rows.scalars().all():
+                access.valid_until = now
 
         await db.commit()
-        logger.info(f"Subscription deleted: sub={sub_id} user={sub.user_id} circuit={sub.circuit_id}")
+        logger.info(
+            f"Subscription deleted: sub={sub_id} user={sub.user_id} "
+            f"circuits={revoked_circuit_ids}"
+        )
 
 
 async def _apply_config_to_user(user_id: int, config: ProductTabConfig, db: AsyncSession):

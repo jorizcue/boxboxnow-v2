@@ -14,19 +14,23 @@ const stripePromise = loadStripe(
 
 export function EmbeddedCheckout({
   plan,
-  circuitId,
+  circuitIds,
   eventDates,
   onCancel,
 }: {
   plan: string;
-  circuitId: number | null;
+  /** Full list of circuits the buyer picked. Empty array means the plan
+   *  is cross-circuit (per_circuit=false) and grants every circuit at
+   *  once. Single-circuit purchases pass a one-element array — the
+   *  backend still accepts the legacy `circuit_id` field too. */
+  circuitIds: number[];
   eventDates?: string[];
   onCancel: () => void;
 }) {
   const fetchClientSecret = useCallback(async () => {
-    const data = await api.createCheckoutSession("", circuitId, plan, eventDates);
+    const data = await api.createCheckoutSession("", circuitIds, plan, eventDates);
     return data.client_secret;
-  }, [plan, circuitId, eventDates]);
+  }, [plan, circuitIds, eventDates]);
 
   return (
     <div className="min-h-screen bg-black flex flex-col items-center px-4 py-8">

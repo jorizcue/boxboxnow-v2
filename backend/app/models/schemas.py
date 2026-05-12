@@ -335,6 +335,14 @@ class ProductTabConfig(Base):
     concurrency_web = Column(Integer, nullable=True)  # Max concurrent browser sessions (NULL = use max_devices)
     concurrency_mobile = Column(Integer, nullable=True)  # Max concurrent mobile-app sessions (NULL = use max_devices)
     per_circuit = Column(Boolean, nullable=False, default=True)  # If False, grants access to ALL circuits on purchase
+    # Number of circuits the buyer must pick during the per-circuit purchase
+    # flow. Only meaningful when per_circuit=True. Default 1 keeps existing
+    # plans behaving exactly as before (single-circuit checkout). Values > 1
+    # turn the circuit selector into a checkbox grid that requires the user
+    # to choose exactly N circuits before the "Continuar al pago" button
+    # unlocks. The backend webhook then grants N UserCircuitAccess rows for
+    # the selected circuits in one Stripe payment.
+    circuits_to_select = Column(Integer, nullable=False, default=1)
     display_name = Column(String(100), nullable=False, default="")
     description = Column(Text, nullable=True)
     features = Column(Text, nullable=True, default="[]")  # JSON array of feature strings

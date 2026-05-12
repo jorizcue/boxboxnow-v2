@@ -334,16 +334,36 @@ export const api = {
   // Stripe
   getCheckoutCircuits: () =>
     fetchApi<{ id: number; name: string }[]>("/api/stripe/circuits"),
-  createCheckoutSession: (priceId: string, circuitId: number | null, plan?: string, eventDates?: string[]) =>
-    fetchApi<{ client_secret: string; session_id: string }>("/api/stripe/create-checkout-session", {
+  // `circuits` accepts:
+  //   * null  → cross-circuit plan, no selection (backend grants all)
+  //   * []    → same as null (cross-circuit)
+  //   * [id]  → legacy single-circuit purchase (also sends `circuit_id`
+  //             for backward compat with older backends)
+  //   * [a,b] → multi-circuit purchase, backend grants N
+  //             UserCircuitAccess rows in one Stripe payment
+  createCheckoutSession: (
+    priceId: string,
+    circuits: number | number[] | null,
+    plan?: string,
+    eventDates?: string[],
+  ) => {
+    const circuitIds: number[] = Array.isArray(circuits)
+      ? circuits.filter((c) => typeof c === "number" && c > 0)
+      : typeof circuits === "number" && circuits > 0
+        ? [circuits]
+        : [];
+    const primary = circuitIds[0] ?? null;
+    return fetchApi<{ client_secret: string; session_id: string }>("/api/stripe/create-checkout-session", {
       method: "POST",
       body: JSON.stringify({
         ...(priceId ? { price_id: priceId } : {}),
         ...(plan ? { plan } : {}),
-        ...(circuitId ? { circuit_id: circuitId } : {}),
+        ...(primary ? { circuit_id: primary } : {}),
+        ...(circuitIds.length ? { circuit_ids: circuitIds } : {}),
         ...(eventDates?.length ? { event_dates: eventDates } : {}),
       }),
-    }),
+    });
+  },
   getSubscriptions: () => fetchApi<any[]>("/api/stripe/subscriptions"),
   cancelSubscription: (subId: number) =>
     fetchApi<{ ok: boolean }>(`/api/stripe/subscriptions/${subId}/cancel`, { method: "POST" }),
@@ -415,6 +435,7 @@ export const api = {
       is_popular: boolean;
       sort_order: number;
       per_circuit: boolean;
+      circuits_to_select: number;
     }[]>("/api/plans"),
 
   // Trial config (public)

@@ -34,7 +34,13 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<Tab>("race");
   const [pendingPlan, setPendingPlan] = useState<string | null>(null);
   const [pendingPlanPerCircuit, setPendingPlanPerCircuit] = useState<boolean>(true);
-  const [checkoutCircuitId, setCheckoutCircuitId] = useState<number | null>(null);
+  // Number of circuits the pending plan requires the buyer to pick.
+  // Mirrors ProductTabConfig.circuits_to_select from /api/plans. 1 is
+  // the legacy single-circuit checkout; >1 unlocks the multi-circuit
+  // checkbox grid in CircuitSelector and routes a full id list to the
+  // checkout endpoint.
+  const [pendingPlanCircuitCount, setPendingPlanCircuitCount] = useState<number>(1);
+  const [checkoutCircuitIds, setCheckoutCircuitIds] = useState<number[] | null>(null);
   const [checkoutReady, setCheckoutReady] = useState(false);
   const [eventDates, setEventDates] = useState<string[] | undefined>(undefined);
   const router = useRouter();
@@ -112,8 +118,9 @@ export default function DashboardPage() {
     }
   }, [_hydrated, token]);
 
-  // Look up per_circuit flag for the pending plan to decide whether to show
-  // the circuit selector or go straight to checkout with a null circuit.
+  // Look up per_circuit flag + circuits_to_select for the pending plan
+  // to decide whether to show the circuit selector (and as single- or
+  // multi-pick) or go straight to checkout with a null circuit.
   useEffect(() => {
     if (!pendingPlan) {
       setCheckoutReady(false);
@@ -126,22 +133,28 @@ export default function DashboardPage() {
         .then((plans) => {
           const match = plans.find((p) => p.plan_type === pendingPlan);
           const perCircuit = match ? match.per_circuit : true;
+          const count =
+            match && typeof match.circuits_to_select === "number"
+              ? Math.max(1, match.circuits_to_select)
+              : 1;
           setPendingPlanPerCircuit(perCircuit);
+          setPendingPlanCircuitCount(count);
           if (!perCircuit) {
-            setCheckoutCircuitId(null);
+            setCheckoutCircuitIds(null);
           }
           setCheckoutReady(true);
         })
         .catch(() => {
           setPendingPlanPerCircuit(true);
+          setPendingPlanCircuitCount(1);
           setCheckoutReady(true);
         })
     );
   }, [pendingPlan]);
 
   // Handle circuit selection → show embedded checkout
-  const handleCircuitSelected = (circuitId: number, dates?: string[]) => {
-    setCheckoutCircuitId(circuitId);
+  const handleCircuitSelected = (circuitIds: number[], dates?: string[]) => {
+    setCheckoutCircuitIds(circuitIds);
     setEventDates(dates);
   };
 
@@ -182,23 +195,30 @@ export default function DashboardPage() {
       return (
         <EmbeddedCheckout
           plan={pendingPlan}
-          circuitId={null}
+          circuitIds={[]}
           eventDates={eventDates}
-          onCancel={() => { setCheckoutCircuitId(null); setPendingPlan(null); setEventDates(undefined); }}
+          onCancel={() => { setCheckoutCircuitIds(null); setPendingPlan(null); setEventDates(undefined); }}
         />
       );
     }
-    if (checkoutCircuitId) {
+    if (checkoutCircuitIds && checkoutCircuitIds.length > 0) {
       return (
         <EmbeddedCheckout
           plan={pendingPlan}
-          circuitId={checkoutCircuitId}
+          circuitIds={checkoutCircuitIds}
           eventDates={eventDates}
-          onCancel={() => { setCheckoutCircuitId(null); setPendingPlan(null); setEventDates(undefined); }}
+          onCancel={() => { setCheckoutCircuitIds(null); setPendingPlan(null); setEventDates(undefined); }}
         />
       );
     }
-    return <CircuitSelector plan={pendingPlan} onSelect={handleCircuitSelected} onCancel={() => setPendingPlan(null)} />;
+    return (
+      <CircuitSelector
+        plan={pendingPlan}
+        circuitsToSelect={pendingPlanCircuitCount}
+        onSelect={handleCircuitSelected}
+        onCancel={() => setPendingPlan(null)}
+      />
+    );
   }
 
   // Subscription gate: non-admin, non-internal users without active
