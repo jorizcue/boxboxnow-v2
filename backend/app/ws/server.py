@@ -309,7 +309,14 @@ async def race_websocket(
         if getattr(ws, "_bbn_client_kind", "web") == client_kind
     )
     base_limit = kind_limit if kind_limit is not None else fallback_max
-    effective_max = base_limit + 1 if (is_driver_view and client_kind == "mobile") else base_limit
+    # `view=driver` connections get an extra slot on top of the per-kind
+    # limit so the strategist can keep the main dashboard open AND open
+    # a pilot-view popup in another tab/window without bumping into
+    # max_devices. Previously the +1 only applied to mobile clients
+    # (the iOS/Android driver app), but the web `/driver` popup we
+    # restored connects as `device=web&view=driver` and was being
+    # rejected on plans with concurrency_web=1. Now both kinds benefit.
+    effective_max = base_limit + 1 if is_driver_view else base_limit
     if same_kind_count >= effective_max:
         logger.warning(
             f"WS rejected: max {client_kind} devices "
