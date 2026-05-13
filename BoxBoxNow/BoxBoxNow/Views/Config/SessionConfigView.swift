@@ -118,6 +118,42 @@ struct SessionConfigView: View {
                         }
                     }
 
+                    // ── Section: Modo lluvia ──
+                    // Quick toggle that mirrors the rain icon on the
+                    // web StatusBar: flips `session.rain` and persists
+                    // it immediately so the strategist can switch
+                    // between dry/wet pace assumptions in one tap,
+                    // without scrolling down to "ACTUALIZAR SESION".
+                    ConfigSection(title: "MODO LLUVIA", icon: "cloud.rain.fill") {
+                        RainToggleRow(
+                            rain: configVM.session.rain,
+                            onChange: { newVal in
+                                configVM.session.rain = newVal
+                                Task {
+                                    await configVM.saveSession()
+                                    if let error = configVM.errorMessage {
+                                        await MainActor.run {
+                                            // Revert so the toggle
+                                            // doesn't lie about the
+                                            // server's state.
+                                            configVM.session.rain = !newVal
+                                            toast.warning("No se pudo actualizar el modo lluvia")
+                                            configVM.errorMessage = nil
+                                        }
+                                    } else {
+                                        await MainActor.run {
+                                            toast.success(
+                                                newVal
+                                                    ? "Modo lluvia activado"
+                                                    : "Modo lluvia desactivado"
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        )
+                    }
+
                     // ── Save button ──
                     Button(action: saveSession) {
                         HStack {
@@ -181,6 +217,59 @@ struct SessionConfigView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Rain Toggle Row
+
+/// Card-style toggle for race-wide rain mode. Single source of truth
+/// for the flag is `configVM.session.rain`, persisted through the
+/// same `/config/session` PUT that the web RainToggle hits — both
+/// surfaces now stay in sync after a websocket / refresh round-trip.
+private struct RainToggleRow: View {
+    let rain: Bool
+    let onChange: (Bool) -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(rain
+                        ? Color.blue.opacity(0.18)
+                        : Color(.systemGray6))
+                    .frame(width: 44, height: 44)
+                Image(systemName: rain ? "cloud.rain.fill" : "cloud.rain")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(rain ? Color.blue : .gray)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(rain ? "Activado" : "Desactivado")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                Text("Desactiva el filtro de outliers en las medias para que la lluvia no falsee el ritmo.")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(.systemGray))
+            }
+            Spacer()
+            Toggle(
+                "",
+                isOn: Binding(
+                    get: { rain },
+                    set: { onChange($0) }
+                )
+            )
+            .labelsHidden()
+            .tint(Color.blue)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(
+                    rain ? Color.blue.opacity(0.5) : Color(.systemGray4),
+                    lineWidth: 1.5
+                )
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemGray6)))
+        )
     }
 }
 

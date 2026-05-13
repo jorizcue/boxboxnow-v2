@@ -2,6 +2,8 @@ package com.boxboxnow.app.ui.config
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -37,6 +40,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -277,6 +282,21 @@ fun SessionConfigScreen(onBack: () -> Unit) {
                 }
             }
 
+            // ── Section: Modo lluvia ──
+            // Mirrors the rain icon in the web StatusBar: flips
+            // `session.rain` and persists it immediately so the
+            // strategist can toggle wet/dry pace assumptions without
+            // scrolling down to "Actualizar sesion".
+            ConfigSection(title = "MODO LLUVIA", icon = Icons.Default.WaterDrop) {
+                RainToggleRow(
+                    rain = session.rain,
+                    onChange = { newVal ->
+                        vm.updateSession { s -> s.copy(rain = newVal) }
+                        vm.saveSession()
+                    },
+                )
+            }
+
             // ── Error ──
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
@@ -317,6 +337,86 @@ fun SessionConfigScreen(onBack: () -> Unit) {
 
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+// ── Rain toggle ──
+
+/**
+ * Card-style toggle for race-wide rain mode. Mirrors the rain icon
+ * in the web StatusBar — the underlying flag (`session.rain`) is
+ * the same column persisted through `PUT /config/session`, so both
+ * surfaces stay in sync after the next reload / websocket refresh.
+ *
+ * Pressing the row OR the switch fires `onChange`. The hint text
+ * explains why the toggle matters: it disables outlier filtering
+ * on the rolling averages so a slow lap doesn't get rejected as
+ * noise during a wet stint.
+ */
+@Composable
+private fun RainToggleRow(
+    rain: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    val accent = if (rain) Color(0xFF4FA8FF) else BoxBoxNowColors.SystemGray
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .border(
+                width = 1.5.dp,
+                color = if (rain) accent.copy(alpha = 0.5f) else BoxBoxNowColors.SystemGray4,
+                shape = RoundedCornerShape(10.dp),
+            )
+            .background(BoxBoxNowColors.SystemGray6)
+            .clickable { onChange(!rain) }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(
+                    if (rain) accent.copy(alpha = 0.18f)
+                    else BoxBoxNowColors.SystemGray5
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.WaterDrop,
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                if (rain) "Activado" else "Desactivado",
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "Desactiva el filtro de outliers en las medias para que la lluvia no falsee el ritmo.",
+                color = BoxBoxNowColors.SystemGray,
+                fontSize = 11.sp,
+                lineHeight = 14.sp,
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Switch(
+            checked = rain,
+            onCheckedChange = { onChange(it) },
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = accent,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = BoxBoxNowColors.SystemGray4,
+                uncheckedBorderColor = BoxBoxNowColors.SystemGray4,
+            ),
+        )
     }
 }
 
