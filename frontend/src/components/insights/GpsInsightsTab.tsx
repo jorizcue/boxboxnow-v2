@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useReplayClockMs } from "@/hooks/useReplayClockMs";
+import { useT } from "@/lib/i18n";
 import type { CircuitOption, GpsLapDetail, GpsLapSummary, GpsStats, LatLon } from "./types";
 import {
   formatDateShort,
@@ -41,6 +42,8 @@ function lapTimeColor(ms: number, bestMs: number, avgMs: number): string {
 }
 
 export function GpsInsightsTab() {
+  const t = useT();
+
   // ── Replay overlay (live during a replay session) ──────────────────
   // The overlay state (circuit/kart/window) is set in ReplayTab when the
   // user hits Play, and lives in the global race store so this panel
@@ -134,7 +137,7 @@ export function GpsInsightsTab() {
   };
 
   const deleteLap = async (lapId: number) => {
-    if (!confirm("¿Eliminar esta vuelta?")) return;
+    if (!confirm(t("insights.list.confirmDelete"))) return;
     try {
       await api.deleteGpsLap(lapId);
       setLaps((prev) => prev.filter((l) => l.id !== lapId));
@@ -190,28 +193,28 @@ export function GpsInsightsTab() {
   const statCards = useMemo(() => {
     if (!stats) return [];
     return [
-      { label: "Total vueltas", value: String(stats.total_laps ?? 0) },
+      { label: t("insights.stats.totalLaps"), value: String(stats.total_laps ?? 0) },
       {
-        label: "Mejor vuelta",
+        label: t("insights.stats.bestLap"),
         value: stats.best_lap_ms ? formatLapTime(stats.best_lap_ms) : "-",
         accent: true,
       },
       {
-        label: "Vuelta media",
+        label: t("insights.stats.avgLap"),
         value: stats.avg_lap_ms ? formatLapTime(stats.avg_lap_ms) : "-",
       },
       {
-        label: "Vel. máxima",
+        label: t("insights.stats.maxSpeed"),
         value: stats.top_speed_kmh ? `${stats.top_speed_kmh.toFixed(1)} km/h` : "-",
       },
       {
-        label: "Distancia total",
+        label: t("insights.stats.totalDistance"),
         value: stats.total_distance_km
           ? `${stats.total_distance_km.toFixed(1)} km`
           : "-",
       },
     ];
-  }, [stats]);
+  }, [stats, t]);
 
   const finishLine: { p1: LatLon; p2: LatLon } | null = useMemo(() => {
     if (!detailLap) return null;
@@ -257,17 +260,17 @@ export function GpsInsightsTab() {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[11px] text-neutral-200 uppercase tracking-wider font-medium flex items-center gap-2">
               <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              Posición GPS en directo
+              {t("insights.replay.title")}
               <span className="text-neutral-500 font-normal normal-case tracking-normal">
-                · sincronizado con replay
+                · {t("insights.replay.syncedSubtitle")}
               </span>
             </h3>
             <button
               onClick={() => setReplayGpsOverlay(null)}
               className="text-neutral-500 hover:text-white text-xs transition-colors"
-              title="Ocultar mapa GPS"
+              title={t("insights.replay.hideMap")}
             >
-              Ocultar
+              {t("insights.replay.hide")}
             </button>
           </div>
           <ReplayGpsMap
@@ -288,17 +291,17 @@ export function GpsInsightsTab() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
             </svg>
-            <h2 className="text-sm font-semibold text-white uppercase tracking-wider">GPS Insights</h2>
+            <h2 className="text-sm font-semibold text-white uppercase tracking-wider">{t("insights.title")}</h2>
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-[10px] text-neutral-400 uppercase tracking-wider">Circuito</label>
+            <label className="text-[10px] text-neutral-400 uppercase tracking-wider">{t("insights.circuit")}</label>
             <select
               value={selectedCircuit ?? ""}
               onChange={(e) => setSelectedCircuit(e.target.value ? Number(e.target.value) : null)}
               className="bg-black/40 border border-neutral-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-accent/50 transition-colors"
             >
-              <option value="">Todos</option>
+              <option value="">{t("insights.circuitAll")}</option>
               {circuits.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
@@ -328,9 +331,9 @@ export function GpsInsightsTab() {
           </div>
         ) : !loading && laps.length === 0 ? (
           <div className="mt-4 text-center py-8">
-            <p className="text-neutral-500 text-sm">No hay datos GPS todavía</p>
+            <p className="text-neutral-500 text-sm">{t("insights.empty.title")}</p>
             <p className="text-neutral-600 text-xs mt-1">
-              Las vueltas se guardan automáticamente desde la vista de piloto
+              {t("insights.empty.hint")}
             </p>
           </div>
         ) : null}
@@ -342,19 +345,19 @@ export function GpsInsightsTab() {
           onClick={() => { setView("list"); setDetailLap(null); }}
           className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${view === "list" ? "bg-accent/20 text-accent border border-accent/40" : "bg-white/[0.03] text-neutral-400 border border-border hover:text-white"}`}
         >
-          Vueltas
+          {t("insights.tab.laps")}
         </button>
         <button
           onClick={() => setView("heatmap")}
           className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${view === "heatmap" ? "bg-accent/20 text-accent border border-accent/40" : "bg-white/[0.03] text-neutral-400 border border-border hover:text-white"}`}
         >
-          Mapa de calor
+          {t("insights.tab.heatmap")}
         </button>
         <button
           onClick={() => setView("consistency")}
           className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${view === "consistency" ? "bg-accent/20 text-accent border border-accent/40" : "bg-white/[0.03] text-neutral-400 border border-border hover:text-white"}`}
         >
-          Consistencia
+          {t("insights.tab.consistency")}
         </button>
         {compareIds.size > 0 && view !== "compare" && (
           <button
@@ -362,7 +365,7 @@ export function GpsInsightsTab() {
             disabled={compareIds.size !== 2}
             className="ml-auto bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs px-3 py-1.5 rounded-lg transition-colors"
           >
-            Comparar ({compareIds.size}/2)
+            {t("insights.compare.button", { n: compareIds.size })}
           </button>
         )}
       </div>
@@ -371,7 +374,7 @@ export function GpsInsightsTab() {
       {view === "list" && !loading && laps.length > 0 && (
         <div className="bg-white/[0.03] rounded-xl border border-border p-4">
           <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider font-medium">
-            Vueltas registradas
+            {t("insights.list.title")}
             <span className="text-neutral-500 font-normal ml-2">({laps.length})</span>
           </h3>
           <div className="overflow-x-auto">
@@ -380,12 +383,12 @@ export function GpsInsightsTab() {
                 <tr>
                   <th className="text-center px-1 py-1.5 w-8" />
                   <th className="text-center px-2 py-1.5 w-8">#</th>
-                  <th className="text-right px-2 py-1.5">Tiempo</th>
-                  <th className="text-right px-2 py-1.5 hidden sm:table-cell">Distancia</th>
-                  <th className="text-right px-2 py-1.5">Vel. máx</th>
-                  <th className="text-left px-2 py-1.5 hidden md:table-cell">Fuente</th>
-                  <th className="text-left px-2 py-1.5 hidden sm:table-cell">Fecha</th>
-                  <th className="text-center px-2 py-1.5 w-20">Acciones</th>
+                  <th className="text-right px-2 py-1.5">{t("insights.list.col.time")}</th>
+                  <th className="text-right px-2 py-1.5 hidden sm:table-cell">{t("insights.list.col.distance")}</th>
+                  <th className="text-right px-2 py-1.5">{t("insights.list.col.maxSpeed")}</th>
+                  <th className="text-left px-2 py-1.5 hidden md:table-cell">{t("insights.list.col.source")}</th>
+                  <th className="text-left px-2 py-1.5 hidden sm:table-cell">{t("insights.list.col.date")}</th>
+                  <th className="text-center px-2 py-1.5 w-20">{t("insights.list.col.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -421,7 +424,7 @@ export function GpsInsightsTab() {
                         <button
                           onClick={() => openDetail(lap.id)}
                           className="text-neutral-500 hover:text-accent transition-colors p-1"
-                          title="Ver detalle"
+                          title={t("insights.list.viewDetail")}
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
@@ -431,7 +434,7 @@ export function GpsInsightsTab() {
                         <button
                           onClick={() => deleteLap(lap.id)}
                           className="text-neutral-500 hover:text-red-400 transition-colors p-1"
-                          title="Eliminar"
+                          title={t("insights.list.delete")}
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79M9 5.79V4.875c0-1.18.91-2.165 2.09-2.201a51.964 51.964 0 013.32 0c1.18.036 2.09 1.022 2.09 2.201V5.79" />
@@ -445,9 +448,9 @@ export function GpsInsightsTab() {
             </table>
           </div>
           <div className="mt-3 flex items-center gap-4 text-[10px]">
-            <span className="text-green-400">Rápida</span>
-            <span className="text-yellow-400">Media</span>
-            <span className="text-red-400">Lenta</span>
+            <span className="text-green-400">{t("insights.list.legend.fast")}</span>
+            <span className="text-yellow-400">{t("insights.list.legend.medium")}</span>
+            <span className="text-red-400">{t("insights.list.legend.slow")}</span>
           </div>
         </div>
       )}
@@ -456,9 +459,9 @@ export function GpsInsightsTab() {
       {view === "heatmap" && (
         <div className="bg-white/[0.03] rounded-xl border border-border p-4">
           <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider font-medium">
-            Mapa de calor de velocidad
+            {t("insights.heatmap.title")}
             <span className="text-neutral-500 font-normal ml-2">
-              (agrega últimas {Math.min(20, laps.length)} vueltas)
+              {t("insights.heatmap.subtitle", { n: Math.min(20, laps.length) })}
             </span>
           </h3>
           <SpeedHeatmap lapSummaries={laps} circuitId={selectedCircuit} />
@@ -469,7 +472,7 @@ export function GpsInsightsTab() {
       {view === "consistency" && (
         <div className="bg-white/[0.03] rounded-xl border border-border p-4">
           <h3 className="text-[11px] text-neutral-200 mb-3 uppercase tracking-wider font-medium">
-            Consistencia por microsector
+            {t("insights.consistency.title")}
           </h3>
           <ConsistencyView lapSummaries={laps} circuitId={selectedCircuit} />
         </div>
@@ -479,20 +482,20 @@ export function GpsInsightsTab() {
       {view === "detail" && (
         <div className="bg-white/[0.03] rounded-xl border border-border p-4 space-y-4">
           {loadingDetail ? (
-            <div className="text-neutral-500 text-xs animate-pulse text-center py-12">Cargando detalle...</div>
+            <div className="text-neutral-500 text-xs animate-pulse text-center py-12">{t("insights.detail.loading")}</div>
           ) : detailLap ? (
             <>
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
-                    Vuelta {detailLap.lap_number}
+                    {t("insights.detail.lapPrefix")} {detailLap.lap_number}
                   </h3>
                   <div className="flex items-center gap-3 text-[10px] text-neutral-400 mt-1">
                     <span className="text-green-400 font-mono font-semibold text-base">
                       {formatLapTime(detailLap.duration_ms)}
                     </span>
                     <span>{formatDistance(detailLap.total_distance_m)}</span>
-                    <span>Máx: {detailLap.max_speed_kmh?.toFixed(1) ?? "-"} km/h</span>
+                    <span>{t("insights.detail.max")}: {detailLap.max_speed_kmh?.toFixed(1) ?? "-"} km/h</span>
                     <span className="text-neutral-500">
                       {(detailLap.distances?.length ?? 0)} samples
                     </span>
@@ -524,26 +527,26 @@ export function GpsInsightsTab() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-[10px] text-neutral-400 uppercase tracking-wider">
-                      Trazado satélite
+                      {t("insights.detail.trackTitle")}
                     </div>
                     <div className="flex items-center gap-1 text-[10px]">
                       <button
                         onClick={() => setColorMode("accel")}
                         className={`px-2 py-0.5 rounded ${colorMode === "accel" ? "bg-accent/20 text-accent" : "text-neutral-500 hover:text-white"}`}
                       >
-                        Frenadas/Aceleraciones
+                        {t("insights.detail.colorAccel")}
                       </button>
                       <button
                         onClick={() => setColorMode("speed")}
                         className={`px-2 py-0.5 rounded ${colorMode === "speed" ? "bg-accent/20 text-accent" : "text-neutral-500 hover:text-white"}`}
                       >
-                        Velocidad
+                        {t("insights.detail.colorSpeed")}
                       </button>
                       <button
                         onClick={() => setColorMode("sectors")}
                         className={`px-2 py-0.5 rounded ${colorMode === "sectors" ? "bg-accent/20 text-accent" : "text-neutral-500 hover:text-white"}`}
                       >
-                        Sectores
+                        {t("insights.detail.colorSectors")}
                       </button>
                     </div>
                   </div>
@@ -558,19 +561,19 @@ export function GpsInsightsTab() {
                     <div className="flex items-center gap-3 mt-2 text-[10px] text-neutral-400">
                       <span className="flex items-center gap-1">
                         <span className="inline-block w-3 h-1 rounded" style={{ background: "rgb(240,50,50)" }} />
-                        Frenando
+                        {t("insights.detail.legend.braking")}
                       </span>
                       <span className="flex items-center gap-1">
                         <span className="inline-block w-3 h-1 rounded bg-neutral-300" />
-                        Velocidad constante
+                        {t("insights.detail.legend.constant")}
                       </span>
                       <span className="flex items-center gap-1">
                         <span className="inline-block w-3 h-1 rounded" style={{ background: "rgb(40,240,70)" }} />
-                        Acelerando
+                        {t("insights.detail.legend.accelerating")}
                       </span>
                       <span className="flex items-center gap-1">
                         <span className="inline-block w-2 h-2 rounded-full" style={{ background: "#facc15" }} />
-                        Apex
+                        {t("insights.detail.legend.apex")}
                       </span>
                     </div>
                   )}
@@ -580,7 +583,7 @@ export function GpsInsightsTab() {
               {detailLap.speeds && detailLap.distances && detailLap.speeds.length > 1 && (
                 <div>
                   <div className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
-                    Velocidad vs distancia
+                    {t("insights.detail.speedTrace")}
                   </div>
                   <div className="bg-black/30 rounded-lg border border-border p-2">
                     <SpeedTrace
@@ -597,7 +600,7 @@ export function GpsInsightsTab() {
                 {detailLap.gforce_lat && detailLap.gforce_lon && detailLap.gforce_lat.length > 0 && (
                   <div>
                     <div className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
-                      G-G diagram
+                      {t("insights.detail.gg")}
                     </div>
                     <div className="bg-black/30 rounded-lg border border-border p-2">
                       <GForceScatter
@@ -610,7 +613,7 @@ export function GpsInsightsTab() {
                 {detailLap.speeds && detailLap.speeds.length > 0 && (
                   <div>
                     <div className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
-                      Distribución de velocidad
+                      {t("insights.detail.speedDistribution")}
                     </div>
                     <div className="bg-black/30 rounded-lg border border-border p-2">
                       <SpeedHistogram speeds={detailLap.speeds} />
@@ -622,7 +625,7 @@ export function GpsInsightsTab() {
               {apexIndices.length > 0 && (
                 <div>
                   <div className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
-                    Apex detectados ({apexIndices.length})
+                    {t("insights.detail.apexCount", { n: apexIndices.length })}
                   </div>
                   <ApexList lap={detailLap} apexes={apexIndices} />
                 </div>
@@ -630,7 +633,7 @@ export function GpsInsightsTab() {
             </>
           ) : (
             <div className="text-neutral-500 text-xs text-center py-8">
-              No se pudo cargar el detalle.
+              {t("insights.detail.notLoaded")}
             </div>
           )}
         </div>
@@ -641,7 +644,7 @@ export function GpsInsightsTab() {
         <div className="bg-white/[0.03] rounded-xl border border-border p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
-              Comparación de vueltas
+              {t("insights.compare.title")}
             </h3>
             <button
               onClick={() => { setView("list"); setCompareLaps([]); setCompareIds(new Set()); }}
@@ -652,14 +655,14 @@ export function GpsInsightsTab() {
           </div>
 
           {loadingCompare ? (
-            <div className="text-neutral-500 text-xs animate-pulse text-center py-8">Cargando...</div>
+            <div className="text-neutral-500 text-xs animate-pulse text-center py-8">{t("insights.compare.loading")}</div>
           ) : compareLaps.length === 2 ? (
             <>
               <MicrosectorTable lapA={compareLaps[0]} lapB={compareLaps[1]} />
 
               <div>
                 <div className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
-                  Velocidad superpuesta
+                  {t("insights.compare.speedOverlay")}
                 </div>
                 <div className="bg-black/30 rounded-lg border border-border p-2">
                   <SpeedTraceCompare
@@ -675,7 +678,7 @@ export function GpsInsightsTab() {
                 {compareLaps.map((lap, i) => (
                   <div key={lap.id}>
                     <div className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
-                      Trazado V{lap.lap_number}{" "}
+                      {t("insights.compare.trackPrefix")} V{lap.lap_number}{" "}
                       <span className={i === 0 ? "text-blue-400" : "text-orange-400"}>
                         ({formatLapTime(lap.duration_ms)})
                       </span>
@@ -696,7 +699,7 @@ export function GpsInsightsTab() {
               {(compareApexesA.length > 0 || compareApexesB.length > 0) && (
                 <div>
                   <div className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
-                    Apex detectados
+                    {t("insights.compare.apexDetected")}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {compareLaps.map((lap, i) => {
@@ -707,12 +710,12 @@ export function GpsInsightsTab() {
                             <span className={i === 0 ? "text-blue-400" : "text-orange-400"}>
                               V{lap.lap_number}
                             </span>
-                            <span className="text-neutral-500 ml-1.5">({apx.length} apexes)</span>
+                            <span className="text-neutral-500 ml-1.5">{t("insights.compare.apexesSuffix", { n: apx.length })}</span>
                           </div>
                           {apx.length > 0 ? (
                             <ApexList lap={lap} apexes={apx} />
                           ) : (
-                            <div className="text-neutral-600 text-xs">Sin apexes detectados</div>
+                            <div className="text-neutral-600 text-xs">{t("insights.compare.noApexes")}</div>
                           )}
                         </div>
                       );
@@ -723,7 +726,7 @@ export function GpsInsightsTab() {
             </>
           ) : (
             <div className="text-neutral-500 text-xs text-center py-8">
-              No se pudieron cargar los datos de comparación.
+              {t("insights.compare.notLoaded")}
             </div>
           )}
         </div>

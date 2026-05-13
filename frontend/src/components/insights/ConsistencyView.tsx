@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import type { GpsLapDetail, GpsLapSummary } from "./types";
 import { microsectorTimes, formatLapTime, MICROSECTOR_COUNT } from "./helpers";
+import { useT } from "@/lib/i18n";
 
 interface Props {
   lapSummaries: GpsLapSummary[];
@@ -24,6 +25,7 @@ interface SectorStat {
 }
 
 export function ConsistencyView({ lapSummaries, circuitId }: Props) {
+  const t = useT();
   const [details, setDetails] = useState<GpsLapDetail[]>([]);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -94,7 +96,7 @@ export function ConsistencyView({ lapSummaries, circuitId }: Props) {
   if (targetLaps.length < 2) {
     return (
       <div className="text-neutral-500 text-xs text-center py-6">
-        Necesitas al menos 2 vueltas válidas en este circuito para análisis de consistencia.
+        {t("insights.consistency.minLaps")}
       </div>
     );
   }
@@ -102,7 +104,7 @@ export function ConsistencyView({ lapSummaries, circuitId }: Props) {
   if (loading) {
     return (
       <div className="text-neutral-400 text-xs text-center py-6">
-        Cargando detalle de vueltas... ({progress}/{targetLaps.length})
+        {t("insights.consistency.loadingProgress", { done: progress, total: targetLaps.length })}
       </div>
     );
   }
@@ -110,7 +112,7 @@ export function ConsistencyView({ lapSummaries, circuitId }: Props) {
   if (stats.length === 0) {
     return (
       <div className="text-neutral-500 text-xs text-center py-6">
-        No se pudo procesar la telemetría de las vueltas seleccionadas.
+        {t("insights.consistency.processError")}
       </div>
     );
   }
@@ -122,21 +124,21 @@ export function ConsistencyView({ lapSummaries, circuitId }: Props) {
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
-          <div className="text-[10px] text-neutral-400 uppercase tracking-wider">Vuelta teórica óptima</div>
+          <div className="text-[10px] text-neutral-400 uppercase tracking-wider">{t("insights.consistency.theoreticalBest")}</div>
           <div className="text-base font-mono font-semibold text-purple-300">
             {formatLapTime(theoreticalMs)}
           </div>
           <div className="text-[10px] text-neutral-500 mt-0.5">
-            Suma de los mejores microsectores de {details.length} vueltas
+            {t("insights.consistency.sumOfBest", { n: details.length })}
           </div>
         </div>
         <div className="bg-white/[0.03] border border-border rounded-lg p-3">
-          <div className="text-[10px] text-neutral-400 uppercase tracking-wider">Sectores analizados</div>
+          <div className="text-[10px] text-neutral-400 uppercase tracking-wider">{t("insights.consistency.sectorsAnalyzed")}</div>
           <div className="text-base font-mono font-semibold text-white">
-            {stats.length} <span className="text-neutral-500 text-xs">× {details.length} vueltas</span>
+            {stats.length} <span className="text-neutral-500 text-xs">{t("insights.consistency.lapsLabel", { n: details.length })}</span>
           </div>
           <div className="text-[10px] text-neutral-500 mt-0.5">
-            Verde = consistente, naranja = irregular
+            {t("insights.consistency.colorLegend")}
           </div>
         </div>
       </div>
@@ -145,11 +147,11 @@ export function ConsistencyView({ lapSummaries, circuitId }: Props) {
         <table className="w-full text-xs">
           <thead className="text-[10px] text-neutral-400 uppercase tracking-wider bg-black/40">
             <tr>
-              <th className="text-left px-2 py-1.5">Sector</th>
-              <th className="text-right px-2 py-1.5">Mejor</th>
-              <th className="text-right px-2 py-1.5">Media</th>
+              <th className="text-left px-2 py-1.5">{t("insights.consistency.col.sector")}</th>
+              <th className="text-right px-2 py-1.5">{t("insights.consistency.col.best")}</th>
+              <th className="text-right px-2 py-1.5">{t("insights.consistency.col.avg")}</th>
               <th className="text-right px-2 py-1.5">σ</th>
-              <th className="text-left px-2 py-1.5">Variabilidad</th>
+              <th className="text-left px-2 py-1.5">{t("insights.consistency.col.variability")}</th>
             </tr>
           </thead>
           <tbody>

@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { trackAction } from "@/lib/tracker";
 import { useDriverConfig, ALL_DRIVER_CARDS, DEFAULT_CARD_ORDER, DRIVER_CARD_GROUPS, type DriverCardId } from "@/hooks/useDriverConfig";
 import { useAuth } from "@/hooks/useAuth";
+import { useT, useLangStore } from "@/lib/i18n";
 
 interface Circuit {
   id: number;
@@ -30,6 +31,8 @@ interface Preset {
 export function DriverConfigTab() {
   const config = useDriverConfig();
   const { user } = useAuth();
+  const t = useT();
+  const lang = useLangStore((s) => s.lang);
   const userTabs = user?.tab_access ?? [];
   const canBox = user?.is_admin || userTabs.includes("app-config-box");
   const [circuits, setCircuits] = useState<Circuit[]>([]);
@@ -81,8 +84,12 @@ export function DriverConfigTab() {
       setPresetName("");
       setShowSaveInput(false);
     } catch (e: any) {
-      const msg = e?.message || "Error al guardar";
-      setPresetError(msg.includes("409") ? "Ya existe una plantilla con ese nombre" : msg.includes("400") ? "Máximo 10 plantillas" : msg);
+      const msg = e?.message || t("driverConfig.tab.presetError");
+      setPresetError(
+        msg.includes("409") ? t("driverConfig.tab.presetExists")
+        : msg.includes("400") ? t("driverConfig.tab.presetMax")
+        : msg,
+      );
     } finally {
       setPresetSaving(false);
     }
@@ -130,14 +137,14 @@ export function DriverConfigTab() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-white">Configuracion Vista Piloto</h2>
-        <p className="text-xs text-neutral-500 mt-1">Personaliza la vista del piloto: circuito GPS, numero de kart y tarjetas visibles.</p>
+        <h2 className="text-lg font-bold text-white">{t("driverConfig.tab.title")}</h2>
+        <p className="text-xs text-neutral-500 mt-1">{t("driverConfig.tab.subtitle")}</p>
       </div>
 
       {/* Presets */}
       <div className="bg-surface border border-border rounded-xl p-4 space-y-3">
-        <h3 className="text-xs font-bold text-accent uppercase tracking-wider">Plantillas</h3>
-        <p className="text-[11px] text-neutral-500">Guarda la configuracion actual como plantilla para reutilizarla mas tarde.</p>
+        <h3 className="text-xs font-bold text-accent uppercase tracking-wider">{t("driverConfig.tab.presets")}</h3>
+        <p className="text-[11px] text-neutral-500">{t("driverConfig.tab.presetsHint")}</p>
 
         {presets.length > 0 && (
           <div className="space-y-1.5">
@@ -149,7 +156,7 @@ export function DriverConfigTab() {
                 <button
                   onClick={() => handleToggleDefault(preset)}
                   className={`p-0.5 transition-colors ${preset.is_default ? "text-accent" : "text-neutral-600 hover:text-accent/80"}`}
-                  title={preset.is_default ? "Plantilla predefinida (click para desmarcar)" : "Marcar como predefinida"}
+                  title={preset.is_default ? t("driverConfig.tab.presetTitleDefault") : t("driverConfig.tab.presetTitleSetDefault")}
                 >
                   <svg className="w-4 h-4" fill={preset.is_default ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -161,16 +168,16 @@ export function DriverConfigTab() {
                 >
                   {preset.name}
                   {preset.is_default && (
-                    <span className="ml-2 text-[9px] uppercase tracking-wider text-accent">Predefinida</span>
+                    <span className="ml-2 text-[9px] uppercase tracking-wider text-accent">{t("driverConfig.tab.presetDefault")}</span>
                   )}
                 </button>
                 <span className="text-[10px] text-neutral-600">
-                  {Object.values(preset.visible_cards).filter(Boolean).length} tarjetas
+                  {t("driverConfig.tab.presetCards", { n: Object.values(preset.visible_cards).filter(Boolean).length })}
                 </span>
                 <button
                   onClick={() => handleDeletePreset(preset.id)}
                   className="text-neutral-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-0.5"
-                  title="Eliminar plantilla"
+                  title={t("driverConfig.tab.presetDelete")}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -182,7 +189,7 @@ export function DriverConfigTab() {
         )}
 
         {presets.length === 0 && !showSaveInput && (
-          <p className="text-[11px] text-neutral-600 italic">No tienes plantillas guardadas.</p>
+          <p className="text-[11px] text-neutral-600 italic">{t("driverConfig.tab.presetEmpty")}</p>
         )}
 
         {showSaveInput ? (
@@ -193,7 +200,7 @@ export function DriverConfigTab() {
               value={presetName}
               onChange={(e) => { setPresetName(e.target.value); setPresetError(null); }}
               onKeyDown={(e) => e.key === "Enter" && handleSavePreset()}
-              placeholder="Nombre de la plantilla"
+              placeholder={t("driverConfig.tab.presetNamePlaceholder")}
               maxLength={50}
               className="flex-1 bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:border-accent focus:outline-none"
             />
@@ -202,13 +209,13 @@ export function DriverConfigTab() {
               disabled={!presetName.trim() || presetSaving}
               className="px-3 py-2 rounded-lg bg-accent text-black text-xs font-bold hover:bg-accent/90 disabled:opacity-40 transition-colors"
             >
-              {presetSaving ? "..." : "Guardar"}
+              {presetSaving ? "..." : t("driverConfig.tab.presetSave")}
             </button>
             <button
               onClick={() => { setShowSaveInput(false); setPresetName(""); setPresetError(null); }}
               className="px-2 py-2 text-neutral-500 hover:text-white text-xs"
             >
-              Cancelar
+              {t("driverConfig.tab.presetCancel")}
             </button>
           </div>
         ) : (
@@ -216,12 +223,12 @@ export function DriverConfigTab() {
             onClick={() => setShowSaveInput(true)}
             disabled={!canSaveMore}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-neutral-700 hover:border-accent text-xs text-neutral-400 hover:text-accent disabled:opacity-40 disabled:hover:border-neutral-700 disabled:hover:text-neutral-400 transition-colors"
-            title={canSaveMore ? "Guardar configuracion actual como plantilla" : "Máximo 10 plantillas"}
+            title={canSaveMore ? t("driverConfig.tab.presetSaveAsTitle") : t("driverConfig.tab.presetMax")}
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
-            Guardar como plantilla
+            {t("driverConfig.tab.presetSaveAs")}
           </button>
         )}
 
@@ -232,42 +239,42 @@ export function DriverConfigTab() {
 
       {/* Circuit selector */}
       <div className="bg-surface border border-border rounded-xl p-4 space-y-3">
-        <h3 className="text-xs font-bold text-accent uppercase tracking-wider">Circuito GPS</h3>
-        <p className="text-[11px] text-neutral-500">Selecciona el circuito para la linea de meta GPS. Si lo dejas en automatico, usara la sesion activa.</p>
+        <h3 className="text-xs font-bold text-accent uppercase tracking-wider">{t("driverConfig.tab.circuitGps")}</h3>
+        <p className="text-[11px] text-neutral-500">{t("driverConfig.tab.circuitGpsHint")}</p>
         <select
           value={config.selectedCircuitId ?? ""}
           onChange={(e) => config.setCircuitId(e.target.value ? Number(e.target.value) : null)}
           className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:border-accent focus:outline-none"
         >
-          <option value="">Automatico (sesion activa)</option>
+          <option value="">{t("driverConfig.tab.circuitAutoOption")}</option>
           {circuits.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name} {c.finish_lat1 ? " - GPS configurado" : ""}
+              {c.name} {c.finish_lat1 ? t("driverConfig.tab.circuitGpsConfigured") : ""}
             </option>
           ))}
         </select>
-        {loading && <span className="text-[10px] text-neutral-500">Cargando circuitos...</span>}
+        {loading && <span className="text-[10px] text-neutral-500">{t("driverConfig.panel.loadingCircuits")}</span>}
       </div>
 
       {/* Kart number */}
       <div className="bg-surface border border-border rounded-xl p-4 space-y-3">
-        <h3 className="text-xs font-bold text-accent uppercase tracking-wider">Numero de Kart</h3>
-        <p className="text-[11px] text-neutral-500">Sobrescribe el numero de kart. Si lo dejas vacio, usara el de la sesion activa.</p>
+        <h3 className="text-xs font-bold text-accent uppercase tracking-wider">{t("driverConfig.panel.kartNumber")}</h3>
+        <p className="text-[11px] text-neutral-500">{t("driverConfig.tab.kartHint")}</p>
         <input
           type="number"
           min={0}
           max={999}
           value={config.selectedKartNumber ?? ""}
           onChange={(e) => config.setKartNumber(e.target.value ? Number(e.target.value) : null)}
-          placeholder="Automatico (sesion activa)"
+          placeholder={t("driverConfig.tab.circuitAutoOption")}
           className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:border-accent focus:outline-none"
         />
       </div>
 
       {/* Card visibility */}
       <div className="bg-surface border border-border rounded-xl p-4 space-y-4">
-        <h3 className="text-xs font-bold text-accent uppercase tracking-wider">Tarjetas visibles</h3>
-        <p className="text-[11px] text-neutral-500">Selecciona las tarjetas que quieres ver en la vista del piloto.</p>
+        <h3 className="text-xs font-bold text-accent uppercase tracking-wider">{t("driverConfig.panel.visibleCards")}</h3>
+        <p className="text-[11px] text-neutral-500">{t("driverConfig.tab.cardsHint")}</p>
 
         {visibleGroups.map((group) => {
           // Plan-aware filter: only show cards in `user.allowed_cards`.
@@ -275,10 +282,14 @@ export function DriverConfigTab() {
           // backends, admins, trial users without a plan match).
           const allowed = user?.allowed_cards;
           const allowedSet = allowed && allowed.length > 0 ? new Set(allowed) : null;
+          // Resolve the localized label up-front so the alphabetical sort
+          // matches what the user sees (German "Ø Runde" vs Spanish
+          // "Vuelta media" → totally different order).
           const groupCards = ALL_DRIVER_CARDS
             .filter((c) => c.group === group.id)
             .filter((c) => !allowedSet || allowedSet.has(c.id))
-            .sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
+            .map((c) => ({ ...c, _localLabel: t(c.labelKey) }))
+            .sort((a, b) => a._localLabel.localeCompare(b._localLabel, lang, { sensitivity: 'base' }));
           if (groupCards.length === 0) return null;
           const isGps = group.id === "gps";
           return (
@@ -289,8 +300,8 @@ export function DriverConfigTab() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                   </svg>
                 )}
-                {group.label}
-                {isGps && <span className="text-[9px] text-cyan-700 normal-case tracking-normal font-normal">(requieren RaceBox o GPS del movil)</span>}
+                {t(group.labelKey)}
+                {isGps && <span className="text-[9px] text-cyan-700 normal-case tracking-normal font-normal">{t("driverConfig.tab.gpsRequirement")}</span>}
               </h4>
               <div className="grid grid-cols-2 gap-2">
                 {groupCards.map((card) => (
@@ -305,7 +316,7 @@ export function DriverConfigTab() {
                       className={`w-3.5 h-3.5 rounded ${isGps ? "accent-cyan-500" : "accent-accent"}`}
                     />
                     <span className={`text-xs ${config.visibleCards[card.id] ? "text-neutral-200" : "text-neutral-500"}`}>
-                      {card.label}
+                      {card._localLabel}
                     </span>
                   </label>
                 ))}
@@ -317,8 +328,8 @@ export function DriverConfigTab() {
 
       {/* Visual preview with drag-and-drop */}
       <div className="bg-surface border border-border rounded-xl p-4 space-y-3">
-        <h3 className="text-xs font-bold text-accent uppercase tracking-wider">Preview y orden</h3>
-        <p className="text-[11px] text-neutral-500">Arrastra las tarjetas para reordenarlas. La vista refleja como se vera en la pantalla del piloto.</p>
+        <h3 className="text-xs font-bold text-accent uppercase tracking-wider">{t("driverConfig.tab.preview")}</h3>
+        <p className="text-[11px] text-neutral-500">{t("driverConfig.tab.previewHint")}</p>
 
         <CardOrderPreview config={config} />
       </div>
@@ -407,6 +418,7 @@ interface CardOrderPreviewProps {
 }
 
 function CardOrderPreview({ config }: CardOrderPreviewProps) {
+  const t = useT();
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
 
@@ -517,7 +529,7 @@ function CardOrderPreview({ config }: CardOrderPreviewProps) {
             <span className="text-[9px] font-bold text-white">BB<span className="text-accent">N</span></span>
             <div className="w-1.5 h-1.5 rounded-full bg-accent" />
           </div>
-          <span className="text-[8px] text-neutral-600 font-mono">K42 · Vista Piloto</span>
+          <span className="text-[8px] text-neutral-600 font-mono">K42 · {t("driverConfig.driverViewBadge")}</span>
         </div>
 
         {/* 3-column grid */}
@@ -558,7 +570,7 @@ function CardOrderPreview({ config }: CardOrderPreviewProps) {
 
                 {/* Card label */}
                 <span className="text-[7px] sm:text-[9px] text-neutral-500 uppercase tracking-widest mb-1 font-bold text-center leading-tight">
-                  {card.label}
+                  {t(card.labelKey)}
                 </span>
 
                 {/* Sample value */}
@@ -580,8 +592,13 @@ function CardOrderPreview({ config }: CardOrderPreviewProps) {
       {hiddenCards.length > 0 && (
         <div className="px-1">
           <p className="text-[10px] text-neutral-600">
-            <span className="font-semibold text-neutral-500">{hiddenCards.length} tarjeta{hiddenCards.length !== 1 ? "s" : ""} oculta{hiddenCards.length !== 1 ? "s" : ""}:</span>{" "}
-            {hiddenCards.map((id) => ALL_DRIVER_CARDS.find((c) => c.id === id)?.label).filter(Boolean).join(", ")}
+            <span className="font-semibold text-neutral-500">
+              {t(hiddenCards.length === 1 ? "driverConfig.tab.hiddenCardsOne" : "driverConfig.tab.hiddenCardsMany", { n: hiddenCards.length })}
+            </span>{" "}
+            {hiddenCards.map((id) => {
+              const card = ALL_DRIVER_CARDS.find((c) => c.id === id);
+              return card ? t(card.labelKey) : null;
+            }).filter(Boolean).join(", ")}
           </p>
         </div>
       )}

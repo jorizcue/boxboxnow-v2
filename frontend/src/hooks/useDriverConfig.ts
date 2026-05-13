@@ -60,56 +60,57 @@ export type DriverCardGroup = "raceApex" | "raceBbn" | "box" | "gps";
 
 export const ALL_DRIVER_CARDS: {
   id: DriverCardId;
+  labelKey: string;
   label: string;
   requiresGps: boolean;
   group: DriverCardGroup;
 }[] = [
   // --- CARRERA - APEX (raw Apex live timing) ---
-  { id: "raceTimer", label: "Tiempo de carrera", requiresGps: false, group: "raceApex" },
-  { id: "lastLap", label: "Última vuelta", requiresGps: false, group: "raceApex" },
-  { id: "bestStintLap", label: "Mejor vuelta stint", requiresGps: false, group: "raceApex" },
-  { id: "apexPosition", label: "Posición Apex", requiresGps: false, group: "raceApex" },
-  { id: "intervalAhead", label: "Intervalo kart delante", requiresGps: false, group: "raceApex" },
-  { id: "intervalBehind", label: "Intervalo kart detrás", requiresGps: false, group: "raceApex" },
+  { id: "raceTimer", labelKey: "card.raceTimer", label: "Tiempo de carrera", requiresGps: false, group: "raceApex" },
+  { id: "lastLap", labelKey: "card.lastLap", label: "Última vuelta", requiresGps: false, group: "raceApex" },
+  { id: "bestStintLap", labelKey: "card.bestStintLap", label: "Mejor vuelta stint", requiresGps: false, group: "raceApex" },
+  { id: "apexPosition", labelKey: "card.apexPosition", label: "Posición Apex", requiresGps: false, group: "raceApex" },
+  { id: "intervalAhead", labelKey: "card.intervalAhead", label: "Intervalo kart delante", requiresGps: false, group: "raceApex" },
+  { id: "intervalBehind", labelKey: "card.intervalBehind", label: "Intervalo kart detrás", requiresGps: false, group: "raceApex" },
 
   // --- CARRERA - BBN (BoxBoxNow-derived analytics) ---
-  { id: "currentLapTime", label: "Vuelta actual (tiempo real)", requiresGps: true, group: "raceBbn" },
-  { id: "avgLap20", label: "Vuelta media (20v)", requiresGps: false, group: "raceBbn" },
-  { id: "best3", label: "Media Mejor 3 v", requiresGps: false, group: "raceBbn" },
-  { id: "position", label: "Posición (tiempos medios)", requiresGps: false, group: "raceBbn" },
-  { id: "realPos", label: "Posición (clasif. real)", requiresGps: false, group: "raceBbn" },
-  { id: "gapAhead", label: "Gap Real Kart delante", requiresGps: false, group: "raceBbn" },
-  { id: "gapBehind", label: "Gap Real Kart detrás", requiresGps: false, group: "raceBbn" },
-  { id: "avgFutureStint", label: "Media stint futuro", requiresGps: false, group: "raceBbn" },
-  { id: "lapsToMaxStint", label: "Vueltas hasta stint máximo", requiresGps: false, group: "raceBbn" },
-  { id: "theoreticalBestLap", label: "Mejor vuelta teórica sectores", requiresGps: false, group: "raceBbn" },
+  { id: "currentLapTime", labelKey: "card.currentLapTime", label: "Vuelta actual (tiempo real)", requiresGps: true, group: "raceBbn" },
+  { id: "avgLap20", labelKey: "card.avgLap20", label: "Vuelta media (20v)", requiresGps: false, group: "raceBbn" },
+  { id: "best3", labelKey: "card.best3", label: "Media Mejor 3 v", requiresGps: false, group: "raceBbn" },
+  { id: "position", labelKey: "card.position", label: "Posición (tiempos medios)", requiresGps: false, group: "raceBbn" },
+  { id: "realPos", labelKey: "card.realPos", label: "Posición (clasif. real)", requiresGps: false, group: "raceBbn" },
+  { id: "gapAhead", labelKey: "card.gapAhead", label: "Gap Real Kart delante", requiresGps: false, group: "raceBbn" },
+  { id: "gapBehind", labelKey: "card.gapBehind", label: "Gap Real Kart detrás", requiresGps: false, group: "raceBbn" },
+  { id: "avgFutureStint", labelKey: "card.avgFutureStint", label: "Media stint futuro", requiresGps: false, group: "raceBbn" },
+  { id: "lapsToMaxStint", labelKey: "card.lapsToMaxStint", label: "Vueltas hasta stint máximo", requiresGps: false, group: "raceBbn" },
+  { id: "theoreticalBestLap", labelKey: "card.theoreticalBestLap", label: "Mejor vuelta teórica sectores", requiresGps: false, group: "raceBbn" },
   // Sector cards classified as BBN — they're computed from Apex sector
   // events but only meaningful as deltas vs the field's best, which is
   // our own analytics. Appear "--" on circuits without sector data.
-  { id: "deltaBestS1", label: "Δ Mejor S1", requiresGps: false, group: "raceBbn" },
-  { id: "deltaBestS2", label: "Δ Mejor S2", requiresGps: false, group: "raceBbn" },
-  { id: "deltaBestS3", label: "Δ Mejor S3", requiresGps: false, group: "raceBbn" },
-  { id: "deltaSectors", label: "Δ Sectores", requiresGps: false, group: "raceBbn" },
+  { id: "deltaBestS1", labelKey: "card.deltaBestS1", label: "Δ Mejor S1", requiresGps: false, group: "raceBbn" },
+  { id: "deltaBestS2", labelKey: "card.deltaBestS2", label: "Δ Mejor S2", requiresGps: false, group: "raceBbn" },
+  { id: "deltaBestS3", labelKey: "card.deltaBestS3", label: "Δ Mejor S3", requiresGps: false, group: "raceBbn" },
+  { id: "deltaSectors", labelKey: "card.deltaSectors", label: "Δ Sectores", requiresGps: false, group: "raceBbn" },
 
   // --- BOX group (alphabetical by label) ---
-  { id: "currentPit", label: "Pit en curso", requiresGps: false, group: "box" },
-  { id: "pitCount", label: "PITS (realizados / mínimos)", requiresGps: false, group: "box" },
-  { id: "boxScore", label: "Puntuación Box", requiresGps: false, group: "box" },
-  { id: "pitWindow", label: "Ventana de pit (open/closed)", requiresGps: false, group: "box" },
+  { id: "currentPit", labelKey: "card.currentPit", label: "Pit en curso", requiresGps: false, group: "box" },
+  { id: "pitCount", labelKey: "card.pitCount", label: "PITS (realizados / mínimos)", requiresGps: false, group: "box" },
+  { id: "boxScore", labelKey: "card.boxScore", label: "Puntuación Box", requiresGps: false, group: "box" },
+  { id: "pitWindow", labelKey: "card.pitWindow", label: "Ventana de pit (open/closed)", requiresGps: false, group: "box" },
 
   // --- GPS group (alphabetical by label) ---
-  { id: "deltaBestLap", label: "Delta vs Best Lap (GPS)", requiresGps: true, group: "gps" },
-  { id: "gpsLapDelta", label: "Delta vuelta anterior GPS", requiresGps: true, group: "gps" },
-  { id: "gForceRadar", label: "G-Force (diana)", requiresGps: true, group: "gps" },
-  { id: "gpsGForce", label: "G-Force (números)", requiresGps: true, group: "gps" },
-  { id: "gpsSpeed", label: "Velocidad GPS", requiresGps: true, group: "gps" },
+  { id: "deltaBestLap", labelKey: "card.deltaBestLap", label: "Delta vs Best Lap (GPS)", requiresGps: true, group: "gps" },
+  { id: "gpsLapDelta", labelKey: "card.gpsLapDelta", label: "Delta vuelta anterior GPS", requiresGps: true, group: "gps" },
+  { id: "gForceRadar", labelKey: "card.gForceRadar", label: "G-Force (diana)", requiresGps: true, group: "gps" },
+  { id: "gpsGForce", labelKey: "card.gpsGForce", label: "G-Force (números)", requiresGps: true, group: "gps" },
+  { id: "gpsSpeed", labelKey: "card.gpsSpeed", label: "Velocidad GPS", requiresGps: true, group: "gps" },
 ];
 
-export const DRIVER_CARD_GROUPS: { id: DriverCardGroup; label: string }[] = [
-  { id: "raceApex", label: "Carrera - Apex" },
-  { id: "raceBbn", label: "Carrera - BBN" },
-  { id: "box", label: "BOX" },
-  { id: "gps", label: "GPS" },
+export const DRIVER_CARD_GROUPS: { id: DriverCardGroup; labelKey: string; label: string }[] = [
+  { id: "raceApex", labelKey: "cardGroup.raceApex", label: "Carrera - Apex" },
+  { id: "raceBbn", labelKey: "cardGroup.raceBbn", label: "Carrera - BBN" },
+  { id: "box", labelKey: "cardGroup.box", label: "BOX" },
+  { id: "gps", labelKey: "cardGroup.gps", label: "GPS" },
 ];
 
 export const DEFAULT_CARD_ORDER: DriverCardId[] = ALL_DRIVER_CARDS.map((c) => c.id);

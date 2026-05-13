@@ -7,6 +7,7 @@
 import { useMemo } from "react";
 import type { GpsLapDetail } from "./types";
 import { microsectorTimes, formatLapTime, formatDelta, MICROSECTOR_COUNT } from "./helpers";
+import { useT } from "@/lib/i18n";
 
 interface Props {
   lapA: GpsLapDetail;
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function MicrosectorTable({ lapA, lapB, count = MICROSECTOR_COUNT }: Props) {
+  const t = useT();
   const data = useMemo(() => {
     const a = microsectorTimes(lapA, count);
     const b = microsectorTimes(lapB, count);
@@ -66,13 +68,13 @@ export function MicrosectorTable({ lapA, lapB, count = MICROSECTOR_COUNT }: Prop
         </div>
         <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
           <div className="text-[10px] text-neutral-400 uppercase tracking-wider">
-            Vuelta teórica
+            {t("insights.microsector.theoretical")}
           </div>
           <div className="text-base font-mono font-semibold text-purple-300">
             {formatLapTime(data.sumBest)}
           </div>
           <div className="text-[10px] text-neutral-500 mt-0.5">
-            {formatDelta(data.sumBest - Math.min(data.sumA, data.sumB))} vs mejor real
+            {formatDelta(data.sumBest - Math.min(data.sumA, data.sumB))} {t("insights.microsector.vsBest")}
           </div>
         </div>
       </div>
@@ -80,7 +82,7 @@ export function MicrosectorTable({ lapA, lapB, count = MICROSECTOR_COUNT }: Prop
       {/* Sector bars */}
       <div className="bg-black/30 rounded-lg border border-border p-3">
         <div className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
-          {data.rows.length} microsectores · ganador por sector
+          {t("insights.microsector.summary", { n: data.rows.length })}
         </div>
         <div className="flex gap-0.5 h-8">
           {data.rows.map((r) => {
@@ -102,11 +104,11 @@ export function MicrosectorTable({ lapA, lapB, count = MICROSECTOR_COUNT }: Prop
         <div className="flex items-center gap-3 mt-2 text-[10px]">
           <span className="text-blue-400 flex items-center gap-1">
             <span className="w-2 h-2 bg-blue-500 inline-block rounded-sm" />
-            {labelA} más rápido ({data.rows.filter((r) => r.winner === "A").length})
+            {labelA} {t("insights.microsector.fasterPrefix")} ({data.rows.filter((r) => r.winner === "A").length})
           </span>
           <span className="text-orange-400 flex items-center gap-1">
             <span className="w-2 h-2 bg-orange-500 inline-block rounded-sm" />
-            {labelB} más rápido ({data.rows.filter((r) => r.winner === "B").length})
+            {labelB} {t("insights.microsector.fasterPrefix")} ({data.rows.filter((r) => r.winner === "B").length})
           </span>
         </div>
       </div>
@@ -117,12 +119,12 @@ export function MicrosectorTable({ lapA, lapB, count = MICROSECTOR_COUNT }: Prop
           <table className="w-full text-xs">
             <thead className="text-[10px] text-neutral-400 uppercase tracking-wider bg-black/40">
               <tr>
-                <th className="text-left px-2 py-1.5">Sector</th>
-                <th className="text-right px-2 py-1.5">Desde</th>
-                <th className="text-right px-2 py-1.5">Hasta</th>
+                <th className="text-left px-2 py-1.5">{t("insights.microsector.col.sector")}</th>
+                <th className="text-right px-2 py-1.5">{t("insights.microsector.col.from")}</th>
+                <th className="text-right px-2 py-1.5">{t("insights.microsector.col.to")}</th>
                 <th className="text-right px-2 py-1.5 text-blue-300">{labelA}</th>
                 <th className="text-right px-2 py-1.5 text-orange-300">{labelB}</th>
-                <th className="text-right px-2 py-1.5">Delta</th>
+                <th className="text-right px-2 py-1.5">{t("insights.microsector.col.delta")}</th>
               </tr>
             </thead>
             <tbody>

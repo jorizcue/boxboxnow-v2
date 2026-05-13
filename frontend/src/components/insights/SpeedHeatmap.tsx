@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import { api } from "@/lib/api";
 import type { GpsLapDetail, GpsLapSummary } from "./types";
+import { useT } from "@/lib/i18n";
 
 interface Props {
   lapSummaries: GpsLapSummary[];
@@ -46,6 +47,7 @@ function speedColor(t: number): string {
 }
 
 export function SpeedHeatmap({ lapSummaries, circuitId, height = 360 }: Props) {
+  const t = useT();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<unknown>(null);
   const layerRef = useRef<unknown>(null);
@@ -163,7 +165,7 @@ export function SpeedHeatmap({ lapSummaries, circuitId, height = 360 }: Props) {
   if (targetLaps.length === 0) {
     return (
       <div className="text-neutral-500 text-xs text-center py-6">
-        Selecciona un circuito con vueltas registradas para ver el mapa de calor.
+        {t("insights.heatmap.selectCircuit")}
       </div>
     );
   }
@@ -172,21 +174,23 @@ export function SpeedHeatmap({ lapSummaries, circuitId, height = 360 }: Props) {
     <div className="space-y-2">
       <div className="flex items-center justify-between text-[10px] text-neutral-400">
         <span>
-          Agregando {targetLaps.length} vuelta{targetLaps.length === 1 ? "" : "s"} ·{" "}
-          {points.length} puntos
+          {t(
+            targetLaps.length === 1 ? "insights.heatmap.aggregatingOne" : "insights.heatmap.aggregatingMany",
+            { n: targetLaps.length, points: points.length },
+          )}
         </span>
         <div className="flex items-center gap-2">
-          <span>Lento</span>
+          <span>{t("insights.heatmap.slow")}</span>
           <div className="h-2 w-32 rounded-sm" style={{
             background:
               "linear-gradient(90deg, rgb(40,80,255), rgb(40,255,200), rgb(150,255,50), rgb(255,200,0), rgb(255,55,0))",
           }} />
-          <span>Rápido</span>
+          <span>{t("insights.heatmap.fast")}</span>
         </div>
       </div>
       {loading && (
         <div className="text-[10px] text-neutral-500">
-          Cargando vueltas... ({progress}/{targetLaps.length})
+          {t("insights.heatmap.loadingLaps", { done: progress, total: targetLaps.length })}
         </div>
       )}
       <div

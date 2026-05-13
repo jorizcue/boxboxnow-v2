@@ -5,6 +5,7 @@
 // the lap it sits — useful as a hand-rail when watching a replay.
 
 import type { GpsLapDetail } from "./types";
+import { useT } from "@/lib/i18n";
 
 interface Props {
   lap: GpsLapDetail;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function ApexList({ lap, apexes }: Props) {
+  const t = useT();
   const speeds = lap.speeds ?? [];
   const dists = lap.distances ?? [];
   const ts = lap.timestamps ?? [];
@@ -19,7 +21,7 @@ export function ApexList({ lap, apexes }: Props) {
   if (apexes.length === 0) {
     return (
       <div className="text-neutral-500 text-xs text-center py-4">
-        No se han detectado apex (puede que la vuelta sea muy corta o sin curvas marcadas).
+        {t("insights.apex.notDetected")}
       </div>
     );
   }
@@ -30,11 +32,11 @@ export function ApexList({ lap, apexes }: Props) {
         <thead className="text-[10px] text-neutral-400 uppercase tracking-wider bg-black/40">
           <tr>
             <th className="text-left px-2 py-1.5">#</th>
-            <th className="text-right px-2 py-1.5">Distancia</th>
-            <th className="text-right px-2 py-1.5">% vuelta</th>
-            <th className="text-right px-2 py-1.5">Tiempo</th>
-            <th className="text-right px-2 py-1.5">Velocidad</th>
-            <th className="text-right px-2 py-1.5">G lateral</th>
+            <th className="text-right px-2 py-1.5">{t("insights.apex.col.distance")}</th>
+            <th className="text-right px-2 py-1.5">{t("insights.apex.col.lapPct")}</th>
+            <th className="text-right px-2 py-1.5">{t("insights.apex.col.time")}</th>
+            <th className="text-right px-2 py-1.5">{t("insights.apex.col.speed")}</th>
+            <th className="text-right px-2 py-1.5">{t("insights.apex.col.latG")}</th>
           </tr>
         </thead>
         <tbody>
