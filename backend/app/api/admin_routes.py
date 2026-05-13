@@ -23,6 +23,95 @@ from app.api.auth_routes import require_admin, hash_password, _user_out
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
+# ─── Pit-gate diagnostic ────────────────────────────────────────────
+#
+# Defined at module-import time so it shows up under /api/admin even
+# while we're hunting a specific user-reported bug. Hits the in-memory
+# RaceStateManager for the requested user and returns the exact
+# numbers that `compute_pit_status` sees — useful when the badge in
+# the UI says one thing and our offline math says another.
+
+@router.get("/pit-gate-debug")
+async def pit_gate_debug(
+    user_id: int | None = None,
+    request: Request = None,
+    admin: User = Depends(require_admin),
+):
+    """Inspect the live/replay pit-gate decision for a user.
+
+    Looks up the user's currently-active RaceStateManager in either the
+    live `registry` or the `replay_registry`, then re-runs
+    `compute_pit_status` and dumps every input parameter alongside the
+    result. Lets us see exactly which value diverges when the UI shows
+    "PIT ABIERTO" but the math says otherwise.
+    """
+    target_user = user_id if user_id is not None else admin.id
+    registry = request.app.state.registry
+    replay_registry = request.app.state.replay_registry
+
+    sessions = {}
+    live_sess = registry.get(target_user) if registry else None
+    if live_sess is not None:
+        sessions["live"] = live_sess.state
+    replay_sess = replay_registry.get(target_user) if replay_registry else None
+    if replay_sess is not None:
+        sessions["replay"] = replay_sess.state
+
+    if not sessions:
+        return {
+            "user_id": target_user,
+            "error": "no active session (neither live nor replay)",
+        }
+
+    from app.engine.pit_gate import compute_pit_status
+
+    out: dict = {"user_id": target_user, "sessions": {}}
+    for kind, state in sessions.items():
+        our_kart_n = getattr(state, "our_kart_number", 0) or 0
+        our_kart = next(
+            (k for k in state.karts.values() if k.kart_number == our_kart_n),
+            None,
+        )
+        kart_dump = None
+        if our_kart is not None:
+            kart_dump = {
+                "kart_number": our_kart.kart_number,
+                "pit_count": getattr(our_kart, "pit_count", None),
+                "pit_status": getattr(our_kart, "pit_status", None),
+                "driver_name": getattr(our_kart, "driver_name", None),
+                "stint_elapsed_ms": getattr(our_kart, "stint_elapsed_ms", None),
+                "stint_start_countdown_ms": getattr(
+                    our_kart, "stint_start_countdown_ms", None
+                ),
+                "driver_total_ms": dict(getattr(our_kart, "driver_total_ms", {}) or {}),
+            }
+        try:
+            result = compute_pit_status(state)
+            result_dump = result.to_dict()
+        except Exception as e:
+            result_dump = {"error": repr(e)}
+
+        out["sessions"][kind] = {
+            "race_started": getattr(state, "race_started", None),
+            "race_finished": getattr(state, "race_finished", None),
+            "our_kart_number": our_kart_n,
+            "countdown_ms": getattr(state, "countdown_ms", None),
+            "duration_min": getattr(state, "duration_min", None),
+            "first_countdown_ms": getattr(state, "_first_countdown_ms", None),
+            "min_pits": getattr(state, "min_pits", None),
+            "min_stint_min": getattr(state, "min_stint_min", None),
+            "max_stint_min": getattr(state, "max_stint_min", None),
+            "pit_time_s": getattr(state, "pit_time_s", None),
+            "min_driver_time_min": getattr(state, "min_driver_time_min", None),
+            "team_drivers_count": getattr(state, "team_drivers_count", None),
+            "pit_closed_start_min": getattr(state, "pit_closed_start_min", None),
+            "pit_closed_end_min": getattr(state, "pit_closed_end_min", None),
+            "our_kart": kart_dump,
+            "compute_pit_status": result_dump,
+        }
+    return out
+
+
 # --- Users ---
 
 @router.get("/users", response_model=list[UserOut])
