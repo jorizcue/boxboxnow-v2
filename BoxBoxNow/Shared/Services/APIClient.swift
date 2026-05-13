@@ -337,29 +337,29 @@ enum APIError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "URL invalida"
+            return "URL inválida"
         case .decodingError:
             return "Error procesando datos"
         case .requestFailed(let msg):
-            return msg ?? "Error de conexion"
+            return msg ?? "Error de conexión"
         case .unauthorized(let msg):
             // Server's message is almost always more accurate than the
-            // generic "Sesion expirada" — "Invalid credentials" vs
+            // generic "Sesión expirada" — "Invalid credentials" vs
             // "Session terminated" mean different things to the user.
             if let msg {
                 if msg.localizedCaseInsensitiveContains("invalid credentials") {
                     return "Usuario o contraseña incorrectos"
                 }
                 if msg.localizedCaseInsensitiveContains("session terminated") {
-                    return "Tu sesion se ha cerrado desde otro dispositivo"
+                    return "Tu sesión se ha cerrado desde otro dispositivo"
                 }
                 return msg
             }
-            return "Sesion expirada"
+            return "Sesión expirada"
         case .rateLimited(let msg):
             return msg ?? "Demasiados intentos fallidos. Espera unos minutos e inténtalo de nuevo."
         case .conflict(let msg):
-            return msg ?? "Se ha alcanzado el limite de dispositivos. Cierra una sesion existente."
+            return msg ?? "Se ha alcanzado el límite de dispositivos. Cierra una sesión existente."
         case .upgradeRequired(let info):
             return info.message
         }

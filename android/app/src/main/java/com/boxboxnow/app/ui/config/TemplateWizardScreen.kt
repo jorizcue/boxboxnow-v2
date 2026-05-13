@@ -721,7 +721,7 @@ private fun StepDisplayOptions(
         Spacer(Modifier.height(8.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             OrientationLock.entries.forEach { option ->
                 val selected = orientationLock == option
@@ -732,21 +732,21 @@ private fun StepDisplayOptions(
                         contentColor = if (selected) Color.Black else Color.White,
                     ),
                     shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                    // Tighter horizontal padding gives ~14 dp more
+                    // room per button — enough for "Horizontal" at
+                    // 13.sp to fit without truncating on phones in
+                    // portrait. The selected-state visual cue is the
+                    // accent fill colour, so the trailing check icon
+                    // is redundant and was stealing the chars.
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f),
                 ) {
-                    if (selected) {
-                        Icon(
-                            Icons.Filled.Check,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                    }
                     Text(
                         option.display,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        softWrap = false,
                     )
                 }
             }

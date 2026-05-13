@@ -122,7 +122,7 @@ fun PresetsScreen(
             if (presets.isEmpty()) {
                 item {
                     Text(
-                        "No tienes plantillas guardadas. Usa el boton de abajo para guardar la configuracion actual.",
+                        "No tienes plantillas guardadas. Usa el botón de abajo para guardar la configuración actual.",
                         color = BoxBoxNowColors.SystemGray,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(16.dp),
@@ -194,7 +194,7 @@ fun PresetsScreen(
             titleContentColor = Color.White,
             textContentColor = Color.White,
             title = { Text("Eliminar plantilla") },
-            text = { Text("Quitar '${preset.name}'? Esta accion no se puede deshacer.") },
+            text = { Text("¿Quitar '${preset.name}'? Esta acción no se puede deshacer.") },
             confirmButton = {
                 TextButton(
                     onClick = {

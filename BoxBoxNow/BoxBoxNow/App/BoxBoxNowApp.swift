@@ -4,6 +4,7 @@ import SwiftUI
 struct BoxBoxNowApp: App {
     @UIApplicationDelegateAdaptor(BoxBoxNowAppDelegate.self) private var appDelegate
     @StateObject private var appState = AppState()
+    @StateObject private var langStore = LanguageStore.shared
 
     var body: some Scene {
         WindowGroup {
@@ -20,6 +21,7 @@ struct BoxBoxNowApp: App {
             .environmentObject(appState.configVM)
             .environmentObject(appState.gpsVM)
             .environmentObject(appState.toast)
+            .environmentObject(langStore)
             .toast(appState.toast)
             .preferredColorScheme(.dark)
         }

@@ -177,7 +177,7 @@ struct TemplateWizardView: View {
 
             Text(isEditMode
                  ? "Modifica el nombre de la plantilla si lo deseas"
-                 : "Elige un nombre para identificar esta configuracion")
+                 : "Elige un nombre para identificar esta configuración")
                 .font(.subheadline)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)

@@ -59,7 +59,7 @@ fun ConfigScreen(
         containerColor = Color.Black,
         topBar = {
             TopAppBar(
-                title = { Text("Configuracion", color = Color.White) },
+                title = { Text("Configuración", color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -82,8 +82,8 @@ fun ConfigScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             ConfigRow(
-                label = "Sesion",
-                subtitle = "Duracion, stints, pits y kart",
+                label = "Sesión",
+                subtitle = "Duración, stints, pits y kart",
                 icon = Icons.Filled.Flag,
                 onClick = onOpenSession,
             )

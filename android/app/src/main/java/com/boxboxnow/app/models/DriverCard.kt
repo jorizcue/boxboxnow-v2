@@ -52,21 +52,21 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
     LastLap("lastLap", "Ultima vuelta", "1:02.456"),
     DeltaBestLap("deltaBestLap", "Delta vs Best Lap (GPS)", "-0.32s"),
     GForceRadar("gForceRadar", "G-Force (diana)", "G"),
-    Position("position", "Posicion (tiempos medios)", "P3/12"),
-    RealPos("realPos", "Posicion (clasif. real)", "P5/12"),
+    Position("position", "Posición (tiempos medios)", "P3/12"),
+    RealPos("realPos", "Posición (clasif. real)", "P5/12"),
     GapAhead("gapAhead", "Gap Real Kart delante", "-1.2s"),
-    GapBehind("gapBehind", "Gap Real Kart detras", "+0.8s"),
+    GapBehind("gapBehind", "Gap Real Kart detrás", "+0.8s"),
     AvgLap20("avgLap20", "Vuelta media (20v)", "1:03.120"),
     Best3("best3", "Media Mejor 3 v", "1:01.890"),
     AvgFutureStint("avgFutureStint", "Media stint futuro", "0:38:20"),
-    BoxScore("boxScore", "Puntuacion Box", "87"),
+    BoxScore("boxScore", "Puntuación Box", "87"),
     BestStintLap("bestStintLap", "Mejor vuelta stint", "1:01.234"),
     GpsLapDelta("gpsLapDelta", "Delta vuelta anterior GPS", "+0.15s"),
     GpsSpeed("gpsSpeed", "Velocidad GPS", "94 km/h"),
-    GpsGForce("gpsGForce", "G-Force (numeros)", "1.2G"),
-    LapsToMaxStint("lapsToMaxStint", "Vueltas hasta stint maximo", "5.2"),
+    GpsGForce("gpsGForce", "G-Force (números)", "1.2G"),
+    LapsToMaxStint("lapsToMaxStint", "Vueltas hasta stint máximo", "5.2"),
     PitWindow("pitWindow", "Ventana de pit (open/closed)", "OPEN"),
-    PitCount("pitCount", "PITS (realizados / minimos)", "2/4"),
+    PitCount("pitCount", "PITS (realizados / mínimos)", "2/4"),
     CurrentPit("currentPit", "Pit en curso", "0:45"),
     // Sector telemetry — only meaningful on circuits whose Apex grid
     // declares `s1|s2|s3` columns. The cards self-handle the "no
@@ -76,7 +76,7 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
     DeltaBestS1("deltaBestS1", "Δ Mejor S1", "+0.21s"),
     DeltaBestS2("deltaBestS2", "Δ Mejor S2", "-0.15s"),
     DeltaBestS3("deltaBestS3", "Δ Mejor S3", "+0.08s"),
-    TheoreticalBestLap("theoreticalBestLap", "Mejor vuelta teorica sectores", "1:01.67"),
+    TheoreticalBestLap("theoreticalBestLap", "Mejor vuelta teórica sectores", "1:01.67"),
     /** Combined view of S1/S2/S3 deltas in three lines on a single
      *  card — same colored-by-sign math as DeltaBestS1/2/3 but
      *  without the leader's kart number / team / driver. Saves grid
@@ -90,8 +90,8 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
     // (avg-pace) / RealPos (adjusted). These surface the values straight
     // from Apex's `data-type="int"` and `data-type="rk"` columns.
     IntervalAhead("intervalAhead", "Intervalo kart delante", "0.968s"),
-    IntervalBehind("intervalBehind", "Intervalo kart detras", "0.973s"),
-    ApexPosition("apexPosition", "Posicion Apex", "P4/12");
+    IntervalBehind("intervalBehind", "Intervalo kart detrás", "0.973s"),
+    ApexPosition("apexPosition", "Posición Apex", "P4/12");
 
     val group: DriverCardGroup get() = when (this) {
         BoxScore, PitCount, CurrentPit, PitWindow -> DriverCardGroup.BOX

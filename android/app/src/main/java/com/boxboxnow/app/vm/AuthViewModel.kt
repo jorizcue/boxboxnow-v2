@@ -130,7 +130,7 @@ class AuthViewModel @Inject constructor(
 
     fun googleLoginFailed(message: String?) {
         _isGoogleLoading.value = false
-        _errorMessage.value = message ?: "Error iniciando sesion con Google"
+        _errorMessage.value = message ?: "Error iniciando sesión con Google"
     }
 
     fun startGoogleLogin() {
@@ -232,7 +232,7 @@ class AuthViewModel @Inject constructor(
                 _biometricPending.value = false
                 _isAuthenticated.value = false
                 _user.value = null
-                _errorMessage.value = "La sesion ya no es valida. Inicia sesion de nuevo."
+                _errorMessage.value = "La sesión ya no es válida. Inicia sesión de nuevo."
             }
         }
     }

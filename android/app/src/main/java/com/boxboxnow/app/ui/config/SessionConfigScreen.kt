@@ -93,7 +93,7 @@ fun SessionConfigScreen(onBack: () -> Unit) {
         containerColor = Color.Black,
         topBar = {
             TopAppBar(
-                title = { Text("Sesion de carrera", color = Color.White) },
+                title = { Text("Sesión de carrera", color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
@@ -242,21 +242,21 @@ fun SessionConfigScreen(onBack: () -> Unit) {
                     NumberCard(
                         title = "STINT MIN (MIN)",
                         value = session.minStintMin,
-                        tooltip = "Tiempo minimo que un piloto debe estar en pista",
+                        tooltip = "Tiempo mínimo que un piloto debe estar en pista",
                         onValueChange = { vm.updateSession { s -> s.copy(minStintMin = it) } },
                         modifier = Modifier.weight(1f),
                     )
                     NumberCard(
                         title = "STINT MAX (MIN)",
                         value = session.maxStintMin,
-                        tooltip = "Tiempo maximo que un piloto puede estar en pista",
+                        tooltip = "Tiempo máximo que un piloto puede estar en pista",
                         onValueChange = { vm.updateSession { s -> s.copy(maxStintMin = it) } },
                         modifier = Modifier.weight(1f),
                     )
                     NumberCard(
                         title = "TIEMPO MIN\nPILOTO (MIN)",
                         value = session.minDriverTimeMin,
-                        tooltip = "Tiempo minimo total que cada piloto debe conducir",
+                        tooltip = "Tiempo mínimo total que cada piloto debe conducir",
                         onValueChange = { vm.updateSession { s -> s.copy(minDriverTimeMin = it) } },
                         modifier = Modifier.weight(1f),
                     )
@@ -273,7 +273,7 @@ fun SessionConfigScreen(onBack: () -> Unit) {
                     NumberCard(
                         title = "PILOTOS\nDEL EQUIPO",
                         value = session.teamDriversCount,
-                        tooltip = "Numero de pilotos del equipo. 0 = automatico segun Apex.",
+                        tooltip = "Número de pilotos del equipo. 0 = automático según Apex.",
                         onValueChange = { vm.updateSession { s -> s.copy(teamDriversCount = it) } },
                         modifier = Modifier.weight(1f),
                     )

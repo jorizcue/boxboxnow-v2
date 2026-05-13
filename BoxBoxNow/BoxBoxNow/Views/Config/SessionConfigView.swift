@@ -13,7 +13,7 @@ struct SessionConfigView: View {
     var body: some View {
         ScrollView {
             if configVM.isLoading {
-                ProgressView("Cargando sesion...")
+                ProgressView("Cargando sesión...")
                     .padding(.top, 60)
             } else {
                 VStack(spacing: 20) {
@@ -89,19 +89,19 @@ struct SessionConfigView: View {
                                 title: "STINT MIN (MIN)",
                                 value: $configVM.session.minStintMin,
                                 range: 0...300,
-                                tooltip: "Tiempo minimo que un piloto debe estar en pista antes de poder entrar a boxes"
+                                tooltip: "Tiempo mínimo que un piloto debe estar en pista antes de poder entrar a boxes"
                             )
                             NumberCard(
                                 title: "STINT MAX (MIN)",
                                 value: $configVM.session.maxStintMin,
                                 range: 0...300,
-                                tooltip: "Tiempo maximo que un piloto puede estar en pista antes de ser obligado a parar"
+                                tooltip: "Tiempo máximo que un piloto puede estar en pista antes de ser obligado a parar"
                             )
                             NumberCard(
                                 title: "TIEMPO MIN\nPILOTO (MIN)",
                                 value: $configVM.session.minDriverTimeMin,
                                 range: 0...300,
-                                tooltip: "Tiempo minimo total que cada piloto debe conducir durante la carrera"
+                                tooltip: "Tiempo mínimo total que cada piloto debe conducir durante la carrera"
                             )
                             // Pilot count used by the pit-gate feasibility
                             // check (see backend/app/engine/pit_gate.py).
@@ -170,7 +170,7 @@ struct SessionConfigView: View {
                         .cornerRadius(12)
                     }
                     .disabled(isSaving)
-                    .accessibilityLabel(showSaved ? "Guardado" : "Actualizar sesion")
+                    .accessibilityLabel(showSaved ? "Guardado" : "Actualizar sesión")
                     .padding(.top, 4)
                 }
                 .padding(16)
@@ -193,7 +193,7 @@ struct SessionConfigView: View {
             await configVM.loadSession()
             await configVM.loadCircuits()
             if let error = configVM.errorMessage {
-                toast.error("Error cargando sesion: \(error)")
+                toast.error("Error cargando sesión: \(error)")
                 configVM.errorMessage = nil
             }
         }

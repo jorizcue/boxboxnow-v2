@@ -15,11 +15,15 @@ import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import com.boxboxnow.app.i18n.LanguageStore
+import com.boxboxnow.app.i18n.LocalLanguage
 import com.boxboxnow.app.ui.AppNav
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.ui.theme.BoxBoxNowTheme
@@ -44,16 +48,29 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         requestRuntimePermissions()
 
+        // Hydrate the i18n store from SharedPreferences BEFORE composition
+        // starts, so the first frame already renders in the user's
+        // persisted language and we avoid a one-frame flash of Spanish
+        // when they had switched to e.g. English on a previous launch.
+        LanguageStore.init(applicationContext)
+
         // Handle a boxboxnow:// launch URI if the activity was created by it
         handleAuthDeepLink(intent)
 
         setContent {
-            BoxBoxNowTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize().background(Color.Black),
-                    color = Color.Black,
-                ) {
-                    AppNav(onStartGoogleSso = { launchGoogleSso() })
+            // Provide the active Language to the whole tree via a
+            // CompositionLocal. Every `t(key)` call site reads
+            // `LocalLanguage.current`, so flipping the language from the
+            // toolbar picker recomposes everything that uses it.
+            val activeLang by LanguageStore.state
+            CompositionLocalProvider(LocalLanguage provides activeLang) {
+                BoxBoxNowTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize().background(Color.Black),
+                        color = Color.Black,
+                    ) {
+                        AppNav(onStartGoogleSso = { launchGoogleSso() })
+                    }
                 }
             }
         }

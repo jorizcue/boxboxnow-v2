@@ -32,7 +32,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.boxboxnow.app.BuildConfig
+import com.boxboxnow.app.i18n.t
 import com.boxboxnow.app.models.RaceSession
+import com.boxboxnow.app.ui.components.LanguagePicker
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.vm.AuthViewModel
 import com.boxboxnow.app.vm.ConfigViewModel
@@ -90,6 +92,12 @@ fun HomeScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black),
                 actions = {
+                    // Language switcher — same five locales as iOS / web
+                    // (es / en / it / de / fr). Lives in the toolbar so
+                    // it's discoverable without burying it in a settings
+                    // screen.
+                    LanguagePicker()
+                    Spacer(Modifier.width(4.dp))
                     // Full sign-out wipes the local token + biometric AND
                     // tells the server to delete the DeviceSession so the
                     // admin "Sesiones activas" panel reflects the exit.
@@ -98,7 +106,7 @@ fun HomeScreen(
                     // users reported stale mobile sessions lingering after
                     // they closed the app.
                     TextButton(onClick = { authVM.fullSignOut() }) {
-                        Text("Salir", color = BoxBoxNowColors.ErrorRed, fontWeight = FontWeight.SemiBold)
+                        Text(t("home.signOut"), color = BoxBoxNowColors.ErrorRed, fontWeight = FontWeight.SemiBold)
                     }
                 },
             )
@@ -147,16 +155,16 @@ fun HomeScreen(
             // Action cards
             HomeCard(
                 icon = Icons.Default.Settings,
-                title = "Configuración",
-                subtitle = "Carrera, Plantillas, GPS",
+                title = t("home.config"),
+                subtitle = t("home.configSubtitle"),
                 onClick = onOpenConfig,
             )
             HomeCard(
                 icon = Icons.Default.Speed,
-                title = "Vista Piloto",
+                title = t("home.viewPilot"),
                 subtitle = if (hasSession)
                     "Kart #${session.ourKartNumber} · ${session.durationMin} min"
-                else "Pantalla completa",
+                else t("home.fullScreen"),
                 accentBorder = true,
                 onClick = onOpenDriver,
             )
@@ -241,8 +249,8 @@ private fun NoSessionCard() {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Icon(Icons.Default.WarningAmber, contentDescription = null, tint = BoxBoxNowColors.WarningOrange, modifier = Modifier.size(28.dp))
-        Text("Configura la sesión antes de entrar", color = BoxBoxNowColors.WarningOrange, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-        Text("Necesitas definir al menos el kart y la duración", color = BoxBoxNowColors.SystemGray3, fontSize = 11.sp)
+        Text(t("home.configureSession"), color = BoxBoxNowColors.WarningOrange, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Text(t("home.needKartAndDuration"), color = BoxBoxNowColors.SystemGray3, fontSize = 11.sp)
     }
 }
 

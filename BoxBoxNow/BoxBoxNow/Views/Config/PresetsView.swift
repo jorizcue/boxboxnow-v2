@@ -27,7 +27,7 @@ struct PresetsView: View {
                         Text("Sin plantillas")
                             .font(.subheadline.bold())
                             .foregroundColor(.gray)
-                        Text("Guarda tu configuracion actual para aplicarla despues")
+                        Text("Guarda tu configuración actual para aplicarla después")
                             .font(.caption)
                             .foregroundColor(Color(.systemGray2))
                             .multilineTextAlignment(.center)
@@ -127,7 +127,7 @@ struct PresetsView: View {
             Button("Cancelar", role: .cancel) { presetToDelete = nil }
         } message: {
             if let preset = presetToDelete {
-                Text("Se eliminara la plantilla \"\(preset.name)\". Esta accion no se puede deshacer.")
+                Text("Se eliminará la plantilla \"\(preset.name)\". Esta acción no se puede deshacer.")
             }
         }
     }

@@ -119,7 +119,7 @@ fun BoxConfigScreen(onBack: () -> Unit) {
         containerColor = Color.Black,
         topBar = {
             TopAppBar(
-                title = { Text("Configuracion Box", color = Color.White) },
+                title = { Text("Configuración Box", color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
@@ -375,7 +375,7 @@ fun BoxConfigScreen(onBack: () -> Unit) {
             title = { Text("Anadir equipo") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Nombre y numero de kart del nuevo equipo.", color = BoxBoxNowColors.SystemGray, fontSize = 13.sp)
+                    Text("Nombre y número de kart del nuevo equipo.", color = BoxBoxNowColors.SystemGray, fontSize = 13.sp)
                     OutlinedTextField(
                         value = newTeamName,
                         onValueChange = { newTeamName = it },
@@ -539,6 +539,21 @@ private fun TeamRow(
                                 colors = fieldColors(),
                             )
                             Spacer(Modifier.width(6.dp))
+                            // Differential editor — milliseconds field that
+                            // takes a SECONDS string (with sign) for
+                            // ergonomics, matching iOS's "+1.2" / "-0.5"
+                            // input pattern. The TeamDriver field is ms,
+                            // so we round-trip via Double seconds.
+                            DiffMsField(
+                                valueMs = driver.differentialMs,
+                                onValueChange = { newMs ->
+                                    val updated = team.drivers.toMutableList()
+                                    updated[dIdx] = driver.copy(differentialMs = newMs)
+                                    onUpdate(team.copy(drivers = updated))
+                                },
+                                modifier = Modifier.width(82.dp).height(48.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
                             IconButton(
                                 onClick = {
                                     val updated = team.drivers.toMutableList()
@@ -594,3 +609,58 @@ private fun fieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedLabelColor = BoxBoxNowColors.SystemGray,
     cursorColor = BoxBoxNowColors.Accent,
 )
+
+/**
+ * Differential-ms editor. Stores ms in the model but the user types
+ * seconds with one decimal and an optional sign. Empty → 0 ms.
+ *
+ * Local string state is kept so the user can type "-", "1.", "-2.5",
+ * etc. without the parent state stomping mid-keystroke. We push to
+ * `onValueChange` only when the buffer parses to a clean number (or
+ * the user clears the field).
+ */
+@Composable
+private fun DiffMsField(
+    valueMs: Int,
+    onValueChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // Display format: "+1.2" / "-0.5" / "0" — mirrors the read-only
+    // formatter further up so the field doesn't visually jump when
+    // entering / leaving edit mode.
+    val formatted = remember(valueMs) {
+        if (valueMs == 0) "0"
+        else "%+.1f".format(valueMs / 1000.0)
+    }
+    var text by remember(valueMs) { mutableStateOf(formatted) }
+
+    OutlinedTextField(
+        value = text,
+        onValueChange = { raw ->
+            // Allow only digits, dot, comma (es-ES), and a leading sign.
+            val cleaned = raw.filterIndexed { idx, c ->
+                c.isDigit() || c == '.' || c == ',' ||
+                ((c == '-' || c == '+') && idx == 0)
+            }
+            text = cleaned
+            // Try to commit. Empty or just "-" / "+" → 0 ms.
+            val normalised = cleaned.replace(',', '.')
+            val parsed = normalised.toDoubleOrNull()
+            if (parsed != null) {
+                onValueChange((parsed * 1000.0).toInt())
+            } else if (cleaned.isEmpty()) {
+                onValueChange(0)
+            }
+        },
+        placeholder = { Text("± s", fontSize = 11.sp) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        textStyle = androidx.compose.ui.text.TextStyle(
+            fontSize = 13.sp,
+            fontFamily = FontFamily.Monospace,
+            color = Color.White,
+        ),
+        modifier = modifier,
+        colors = fieldColors(),
+    )
+}

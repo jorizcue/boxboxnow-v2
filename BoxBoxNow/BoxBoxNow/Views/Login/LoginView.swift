@@ -173,7 +173,7 @@ struct LoginView: View {
             Button(action: { authVM.login(email: email, password: password) }) {
                 HStack {
                     if authVM.isLoading { ProgressView().tint(.black) }
-                    Text("Iniciar sesion")
+                    Text("Iniciar sesión")
                         .font(.headline)
                 }
                 .frame(maxWidth: .infinity, minHeight: 44)
@@ -182,7 +182,7 @@ struct LoginView: View {
                 .cornerRadius(10)
             }
             .disabled(authVM.isLoading || email.isEmpty || password.isEmpty)
-            .accessibilityLabel("Iniciar sesion")
+            .accessibilityLabel("Iniciar sesión")
             .padding(.top, 4)
 
             // Divider

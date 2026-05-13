@@ -163,7 +163,7 @@ private fun NoPresetsGate(onBack: () -> Unit) {
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                "Crea al menos una plantilla en Configuracion → Plantillas para usar la vista del piloto.",
+                "Crea al menos una plantilla en Configuración → Plantillas para usar la vista del piloto.",
                 color = Color(0xFF8E8E93),
                 fontSize = 14.sp,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,

@@ -4,6 +4,11 @@ struct HomeView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @EnvironmentObject var configVM: ConfigViewModel
     @EnvironmentObject var raceVM: RaceViewModel
+    // Observing the language store forces SwiftUI to re-render every
+    // `t(_:)` call site in this view tree whenever the user flips
+    // language from the toolbar picker. Without this the toolbar
+    // picker swaps but the rest of the screen stays in the old locale.
+    @EnvironmentObject var langStore: LanguageStore
     @State private var showDriver = false
 
     private var hasSession: Bool {
@@ -80,10 +85,10 @@ struct HomeView: View {
                                 Image(systemName: "exclamationmark.triangle")
                                     .font(.system(size: 24))
                                     .foregroundColor(.orange)
-                                Text("Configura la sesion antes de entrar")
+                                Text(t("home.configureSession"))
                                     .font(.subheadline)
                                     .foregroundColor(.orange)
-                                Text("Necesitas definir al menos el kart y la duracion")
+                                Text(t("home.needKartAndDuration"))
                                     .font(.caption)
                                     .foregroundColor(Color(.systemGray3))
                             }
@@ -103,18 +108,18 @@ struct HomeView: View {
                         NavigationLink(destination: ConfigView()) {
                             HomeCard(
                                 icon: "gearshape.fill",
-                                title: "Configuracion",
-                                subtitle: "Carrera, Plantillas, GPS"
+                                title: t("home.config"),
+                                subtitle: t("home.configSubtitle")
                             )
                         }
 
                         Button(action: { showDriver = true }) {
                             HomeCard(
                                 icon: "gauge.open.with.lines.needle.33percent.and.arrowtriangle",
-                                title: "Vista Piloto",
+                                title: t("home.viewPilot"),
                                 subtitle: hasSession
                                     ? "Kart #\(configVM.session.ourKartNumber) · \(configVM.session.durationMin) min"
-                                    : "Pantalla completa",
+                                    : t("home.fullScreen"),
                                 accentBorder: true
                             )
                         }
@@ -146,18 +151,21 @@ struct HomeView: View {
                         .fill(raceVM.isConnected ? Color.green : Color(.systemGray4))
                         .frame(width: 8, height: 8)
                 }
+                // Language switcher — same five locales as the web
+                // (es/en/it/de/fr). Lives next to the sign-out
+                // button so it's discoverable without burying it in
+                // a settings screen.
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    LanguagePicker()
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     // Full sign-out wipes the local token + biometric AND
                     // tells the server to delete the DeviceSession so the
                     // admin "Sesiones activas" panel reflects the exit.
-                    // Previously this called `logout()`, which only reset
-                    // in-memory state and left the server session alive —
-                    // users reported stale mobile sessions lingering after
-                    // they closed the app.
-                    Button("Salir") { authVM.fullSignOut() }
+                    Button(t("home.signOut")) { authVM.fullSignOut() }
                         .foregroundColor(.red)
                         .frame(minHeight: 44)
-                        .accessibilityLabel("Cerrar sesion")
+                        .accessibilityLabel(t("home.signOut"))
                 }
             }
             .task {
