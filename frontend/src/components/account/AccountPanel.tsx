@@ -75,6 +75,15 @@ function formatDate(iso: string | null): string {
 
 function planLabel(planType: string): string {
   const labels: Record<string, string> = {
+    // Current catalog (Individual / Endurance Básico / Endurance Pro)
+    individual_monthly: "Individual Mensual",
+    individual_annual: "Individual Anual",
+    endurance_basic_monthly: "Endurance Básico",
+    endurance_pro_monthly: "Endurance Pro Mensual",
+    endurance_pro_annual: "Endurance Pro Anual",
+    // Legacy plan_types kept so existing subscriptions created before the
+    // catalog rename still render with a readable label instead of the
+    // raw plan_type string.
     basic_monthly: "Basico Mensual",
     basic_annual: "Basico Anual",
     pro_monthly: "Pro Mensual",
@@ -117,6 +126,15 @@ function statusBadge(sub: Sub) {
 /** Given a plan_type, return the alternate billing interval plan */
 function getAlternatePlan(planType: string): { plan: string; label: string } | null {
   const swaps: Record<string, { plan: string; label: string }> = {
+    // Current catalog
+    individual_monthly: { plan: "individual_annual", label: "Individual Anual" },
+    individual_annual: { plan: "individual_monthly", label: "Individual Mensual" },
+    endurance_pro_monthly: { plan: "endurance_pro_annual", label: "Endurance Pro Anual" },
+    endurance_pro_annual: { plan: "endurance_pro_monthly", label: "Endurance Pro Mensual" },
+    // (endurance_basic only sells monthly — intentionally no entry so the
+    //  "Cambiar a anual" button doesn't appear for that plan.)
+    // Legacy plan_types — kept so any historical subscription that still
+    // carries the old label can offer a swap.
     basic_monthly: { plan: "basic_annual", label: "Basico Anual" },
     basic_annual: { plan: "basic_monthly", label: "Basico Mensual" },
     pro_monthly: { plan: "pro_annual", label: "Pro Anual" },
