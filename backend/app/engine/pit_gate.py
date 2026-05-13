@@ -115,6 +115,7 @@ def _is_driver_min_feasible(
     min_stint_ms: int,
     max_stint_ms: int,
     min_driver_time_ms: int,
+    current_driver_idx: int | None = None,
 ) -> tuple[bool, str | None, int]:
     """O(K · N) greedy feasibility check.
 
@@ -122,6 +123,19 @@ def _is_driver_min_feasible(
     feasible is True, the blocking-driver fields are ("", 0). When False,
     they point to the driver with the largest unmet remaining time — the
     one we'll surface in the UI badge.
+
+    `current_driver_idx` (when supplied) is the index in `drivers` of the
+    pilot CURRENTLY at the wheel. Pitting now means that pilot LEAVES the
+    kart, so their available future stints are capped at
+    `n_future_stints - 1` (at least one stint must go to whoever takes
+    over post-pit). This catches the strategist's classic "Alejandro
+    falta 54 s para su min, pero ya hay que pitar" case: with only 1
+    future stint left, Alejandro can't be both "the one who pits now"
+    AND "the one who drives the last stint" — he loses his 54 s.
+    Without this guard the gate said OPEN whenever driver_total_ms was
+    incomplete (e.g. the other driver hadn't been committed yet by
+    Apex's pit-in event), since the algorithm only saw the current
+    driver and concluded "one stint suffices for one driver".
     """
     K = len(drivers)
     if K == 0:
@@ -161,6 +175,28 @@ def _is_driver_min_feasible(
 
     # Per-driver "remaining time" required to hit min_driver_time.
     remaining = [max(0, min_driver_time_ms - acc) for _, acc in drivers]
+
+    # Current-driver constraint: if we pit NOW, the pilot at the wheel
+    # leaves the kart and at least one OTHER driver takes the next
+    # stint. The current driver can only return for stints AFTER that
+    # handover. Cap their future-stint allowance at n_future_stints-1.
+    # If their remaining > 0 forces more stints than the cap allows,
+    # the gate must close — they'd end the race below min_driver_time.
+    if current_driver_idx is not None and 0 <= current_driver_idx < K:
+        rem_curr = remaining[current_driver_idx]
+        if rem_curr > 0:
+            # Min stints the current driver still needs (each capped at
+            # max_stint, so ceil-division gives the floor).
+            needed = math.ceil(rem_curr / max_stint_ms)
+            # Max stints they can take post-pit = n_future_stints - 1
+            # (one stint guaranteed to a different driver after the pit).
+            allowed = max(0, n_future_stints - 1)
+            if needed > allowed:
+                return (
+                    False,
+                    drivers[current_driver_idx][0],
+                    rem_curr,
+                )
 
     # Step 1: minimum stints required per driver. A driver who already has
     # remaining == 0 doesn't need a stint at all (0 stints suffice). A
@@ -400,6 +436,16 @@ def compute_pit_status(state) -> PitStatus:
         if drive_remaining_s < 0:
             drive_remaining_s = 0
 
+        # Index of the current driver in drivers_pairs (None when we
+        # don't know who's at the wheel — fall back to the symmetric
+        # algorithm without the current-driver constraint).
+        current_driver_idx_in_pairs: int | None = None
+        if current_driver:
+            for i, (n, _) in enumerate(drivers_pairs):
+                if n == current_driver:
+                    current_driver_idx_in_pairs = i
+                    break
+
         feasible, algo_blocker, algo_blocker_rem = _is_driver_min_feasible(
             drivers_pairs,
             n_future_stints,
@@ -407,6 +453,7 @@ def compute_pit_status(state) -> PitStatus:
             int(min_stint_s * 1000),
             int(max_stint_s * 1000),
             min_driver_time_ms,
+            current_driver_idx=current_driver_idx_in_pairs,
         )
 
         if not feasible:
@@ -504,6 +551,15 @@ def _predict_next_open_countdown_ms(state, our_kart) -> int | None:
             team_drivers_count,
         )
 
+        # Same current-driver lookup as compute_pit_status so the
+        # predictor evaluates feasibility under identical constraints.
+        current_idx_in_pairs: int | None = None
+        if current_driver:
+            for i, (n, _) in enumerate(drivers_pairs):
+                if n == current_driver:
+                    current_idx_in_pairs = i
+                    break
+
         # Check stint-length-window too — they shift as the clock advances.
         t_start_s = stint_start_countdown_ms / 1000.0
         future_stint_sec = max(0.0, t_start_s - future_countdown_ms / 1000.0)
@@ -534,6 +590,7 @@ def _predict_next_open_countdown_ms(state, our_kart) -> int | None:
             int(min_stint_s * 1000),
             int(max_stint_s * 1000),
             min_driver_time_ms,
+            current_driver_idx=current_idx_in_pairs,
         )
         if feasible:
             return int(future_countdown_ms)
