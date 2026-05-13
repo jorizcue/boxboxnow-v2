@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { trackAction } from "@/lib/tracker";
 import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
+import { useT, useLangStore } from "@/lib/i18n";
 import { PaymentMethodsPanel } from "./PaymentMethodsPanel";
 
 interface BillingAddress {
@@ -24,20 +25,22 @@ interface BillingInfo {
 const EMPTY_ADDRESS: BillingAddress = { line1: "", line2: "", city: "", postal_code: "", country: "ES" };
 const EMPTY_BILLING: BillingInfo = { name: "", address: EMPTY_ADDRESS, tax_ids: [] };
 
-const EU_COUNTRIES = [
-  ["ES", "España"],["DE", "Alemania"],["FR", "Francia"],["IT", "Italia"],["PT", "Portugal"],
-  ["NL", "Países Bajos"],["BE", "Bélgica"],["AT", "Austria"],["PL", "Polonia"],["SE", "Suecia"],
-  ["DK", "Dinamarca"],["FI", "Finlandia"],["IE", "Irlanda"],["GR", "Grecia"],["CZ", "Rep. Checa"],
-  ["RO", "Rumanía"],["HU", "Hungría"],["SK", "Eslovaquia"],["HR", "Croacia"],["GB", "Reino Unido"],
-  ["US", "Estados Unidos"],["MX", "México"],["AR", "Argentina"],["CL", "Chile"],["CO", "Colombia"],
+// ISO codes only — labels come from i18n (`country.<code>` key).
+// Order is roughly "most common first" → Spanish-speaking + EU.
+const COUNTRY_CODES = [
+  "ES", "DE", "FR", "IT", "PT",
+  "NL", "BE", "AT", "PL", "SE",
+  "DK", "FI", "IE", "GR", "CZ",
+  "RO", "HU", "SK", "HR", "GB",
+  "US", "MX", "AR", "CL", "CO",
 ];
 
-const TAX_ID_TYPES = [
-  // Personal NIF (DNI) o empresa española → Stripe `eu_vat`: el
-  // backend añade el prefijo `ES` automáticamente si el usuario no
-  // lo escribe (ej. acepta `46937098D` y lo envía como `ES46937098D`).
-  ["eu_vat", "NIF / CIF / VAT-UE"],
-  ["es_cif", "CIF antiguo (empresas, sin prefijo ES)"],
+// Tax-ID type codes + their i18n label keys. The order is intentional
+// (eu_vat first because it covers both personal NIF and company CIF
+// after the backend auto-prefixes `ES`).
+const TAX_ID_TYPES: { code: string; labelKey: string }[] = [
+  { code: "eu_vat", labelKey: "account.billing.taxTypeEuVat" },
+  { code: "es_cif", labelKey: "account.billing.taxTypeEsCif" },
 ];
 
 interface Sub {
@@ -72,9 +75,16 @@ interface Invoice {
   kind: "factura" | "recibo";
 }
 
-function formatDate(iso: string | null): string {
+/** Map the i18n language code to the BCP-47 locale we hand to
+ *  `toLocaleDateString`. `es-ES` style — Spanish dates look like
+ *  "13 may 2026", English "13 May 2026", etc. */
+const DATE_LOCALE: Record<string, string> = {
+  es: "es-ES", en: "en-GB", it: "it-IT", de: "de-DE", fr: "fr-FR",
+};
+
+function formatDate(iso: string | null, lang: string = "es"): string {
   if (!iso) return "-";
-  return new Date(iso).toLocaleDateString("es-ES", {
+  return new Date(iso).toLocaleDateString(DATE_LOCALE[lang] ?? "es-ES", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -102,18 +112,35 @@ function planLabel(planType: string): string {
   return labels[planType] || planType;
 }
 
-function formatPrice(amount?: number, currency?: string, interval?: string): string | null {
+/** Map interval → localized "/month" / "/year" suffix. Defaults are
+ *  Spanish so existing behaviour is preserved when no lang is passed. */
+const INTERVAL_SUFFIX: Record<string, { month: string; year: string }> = {
+  es: { month: "/mes",   year: "/año"   },
+  en: { month: "/month", year: "/year"  },
+  it: { month: "/mese",  year: "/anno"  },
+  de: { month: "/Monat", year: "/Jahr"  },
+  fr: { month: "/mois",  year: "/an"    },
+};
+
+function formatPrice(
+  amount?: number,
+  currency?: string,
+  interval?: string,
+  lang: string = "es",
+): string | null {
   if (amount == null) return null;
   const sym = currency === "eur" ? "€" : currency?.toUpperCase() || "€";
-  const per = interval === "year" ? "/año" : "/mes";
+  const suffix = INTERVAL_SUFFIX[lang] ?? INTERVAL_SUFFIX.es;
+  const per = interval === "year" ? suffix.year : suffix.month;
   return `${amount.toFixed(2)}${sym}${per}`;
 }
 
-function statusBadge(sub: Sub) {
+function StatusBadge({ sub }: { sub: Sub }) {
+  const t = useT();
   if (sub.cancel_at_period_end) {
     return (
       <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-orange-500/20 text-orange-400 border border-orange-500/30">
-        No renueva
+        {t("account.subs.status.noRenew")}
       </span>
     );
   }
@@ -124,9 +151,14 @@ function statusBadge(sub: Sub) {
     past_due: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
     expired: "bg-neutral-500/20 text-neutral-400 border-neutral-500/30",
   };
+  const label =
+    sub.status === "active"   ? t("account.subs.status.active")
+    : sub.status === "trialing" ? t("account.subs.status.trialing")
+    : sub.status === "canceled" ? t("account.subs.status.canceled")
+    : sub.status;
   return (
     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${colors[sub.status] || colors.expired}`}>
-      {sub.status === "active" ? "Activa" : sub.status === "trialing" ? "Prueba" : sub.status === "canceled" ? "Cancelada" : sub.status}
+      {label}
     </span>
   );
 }
@@ -154,6 +186,12 @@ function getAlternatePlan(planType: string): { plan: string; label: string } | n
 export function AccountPanel() {
   const { user } = useAuth();
   const confirm = useConfirm();
+  const t = useT();
+  // Subscribing to `lang` here is what makes the whole panel re-render
+  // when the user flips language from the toolbar — without it, the
+  // sub-components that call `useT()` re-render but cached fields
+  // (formatDate / formatPrice outputs) wouldn't update.
+  const lang = useLangStore((s) => s.lang);
   const [subs, setSubs] = useState<Sub[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -205,10 +243,10 @@ export function AccountPanel() {
 
   const handleCancel = async (subId: number) => {
     const ok = await confirm({
-      title: "Cancelar suscripción",
-      message: "Se cancelará la renovación automática. Seguirás teniendo acceso hasta el final del periodo actual.",
-      confirmText: "Cancelar suscripción",
-      cancelText: "Volver",
+      title: t("account.subs.confirmCancel.title"),
+      message: t("account.subs.confirmCancel.message"),
+      confirmText: t("account.subs.confirmCancel.confirm"),
+      cancelText: t("account.subs.confirmCancel.back"),
       danger: true,
     });
     if (!ok) return;
@@ -218,7 +256,7 @@ export function AccountPanel() {
       trackAction("subscription.cancel", { sub_id: subId });
       await loadData();
     } catch {
-      alert("Error al cancelar la suscripcion");
+      alert(t("account.subs.errors.cancel"));
     } finally {
       setActionLoading(null);
     }
@@ -231,7 +269,7 @@ export function AccountPanel() {
       trackAction("subscription.reactivate", { sub_id: subId });
       await loadData();
     } catch {
-      alert("Error al reactivar la suscripcion");
+      alert(t("account.subs.errors.reactivate"));
     } finally {
       setActionLoading(null);
     }
@@ -239,10 +277,10 @@ export function AccountPanel() {
 
   const handleSwitchPlan = async (subId: number, newPlan: string, newLabel: string) => {
     const ok = await confirm({
-      title: "Cambiar de plan",
-      message: `¿Cambiar a ${newLabel}? El cambio se aplicará en la próxima renovación.`,
-      confirmText: `Cambiar a ${newLabel.split(" ").pop()}`,
-      cancelText: "Cancelar",
+      title: t("account.subs.confirmSwitch.title"),
+      message: t("account.subs.confirmSwitch.message", { plan: newLabel }),
+      confirmText: `${t("account.subs.switchToPrefix")} ${newLabel.split(" ").pop() ?? ""}`,
+      cancelText: t("account.subs.cancel"),
     });
     if (!ok) return;
     setActionLoading(subId);
@@ -251,7 +289,7 @@ export function AccountPanel() {
       trackAction("subscription.switch_plan", { sub_id: subId, new_plan: newPlan });
       await loadData();
     } catch {
-      alert("Error al cambiar el plan");
+      alert(t("account.subs.errors.switch"));
     } finally {
       setActionLoading(null);
     }
@@ -272,7 +310,7 @@ export function AccountPanel() {
       await loadBillingInfo();
       setTimeout(() => setBillingSaved(false), 3000);
     } catch (e: any) {
-      setBillingError(e?.message || "Error al guardar los datos fiscales");
+      setBillingError(e?.message || t("account.billing.error"));
     } finally {
       setBillingSaving(false);
     }
@@ -291,7 +329,7 @@ export function AccountPanel() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white">Mi cuenta</h2>
+          <h2 className="text-xl font-bold text-white">{t("account.title")}</h2>
           <p className="text-sm text-neutral-400 mt-1">
             {user?.username} {user?.email ? `· ${user.email}` : ""}
           </p>
@@ -303,7 +341,7 @@ export function AccountPanel() {
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
-          Nueva suscripción
+          {t("account.newSubscription")}
         </a>
       </div>
 
@@ -317,7 +355,7 @@ export function AccountPanel() {
               : "text-neutral-400 hover:text-neutral-200"
           }`}
         >
-          Suscripciones
+          {t("account.tab.subs")}
         </button>
         <button
           onClick={() => setTab("recibos")}
@@ -327,7 +365,7 @@ export function AccountPanel() {
               : "text-neutral-400 hover:text-neutral-200"
           }`}
         >
-          Recibos ({invoices.filter((i) => i.kind === "recibo").length})
+          {t("account.tab.recibos")} ({invoices.filter((i) => i.kind === "recibo").length})
         </button>
         <button
           onClick={() => setTab("facturas")}
@@ -337,7 +375,7 @@ export function AccountPanel() {
               : "text-neutral-400 hover:text-neutral-200"
           }`}
         >
-          Facturas ({invoices.filter((i) => i.kind === "factura").length})
+          {t("account.tab.facturas")} ({invoices.filter((i) => i.kind === "factura").length})
         </button>
         <button
           onClick={() => setTab("payment")}
@@ -347,7 +385,7 @@ export function AccountPanel() {
               : "text-neutral-400 hover:text-neutral-200"
           }`}
         >
-          Métodos de pago
+          {t("account.tab.payment")}
         </button>
         <button
           onClick={() => setTab("billing")}
@@ -357,7 +395,7 @@ export function AccountPanel() {
               : "text-neutral-400 hover:text-neutral-200"
           }`}
         >
-          Facturación
+          {t("account.tab.billing")}
         </button>
         <button
           onClick={() => setTab("privacy")}
@@ -367,7 +405,7 @@ export function AccountPanel() {
               : "text-neutral-400 hover:text-neutral-200"
           }`}
         >
-          Privacidad
+          {t("account.tab.privacy")}
         </button>
       </div>
 
@@ -376,40 +414,40 @@ export function AccountPanel() {
         <div className="space-y-3">
           {subs.length === 0 ? (
             <div className="bg-surface border border-border rounded-xl p-8 text-center">
-              <p className="text-neutral-400">No tienes suscripciones activas</p>
+              <p className="text-neutral-400">{t("account.subs.empty")}</p>
               <a href="/#pricing" className="inline-block mt-4 px-4 py-2 bg-accent text-black rounded-lg text-sm font-semibold hover:bg-accent-hover transition-colors">
-                Ver planes
+                {t("account.subs.viewPlans")}
               </a>
             </div>
           ) : (
             subs.map((sub) => {
-              const price = formatPrice(sub.amount, sub.currency, sub.interval);
+              const price = formatPrice(sub.amount, sub.currency, sub.interval, lang);
               return (
                 <div key={sub.id} className="bg-surface border border-border rounded-xl p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-white">{planLabel(sub.plan_type)}</span>
-                        {statusBadge(sub)}
+                        <StatusBadge sub={sub} />
                         {price && (
                           <span className="text-sm font-mono text-accent">{price}</span>
                         )}
                       </div>
                       {sub.circuit_name && (
-                        <p className="text-sm text-neutral-400 mt-1">Circuito: {sub.circuit_name}</p>
+                        <p className="text-sm text-neutral-400 mt-1">{t("account.subs.circuit")}: {sub.circuit_name}</p>
                       )}
                       <div className="flex gap-4 mt-2 text-xs text-neutral-500">
-                        <span>Inicio: {formatDate(sub.current_period_start)}</span>
-                        <span>Fin periodo: {formatDate(sub.current_period_end)}</span>
+                        <span>{t("account.subs.start")}: {formatDate(sub.current_period_start, lang)}</span>
+                        <span>{t("account.subs.endPeriod")}: {formatDate(sub.current_period_end, lang)}</span>
                       </div>
                       {sub.cancel_at_period_end && (
                         <p className="text-xs text-orange-400 mt-2">
-                          No se renovará. Acceso hasta {formatDate(sub.current_period_end)}.
+                          {t("account.subs.willNotRenew", { date: formatDate(sub.current_period_end, lang) })}
                         </p>
                       )}
                       {sub.pending_plan && (
                         <p className="text-xs text-blue-400 mt-2">
-                          Cambio a {planLabel(sub.pending_plan)} programado para la próxima renovación.
+                          {t("account.subs.pendingChange", { plan: planLabel(sub.pending_plan) })}
                         </p>
                       )}
                     </div>
@@ -422,7 +460,7 @@ export function AccountPanel() {
                             disabled={actionLoading === sub.id}
                             className="px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
                           >
-                            {actionLoading === sub.id ? "..." : `Cambiar a ${alt.label.split(" ").pop()}`}
+                            {actionLoading === sub.id ? "..." : `${t("account.subs.switchToPrefix")} ${alt.label.split(" ").pop()}`}
                           </button>
                         ) : null;
                       })()}
@@ -432,7 +470,7 @@ export function AccountPanel() {
                           disabled={actionLoading === sub.id}
                           className="px-3 py-1.5 text-xs font-medium rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
                         >
-                          {actionLoading === sub.id ? "..." : "Cancelar"}
+                          {actionLoading === sub.id ? "..." : t("account.subs.cancel")}
                         </button>
                       )}
                       {sub.cancel_at_period_end && sub.status === "active" && (
@@ -441,7 +479,7 @@ export function AccountPanel() {
                           disabled={actionLoading === sub.id}
                           className="px-3 py-1.5 text-xs font-medium rounded-lg border border-accent/30 text-accent hover:bg-accent/10 transition-colors disabled:opacity-50"
                         >
-                          {actionLoading === sub.id ? "..." : "Reactivar"}
+                          {actionLoading === sub.id ? "..." : t("account.subs.reactivate")}
                         </button>
                       )}
                     </div>
@@ -460,20 +498,20 @@ export function AccountPanel() {
       {tab === "billing" && (
         <div className="bg-surface border border-border rounded-xl p-6 space-y-5">
           <div>
-            <h3 className="text-sm font-semibold text-white mb-0.5">Datos fiscales</h3>
+            <h3 className="text-sm font-semibold text-white mb-0.5">{t("account.billing.title")}</h3>
             <p className="text-xs text-neutral-500">
-              Estos datos se asocian a tu cliente en Stripe y aparecerán en las facturas generadas a partir de ahora.
+              {t("account.billing.desc")}
             </p>
           </div>
 
           {/* Nombre fiscal */}
           <div>
             <label className="block text-xs text-neutral-400 mb-1 uppercase tracking-wider">
-              Nombre / razón social
+              {t("account.billing.name")}
             </label>
             <input
               type="text"
-              placeholder="Ej: Empresa S.L. o Juan García"
+              placeholder={t("account.billing.namePlaceholder")}
               value={billingForm.name}
               onChange={(e) => setBillingForm((p) => ({ ...p, name: e.target.value }))}
               className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-accent/50"
@@ -484,22 +522,22 @@ export function AccountPanel() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-neutral-400 mb-1 uppercase tracking-wider">
-                Tipo de ID fiscal
+                {t("account.billing.taxType")}
               </label>
               <select
                 value={billingTaxType}
                 onChange={(e) => setBillingTaxType(e.target.value)}
                 className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50"
               >
-                <option value="">— Sin ID fiscal —</option>
-                {TAX_ID_TYPES.map(([val, label]) => (
-                  <option key={val} value={val}>{label}</option>
+                <option value="">{t("account.billing.taxTypeNone")}</option>
+                {TAX_ID_TYPES.map(({ code, labelKey }) => (
+                  <option key={code} value={code}>{t(labelKey)}</option>
                 ))}
               </select>
             </div>
             <div>
               <label className="block text-xs text-neutral-400 mb-1 uppercase tracking-wider">
-                Número NIF / CIF / VAT
+                {t("account.billing.taxNumber")}
               </label>
               <input
                 type="text"
@@ -511,8 +549,7 @@ export function AccountPanel() {
               />
               {billingTaxType === "eu_vat" && (
                 <p className="text-[10px] text-neutral-500 mt-1 leading-relaxed">
-                  Para España puedes escribir solo el NIF/CIF (sin prefijo
-                  &quot;ES&quot;) — lo añadimos automáticamente al enviarlo a Stripe.
+                  {t("account.billing.taxHelp")}
                 </p>
               )}
             </div>
@@ -520,17 +557,17 @@ export function AccountPanel() {
 
           {/* Dirección */}
           <div className="space-y-3">
-            <p className="text-xs text-neutral-400 uppercase tracking-wider">Dirección de facturación</p>
+            <p className="text-xs text-neutral-400 uppercase tracking-wider">{t("account.billing.address")}</p>
             <input
               type="text"
-              placeholder="Calle y número"
+              placeholder={t("account.billing.line1Placeholder")}
               value={billingForm.address.line1}
               onChange={(e) => setBillingForm((p) => ({ ...p, address: { ...p.address, line1: e.target.value } }))}
               className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-accent/50"
             />
             <input
               type="text"
-              placeholder="Piso, puerta, etc. (opcional)"
+              placeholder={t("account.billing.line2Placeholder")}
               value={billingForm.address.line2}
               onChange={(e) => setBillingForm((p) => ({ ...p, address: { ...p.address, line2: e.target.value } }))}
               className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-accent/50"
@@ -538,14 +575,14 @@ export function AccountPanel() {
             <div className="grid grid-cols-2 gap-3">
               <input
                 type="text"
-                placeholder="Ciudad"
+                placeholder={t("account.billing.cityPlaceholder")}
                 value={billingForm.address.city}
                 onChange={(e) => setBillingForm((p) => ({ ...p, address: { ...p.address, city: e.target.value } }))}
                 className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-accent/50"
               />
               <input
                 type="text"
-                placeholder="Código postal"
+                placeholder={t("account.billing.postalCode")}
                 value={billingForm.address.postal_code}
                 onChange={(e) => setBillingForm((p) => ({ ...p, address: { ...p.address, postal_code: e.target.value } }))}
                 className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-accent/50"
@@ -556,8 +593,8 @@ export function AccountPanel() {
               onChange={(e) => setBillingForm((p) => ({ ...p, address: { ...p.address, country: e.target.value } }))}
               className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/50"
             >
-              {EU_COUNTRIES.map(([code, name]) => (
-                <option key={code} value={code}>{name}</option>
+              {COUNTRY_CODES.map((code) => (
+                <option key={code} value={code}>{t(`country.${code}`)}</option>
               ))}
             </select>
           </div>
@@ -569,10 +606,10 @@ export function AccountPanel() {
               disabled={billingSaving}
               className="px-5 py-2 bg-accent hover:bg-accent-hover text-black text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
             >
-              {billingSaving ? "Guardando..." : "Guardar datos fiscales"}
+              {billingSaving ? t("account.billing.saving") : t("account.billing.save")}
             </button>
             {billingSaved && (
-              <span className="text-xs text-green-400">✓ Datos actualizados en Stripe</span>
+              <span className="text-xs text-green-400">{t("account.billing.saved")}</span>
             )}
             {billingError && (
               <span className="text-xs text-red-400">{billingError}</span>
@@ -582,7 +619,7 @@ export function AccountPanel() {
           {/* Current saved tax IDs info */}
           {billing.tax_ids.length > 0 && (
             <div className="border-t border-border pt-4">
-              <p className="text-xs text-neutral-500 mb-2">ID fiscal registrado en Stripe:</p>
+              <p className="text-xs text-neutral-500 mb-2">{t("account.billing.savedTaxId")}</p>
               {billing.tax_ids.map((tid) => (
                 <div key={tid.id} className="flex items-center gap-2">
                   <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-accent/10 text-accent border border-accent/20">
@@ -602,17 +639,18 @@ export function AccountPanel() {
           items={invoices.filter((i) => i.kind === "recibo")}
           emptyMessage={
             <>
-              No hay recibos disponibles.
+              {t("account.recibos.empty")}
               <br />
               <span className="text-xs text-neutral-500">
-                Los recibos se generan automáticamente con cada cobro. Si necesitas factura con datos fiscales,
-                puedes <button onClick={() => setTab("billing")} className="underline hover:text-white">
-                  añadir tu información fiscal
-                </button> y se aplicará a los próximos cobros.
+                {t("account.recibos.emptyHint.before")}
+                <button onClick={() => setTab("billing")} className="underline hover:text-white">
+                  {t("account.recibos.emptyHint.link")}
+                </button>
+                {t("account.recibos.emptyHint.after")}
               </span>
             </>
           }
-          openLabel="Ver recibo"
+          openLabel={t("account.invoices.viewReceipt")}
         />
       )}
 
@@ -622,17 +660,18 @@ export function AccountPanel() {
           items={invoices.filter((i) => i.kind === "factura")}
           emptyMessage={
             <>
-              No hay facturas disponibles.
+              {t("account.facturas.empty")}
               <br />
               <span className="text-xs text-neutral-500">
-                Para recibir factura legal en tu próxima renovación, añade tu nombre fiscal,
-                NIF y dirección en <button onClick={() => setTab("billing")} className="underline hover:text-white">
-                  Facturación
-                </button>.
+                {t("account.facturas.emptyHint.before")}
+                <button onClick={() => setTab("billing")} className="underline hover:text-white">
+                  {t("account.facturas.emptyHint.link")}
+                </button>
+                {t("account.facturas.emptyHint.after")}
               </span>
             </>
           }
-          openLabel="Ver factura"
+          openLabel={t("account.invoices.viewInvoice")}
         />
       )}
 
@@ -656,6 +695,8 @@ function InvoicesTable({
   emptyMessage: ReactNode;
   openLabel: string;
 }) {
+  const t = useT();
+  const lang = useLangStore((s) => s.lang);
   return (
     <div className="bg-surface border border-border rounded-xl overflow-hidden">
       {items.length === 0 ? (
@@ -664,9 +705,9 @@ function InvoicesTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-neutral-400 text-xs uppercase tracking-wider">
-              <th className="text-left px-4 py-3 font-medium">Fecha</th>
-              <th className="text-left px-4 py-3 font-medium">Número</th>
-              <th className="text-right px-4 py-3 font-medium">Importe</th>
+              <th className="text-left px-4 py-3 font-medium">{t("account.invoices.date")}</th>
+              <th className="text-left px-4 py-3 font-medium">{t("account.invoices.number")}</th>
+              <th className="text-right px-4 py-3 font-medium">{t("account.invoices.amount")}</th>
               <th className="text-right px-4 py-3 font-medium"></th>
             </tr>
           </thead>
@@ -674,7 +715,7 @@ function InvoicesTable({
             {items.map((inv) => (
               <tr key={inv.id} className="border-b border-border/50 last:border-0 hover:bg-white/[0.02]">
                 <td className="px-4 py-3 text-neutral-300 font-mono text-xs">
-                  {formatDate(inv.created)}
+                  {formatDate(inv.created, lang)}
                 </td>
                 <td className="px-4 py-3 text-neutral-400 text-xs">
                   {inv.number || "-"}
@@ -690,7 +731,7 @@ function InvoicesTable({
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-accent hover:text-accent-hover transition-colors"
-                        title="Descargar PDF"
+                        title={t("account.invoices.downloadPdf")}
                       >
                         PDF
                       </a>
@@ -703,7 +744,7 @@ function InvoicesTable({
                         className="text-xs text-neutral-400 hover:text-white transition-colors"
                         title={openLabel}
                       >
-                        Ver
+                        {t("account.invoices.view")}
                       </a>
                     )}
                   </div>
@@ -724,6 +765,7 @@ function InvoicesTable({
  * scannable.
  */
 function PrivacyTab() {
+  const t = useT();
   // We deliberately read the localStorage flag synchronously inside an
   // effect — this is a client-only feature and SSR would otherwise
   // throw. Initial render shows the unchecked state for a frame.
@@ -743,13 +785,10 @@ function PrivacyTab() {
     <div className="bg-surface border border-border rounded-xl p-6 space-y-5">
       <div>
         <h3 className="text-sm font-semibold text-white mb-0.5">
-          Analítica interna
+          {t("account.privacy.title")}
         </h3>
         <p className="text-xs text-neutral-500 leading-relaxed">
-          Usamos analítica propia y agregada (sin terceros) para entender
-          cómo se usa la plataforma y mejorar el producto. Puedes
-          desactivarla aquí. Si lo haces, dejaremos de registrar eventos
-          de tu navegador inmediatamente.
+          {t("account.privacy.desc")}
         </p>
       </div>
       <label className="flex items-start gap-3 cursor-pointer select-none">
@@ -761,12 +800,12 @@ function PrivacyTab() {
         />
         <div>
           <div className="text-sm font-medium text-white">
-            Permitir analítica interna agregada
+            {t("account.privacy.allow")}
           </div>
           <div className="text-xs text-neutral-500 mt-0.5">
-            Activado por defecto. No se comparte con terceros.{" "}
+            {t("account.privacy.allowSub.before")}
             <a href="/cookies" className="text-accent hover:underline">
-              Más información
+              {t("account.privacy.allowSub.link")}
             </a>
             .
           </div>
