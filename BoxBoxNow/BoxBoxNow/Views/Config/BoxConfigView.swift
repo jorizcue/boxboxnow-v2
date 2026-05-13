@@ -87,7 +87,7 @@ struct BoxConfigView: View {
                         )
                     }
                     .onMove { from, to in
-                        if isEditing { moveTeam(from: from, to: to) }
+                        moveTeam(from: from, to: to)
                     }
                 }
             }
@@ -113,6 +113,12 @@ struct BoxConfigView: View {
             }
         }
         .listStyle(.insetGrouped)
+        // Bind SwiftUI's EditMode to our local `isEditing` so `.onMove`
+        // actually lets the user drag rows when "Editar" is on. Without
+        // this, the rows render but aren't reorderable — the user sees
+        // them snap back to the original order on save because no move
+        // ever happened.
+        .environment(\.editMode, .constant(isEditing ? .active : .inactive))
         .navigationTitle("Configuracion Box")
         .navigationBarItems(trailing:
             Button(isEditing ? "Listo" : "Editar") {

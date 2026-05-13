@@ -85,4 +85,5 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.browser)
     implementation(libs.androidx.splashscreen)
+    implementation(libs.reorderable)
 }

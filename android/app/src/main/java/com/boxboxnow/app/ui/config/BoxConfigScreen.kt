@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Person
@@ -70,6 +72,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import javax.inject.Inject
 
 /** Thin ViewModel to access Hilt-injected ApiClient from BoxConfigScreen. */
@@ -141,7 +145,27 @@ fun BoxConfigScreen(onBack: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) { CircularProgressIndicator(color = BoxBoxNowColors.Accent) }
         } else {
+            // Reorderable wiring: `lazyListState` is shared between the
+            // LazyColumn and `rememberReorderableLazyListState`, and the
+            // `onMove` callback mutates the same `teams` SnapshotStateList
+            // the rest of the screen reads from. Keys MUST stay stable
+            // across moves — we use `team.kart` because it's the only
+            // field guaranteed unique by the backend.
+            val listState = rememberLazyListState()
+            val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
+                // Indices include the non-team items above the team list
+                // (auto-load row, actions row, header). We work directly
+                // on the data list using its OWN indices, which we
+                // recover by subtracting the lead offset.
+                val lead = 3 // auto-load + actions + header
+                val fromIdx = from.index - lead
+                val toIdx = to.index - lead
+                if (fromIdx in teams.indices && toIdx in teams.indices) {
+                    teams.add(toIdx, teams.removeAt(fromIdx))
+                }
+            }
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize()
@@ -264,24 +288,44 @@ fun BoxConfigScreen(onBack: () -> Unit) {
                         )
                     }
                 } else {
-                    itemsIndexed(teams, key = { idx, t -> "${t.kart}_$idx" }) { idx, team ->
-                        TeamRow(
-                            team = team,
-                            index = idx,
-                            isExpanded = expandedIndices.contains(idx),
-                            isEditing = isEditing,
-                            onToggleExpand = {
-                                expandedIndices = if (expandedIndices.contains(idx))
-                                    expandedIndices - idx else expandedIndices + idx
-                            },
-                            onUpdate = { updated -> teams[idx] = updated },
-                            onRemove = {
-                                teams.removeAt(idx)
-                                expandedIndices = expandedIndices.filter { it != idx }.map {
-                                    if (it > idx) it - 1 else it
-                                }.toSet()
-                            },
-                        )
+                    // Key MUST be stable across reorders for the
+                    // ReorderableItem snapshot to track the row — we
+                    // key by kart number, which is unique per team in
+                    // the backend payload.
+                    itemsIndexed(teams, key = { _, t -> "team_${t.kart}" }) { idx, team ->
+                        ReorderableItem(reorderableState, key = "team_${team.kart}") { isDragging ->
+                            TeamRow(
+                                team = team,
+                                index = idx,
+                                isExpanded = expandedIndices.contains(idx),
+                                isEditing = isEditing,
+                                isDragging = isDragging,
+                                // Handle is only attached in edit mode —
+                                // mirrors iOS where reordering requires
+                                // the "Editar" toolbar button to be on.
+                                dragHandle = if (isEditing) ({
+                                    Icon(
+                                        Icons.Default.DragHandle,
+                                        contentDescription = "Reordenar",
+                                        tint = BoxBoxNowColors.SystemGray,
+                                        modifier = Modifier
+                                            .draggableHandle()
+                                            .size(20.dp),
+                                    )
+                                }) else ({}),
+                                onToggleExpand = {
+                                    expandedIndices = if (expandedIndices.contains(idx))
+                                        expandedIndices - idx else expandedIndices + idx
+                                },
+                                onUpdate = { updated -> teams[idx] = updated },
+                                onRemove = {
+                                    teams.removeAt(idx)
+                                    expandedIndices = expandedIndices.filter { it != idx }.map {
+                                        if (it > idx) it - 1 else it
+                                    }.toSet()
+                                },
+                            )
+                        }
                     }
                 }
 
@@ -379,15 +423,28 @@ private fun TeamRow(
     onToggleExpand: () -> Unit,
     onUpdate: (Team) -> Unit,
     onRemove: () -> Unit,
+    isDragging: Boolean = false,
+    /** Drag handle composable supplied by `ReorderableItem` so it can
+     *  attach the `.draggableHandle()` modifier from the reorderable
+     *  scope. Rendered to the left of the row. Pass `{}` (or omit)
+     *  when the row isn't inside a ReorderableItem. */
+    dragHandle: @Composable () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(BoxBoxNowColors.SystemGray6)
+            .background(
+                if (isDragging) BoxBoxNowColors.SystemGray5
+                else BoxBoxNowColors.SystemGray6
+            )
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            // Drag handle — pressing + dragging this icon reorders the
+            // row via the surrounding ReorderableItem scope.
+            dragHandle()
+            Spacer(Modifier.width(6.dp))
             // Position
             Text(
                 "#${index + 1}",

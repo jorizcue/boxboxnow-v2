@@ -118,10 +118,20 @@ fun SessionConfigScreen(onBack: () -> Unit) {
                         letterSpacing = 1.sp,
                     )
                     var expanded by remember { mutableStateOf(false) }
-                    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { expanded = it },
+                        // Full-width so the anchor (and the dropdown that
+                        // inherits its width) spans the whole column.
+                        // Without this the dropdown shrinks to fit just
+                        // the current label, making it look tiny on the
+                        // form.
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Row(
                             modifier = Modifier
                                 .menuAnchor()
+                                .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(BoxBoxNowColors.SystemGray6)
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -132,6 +142,7 @@ fun SessionConfigScreen(onBack: () -> Unit) {
                                 color = Color.White,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f),
                             )
                             Spacer(Modifier.width(6.dp))
                             Text("⌃", color = BoxBoxNowColors.SystemGray, fontSize = 12.sp)
@@ -140,6 +151,7 @@ fun SessionConfigScreen(onBack: () -> Unit) {
                             expanded = expanded,
                             onDismissRequest = { expanded = false },
                             containerColor = BoxBoxNowColors.SystemGray6,
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
                             circuits.forEach { c ->
                                 DropdownMenuItem(

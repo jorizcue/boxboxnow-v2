@@ -20,8 +20,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
@@ -121,7 +124,11 @@ fun DriverMenuOverlay(
                     .padding(horizontal = 20.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(22.dp),
             ) {
-                // Preset picker
+                // Preset picker — leading "stacked layers" icon makes
+                // it obvious at a glance that the field opens a list
+                // of plantillas. Each dropdown item also gets a small
+                // icon + a check mark on the currently-selected one
+                // so the active preset is unambiguous.
                 if (presets.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("PLANTILLA", color = BoxBoxNowColors.SystemGray3, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
@@ -137,15 +144,57 @@ fun DriverMenuOverlay(
                                     .padding(horizontal = 12.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(selected, color = Color.White, fontSize = 14.sp)
+                                Icon(
+                                    Icons.Filled.Style,
+                                    contentDescription = null,
+                                    tint = BoxBoxNowColors.Accent,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    selected,
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Icon(
+                                    Icons.Filled.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = BoxBoxNowColors.SystemGray,
+                                    modifier = Modifier.size(20.dp),
+                                )
                             }
                             DropdownMenu(
                                 expanded = expanded,
                                 onDismissRequest = { expanded = false },
                             ) {
                                 presets.forEach { preset ->
+                                    val isActive = preset.id == selectedPresetId
                                     DropdownMenuItem(
-                                        text = { Text(preset.name) },
+                                        text = {
+                                            Text(
+                                                preset.name,
+                                                color = if (isActive) BoxBoxNowColors.Accent else Color.White,
+                                                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Filled.Style,
+                                                contentDescription = null,
+                                                tint = if (isActive) BoxBoxNowColors.Accent
+                                                       else BoxBoxNowColors.SystemGray,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        },
+                                        trailingIcon = if (isActive) ({
+                                            Icon(
+                                                Icons.Filled.Check,
+                                                contentDescription = "Plantilla activa",
+                                                tint = BoxBoxNowColors.Accent,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        }) else null,
                                         onClick = {
                                             driverVM.applyPreset(preset)
                                             expanded = false

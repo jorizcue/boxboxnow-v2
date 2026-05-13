@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,6 +71,8 @@ import com.boxboxnow.app.models.DriverConfigPreset
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.vm.DriverViewModel
 import com.boxboxnow.app.vm.OrientationLock
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyGridState
 
 private const val TOTAL_STEPS = 4
 
@@ -456,6 +459,8 @@ private fun StepCardOrder(
     val hiddenKeys: List<String> = cardOrder.filter { key -> visibleCards[key] != true }
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
 
+    /** Swap two cells (used by the legacy "tap one then tap another"
+     *  fallback path for users that don't discover the drag handle). */
     fun swapCards(from: Int, to: Int) {
         val mutable = orderedVisible.map { it.key }.toMutableList()
         val temp = mutable[from]
@@ -463,6 +468,26 @@ private fun StepCardOrder(
         mutable[to] = temp
         onReorder(mutable + hiddenKeys)
         selectedIndex = null
+    }
+
+    /** Drag-and-drop reorder — moves the card at `from` to `to`,
+     *  shifting everything in between (NOT a swap). This is the path
+     *  the new reorderable handle takes. */
+    fun moveCard(from: Int, to: Int) {
+        if (from == to) return
+        val mutable = orderedVisible.map { it.key }.toMutableList()
+        if (from !in mutable.indices || to !in mutable.indices) return
+        mutable.add(to, mutable.removeAt(from))
+        onReorder(mutable + hiddenKeys)
+    }
+
+    val gridState = rememberLazyGridState()
+    val reorderableGridState = rememberReorderableLazyGridState(gridState) { from, to ->
+        // ReorderableLazyGridState fires `onMove` continuously while
+        // the user is dragging, with from/to expressed in absolute
+        // LazyGrid indices. Since every grid item maps 1:1 to a visible
+        // card, the index IS the position in `orderedVisible`.
+        moveCard(from.index, to.index)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -481,33 +506,43 @@ private fun StepCardOrder(
                 )
             }
         } else {
-            // Hint text
-            if (selectedIndex != null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    Icon(
-                        Icons.Filled.SwapVert,
-                        contentDescription = null,
-                        tint = BoxBoxNowColors.Accent,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        "Toca otra tarjeta para intercambiar",
-                        color = BoxBoxNowColors.Accent,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
+            // Hint text — adapts based on whether the user has tapped a
+            // card (then they're in swap mode) or not (idle: show the
+            // long-press drag hint).
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    Icons.Filled.SwapVert,
+                    contentDescription = null,
+                    tint = if (selectedIndex != null) BoxBoxNowColors.Accent
+                           else BoxBoxNowColors.SystemGray,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = if (selectedIndex != null)
+                        "Toca otra tarjeta para intercambiar"
+                    else
+                        "Mantén pulsada una tarjeta y arrástrala para reordenar",
+                    color = if (selectedIndex != null) BoxBoxNowColors.Accent
+                            else BoxBoxNowColors.SystemGray,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                )
             }
 
-            // 2-column grid matching iOS CardPreviewCell layout
+            // 2-column grid matching iOS CardPreviewCell layout.
+            // Wrapped with a reorderable state so the user can long-
+            // press + drag a card to reorder. The legacy "tap to
+            // swap" path is still wired below for accessibility
+            // (one-handed use without long-press).
             LazyVerticalGrid(
+                state = gridState,
                 columns = GridCells.Fixed(2),
                 modifier = Modifier
                     .weight(1f)
@@ -520,18 +555,29 @@ private fun StepCardOrder(
                     count = orderedVisible.size,
                     key = { orderedVisible[it].key },
                 ) { index ->
-                    CardPreviewCell(
-                        card = orderedVisible[index],
-                        isSelected = selectedIndex == index,
-                        onClick = {
-                            val sel = selectedIndex
-                            if (sel != null && sel != index) {
-                                swapCards(sel, index)
-                            } else {
-                                selectedIndex = if (sel == index) null else index
-                            }
-                        },
-                    )
+                    val card = orderedVisible[index]
+                    ReorderableItem(reorderableGridState, key = card.key) { isDragging ->
+                        CardPreviewCell(
+                            card = card,
+                            isSelected = selectedIndex == index,
+                            isDragging = isDragging,
+                            // Long-press anywhere on the cell starts a
+                            // drag — Compose's `longPressDraggableHandle`
+                            // is what enables the long-press gesture
+                            // recogniser provided by the reorderable
+                            // scope, so the user doesn't need a tiny
+                            // drag-handle icon to find.
+                            dragModifier = Modifier.longPressDraggableHandle(),
+                            onClick = {
+                                val sel = selectedIndex
+                                if (sel != null && sel != index) {
+                                    swapCards(sel, index)
+                                } else {
+                                    selectedIndex = if (sel == index) null else index
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -554,9 +600,21 @@ private fun CardPreviewCell(
     card: DriverCard,
     isSelected: Boolean,
     onClick: () -> Unit,
+    isDragging: Boolean = false,
+    /** Modifier supplied by the surrounding ReorderableItem (carries
+     *  the long-press drag gesture detector). Falls back to a no-op
+     *  for non-reorderable contexts. */
+    dragModifier: Modifier = Modifier,
 ) {
-    val borderColor = if (isSelected) card.accent else card.accent.copy(alpha = 0.5f)
-    val borderWidth = if (isSelected) 2.5.dp else 1.5.dp
+    val borderColor = when {
+        isDragging -> card.accent
+        isSelected -> card.accent
+        else -> card.accent.copy(alpha = 0.5f)
+    }
+    val borderWidth = if (isSelected || isDragging) 2.5.dp else 1.5.dp
+    // Slightly stronger tint while dragging so the floating card is
+    // visually clear above the grid.
+    val bgAlpha = if (isDragging) 0.22f else 0.10f
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -565,8 +623,9 @@ private fun CardPreviewCell(
             .fillMaxWidth()
             .height(120.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(card.accent.copy(alpha = 0.1f))
+            .background(card.accent.copy(alpha = bgAlpha))
             .border(borderWidth, borderColor, RoundedCornerShape(10.dp))
+            .then(dragModifier)
             .clickable(onClick = onClick)
             .padding(6.dp),
     ) {

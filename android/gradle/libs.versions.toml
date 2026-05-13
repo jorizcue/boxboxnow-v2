@@ -1,5 +1,5 @@
 [versions]
-agp = "8.7.3"
+agp = "8.13.2"
 kotlin = "2.1.0"
 ksp = "2.1.0-1.0.29"
 coreKtx = "1.15.0"
@@ -18,6 +18,10 @@ playServicesLocation = "21.3.0"
 datastore = "1.1.1"
 browser = "1.8.0"
 splashscreen = "1.0.1"
+# Calvin's Compose reorderable — used to enable drag-and-drop on the
+# team list (BoxConfigScreen) and the preset card wizard
+# (TemplateWizardScreen step 3). Pure Compose, no external runtime.
+reorderable = "2.4.3"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -54,6 +58,7 @@ play-services-location = { group = "com.google.android.gms", name = "play-servic
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
 androidx-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
+reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
