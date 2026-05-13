@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import { trackAction } from "@/lib/tracker";
 import { useAuth } from "@/hooks/useAuth";
@@ -62,6 +62,11 @@ interface Invoice {
   created: string;
   invoice_pdf: string | null;
   hosted_invoice_url: string | null;
+  // `factura` = legal invoice with NIF + dirección fiscal (rellenados
+  // por el cliente al pagar). `recibo` = recibo simplificado / ticket
+  // (sin datos fiscales). El backend marca cada documento según los
+  // datos snapshot que tomó Stripe al emitir la invoice.
+  kind: "factura" | "recibo";
 }
 
 function formatDate(iso: string | null): string {
@@ -150,7 +155,11 @@ export function AccountPanel() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
-  const [tab, setTab] = useState<"subs" | "invoices" | "payment" | "billing" | "privacy">("subs");
+  // Tabs: subs = Suscripciones · recibos = recibos simplificados (sin
+  // datos fiscales) · facturas = facturas legales (con NIF + dirección).
+  // Mantenemos pestañas separadas porque legalmente son documentos
+  // distintos: el ticket NO sirve para deducir IVA y la factura sí.
+  const [tab, setTab] = useState<"subs" | "recibos" | "facturas" | "payment" | "billing" | "privacy">("subs");
   const [billing, setBilling] = useState<BillingInfo>(EMPTY_BILLING);
   const [billingForm, setBillingForm] = useState<BillingInfo>(EMPTY_BILLING);
   const [billingTaxType, setBillingTaxType] = useState("");
@@ -308,14 +317,24 @@ export function AccountPanel() {
           Suscripciones
         </button>
         <button
-          onClick={() => setTab("invoices")}
+          onClick={() => setTab("recibos")}
           className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            tab === "invoices"
+            tab === "recibos"
               ? "bg-surface text-white"
               : "text-neutral-400 hover:text-neutral-200"
           }`}
         >
-          Facturas ({invoices.length})
+          Recibos ({invoices.filter((i) => i.kind === "recibo").length})
+        </button>
+        <button
+          onClick={() => setTab("facturas")}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            tab === "facturas"
+              ? "bg-surface text-white"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Facturas ({invoices.filter((i) => i.kind === "factura").length})
         </button>
         <button
           onClick={() => setTab("payment")}
@@ -568,70 +587,123 @@ export function AccountPanel() {
         </div>
       )}
 
-      {/* Invoices */}
-      {tab === "invoices" && (
-        <div className="bg-surface border border-border rounded-xl overflow-hidden">
-          {invoices.length === 0 ? (
-            <div className="p-8 text-center text-neutral-400">
-              No hay facturas disponibles
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-neutral-400 text-xs uppercase tracking-wider">
-                  <th className="text-left px-4 py-3 font-medium">Fecha</th>
-                  <th className="text-left px-4 py-3 font-medium">Numero</th>
-                  <th className="text-right px-4 py-3 font-medium">Importe</th>
-                  <th className="text-right px-4 py-3 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((inv) => (
-                  <tr key={inv.id} className="border-b border-border/50 last:border-0 hover:bg-white/[0.02]">
-                    <td className="px-4 py-3 text-neutral-300 font-mono text-xs">
-                      {formatDate(inv.created)}
-                    </td>
-                    <td className="px-4 py-3 text-neutral-400 text-xs">
-                      {inv.number || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-right text-white font-mono">
-                      {inv.amount_paid.toFixed(2)}{"\u20AC"}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {inv.invoice_pdf && (
-                          <a
-                            href={inv.invoice_pdf}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-accent hover:text-accent-hover transition-colors"
-                            title="Descargar PDF"
-                          >
-                            PDF
-                          </a>
-                        )}
-                        {inv.hosted_invoice_url && (
-                          <a
-                            href={inv.hosted_invoice_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-neutral-400 hover:text-white transition-colors"
-                            title="Ver factura"
-                          >
-                            Ver
-                          </a>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+      {/* Recibos \u2014 recibos simplificados / tickets (sin NIF) */}
+      {tab === "recibos" && (
+        <InvoicesTable
+          items={invoices.filter((i) => i.kind === "recibo")}
+          emptyMessage={
+            <>
+              No hay recibos disponibles.
+              <br />
+              <span className="text-xs text-neutral-500">
+                Los recibos se generan autom\u00E1ticamente con cada cobro. Si necesitas factura con datos fiscales,
+                puedes <button onClick={() => setTab("billing")} className="underline hover:text-white">
+                  a\u00F1adir tu informaci\u00F3n fiscal
+                </button> y se aplicar\u00E1 a los pr\u00F3ximos cobros.
+              </span>
+            </>
+          }
+          openLabel="Ver recibo"
+        />
+      )}
+
+      {/* Facturas \u2014 facturas legales (con NIF + direcci\u00F3n fiscal) */}
+      {tab === "facturas" && (
+        <InvoicesTable
+          items={invoices.filter((i) => i.kind === "factura")}
+          emptyMessage={
+            <>
+              No hay facturas disponibles.
+              <br />
+              <span className="text-xs text-neutral-500">
+                Para recibir factura legal en tu pr\u00F3xima renovaci\u00F3n, a\u00F1ade tu nombre fiscal,
+                NIF y direcci\u00F3n en <button onClick={() => setTab("billing")} className="underline hover:text-white">
+                  Facturaci\u00F3n
+                </button>.
+              </span>
+            </>
+          }
+          openLabel="Ver factura"
+        />
       )}
 
       {tab === "privacy" && <PrivacyTab />}
+    </div>
+  );
+}
+
+/**
+ * Shared table used by both the "Recibos" and "Facturas" tabs. Same
+ * Stripe Invoice object underneath — the only thing that changes is
+ * the empty-state copy and the link label (recibo vs factura). Keeping
+ * it as one component avoids drifting two near-identical tables.
+ */
+function InvoicesTable({
+  items,
+  emptyMessage,
+  openLabel,
+}: {
+  items: Invoice[];
+  emptyMessage: ReactNode;
+  openLabel: string;
+}) {
+  return (
+    <div className="bg-surface border border-border rounded-xl overflow-hidden">
+      {items.length === 0 ? (
+        <div className="p-8 text-center text-neutral-400">{emptyMessage}</div>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-neutral-400 text-xs uppercase tracking-wider">
+              <th className="text-left px-4 py-3 font-medium">Fecha</th>
+              <th className="text-left px-4 py-3 font-medium">Número</th>
+              <th className="text-right px-4 py-3 font-medium">Importe</th>
+              <th className="text-right px-4 py-3 font-medium"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((inv) => (
+              <tr key={inv.id} className="border-b border-border/50 last:border-0 hover:bg-white/[0.02]">
+                <td className="px-4 py-3 text-neutral-300 font-mono text-xs">
+                  {formatDate(inv.created)}
+                </td>
+                <td className="px-4 py-3 text-neutral-400 text-xs">
+                  {inv.number || "-"}
+                </td>
+                <td className="px-4 py-3 text-right text-white font-mono">
+                  {inv.amount_paid.toFixed(2)}{"€"}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    {inv.invoice_pdf && (
+                      <a
+                        href={inv.invoice_pdf}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-accent hover:text-accent-hover transition-colors"
+                        title="Descargar PDF"
+                      >
+                        PDF
+                      </a>
+                    )}
+                    {inv.hosted_invoice_url && (
+                      <a
+                        href={inv.hosted_invoice_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-neutral-400 hover:text-white transition-colors"
+                        title={openLabel}
+                      >
+                        Ver
+                      </a>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

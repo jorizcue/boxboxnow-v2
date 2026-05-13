@@ -378,22 +378,54 @@ async def create_checkout_session(
     session_params.pop("success_url", None)
     session_params.pop("cancel_url", None)
 
-    # Optional tax ID collection so users can request a VAT invoice.
-    # Stripe shows a collapsible "Add billing information" field in the
-    # checkout form — the user fills it only if they want a fiscal receipt.
+    # ── Recibo por defecto, factura solo si el cliente lo pide ──
+    #
+    # Por defecto NO emitimos factura con datos fiscales: el cobro se
+    # documenta como recibo simplificado (ticket). Stripe sigue creando
+    # un objeto Invoice internamente (es el mecanismo de cobro de las
+    # subscriptions y no se puede desactivar), pero sin dirección ni NIF
+    # ese documento NO es una factura legal en España — es un recibo.
+    #
+    # El cliente decide explícitamente con el custom_field
+    # `wants_invoice` de abajo, y si elige "Sí" rellena la sección
+    # colapsable "Información de facturación" de Stripe (NIF +
+    # dirección), que aquí dejamos OPCIONAL (`auto` en vez de
+    # `required`) precisamente para no obligar a todos a darla.
     session_params["tax_id_collection"] = {"enabled": True}
-    # Collecting billing address is required for tax ID to work properly.
-    session_params["billing_address_collection"] = "required"
+    session_params["billing_address_collection"] = "auto"
     # Allow users to update their billing address / tax ID through the
     # Customer Portal as well (applies retroactively to future invoices).
     session_params["customer_update"] = {
         "address": "auto",
         "name": "auto",
     }
-    # Automatic tax calculation — Stripe Tax determines the applicable VAT
-    # rate based on the customer's billing address collected above.
-    # Requires Stripe Tax to be enabled in the dashboard.
-    session_params["automatic_tax"] = {"enabled": True}
+    # `automatic_tax` requiere dirección de facturación, así que sin
+    # ella no podemos calcular IVA dinámicamente. Los precios del
+    # catálogo están configurados como tax-inclusive (IVA incluido),
+    # por lo que basta con desactivar el cálculo automático.
+    session_params["automatic_tax"] = {"enabled": False}
+
+    # Pregunta explícita al cliente — fuerza una elección consciente
+    # antes de pagar. La respuesta se queda guardada en
+    # `session.custom_fields` y la replicamos a metadata en el webhook
+    # para poder consultarla luego sin volver a Stripe.
+    session_params["custom_fields"] = [
+        {
+            "key": "wants_invoice",
+            "label": {
+                "type": "custom",
+                "custom": "¿Necesitas factura con datos fiscales?",
+            },
+            "type": "dropdown",
+            "dropdown": {
+                "options": [
+                    {"label": "No, solo recibo", "value": "no"},
+                    {"label": "Sí, necesito factura", "value": "yes"},
+                ],
+            },
+            "optional": False,
+        }
+    ]
 
     # Promotion codes — Stripe renders an "Add promotion code" field in the
     # embedded checkout. Users type a code (e.g. "LANZAMIENTO50") and Stripe
@@ -427,7 +459,10 @@ async def create_checkout_session(
         "submit": {
             "message": (
                 "Activación inmediata tras el pago. "
-                "Recibirás un email de confirmación con el detalle de tu plan."
+                "Recibirás un email de confirmación con el detalle de tu plan. "
+                "Si has marcado que necesitas factura, "
+                "asegúrate de rellenar tu nombre fiscal, dirección y NIF "
+                "en la sección **Información de facturación**."
             ),
         },
         "terms_of_service_acceptance": {
@@ -487,6 +522,25 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     return {"received": True}
 
 
+def _parse_wants_invoice(session_data: dict) -> str:
+    """Extract the customer's answer to the 'wants_invoice' custom field.
+
+    Returns 'yes' / 'no' / '' (empty when the field wasn't present, e.g.
+    legacy checkout sessions created before this field was added).
+
+    Stripe surfaces custom_field answers as a list of objects under
+    `session.custom_fields`, each with a `key` and a typed value (e.g.
+    `dropdown.value` for dropdown fields). We only care about the
+    `wants_invoice` dropdown here.
+    """
+    for field in session_data.get("custom_fields") or []:
+        if field.get("key") != "wants_invoice":
+            continue
+        dd = field.get("dropdown") or {}
+        return (dd.get("value") or "").lower()
+    return ""
+
+
 def _parse_metadata_circuit_ids(metadata: dict) -> tuple[int | None, list[int]]:
     """Extract primary circuit_id + full circuit_ids list from session metadata.
 
@@ -529,6 +583,11 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
     circuit_id, circuit_ids = _parse_metadata_circuit_ids(metadata)
     # Prefer the explicit stripe_price_id stamped into metadata at checkout.
     stripe_price_id = metadata.get("stripe_price_id") or None
+    # Customer's answer to "¿Necesitas factura?" — empty for legacy
+    # checkouts created before the field was added. We propagate it to
+    # the Subscription's Stripe metadata so renewals can show the right
+    # document kind without re-asking.
+    wants_invoice = _parse_wants_invoice(session_data)
 
     if not user_id:
         return
@@ -574,6 +633,19 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
                 current_period_end=period_end,
             )
             db.add(sub)
+
+            # Persist the wants_invoice answer onto the Stripe
+            # Subscription's metadata so it survives renewals — the
+            # /invoices endpoint can then classify each renewal invoice
+            # without having to re-ask the customer.
+            if wants_invoice:
+                try:
+                    s.Subscription.modify(
+                        sub_id,
+                        metadata={"wants_invoice": wants_invoice},
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not stamp wants_invoice on Stripe sub {sub_id}: {e}")
 
             # Grant circuit access:
             #   * per-circuit + N selected circuits → one UserCircuitAccess
@@ -1419,11 +1491,43 @@ async def update_billing_info(
     return {"ok": True}
 
 
+def _classify_invoice_kind(inv) -> str:
+    """Return 'factura' if the invoice has full fiscal data, else 'recibo'.
+
+    For an invoice to count as a Spanish "factura legal" it needs the
+    customer's fiscal name + address + tax id (NIF / VAT). Stripe takes
+    a snapshot of these on the invoice itself at finalization time, so
+    we read from the invoice (not from the live Customer record, which
+    may have changed since).
+
+    Anything without that fiscal data is a "recibo simplificado" /
+    ticket — same PDF, but missing the fiscal identifiers required by
+    Spanish law to claim VAT back.
+    """
+    addr = getattr(inv, "customer_address", None)
+    has_address = bool(addr and getattr(addr, "line1", None))
+    tax_ids = getattr(inv, "customer_tax_ids", None) or []
+    has_tax_id = bool(tax_ids and len(tax_ids) > 0)
+    return "factura" if (has_address and has_tax_id) else "recibo"
+
+
 @router.get("/invoices")
 async def list_invoices(
     user: User = Depends(get_current_user),
 ):
-    """List user's Stripe invoices."""
+    """List user's Stripe invoices, tagged as 'factura' or 'recibo'.
+
+    The `kind` field tells the UI whether to show the document in the
+    "Facturas" tab (legal invoice with NIF + dirección) or in the
+    "Recibos" tab (recibo simplificado / ticket — same Stripe Invoice
+    object internally, but without the fiscal data needed for VAT
+    reclaim).
+
+    Note: one-time event purchases do NOT create Stripe Invoices, so
+    they won't appear here. The customer gets a card receipt by email
+    from Stripe directly (the "Successful payments" template in
+    dashboard.stripe.com/settings/emails).
+    """
     s = get_stripe()
     if not user.stripe_customer_id:
         return []
@@ -1439,6 +1543,7 @@ async def list_invoices(
             "created": datetime.fromtimestamp(inv.created, tz=timezone.utc).isoformat(),
             "invoice_pdf": inv.invoice_pdf,
             "hosted_invoice_url": inv.hosted_invoice_url,
+            "kind": _classify_invoice_kind(inv),
         }
         for inv in invoices.data
         if inv.status == "paid"
