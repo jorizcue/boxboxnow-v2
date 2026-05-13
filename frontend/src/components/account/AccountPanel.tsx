@@ -104,7 +104,7 @@ function planLabel(planType: string): string {
 
 function formatPrice(amount?: number, currency?: string, interval?: string): string | null {
   if (amount == null) return null;
-  const sym = currency === "eur" ? "\u20AC" : currency?.toUpperCase() || "\u20AC";
+  const sym = currency === "eur" ? "€" : currency?.toUpperCase() || "€";
   const per = interval === "year" ? "/año" : "/mes";
   return `${amount.toFixed(2)}${sym}${per}`;
 }
@@ -596,7 +596,7 @@ export function AccountPanel() {
         </div>
       )}
 
-      {/* Recibos \u2014 recibos simplificados / tickets (sin NIF) */}
+      {/* Recibos — recibos simplificados / tickets (sin NIF) */}
       {tab === "recibos" && (
         <InvoicesTable
           items={invoices.filter((i) => i.kind === "recibo")}
@@ -605,10 +605,10 @@ export function AccountPanel() {
               No hay recibos disponibles.
               <br />
               <span className="text-xs text-neutral-500">
-                Los recibos se generan autom\u00E1ticamente con cada cobro. Si necesitas factura con datos fiscales,
+                Los recibos se generan automáticamente con cada cobro. Si necesitas factura con datos fiscales,
                 puedes <button onClick={() => setTab("billing")} className="underline hover:text-white">
-                  a\u00F1adir tu informaci\u00F3n fiscal
-                </button> y se aplicar\u00E1 a los pr\u00F3ximos cobros.
+                  añadir tu información fiscal
+                </button> y se aplicará a los próximos cobros.
               </span>
             </>
           }
@@ -616,7 +616,7 @@ export function AccountPanel() {
         />
       )}
 
-      {/* Facturas \u2014 facturas legales (con NIF + direcci\u00F3n fiscal) */}
+      {/* Facturas — facturas legales (con NIF + dirección fiscal) */}
       {tab === "facturas" && (
         <InvoicesTable
           items={invoices.filter((i) => i.kind === "factura")}
@@ -625,9 +625,9 @@ export function AccountPanel() {
               No hay facturas disponibles.
               <br />
               <span className="text-xs text-neutral-500">
-                Para recibir factura legal en tu pr\u00F3xima renovaci\u00F3n, a\u00F1ade tu nombre fiscal,
-                NIF y direcci\u00F3n en <button onClick={() => setTab("billing")} className="underline hover:text-white">
-                  Facturaci\u00F3n
+                Para recibir factura legal en tu próxima renovación, añade tu nombre fiscal,
+                NIF y dirección en <button onClick={() => setTab("billing")} className="underline hover:text-white">
+                  Facturación
                 </button>.
               </span>
             </>
