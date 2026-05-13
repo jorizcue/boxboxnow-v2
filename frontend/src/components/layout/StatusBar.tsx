@@ -272,10 +272,22 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
     if (!pitStatusFromBackend || pitStatusFromBackend.isOpen) return null;
     const reason = pitStatusFromBackend.closeReason;
     const rem = pitStatusFromBackend.blockingDriverRemainingMs || 0;
-    if (pitStatusFromBackend.blockingDriver && rem > 0) {
+    const blocker = pitStatusFromBackend.blockingDriver;
+
+    // Ghost-driver heuristic: when the backend pads `team_drivers_count`
+    // beyond the number of Apex-observed drivers, it injects fantasma
+    // entries named `Driver 2`, `Driver 3`, … with 0 ms accumulated.
+    // If THAT is the blocker, the actionable advice for the user is
+    // "fix your team_drivers_count config", not "Driver 3 needs 45 min
+    // more". Detect by the literal "Driver " prefix the backend uses
+    // (see `_driver_times_for_kart` in pit_gate.py).
+    if (blocker && /^Driver \d+$/.test(blocker)) {
+      return t("status.pitReason.ghost_driver");
+    }
+    if (blocker && rem > 0) {
       const remMin = Math.max(1, Math.ceil(rem / 60000));
       return t("status.pitReason.driver_min_time_long")
-        .replace("{driver}", pitStatusFromBackend.blockingDriver)
+        .replace("{driver}", blocker)
         .replace("{minutes}", String(remMin));
     }
     if (reason && reason !== "no_active_kart" && reason !== "not_running") {

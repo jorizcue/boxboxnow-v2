@@ -43,6 +43,21 @@ const translations: Record<string, Record<Language, string>> = {
   "status.pitReason.stint_too_short": { es: "Stint mínimo no alcanzado", en: "Stint min not reached", it: "Stint min non raggiunto", de: "Stint-Min nicht erreicht", fr: "Stint min non atteint" },
   "status.pitReason.stint_too_long": { es: "¡Pita ya! Stint máximo superado", en: "Pit now! Stint max exceeded", it: "Box ora! Stint max superato", de: "Sofort Box! Stint-Max überschritten", fr: "Au box ! Stint max dépassé" },
   "status.pitReason.driver_min_time_short": { es: "tiempo mínimo piloto", en: "min driver time", it: "tempo min pilota", de: "Min Fahrerzeit", fr: "temps min pilote" },
+  // Generic fallback for closeReason == "driver_min_time" when we don't
+  // have a usable blocking_driver + remaining_ms tuple to build the
+  // personalized long template. Without this entry the badge subtitle
+  // rendered the raw i18n key "status.pitReason.driver_min_time".
+  "status.pitReason.driver_min_time": { es: "Tiempo mínimo por piloto no alcanzado", en: "Min driver time not met", it: "Tempo min pilota non raggiunto", de: "Min Fahrerzeit nicht erreicht", fr: "Temps min pilote non atteint" },
+  // Fired when the algorithm pads with a ghost "Driver N" because the
+  // strategist's `team_drivers_count` is larger than the number of
+  // pilots Apex has actually shown driving. Surfacing this in the
+  // badge text saves a support request — the fix is for the user to
+  // edit team_drivers_count in Configuración → Sesión.
+  "status.pitReason.ghost_driver": { es: "Hay un piloto del equipo sin tiempo. Revisa “Pilotos del equipo” en config.", en: "A team driver has no track time. Check “Team drivers” in config.", it: "Un pilota del team senza tempo. Controlla “Piloti del team” in config.", de: "Ein Teamfahrer ohne Zeit. Prüfe “Team-Fahrer” in Konfig.", fr: "Un pilote sans temps de piste. Vérifie « Pilotes de l'équipe » dans config." },
+  // Fired when `compute_pit_status` raised an exception and the
+  // wrapper fell back to the safe CLOSED state. Helps support
+  // distinguish a genuine domain constraint from a backend bug.
+  "status.pitReason.compute_error": { es: "Error al calcular el estado del pit", en: "Error computing pit status", it: "Errore nel calcolo dello stato pit", de: "Fehler beim Berechnen des Pit-Status", fr: "Erreur de calcul de l'état du box" },
   // Used as a subtitle when closeReason == "driver_min_time". Receives the
   // blocking driver name + remaining minutes via simple substitution.
   "status.pitReason.driver_min_time_long": {
