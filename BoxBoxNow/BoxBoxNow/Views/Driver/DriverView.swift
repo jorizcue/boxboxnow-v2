@@ -25,6 +25,78 @@ struct DriverView: View {
     }
 
     var body: some View {
+        // Three-way switch driven by `driverVM.presetsLoaded`:
+        //   1. Initial load → spinner (no UserDefaults state flashed).
+        //   2. Loaded + zero presets → noPresetsGate (mandatory plantilla).
+        //   3. Loaded + ≥1 preset → mainBody (the real driver view).
+        //
+        // Without the gate the driver view inherits whatever cached
+        // visibleCards / cardOrder are sitting in UserDefaults — which
+        // on a brand-new account are the *previous* user's leftovers
+        // when the same device is shared. AuthViewModel wipes that
+        // bucket on logout / account switch; the gate is still the
+        // user-visible "you need a plantilla first" affordance.
+        Group {
+            if !driverVM.presetsLoaded {
+                loadingGate
+            } else if driverVM.presets.isEmpty {
+                noPresetsGate
+            } else {
+                mainBody
+            }
+        }
+        .task {
+            // Single source of truth for the initial preset load.
+            // Runs once when the cover mounts. mainBody.onAppear no
+            // longer needs to fetch presets — only refresh-on-foreground
+            // and the WS-driven `.presetDefaultChanged` observer do.
+            await driverVM.applyDefaultPresetIfAny()
+        }
+    }
+
+    /// Full-black spinner shown for the brief window between mount and
+    /// the first `loadPresets()` response. Keeps the gate decision
+    /// hidden until we actually know whether the user has presets.
+    private var loadingGate: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            ProgressView().tint(.accentColor)
+        }
+    }
+
+    /// Full-screen placeholder shown when the user has no presets.
+    /// Closes the cover so they can navigate to Config → Plantillas.
+    private var noPresetsGate: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack(spacing: 18) {
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 48, weight: .light))
+                    .foregroundColor(.accentColor)
+                Text("Necesitas una plantilla")
+                    .font(.title3.bold())
+                    .foregroundColor(.white)
+                Text("Crea al menos una plantilla en Configuración → Plantillas para usar la vista del piloto.")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                Button(action: { dismiss() }) {
+                    Text("Volver")
+                        .font(.headline)
+                        .foregroundColor(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.accentColor)
+                        .cornerRadius(12)
+                }
+                .padding(.horizontal, 32)
+                .padding(.top, 12)
+            }
+        }
+    }
+
+    private var mainBody: some View {
         // TimelineView ticks every second, giving us a smooth clock
         // without relying on ViewModel timers that SwiftUI can't observe.
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
@@ -263,11 +335,10 @@ struct DriverView: View {
             // preference (the toggle in DriverMenuOverlay writes back to
             // driverVM.audioEnabled, which we mirror here).
             speech.enabled = driverVM.audioEnabled
-            // Fetch presets and auto-apply the default one if the user
-            // marked one as "predefinida" (from web or from the iOS
-            // presets screen). This runs every time the driver view is
-            // opened so the pilot always lands on the expected layout.
-            Task { await driverVM.applyDefaultPresetIfAny() }
+            // Preset fetch + auto-apply now lives in the parent body's
+            // `.task` (runs before this branch renders), gating mainBody
+            // behind a known preset count so the "no plantilla" state
+            // never falls through to the cards grid.
             // Staggered card entrance
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 cardsAppeared = true

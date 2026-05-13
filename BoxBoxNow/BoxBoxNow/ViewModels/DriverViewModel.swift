@@ -23,6 +23,11 @@ final class DriverViewModel: ObservableObject {
     @Published var brightness: Double = 0.0  // 0 = normal, 1 = max contrast boost
     @Published var orientationLock: OrientationLock = .free
     @Published var audioEnabled: Bool = true
+    /// True once `loadPresets()` has finished at least once for the
+    /// current account. Lets DriverView distinguish "still loading the
+    /// list" from "loaded and the user has zero presets" — the gate
+    /// that blocks pilots without a plantilla relies on this.
+    @Published var presetsLoaded: Bool = false
 
     // GPS-derived data
     @Published var gpsData: GPSSample?
@@ -74,6 +79,36 @@ final class DriverViewModel: ObservableObject {
             guard let self else { return }
             Task { await self.applyDefaultPresetIfAny() }
         }
+
+        // Wipe in-memory state when the active account changes (logout
+        // or a different user logs in on the same device). UserDefaults
+        // is cleared by AuthViewModel.wipeDriverConfigDefaults() *before*
+        // the notification fires, so the disk reload below picks up
+        // pristine defaults instead of the previous account's layout.
+        NotificationCenter.default.addObserver(
+            forName: .userAccountChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.resetToDefaults()
+        }
+    }
+
+    /// Snap every per-user @Published property back to its module default.
+    /// Called when the authenticated user changes — without this the
+    /// VM keeps publishing the previous account's visibleCards / cardOrder
+    /// even after the UserDefaults bucket has been wiped, so DriverView
+    /// renders stale data until the next app launch.
+    @MainActor
+    private func resetToDefaults() {
+        visibleCards = DriverCard.defaultVisible
+        cardOrder = DriverCard.defaultOrder
+        presets = []
+        selectedPresetId = nil
+        brightness = 0.0
+        orientationLock = .free
+        audioEnabled = true
+        presetsLoaded = false
     }
 
     func saveConfig() {
@@ -91,6 +126,7 @@ final class DriverViewModel: ObservableObject {
             let result = try await APIClient.shared.fetchPresets()
             await MainActor.run {
                 self.presets = result
+                self.presetsLoaded = true
                 if autoApplyDefault {
                     // Prefer an explicit default, but fall back to the user's
                     // sole preset if they only have one and it isn't flagged —
@@ -105,7 +141,13 @@ final class DriverViewModel: ObservableObject {
                     }
                 }
             }
-        } catch { /* silently fail */ }
+        } catch {
+            // Even on failure mark the load as complete so the UI can
+            // distinguish "still loading" from "the user genuinely has
+            // no presets" — otherwise the gate spinner would never go
+            // away on a flaky network.
+            await MainActor.run { self.presetsLoaded = true }
+        }
     }
 
     /// Fetch presets and, if a default exists, immediately apply it.

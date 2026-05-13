@@ -33,5 +33,24 @@ enum Constants {
         // controls how often the on-screen number changes. Allowed
         // values: 1, 2, 4.
         static let gpsDeltaRefreshHz = "gps_delta_refresh_hz"
+        // Username of the last successfully-authenticated user on this
+        // device. Used to detect "different user logged in" and wipe
+        // per-user-scoped UserDefaults (driver config) so plantillas
+        // from a previous account don't leak into the new account.
+        static let lastUsername = "auth_last_username"
     }
+
+    /// UserDefaults keys that hold per-user driver-view state. Wiped on
+    /// `fullSignOut()` and when a different user logs in — without this,
+    /// the cached visibleCards / cardOrder / brightness / orientation
+    /// / audioEnabled survive a logout, and the next user lands on the
+    /// previous user's plantilla even though they have zero presets of
+    /// their own (visible bug: Vista Piloto loads with stale layout).
+    static let driverConfigKeys: [String] = [
+        Keys.visibleCards,
+        Keys.cardOrder,
+        Keys.orientation,
+        Keys.brightness,
+        Keys.audioEnabled,
+    ]
 }

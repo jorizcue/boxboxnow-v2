@@ -2,6 +2,7 @@ package com.boxboxnow.app.store
 
 import android.content.Context
 import androidx.core.content.edit
+import com.boxboxnow.app.util.Constants
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -39,4 +40,12 @@ class PreferencesStore @Inject constructor(context: Context) {
 
     fun remove(key: String) = prefs.edit { remove(key) }
     fun contains(key: String) = prefs.contains(key)
+
+    /** Wipe every per-user driver-view key. Called on full sign-out
+     *  and when a different username logs in on the same device — fixes
+     *  the bug where the next user landed on the previous user's
+     *  plantilla because SharedPreferences isn't scoped by account. */
+    fun clearDriverConfig() = prefs.edit {
+        for (key in Constants.DRIVER_CONFIG_KEYS) remove(key)
+    }
 }

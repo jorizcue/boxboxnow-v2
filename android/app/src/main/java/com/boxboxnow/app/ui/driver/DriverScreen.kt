@@ -34,6 +34,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -87,6 +88,110 @@ import kotlinx.coroutines.flow.sample
 @Composable
 fun DriverScreen(onBack: () -> Unit) {
     val driverVM: DriverViewModel = hiltViewModel()
+    val authVM: AuthViewModel = hiltViewModel()
+
+    val presetsList by driverVM.presets.collectAsState()
+    val presetsLoaded by driverVM.presetsLoaded.collectAsState()
+
+    // One-shot preset fetch — drives the gate decision. The rest of
+    // DriverScreen's setup (WS connect, brightness max, screen-on lock)
+    // only runs after we know the user has at least one plantilla, so a
+    // brand-new account doesn't burn battery on a WS connection just
+    // to be shown the "you need a plantilla" gate.
+    LaunchedEffect(Unit) {
+        driverVM.applyDefaultPresetIfAny()
+    }
+
+    // Wipe in-memory driver-view state when the active account changes
+    // (logout / different user logs in). The SharedPreferences side is
+    // handled by AuthViewModel, but the DriverViewModel instance can
+    // outlive the auth switch — without this it'd keep publishing the
+    // previous account's visibleCards / cardOrder / brightness.
+    LaunchedEffect(Unit) {
+        authVM.accountChanged.collect { driverVM.resetToDefaults() }
+    }
+
+    when {
+        !presetsLoaded -> LoadingGate()
+        presetsList.isEmpty() -> NoPresetsGate(onBack = onBack)
+        else -> DriverScreenContent(onBack = onBack)
+    }
+}
+
+/** Full-black spinner shown while the initial preset fetch is in flight.
+ *  Keeps the gate decision hidden until we actually know whether the
+ *  user has presets — without it the cards grid would flash for the
+ *  fraction of a second between mount and the first response. */
+@Composable
+private fun LoadingGate() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
+        CircularProgressIndicator(color = BoxBoxNowColors.Accent)
+    }
+}
+
+/** Full-screen placeholder shown when the user has zero plantillas.
+ *  Pops back to home so they can navigate to Configuración → Plantillas
+ *  and create one before trying the pilot view again. */
+@Composable
+private fun NoPresetsGate(onBack: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+            modifier = Modifier.padding(horizontal = 32.dp),
+        ) {
+            Icon(
+                Icons.Filled.Style,
+                contentDescription = null,
+                tint = BoxBoxNowColors.Accent,
+                modifier = Modifier.size(48.dp),
+            )
+            Text(
+                "Necesitas una plantilla",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                "Crea al menos una plantilla en Configuracion → Plantillas para usar la vista del piloto.",
+                color = Color(0xFF8E8E93),
+                fontSize = 14.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(BoxBoxNowColors.Accent)
+                    .clickable { onBack() }
+                    .padding(vertical = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "Volver",
+                    color = Color.Black,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(FlowPreview::class)
+@Composable
+private fun DriverScreenContent(onBack: () -> Unit) {
+    val driverVM: DriverViewModel = hiltViewModel()
     val raceVM: RaceViewModel = hiltViewModel()
     val gpsVM: GpsViewModel = hiltViewModel()
     val authVM: AuthViewModel = hiltViewModel()
@@ -133,7 +238,9 @@ fun DriverScreen(onBack: () -> Unit) {
     var clockMs by remember { mutableStateOf(0.0) }
     LaunchedEffect(Unit) {
         raceVM.connect()
-        driverVM.applyDefaultPresetIfAny()
+        // Preset fetch already ran in the parent `DriverScreen` before
+        // routing here — calling it again would double-fetch on every
+        // gate transition (loading → content).
         // Re-fetch the user's circuits so any admin-side edit to the GPS
         // finish-line (finish_lat1/lon1/lat2/lon2) is picked up without
         // having to kill the app. Mirrors the iOS DriverView.task flow.

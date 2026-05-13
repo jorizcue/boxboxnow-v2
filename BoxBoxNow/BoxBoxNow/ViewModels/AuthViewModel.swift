@@ -98,6 +98,7 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
 
                 // Decode JWT to get the username (sub claim) for per-user Keychain slot
                 let username = KeychainHelper.decodeJWTPayload(token)?["sub"] as? String ?? ""
+                Self.handleUsernameSwitch(newUsername: username)
                 KeychainHelper.saveToken(token, forUser: username)
                 self.isAuthenticated = true
                 // Fetch full User from /auth/me (JWT payload lacks is_admin / tab_access)
@@ -135,8 +136,23 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
             }
             await MainActor.run {
                 KeychainHelper.deleteToken()
+                Self.wipeDriverConfigDefaults()
+                NotificationCenter.default.post(name: .userAccountChanged, object: nil)
                 logout()
             }
+        }
+    }
+
+    /// Remove every per-user driver-view UserDefaults key. Called on
+    /// `fullSignOut()` and whenever a different username logs in on the
+    /// same device — fixes the bug where the next user landed on the
+    /// previous user's plantilla (visibleCards / cardOrder /
+    /// brightness / orientationLock / audioEnabled survived logout
+    /// because UserDefaults isn't scoped by account).
+    static func wipeDriverConfigDefaults() {
+        let d = UserDefaults.standard
+        for key in Constants.driverConfigKeys {
+            d.removeObject(forKey: key)
         }
     }
 
@@ -173,9 +189,30 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
             // Save token keyed to this specific user so multiple accounts
             // on the same device each have their own isolated Keychain slot.
             let username = resp.user?.username ?? ""
+            Self.handleUsernameSwitch(newUsername: username)
             KeychainHelper.saveToken(token, forUser: username)
             user = resp.user
             isAuthenticated = true
         }
+    }
+
+    /// Detect when a different account is logging in on this device and
+    /// wipe per-user driver-view UserDefaults before the new user's
+    /// session takes hold. Without this the new user lands on the
+    /// previous user's plantilla because visibleCards / cardOrder live
+    /// in a global, non-scoped UserDefaults bucket.
+    ///
+    /// Compares against `Constants.Keys.lastUsername` which we update
+    /// here. First-ever login on the device is treated as "no switch"
+    /// because there's nothing to wipe — but we still seed the marker
+    /// so the next switch is detected.
+    static func handleUsernameSwitch(newUsername: String) {
+        let d = UserDefaults.standard
+        let previous = d.string(forKey: Constants.Keys.lastUsername) ?? ""
+        if !previous.isEmpty && previous != newUsername {
+            wipeDriverConfigDefaults()
+            NotificationCenter.default.post(name: .userAccountChanged, object: nil)
+        }
+        d.set(newUsername, forKey: Constants.Keys.lastUsername)
     }
 }

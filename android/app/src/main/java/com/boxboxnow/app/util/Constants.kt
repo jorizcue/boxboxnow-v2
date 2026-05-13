@@ -31,5 +31,24 @@ object Constants {
         // controls how often the on-screen number changes. Allowed
         // values: 1, 2, 4. Matches iOS Constants.Keys.gpsDeltaRefreshHz.
         const val GPS_DELTA_REFRESH_HZ = "gps_delta_refresh_hz"
+        // Username of the last successfully-authenticated user on this
+        // device. Used to detect "different user logged in" and wipe
+        // per-user driver config so plantillas from a previous account
+        // don't leak into the new account.
+        const val LAST_USERNAME = "auth_last_username"
     }
+
+    /// Driver-view SharedPreferences keys that hold per-user state. Wiped
+    /// on `fullSignOut()` and on account switch — without this the cached
+    /// visibleCards / cardOrder / brightness / orientationLock /
+    /// audioEnabled survive a logout, and the next user lands on the
+    /// previous user's plantilla even though they have zero presets of
+    /// their own.
+    val DRIVER_CONFIG_KEYS = listOf(
+        Keys.VISIBLE_CARDS,
+        Keys.CARD_ORDER,
+        Keys.ORIENTATION,
+        Keys.BRIGHTNESS,
+        Keys.AUDIO_ENABLED,
+    )
 }

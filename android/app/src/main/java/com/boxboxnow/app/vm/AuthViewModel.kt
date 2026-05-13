@@ -8,9 +8,14 @@ import com.boxboxnow.app.models.AuthResponse
 import com.boxboxnow.app.models.User
 import com.boxboxnow.app.net.ApiClient
 import com.boxboxnow.app.net.AppUpgradeRequiredException
+import com.boxboxnow.app.store.PreferencesStore
 import com.boxboxnow.app.store.SecureTokenStore
+import com.boxboxnow.app.util.Constants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
@@ -29,7 +34,16 @@ class AuthViewModel @Inject constructor(
     private val api: ApiClient,
     private val tokenStore: SecureTokenStore,
     private val biometric: BiometricService,
+    private val prefs: PreferencesStore,
 ) : ViewModel() {
+
+    /** Fires once whenever the active account changes (logout, full
+     *  sign-out, or a different user logs in). DriverViewModel observes
+     *  it to wipe its in-memory visibleCards / cardOrder — without
+     *  this the previously-loaded layout keeps rendering even after
+     *  SharedPreferences has been cleared. */
+    private val _accountChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val accountChanged: SharedFlow<Unit> = _accountChanged.asSharedFlow()
 
     private val _isAuthenticated = MutableStateFlow(false)
     val isAuthenticated = _isAuthenticated.asStateFlow()
@@ -107,6 +121,7 @@ class AuthViewModel @Inject constructor(
         // Decode the JWT `sub` claim — same approach as iOS.
         val payload = tokenStore.decodeJwtPayload(token)
         val username = (payload?.get("sub") as? JsonPrimitive)?.content ?: ""
+        handleUsernameSwitch(username)
         tokenStore.saveToken(token, username)
         biometric.saveLastUsername(username)
         _isAuthenticated.value = true
@@ -141,8 +156,34 @@ class AuthViewModel @Inject constructor(
             runCatching { api.serverLogout() }
             tokenStore.deleteToken()
             biometric.disable()
+            // Wipe per-user driver-view state so the next account
+            // doesn't inherit the previous user's plantilla. The
+            // emitted `accountChanged` event makes DriverViewModel
+            // drop its in-memory copy of the same values.
+            prefs.clearDriverConfig()
+            _accountChanged.tryEmit(Unit)
             logout()
         }
+    }
+
+    /**
+     * Detect when a different account is logging in on this device and
+     * wipe per-user driver-view SharedPreferences before the new
+     * user's session takes hold. Without this the new user lands on
+     * the previous user's plantilla because the keys aren't scoped by
+     * account.
+     *
+     * First-ever login on the device is a "no switch" because there's
+     * nothing to wipe — but we still seed the marker so the next
+     * switch is detected.
+     */
+    private fun handleUsernameSwitch(newUsername: String) {
+        val previous = prefs.getString(Constants.Keys.LAST_USERNAME).orEmpty()
+        if (previous.isNotEmpty() && previous != newUsername) {
+            prefs.clearDriverConfig()
+            _accountChanged.tryEmit(Unit)
+        }
+        prefs.putString(Constants.Keys.LAST_USERNAME, newUsername)
     }
 
     private fun checkExistingSession() {
@@ -212,6 +253,7 @@ class AuthViewModel @Inject constructor(
         // Save token keyed to this specific user so multiple accounts on
         // the same device each have their own isolated storage slot.
         val username = resp.user?.username ?: ""
+        handleUsernameSwitch(username)
         tokenStore.saveToken(resp.accessToken, username)
         biometric.saveLastUsername(username)  // keep BiometricService in sync
         _user.value = resp.user

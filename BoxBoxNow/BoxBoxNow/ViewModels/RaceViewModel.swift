@@ -12,6 +12,13 @@ extension Notification.Name {
     /// pushes the new coords into LapTracker without waiting for the next
     /// foreground / restart cycle.
     static let circuitUpdated = Notification.Name("circuitUpdated")
+
+    /// Fired when the authenticated user changes (logout, full sign-out,
+    /// or a different user logs in on the same device). DriverViewModel
+    /// listens for this to wipe its in-memory state — without it the
+    /// previously-loaded visibleCards / cardOrder / brightness keep
+    /// rendering for the new user even after UserDefaults is cleared.
+    static let userAccountChanged = Notification.Name("userAccountChanged")
 }
 
 final class RaceViewModel: ObservableObject {

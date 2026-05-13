@@ -77,6 +77,13 @@ class DriverViewModel @Inject constructor(
     private val _gpsDeltaRefreshHz = MutableStateFlow(2)
     val gpsDeltaRefreshHz = _gpsDeltaRefreshHz.asStateFlow()
 
+    /** True once `loadPresets()` has finished at least once for the
+     *  current account. DriverScreen distinguishes "still loading the
+     *  list" from "loaded and the user has zero presets" via this flag —
+     *  the gate that blocks pilots without a plantilla relies on it. */
+    private val _presetsLoaded = MutableStateFlow(false)
+    val presetsLoaded = _presetsLoaded.asStateFlow()
+
     init {
         prefs.getString(Constants.Keys.VISIBLE_CARDS)?.let { raw ->
             runCatching {
@@ -202,20 +209,45 @@ class DriverViewModel @Inject constructor(
 
     fun loadPresets(autoApplyDefault: Boolean = false) {
         viewModelScope.launch {
-            runCatching { api.fetchPresets() }.onSuccess { list ->
-                _presets.value = list
-                if (autoApplyDefault) {
-                    // Prefer an explicit default, but fall back to the user's
-                    // sole preset so pilots who created their first template
-                    // before the auto-default-on-create logic shipped still
-                    // land on a pre-configured driver view (otherwise
-                    // contrast / orientation / audio never load).
-                    val target = list.firstOrNull { it.isDefault }
-                        ?: list.singleOrNull()
-                    target?.let { applyPreset(it) }
+            runCatching { api.fetchPresets() }
+                .onSuccess { list ->
+                    _presets.value = list
+                    if (autoApplyDefault) {
+                        // Prefer an explicit default, but fall back to the user's
+                        // sole preset so pilots who created their first template
+                        // before the auto-default-on-create logic shipped still
+                        // land on a pre-configured driver view (otherwise
+                        // contrast / orientation / audio never load).
+                        val target = list.firstOrNull { it.isDefault }
+                            ?: list.singleOrNull()
+                        target?.let { applyPreset(it) }
+                    }
                 }
-            }
+                .also {
+                    // Mark complete even on failure so the gate spinner can
+                    // resolve — otherwise a flaky /config/presets call would
+                    // leave DriverScreen stuck on the loading state.
+                    _presetsLoaded.value = true
+                }
         }
+    }
+
+    /** Snap every per-user StateFlow back to its module default. Called
+     *  from the host UI when AuthViewModel emits an `accountChanged`
+     *  event — without this the VM keeps publishing the previous
+     *  account's visibleCards / cardOrder even after the
+     *  SharedPreferences bucket has been wiped, so DriverScreen renders
+     *  stale data until the next app launch. */
+    fun resetToDefaults() {
+        _visibleCards.value = DriverCard.defaultVisible
+        _cardOrder.value = DriverCard.defaultOrder
+        _presets.value = emptyList()
+        _selectedPresetId.value = null
+        _brightness.value = 0.0
+        _orientationLock.value = OrientationLock.FREE
+        _audioEnabled.value = true
+        _presetsLoaded.value = false
+        speech.enabled = true
     }
 
     fun applyDefaultPresetIfAny() = loadPresets(autoApplyDefault = true)
