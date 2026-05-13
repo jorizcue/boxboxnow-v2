@@ -442,6 +442,60 @@ export const api = {
   getTrialConfig: () =>
     fetchRaw<{ trial_enabled: boolean; trial_days: number; trial_banner_days: number }>("/api/auth/trial-config"),
 
+  // Usage analytics — admin
+  // Returned shape matches the FastAPI endpoints in usage_routes.py.
+  usageOverview: () =>
+    fetchApi<{
+      dau: number;
+      wau: number;
+      mau: number;
+      total_users: number;
+      active_now: number;
+      platforms: Record<string, number>;
+    }>("/api/usage/stats/overview"),
+  usageActiveUsers: (days = 30) =>
+    fetchApi<{ series: { day: string; active: number }[]; days: number }>(
+      `/api/usage/stats/active-users?days=${days}`,
+    ),
+  usageTopEvents: (params: { days?: number; event_type?: string; limit?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.days) qs.set("days", String(params.days));
+    if (params.event_type) qs.set("event_type", params.event_type);
+    if (params.limit) qs.set("limit", String(params.limit));
+    return fetchApi<{ top: { event_key: string; count: number; users: number }[]; days: number }>(
+      `/api/usage/stats/top-events${qs.toString() ? `?${qs}` : ""}`,
+    );
+  },
+  usageFunnel: (params: { days?: number; utm_source?: string; utm_campaign?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.days) qs.set("days", String(params.days));
+    if (params.utm_source) qs.set("utm_source", params.utm_source);
+    if (params.utm_campaign) qs.set("utm_campaign", params.utm_campaign);
+    return fetchApi<{
+      stages: {
+        event_key: string;
+        label: string;
+        count: number;
+        pct_overall: number | null;
+        pct_step: number | null;
+      }[];
+      days: number;
+    }>(`/api/usage/stats/funnel${qs.toString() ? `?${qs}` : ""}`);
+  },
+  usageHeatmap: (days = 30) =>
+    fetchApi<{
+      cells: { day_of_week: number; hour: number; count: number }[];
+      max_count: number;
+      days: number;
+    }>(`/api/usage/stats/heatmap?days=${days}`),
+  usageAttribution: (days = 30) =>
+    fetchApi<{
+      days: number;
+      by_source: { key: string; visitors: number; registrations: number; payments: number }[];
+      by_campaign: { key: string; visitors: number; registrations: number; payments: number }[];
+      by_referrer: { key: string; visitors: number; registrations: number; payments: number }[];
+    }>(`/api/usage/stats/attribution?days=${days}`),
+
   // Password reset
   forgotPassword: (email: string) =>
     fetchRaw<{ ok: boolean; message: string }>("/api/auth/forgot-password", {

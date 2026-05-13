@@ -494,6 +494,110 @@ class ChatUsage(Base):
     output_tokens = Column(Integer, default=0, nullable=False)
 
 
+class UsageEvent(Base):
+    """Granular log of every meaningful product interaction. Drives the
+    admin "Analítica" panel: DAU/WAU/MAU, tab popularity, acquisition
+    funnel, and first-touch attribution.
+
+    Design notes:
+      * `user_id` is nullable because a chunk of the acquisition funnel
+        (landing.view → pricing.view → register.start) fires before the
+        visitor has an account. `visitor_id` (UUID stored in
+        localStorage as `bbn_vid`) is what stitches anonymous events
+        together. On register/login the backend writes a
+        VisitorIdentity row tying the visitor_id to the user_id.
+      * `event_type` is a coarse category: "session_start" |
+        "tab_view" | "action" | "funnel". `event_key` is the specific
+        identifier within that category (e.g. event_type="tab_view"
+        event_key="race").
+      * `utm_*` and `referrer` are SNAPSHOTTED from first-touch on
+        every event of the visitor — replicated, not joined — so admin
+        queries don't need to walk back to the first event of the
+        session to know attribution.
+      * IP is intentionally NOT stored here (we already capture it in
+        DeviceSession for auth; analytics doesn't need it).
+      * Rows older than 30 days get deleted by the daily cleanup task
+        — the aggregated `usage_daily` table is the durable source for
+        long-term analysis.
+    """
+    __tablename__ = "usage_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    visitor_id = Column(String(36), nullable=True, index=True)
+    ts = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    event_type = Column(String(20), nullable=False, index=True)
+    event_key = Column(String(80), nullable=False, index=True)
+    client_kind = Column(String(16), nullable=True)   # "web" | "mobile"
+    app_platform = Column(String(16), nullable=True)  # "ios" | "android" | "web"
+    app_version = Column(String(32), nullable=True)
+    circuit_id = Column(Integer, ForeignKey("circuits.id"), nullable=True)
+    props_json = Column(Text, nullable=True)
+    # First-touch attribution snapshot. Replicated on every event of
+    # the same visitor so funnel queries don't need a join.
+    utm_source = Column(String(64), nullable=True, index=True)
+    utm_medium = Column(String(64), nullable=True)
+    utm_campaign = Column(String(64), nullable=True, index=True)
+    referrer = Column(String(255), nullable=True)
+
+    __table_args__ = (
+        Index("ix_usage_events_ts_event_key", "ts", "event_key"),
+        Index("ix_usage_events_ts_user", "ts", "user_id"),
+    )
+
+
+class VisitorIdentity(Base):
+    """Stitches an anonymous `visitor_id` (UUID from localStorage) to
+    the `user_id` it eventually becomes. Created on register or first
+    login of a known browser.
+
+    The row's `first_*` columns hold the first-touch attribution
+    captured BEFORE the visitor authenticated — this is what lets the
+    admin funnel attribute a paid subscription to "google_ads /
+    Lanzamiento" even though that UTM stopped appearing on the URL
+    days ago.
+
+    A given visitor_id maps to at most one user_id (PK). A user can
+    have multiple visitor_ids if they sign in from different browsers
+    — each browser gets its own VisitorIdentity row.
+    """
+    __tablename__ = "visitor_identity"
+
+    visitor_id = Column(String(36), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    first_seen = Column(DateTime, nullable=True)
+    linked_at = Column(DateTime, server_default=func.now(), nullable=False)
+    first_utm_source = Column(String(64), nullable=True)
+    first_utm_medium = Column(String(64), nullable=True)
+    first_utm_campaign = Column(String(64), nullable=True)
+    first_referrer = Column(String(255), nullable=True)
+
+
+class UsageDaily(Base):
+    """Daily rollup of `usage_events`. Populated by a nightly task —
+    `usage_events` rows older than 30 days are deleted but the rollup
+    stays. Drives the admin time-series + heatmap views without
+    scanning the raw events table.
+
+    A row says: for (user_id, day, event_key), the event happened
+    `count` times and `unique_visitors` distinct visitors triggered it.
+    `user_id=NULL` rows aggregate anonymous events.
+
+    A surrogate `id` PK is used instead of a composite key because
+    SQLite treats NULL in a composite PK as "always distinct" — which
+    would let us insert duplicate (NULL, day, key) rows. The explicit
+    UNIQUE INDEX below treats NULL as a single value via COALESCE.
+    """
+    __tablename__ = "usage_daily"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    day = Column(Date, nullable=False, index=True)
+    event_key = Column(String(80), nullable=False, index=True)
+    count = Column(Integer, default=0, nullable=False)
+    unique_visitors = Column(Integer, default=0, nullable=False)
+
+
 class ChatMessage(Base):
     """Persisted history of every chat exchange. Used to continue
     conversations across reloads and to surface the most-asked questions

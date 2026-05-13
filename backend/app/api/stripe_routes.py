@@ -592,6 +592,25 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
 
             if config:
                 await _apply_config_to_user(user_id, config, db)
+
+            # Analytics — final stage of the acquisition funnel. Emitted
+            # from the webhook (not the SPA) because the user lands back
+            # on /dashboard via Stripe's redirect and we can't trust the
+            # SPA to be the one to record the event; Stripe is the source
+            # of truth that the money moved.
+            from app.services.usage_events import record_event
+            await record_event(
+                db,
+                event_type="funnel",
+                event_key="checkout.payment_success",
+                user_id=user_id,
+                props={
+                    "plan_type": plan_type,
+                    "circuit_ids": circuit_ids,
+                    "mode": "subscription",
+                },
+            )
+
             await db.commit()
 
             # Send confirmation email with circuit name
@@ -666,6 +685,21 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
 
         if config:
             await _apply_config_to_user(user_id, config, db)
+
+        # Analytics — final funnel stage for one-time / event purchases.
+        from app.services.usage_events import record_event
+        await record_event(
+            db,
+            event_type="funnel",
+            event_key="checkout.payment_success",
+            user_id=user_id,
+            props={
+                "plan_type": plan_type,
+                "circuit_ids": circuit_ids,
+                "mode": "payment",
+            },
+        )
+
         await db.commit()
 
         # Send event confirmation email

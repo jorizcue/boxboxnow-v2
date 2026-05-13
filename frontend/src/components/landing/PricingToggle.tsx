@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
+import { useTracker } from "@/hooks/useTracker";
 
 interface PlanData {
   plan_type: string;
@@ -112,6 +113,8 @@ export function PricingToggle() {
   const [plans, setPlans] = useState<GroupedPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [trialDays, setTrialDays] = useState(0);
+  const { trackFunnel } = useTracker();
+  const sectionRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -127,6 +130,33 @@ export function PricingToggle() {
       setLoading(false);
     });
   }, []);
+
+  // Funnel: pricing.view fires once when the section actually becomes
+  // visible in the viewport. Using IntersectionObserver instead of "on
+  // mount" because the pricing block is at the bottom of the landing —
+  // a visitor who only sees the hero shouldn't count as having viewed
+  // pricing. The `firedRef` guard makes it strictly once per page load.
+  const firedRef = useRef(false);
+  useEffect(() => {
+    if (loading) return;
+    const el = sectionRef.current;
+    if (!el || firedRef.current) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && !firedRef.current) {
+            firedRef.current = true;
+            trackFunnel("pricing.view");
+            io.disconnect();
+            break;
+          }
+        }
+      },
+      { threshold: 0.2 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [loading, trackFunnel]);
 
   const planLink = (p: GroupedPlan) => {
     // Use the exact plan_type from the DB so the /register → /dashboard
@@ -161,7 +191,7 @@ export function PricingToggle() {
   }
 
   return (
-    <div>
+    <div ref={sectionRef}>
       {/* Toggle */}
       <div className="flex items-center justify-center gap-4 mb-16">
         <span
@@ -280,6 +310,22 @@ export function PricingToggle() {
 
               <a
                 href={planButtonHref(plan)}
+                onClick={() => {
+                  // Funnel: plan click. We don't preventDefault — the
+                  // navigation continues. tracker.ts uses sendBeacon on
+                  // pagehide so the event survives the page transition.
+                  const planParam =
+                    plan.is_event
+                      ? (plan.plan_type_event ?? "event")
+                      : (annual ? plan.plan_type_annual : plan.plan_type_monthly)
+                          ?? `${plan.base_type}${annual ? "_annual" : "_monthly"}`;
+                  trackFunnel("pricing.plan_click", {
+                    plan_type: planParam,
+                    base_type: plan.base_type,
+                    interval: plan.is_event ? "event" : annual ? "annual" : "monthly",
+                    is_popular: plan.is_popular,
+                  });
+                }}
                 className={`block w-full rounded-xl py-3.5 text-center text-sm font-bold uppercase tracking-wide transition-all duration-200 ${
                   plan.is_popular
                     ? "bg-accent text-black hover:bg-accent-hover shadow-[0_0_20px_rgba(159,229,86,0.15)] hover:shadow-[0_0_30px_rgba(159,229,86,0.3)]"

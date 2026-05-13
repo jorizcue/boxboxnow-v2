@@ -30,6 +30,24 @@ export const STORAGE_KEYS = {
 
   // Device-level UX preference; intentionally NOT cleared on logout.
   LANGUAGE: "boxboxnow-lang",
+
+  // Usage analytics (F1). Both are DEVICE-LEVEL — they survive logout
+  // so the same browser keeps a stable visitor_id across login sessions
+  // (essential for the acquisition funnel: anonymous → registered →
+  // paying customer all need to share an identifier).
+  //
+  // - VISITOR_ID: UUID v4 generated on first ever landing. First-party,
+  //   never shared with third parties.
+  // - FIRST_TOUCH: JSON blob with the first UTM / referrer captured for
+  //   this visitor. Snapshot-only — once set, never overwritten by
+  //   later visits, so attribution stays loyal to whatever brought the
+  //   user in originally.
+  // - ANALYTICS_OPT_OUT: "1" when the user has flipped the "Permitir
+  //   analítica interna" toggle in Cuenta → Privacidad. When set the
+  //   useTracker hook short-circuits and emits nothing.
+  VISITOR_ID: "bbn_vid",
+  FIRST_TOUCH: "bbn_ft",
+  ANALYTICS_OPT_OUT: "bbn_ao",
 } as const;
 
 // Keys to wipe when the user logs out. Anything tied to "this session" or

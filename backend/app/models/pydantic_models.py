@@ -9,6 +9,12 @@ class LoginRequest(BaseModel):
     username: str
     password: str
     mfa_code: str | None = None
+    # Optional analytics linking. When the visitor was tracked before
+    # the login (typical funnel: landing → register → login again
+    # later), the SPA forwards the visitor_id so the backend can keep
+    # VisitorIdentity tied to the same user and the funnel doesn't
+    # break across sessions.
+    visitor_id: str | None = None
 
 
 class TokenResponse(BaseModel):
@@ -70,6 +76,17 @@ class RegisterRequest(BaseModel):
     email: str
     username: str
     password: str
+    # Optional analytics linking fields. Sent by the SPA when the user
+    # comes through the acquisition funnel — they let the backend tie
+    # the brand-new user_id to the visitor_id that's been tracked
+    # since the landing page, and snapshot first-touch attribution so
+    # the funnel view can answer "this paid customer originated from
+    # campaign X".
+    visitor_id: str | None = None
+    utm_source: str | None = None
+    utm_medium: str | None = None
+    utm_campaign: str | None = None
+    referrer: str | None = None
 
     @field_validator("email")
     @classmethod

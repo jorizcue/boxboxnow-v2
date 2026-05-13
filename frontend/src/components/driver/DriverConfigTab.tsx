@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "@/lib/api";
+import { trackAction } from "@/lib/tracker";
 import { useDriverConfig, ALL_DRIVER_CARDS, DEFAULT_CARD_ORDER, DRIVER_CARD_GROUPS, type DriverCardId } from "@/hooks/useDriverConfig";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -75,6 +76,7 @@ export function DriverConfigTab() {
         visible_cards: config.visibleCards,
         card_order: config.cardOrder,
       });
+      trackAction("preset.create", { name_len: name.length });
       setPresets((prev) => [...prev, created]);
       setPresetName("");
       setShowSaveInput(false);
@@ -95,11 +97,13 @@ export function DriverConfigTab() {
           .concat(allIds.filter((c) => !preset.card_order.includes(c)))
       : DEFAULT_CARD_ORDER;
     config.applyPreset(visibleCards, cardOrder);
+    trackAction("preset.apply", { preset_id: preset.id });
   };
 
   const handleDeletePreset = async (id: number) => {
     try {
       await api.deletePreset(id);
+      trackAction("preset.delete", { preset_id: id });
       setPresets((prev) => prev.filter((p) => p.id !== id));
     } catch {}
   };

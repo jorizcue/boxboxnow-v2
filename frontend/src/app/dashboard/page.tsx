@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useRaceWebSocket } from "@/hooks/useRaceWebSocket";
@@ -13,6 +13,7 @@ import { FifoQueue } from "@/components/pit/FifoQueue";
 import { ClassificationTable } from "@/components/classification/ClassificationTable";
 import { ConfigPanel } from "@/components/config/ConfigPanel";
 import { AdminUsersPanel, AdminCircuitsPanel, AdminHubPanel, AdminPlatformPanel, AdminMarketingPanel } from "@/components/admin/AdminPanel";
+import { AdminAnalyticsPanel } from "@/components/admin/AdminAnalyticsPanel";
 import { LiveTiming } from "@/components/live/LiveTiming";
 import { AdjustedClassification } from "@/components/classification/AdjustedClassification";
 import { ReplayTab } from "@/components/replay/ReplayTab";
@@ -28,10 +29,19 @@ import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { useSiteStatus } from "@/hooks/useSiteStatus";
 import { MaintenancePage } from "@/components/landing/MaintenancePage";
+import { useTracker, useTrackerInit } from "@/hooks/useTracker";
 
 export default function DashboardPage() {
   const { token, user, _hydrated, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("race");
+
+  // First-party usage analytics. Idempotent — only the first call per
+  // app load does real work (generates visitor_id, snapshots first-
+  // touch UTM, fires session_start). Lives at the very top so even
+  // an unauthenticated user briefly hitting /dashboard before being
+  // redirected to /login is counted.
+  useTrackerInit();
+  const { trackFunnel } = useTracker();
   const [pendingPlan, setPendingPlan] = useState<string | null>(null);
   const [pendingPlanPerCircuit, setPendingPlanPerCircuit] = useState<boolean>(true);
   // Number of circuits the pending plan requires the buyer to pick.
@@ -156,7 +166,38 @@ export default function DashboardPage() {
   const handleCircuitSelected = (circuitIds: number[], dates?: string[]) => {
     setCheckoutCircuitIds(circuitIds);
     setEventDates(dates);
+    trackFunnel("checkout.circuit_selected", {
+      circuit_count: circuitIds.length,
+      circuit_ids: circuitIds,
+      plan: pendingPlan,
+    });
   };
+
+  // Funnel stages: fire when the user first lands on each checkout
+  // surface. CircuitSelector shows for per-circuit plans; the
+  // EmbeddedCheckout shows once the plan info is ready. Both gates by
+  // `checkoutReady` so we don't fire while we're still resolving the
+  // pending plan's metadata.
+  const showCircuitSelector =
+    !!pendingPlan && checkoutReady && pendingPlanPerCircuit &&
+    !(checkoutCircuitIds && checkoutCircuitIds.length > 0);
+  const showEmbeddedCheckout =
+    !!pendingPlan && checkoutReady &&
+    (!pendingPlanPerCircuit ||
+      (checkoutCircuitIds !== null && checkoutCircuitIds.length > 0));
+  useEffect(() => {
+    if (showCircuitSelector) {
+      trackFunnel("checkout.circuit_view", { plan: pendingPlan });
+    }
+  }, [showCircuitSelector, pendingPlan, trackFunnel]);
+  useEffect(() => {
+    if (showEmbeddedCheckout) {
+      trackFunnel("checkout.embedded_open", {
+        plan: pendingPlan,
+        circuit_count: checkoutCircuitIds?.length ?? 0,
+      });
+    }
+  }, [showEmbeddedCheckout, pendingPlan, checkoutCircuitIds, trackFunnel]);
 
   if (!_hydrated) {
     return (
@@ -294,6 +335,27 @@ function Dashboard({
   const { connected, trackName, countdownMs } = useRaceStore();
   const { user } = useAuth();
   const userTabs = user?.tab_access ?? [];
+  const { trackTab, trackFunnel } = useTracker();
+
+  // Last funnel stage: the user passed every gate (subscription,
+  // circuit access, MFA) and is looking at the real dashboard. Fires
+  // once per app load via the useRef guard — we don't want a tab
+  // change in the same session to re-trigger "first view".
+  const firstViewFired = useRef(false);
+  useEffect(() => {
+    if (firstViewFired.current) return;
+    firstViewFired.current = true;
+    trackFunnel("dashboard.first_view");
+  }, [trackFunnel]);
+
+  // Every tab change fires a `tab_view` event. Captures the SPA's
+  // navigation flow without instrumenting each tab component
+  // separately — one central useEffect powers the entire "top tabs"
+  // chart in the admin analytics panel.
+  useEffect(() => {
+    if (!activeTab) return;
+    trackTab(activeTab);
+  }, [activeTab, trackTab]);
 
   return (
     <div className="flex flex-col h-screen">
@@ -334,6 +396,7 @@ function Dashboard({
           {activeTab === "admin-hub" && user?.is_admin && userTabs.includes("admin-hub") && <AdminHubPanel />}
           {activeTab === "admin-platform" && user?.is_admin && <AdminPlatformPanel />}
           {activeTab === "admin-marketing" && user?.is_admin && <AdminMarketingPanel />}
+          {activeTab === "admin-analytics" && user?.is_admin && <AdminAnalyticsPanel />}
         </main>
       </div>
       {/* Floating support chatbot — visible only when user has the `chat`

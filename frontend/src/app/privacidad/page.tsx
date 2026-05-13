@@ -139,6 +139,43 @@ export default function PrivacidadPage() {
 
         <section className="space-y-4">
           <h2 className="text-xl font-semibold text-white">
+            4.bis. Analítica interna de uso
+          </h2>
+          <p>
+            Para entender cómo se utiliza la plataforma y mejorarla, registramos
+            <strong className="text-white"> eventos agregados de uso</strong>
+            {" "}(p. ej. pestañas más visitadas, etapas del proceso de compra
+            completadas, dispositivos activos por día). Esta analítica es
+            <strong className="text-white"> de primera parte</strong>: los datos
+            se almacenan en nuestros propios servidores y no se comparten con
+            ningún tercero (no usamos Google Analytics, Mixpanel, Plausible,
+            PostHog ni similares).
+          </p>
+          <p>
+            Para reconstruir el recorrido entre la primera visita y la
+            eventual compra utilizamos un{" "}
+            <strong className="text-white">identificador anónimo (UUID)</strong>
+            {" "}almacenado en tu navegador (<code>bbn_vid</code>), así como una
+            captura de la primera fuente de tráfico (<code>utm_*</code> y
+            referrer) (<code>bbn_ft</code>). No contienen datos personales
+            identificables.
+          </p>
+          <p>
+            Base legal: interés legítimo del responsable (art. 6.1.f RGPD) para
+            la mejora y el mantenimiento del servicio. Puedes oponerte en
+            cualquier momento desactivando la analítica desde{" "}
+            <strong className="text-neutral-300">Cuenta → Privacidad</strong>{" "}
+            dentro de la aplicación. La desactivación es inmediata: dejaremos
+            de registrar nuevos eventos desde tu navegador.
+          </p>
+          <p>
+            No realizamos grabación de sesión, no rastreamos las coordenadas
+            del ratón ni hacemos seguimiento entre sitios.
+          </p>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold text-white">
             5. Tus derechos
           </h2>
           <p>

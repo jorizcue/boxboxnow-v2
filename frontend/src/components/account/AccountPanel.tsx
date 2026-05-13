@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
+import { trackAction } from "@/lib/tracker";
 import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
 import { PaymentMethodsPanel } from "./PaymentMethodsPanel";
@@ -131,7 +132,7 @@ export function AccountPanel() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
-  const [tab, setTab] = useState<"subs" | "invoices" | "payment" | "billing">("subs");
+  const [tab, setTab] = useState<"subs" | "invoices" | "payment" | "billing" | "privacy">("subs");
   const [billing, setBilling] = useState<BillingInfo>(EMPTY_BILLING);
   const [billingForm, setBillingForm] = useState<BillingInfo>(EMPTY_BILLING);
   const [billingTaxType, setBillingTaxType] = useState("");
@@ -184,6 +185,7 @@ export function AccountPanel() {
     setActionLoading(subId);
     try {
       await api.cancelSubscription(subId);
+      trackAction("subscription.cancel", { sub_id: subId });
       await loadData();
     } catch {
       alert("Error al cancelar la suscripcion");
@@ -196,6 +198,7 @@ export function AccountPanel() {
     setActionLoading(subId);
     try {
       await api.reactivateSubscription(subId);
+      trackAction("subscription.reactivate", { sub_id: subId });
       await loadData();
     } catch {
       alert("Error al reactivar la suscripcion");
@@ -215,6 +218,7 @@ export function AccountPanel() {
     setActionLoading(subId);
     try {
       await api.switchPlan(subId, newPlan);
+      trackAction("subscription.switch_plan", { sub_id: subId, new_plan: newPlan });
       await loadData();
     } catch {
       alert("Error al cambiar el plan");
@@ -314,6 +318,16 @@ export function AccountPanel() {
           }`}
         >
           Facturación
+        </button>
+        <button
+          onClick={() => setTab("privacy")}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            tab === "privacy"
+              ? "bg-surface text-white"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Privacidad
         </button>
       </div>
 
@@ -598,6 +612,67 @@ export function AccountPanel() {
           )}
         </div>
       )}
+
+      {tab === "privacy" && <PrivacyTab />}
+    </div>
+  );
+}
+
+/**
+ * Privacy controls — currently a single toggle for analytics opt-out.
+ * Kept as a sub-component because the privacy story is likely to grow
+ * (data export, account deletion) and a separate tab keeps things
+ * scannable.
+ */
+function PrivacyTab() {
+  // We deliberately read the localStorage flag synchronously inside an
+  // effect — this is a client-only feature and SSR would otherwise
+  // throw. Initial render shows the unchecked state for a frame.
+  const [optedOut, setOptedOut] = useState(false);
+  useEffect(() => {
+    // Lazy import to avoid pulling visitor.ts into the SSR bundle of
+    // any code that imports AccountPanel statically.
+    import("@/lib/visitor").then((m) => setOptedOut(m.isAnalyticsOptedOut()));
+  }, []);
+
+  const handleToggle = (next: boolean) => {
+    setOptedOut(next);
+    import("@/lib/visitor").then((m) => m.setAnalyticsOptOut(next));
+  };
+
+  return (
+    <div className="bg-surface border border-border rounded-xl p-6 space-y-5">
+      <div>
+        <h3 className="text-sm font-semibold text-white mb-0.5">
+          Analítica interna
+        </h3>
+        <p className="text-xs text-neutral-500 leading-relaxed">
+          Usamos analítica propia y agregada (sin terceros) para entender
+          cómo se usa la plataforma y mejorar el producto. Puedes
+          desactivarla aquí. Si lo haces, dejaremos de registrar eventos
+          de tu navegador inmediatamente.
+        </p>
+      </div>
+      <label className="flex items-start gap-3 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={!optedOut}
+          onChange={(e) => handleToggle(!e.target.checked)}
+          className="mt-1 w-4 h-4 accent-accent"
+        />
+        <div>
+          <div className="text-sm font-medium text-white">
+            Permitir analítica interna agregada
+          </div>
+          <div className="text-xs text-neutral-500 mt-0.5">
+            Activado por defecto. No se comparte con terceros.{" "}
+            <a href="/cookies" className="text-accent hover:underline">
+              Más información
+            </a>
+            .
+          </div>
+        </div>
+      </label>
     </div>
   );
 }

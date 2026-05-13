@@ -25,6 +25,7 @@ from app.api.stripe_routes import router as stripe_router
 from app.ws.server import router as ws_router
 from app.api.public_routes import router as public_router
 from app.api.apex_replay_routes import router as apex_replay_router
+from app.api.usage_routes import router as usage_router
 from app.chatbot.routes import router as chatbot_router
 
 logging.basicConfig(
@@ -70,6 +71,13 @@ async def lifespan(app: FastAPI):
     from app.tasks.trial_checker import periodic_trial_check
     trial_check_task = asyncio.create_task(periodic_trial_check(interval_hours=24))
 
+    # Usage analytics rollup — aggregates `usage_events` into
+    # `usage_daily` and purges raw events older than 30 days. Runs once
+    # daily; pre-aggregation is what makes the admin "Analítica → Uso"
+    # panel queries instant on weeks-long ranges.
+    from app.tasks.usage_rollup import periodic_usage_rollup
+    usage_rollup_task = asyncio.create_task(periodic_usage_rollup(interval_hours=24))
+
     logger.info("BoxboxNow v2 started (multi-tenant + CircuitHub)")
 
     yield
@@ -78,6 +86,7 @@ async def lifespan(app: FastAPI):
     compress_task.cancel()
     analytics_cleanup_task.cancel()
     trial_check_task.cancel()
+    usage_rollup_task.cancel()
     await registry.stop_all()
     await replay_registry.stop_all()
     await circuit_hub.stop_all()
@@ -114,6 +123,7 @@ app.include_router(stripe_router)
 app.include_router(ws_router)
 app.include_router(public_router)
 app.include_router(apex_replay_router)
+app.include_router(usage_router)
 app.include_router(chatbot_router)
 
 

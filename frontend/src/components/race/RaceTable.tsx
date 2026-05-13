@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n";
 import { msToLapTime, secondsToStint, secondsToHMS, tierHex, formatDifferential } from "@/lib/formatters";
 import { getDriverInfoForKart, DriverDetailsRow } from "@/components/shared/DriverDetails";
 import { sendBoxCall } from "@/lib/driverChannel";
+import { trackAction } from "@/lib/tracker";
 import { api } from "@/lib/api";
 // RainToggle was moved to the StatusBar (icon button) — no longer
 // rendered as a card in this view. Keep the import path documented
@@ -472,6 +473,7 @@ function BoxCallButton() {
 
   const handleClick = useCallback(() => {
     sendBoxCall();
+    trackAction("boxcall_sent", { from: "race" });
     setSent(true);
     setTimeout(() => setSent(false), 2000);
   }, []);

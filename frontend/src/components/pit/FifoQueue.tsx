@@ -6,6 +6,7 @@ import { useRaceClock } from "@/hooks/useRaceClock";
 import { useSimNow } from "@/hooks/useSimNow";
 import { tierHex, secondsToHMS, msToLapTime } from "@/lib/formatters";
 import { sendBoxCall } from "@/lib/driverChannel";
+import { trackAction } from "@/lib/tracker";
 import { computeStintMetrics } from "@/lib/stintCalc";
 import { api } from "@/lib/api";
 import type { FifoEntry } from "@/types/race";
@@ -689,6 +690,7 @@ function BoxCallButton() {
 
   const handleClick = useCallback(() => {
     sendBoxCall();
+    trackAction("boxcall_sent", { from: "pit" });
     setSent(true);
     setTimeout(() => setSent(false), 2000);
   }, []);

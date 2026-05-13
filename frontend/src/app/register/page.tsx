@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useSiteStatus } from "@/hooks/useSiteStatus";
 import { MaintenancePage } from "@/components/landing/MaintenancePage";
 import Link from "next/link";
+import { useTracker, useTrackerInit } from "@/hooks/useTracker";
+import { ensureVisitorId, getFirstTouch } from "@/lib/visitor";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -27,6 +29,26 @@ export default function RegisterPage() {
   const { maintenance, loading: siteLoading } = useSiteStatus();
   const router = useRouter();
   const [pendingPlan] = useState(getPlanFromUrl);
+
+  // Tracker init for users that landed directly on /register (e.g. from
+  // a paid ad with utm_*=...) without ever hitting the homepage. Without
+  // this they'd have no visitor_id and the funnel would lose them.
+  useTrackerInit();
+  const { trackFunnel } = useTracker();
+
+  // Funnel: register.view fires once on mount. register.start fires on
+  // the first keystroke in any field — guarded by registerStartFiredRef
+  // so the user doesn't trigger it repeatedly while typing.
+  const registerStartFiredRef = useRef(false);
+  useEffect(() => {
+    trackFunnel("register.view", pendingPlan ? { plan: pendingPlan } : undefined);
+  }, [trackFunnel, pendingPlan]);
+
+  const markStarted = () => {
+    if (registerStartFiredRef.current) return;
+    registerStartFiredRef.current = true;
+    trackFunnel("register.start", pendingPlan ? { plan: pendingPlan } : undefined);
+  };
 
   // Detect WebView/embedded browsers where Google OAuth is blocked
   const isWebView = typeof navigator !== "undefined" && (
@@ -96,11 +118,26 @@ export default function RegisterPage() {
     setFieldErrors({});
     setLoading(true);
 
+    // Pull visitor identity + first-touch attribution so the backend
+    // can close the funnel loop (link visitor_id → user_id and stamp
+    // the first_utm_* columns on VisitorIdentity).
+    const visitorId = ensureVisitorId();
+    const ft = getFirstTouch();
+
     try {
       const res = await fetch(`${API_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, username, password }),
+        body: JSON.stringify({
+          email,
+          username,
+          password,
+          visitor_id: visitorId,
+          utm_source: ft?.utm_source ?? null,
+          utm_medium: ft?.utm_medium ?? null,
+          utm_campaign: ft?.utm_campaign ?? null,
+          referrer: ft?.referrer ?? null,
+        }),
       });
 
       if (!res.ok) {
@@ -222,7 +259,7 @@ export default function RegisterPage() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { markStarted(); setEmail(e.target.value); }}
                 className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700 focus:outline-none focus:border-accent/50 transition-colors"
                 placeholder="tu@email.com"
                 required
@@ -242,7 +279,7 @@ export default function RegisterPage() {
               <input
                 type="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => { markStarted(); setUsername(e.target.value); }}
                 className="w-full bg-black border border-border rounded-lg px-4 py-3 text-sm text-white placeholder-neutral-700 focus:outline-none focus:border-accent/50 transition-colors"
                 placeholder="tu_usuario"
                 required

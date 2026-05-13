@@ -552,6 +552,29 @@ async def init_db():
             )
         """))
 
+        # ─── Usage analytics (F1 + F2 of the analytics rollout) ───
+        # `Base.metadata.create_all` above already creates the three
+        # tables (usage_events / visitor_identity / usage_daily) for new
+        # databases. The CREATE INDEX statements below are idempotent —
+        # they cover deployments where the tables existed before this
+        # migration shipped (none yet, but defensive).
+        await conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS ix_usage_events_visitor_ts
+            ON usage_events (visitor_id, ts)
+        """))
+        await conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS ix_usage_events_event_type_ts
+            ON usage_events (event_type, ts)
+        """))
+        # Unique constraint on (user_id, day, event_key) for usage_daily,
+        # treating NULL user_id as a single bucket via COALESCE — SQLite's
+        # default behaviour is "NULL is distinct in unique indexes", which
+        # would let us insert duplicate anonymous rows.
+        await conn.execute(text("""
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_usage_daily_user_day_event
+            ON usage_daily (COALESCE(user_id, -1), day, event_key)
+        """))
+
 async def get_db():
     async with async_session() as session:
         yield session

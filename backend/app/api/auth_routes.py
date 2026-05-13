@@ -840,6 +840,37 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
         app_platform=app_platform, app_version=app_version,
     )
     db.add(device_session)
+
+    # Analytics — link anonymous visitor → fresh user_id + emit
+    # register.completed funnel event. Server-side because the
+    # frontend could lose the event to a network blip mid-redirect
+    # and we'd never recover the attribution. Same transaction as the
+    # DeviceSession so it commits atomically with the registration.
+    from app.services.usage_events import link_visitor_to_user, record_event
+    await link_visitor_to_user(
+        db,
+        visitor_id=data.visitor_id,
+        user_id=user.id,
+        utm_source=data.utm_source,
+        utm_medium=data.utm_medium,
+        utm_campaign=data.utm_campaign,
+        referrer=data.referrer,
+    )
+    await record_event(
+        db,
+        event_type="funnel",
+        event_key="register.completed",
+        user_id=user.id,
+        visitor_id=data.visitor_id,
+        client_kind="mobile" if (app_platform or "").lower() in ("ios", "android") else "web",
+        app_platform=app_platform or "web",
+        app_version=app_version or None,
+        utm_source=data.utm_source,
+        utm_medium=data.utm_medium,
+        utm_campaign=data.utm_campaign,
+        referrer=data.referrer,
+    )
+
     await db.commit()
 
     # Reload with tab_access
@@ -1025,6 +1056,25 @@ async def login(
         app_version=app_version,
     )
     db.add(device_session)
+
+    # Analytics — keep visitor_id ↔ user_id mapping alive across
+    # sessions (so a returning user from a different browser also gets
+    # stitched), and emit login.completed for the funnel.
+    from app.services.usage_events import link_visitor_to_user, record_event
+    await link_visitor_to_user(
+        db, visitor_id=data.visitor_id, user_id=user.id,
+    )
+    await record_event(
+        db,
+        event_type="funnel",
+        event_key="login.completed",
+        user_id=user.id,
+        visitor_id=data.visitor_id,
+        client_kind=client_kind,
+        app_platform=app_platform or ("mobile" if client_kind == "mobile" else "web"),
+        app_version=app_version or None,
+    )
+
     await db.commit()
 
     # Create JWT with session_token embedded

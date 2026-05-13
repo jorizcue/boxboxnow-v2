@@ -82,6 +82,21 @@ export default function CookiesPage() {
                 </tr>
                 <tr className="border-b border-neutral-900">
                   <td className="py-3 pr-4 font-mono text-xs text-neutral-300">
+                    bbn_vid, bbn_ft (localStorage)
+                  </td>
+                  <td className="py-3 pr-4">Analítica / Primera parte</td>
+                  <td className="py-3 pr-4">
+                    Identificador anónimo (UUID) y captura de la primera fuente
+                    de visita (UTM / referrer). Se usan internamente para medir
+                    el uso agregado de la plataforma y entender cómo se llega
+                    a ella. Nunca se comparten con terceros. Puedes
+                    desactivarlas en{" "}
+                    <strong className="text-neutral-300">Cuenta → Privacidad</strong>.
+                  </td>
+                  <td className="py-3">Persistente / mientras no se borre el navegador</td>
+                </tr>
+                <tr className="border-b border-neutral-900">
+                  <td className="py-3 pr-4 font-mono text-xs text-neutral-300">
                     __stripe_mid, __stripe_sid
                   </td>
                   <td className="py-3 pr-4">Técnica / Tercero</td>
@@ -117,8 +132,10 @@ export default function CookiesPage() {
           <ul className="list-disc list-inside space-y-2 text-neutral-400 ml-2">
             <li>Cookies de publicidad ni seguimiento publicitario.</li>
             <li>
-              Herramientas de analítica de comportamiento (como Google Analytics
-              u otras plataformas similares).
+              Herramientas de analítica de terceros (Google Analytics, Plausible,
+              Mixpanel, PostHog, etc.). Toda la analítica que realizamos es
+              first-party — los datos quedan en nuestros servidores y no se
+              comparten con nadie.
             </li>
             <li>
               Píxeles de seguimiento de redes sociales (Facebook, X/Twitter,
@@ -126,6 +143,9 @@ export default function CookiesPage() {
             </li>
             <li>
               Cookies de afiliación o de seguimiento entre sitios.
+            </li>
+            <li>
+              Grabaciones de sesión ni mapas de calor de coordenadas del ratón.
             </li>
           </ul>
         </section>
@@ -144,6 +164,15 @@ export default function CookiesPage() {
             Las cookies de Stripe se activan únicamente cuando el usuario inicia
             un proceso de pago, siendo necesarias para garantizar la seguridad
             de la transacción.
+          </p>
+          <p>
+            El identificador anónimo de analítica interna (<code className="text-neutral-300">bbn_vid</code>,{" "}
+            <code className="text-neutral-300">bbn_ft</code>) se utiliza bajo la
+            base legal del <strong className="text-white">interés legítimo</strong>{" "}
+            del responsable para conocer el uso agregado del servicio y mejorarlo.
+            Los datos son agregados, no se ceden a terceros y puedes oponerte
+            en cualquier momento desactivándolos desde{" "}
+            <strong className="text-neutral-300">Cuenta → Privacidad</strong>.
           </p>
         </section>
 
