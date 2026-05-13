@@ -1454,10 +1454,10 @@ async def update_billing_info(
         user.stripe_customer_id = customer.id
         await db.commit()
 
-    name: str = body.get("name") or ""
+    name: str = (body.get("name") or "").strip()
     address: dict = body.get("address") or {}
-    tax_id_type: str = body.get("tax_id_type") or ""
-    tax_id_value: str = body.get("tax_id_value") or ""
+    tax_id_type: str = (body.get("tax_id_type") or "").strip()
+    tax_id_value: str = (body.get("tax_id_value") or "").strip().upper().replace(" ", "")
 
     # Build customer update payload
     update_params: dict = {}
@@ -1476,17 +1476,50 @@ async def update_billing_info(
 
     # Replace tax IDs: delete existing, then create new one if provided
     if tax_id_type and tax_id_value:
+        # Stripe expects `eu_vat` values prefixed with the 2-letter
+        # country code (ES46937098D, ESB12345678, etc). Users typically
+        # write just the NIF (46937098D) — normalise it before sending.
+        # We only auto-prefix `eu_vat`; `es_cif` historically takes the
+        # value without prefix.
+        if tax_id_type == "eu_vat":
+            # Already starts with a 2-letter country prefix?
+            if not (len(tax_id_value) >= 2 and tax_id_value[:2].isalpha()):
+                country = (address.get("country") or "ES").upper()[:2] if address else "ES"
+                tax_id_value = f"{country}{tax_id_value}"
+
         existing = s.Customer.list_tax_ids(user.stripe_customer_id, limit=10)
         for tid in existing.data:
             try:
                 s.Customer.delete_tax_id(user.stripe_customer_id, tid.id)
             except Exception:
                 pass
-        s.Customer.create_tax_id(
-            user.stripe_customer_id,
-            type=tax_id_type,
-            value=tax_id_value,
-        )
+        try:
+            s.Customer.create_tax_id(
+                user.stripe_customer_id,
+                type=tax_id_type,
+                value=tax_id_value,
+            )
+        except stripe.error.InvalidRequestError as e:
+            # Stripe rejects malformed NIFs/VATs with a 400 — surface a
+            # friendly Spanish message instead of bubbling up as 500.
+            msg = (getattr(e, "user_message", None) or str(e)).strip()
+            logger.warning(
+                f"Stripe rejected tax_id {tax_id_type}={tax_id_value} "
+                f"for customer {user.stripe_customer_id}: {msg}"
+            )
+            raise HTTPException(
+                400,
+                f"El identificador fiscal no tiene un formato válido. "
+                f"Para España usa el formato ES + NIF/CIF (ej. ES46937098D "
+                f"o ESB12345678). Detalle Stripe: {msg}",
+            )
+        except Exception as e:
+            logger.error(
+                f"Unexpected error creating tax_id {tax_id_type}={tax_id_value} "
+                f"for customer {user.stripe_customer_id}: {e}",
+                exc_info=True,
+            )
+            raise HTTPException(400, "No se pudo guardar el identificador fiscal.")
 
     return {"ok": True}
 

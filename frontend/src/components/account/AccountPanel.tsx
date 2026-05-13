@@ -33,8 +33,11 @@ const EU_COUNTRIES = [
 ];
 
 const TAX_ID_TYPES = [
-  ["eu_vat", "NIF-IVA / VAT-UE (ej: ESB12345678)"],
-  ["es_cif", "CIF (empresas españolas)"],
+  // Personal NIF (DNI) o empresa española → Stripe `eu_vat`: el
+  // backend añade el prefijo `ES` automáticamente si el usuario no
+  // lo escribe (ej. acepta `46937098D` y lo envía como `ES46937098D`).
+  ["eu_vat", "NIF / CIF / VAT-UE"],
+  ["es_cif", "CIF antiguo (empresas, sin prefijo ES)"],
 ];
 
 interface Sub {
@@ -500,12 +503,18 @@ export function AccountPanel() {
               </label>
               <input
                 type="text"
-                placeholder={billingTaxType === "eu_vat" ? "ESB12345678" : "A12345678"}
+                placeholder={billingTaxType === "eu_vat" ? "46937098D o ESB12345678" : "B12345678"}
                 value={billingTaxValue}
                 onChange={(e) => setBillingTaxValue(e.target.value.toUpperCase())}
                 disabled={!billingTaxType}
                 className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-accent/50 disabled:opacity-40"
               />
+              {billingTaxType === "eu_vat" && (
+                <p className="text-[10px] text-neutral-500 mt-1 leading-relaxed">
+                  Para España puedes escribir solo el NIF/CIF (sin prefijo
+                  &quot;ES&quot;) — lo añadimos automáticamente al enviarlo a Stripe.
+                </p>
+              )}
             </div>
           </div>
 

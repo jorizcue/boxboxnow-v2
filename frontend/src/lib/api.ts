@@ -39,10 +39,30 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`API error ${res.status}: ${body}`);
+    throw new Error(await extractErrorMessage(res));
   }
   return res.json();
+}
+
+/**
+ * Pull a human-readable message out of an error response.
+ * FastAPI returns `{ "detail": "..." }` (or `[{loc, msg, type}, ...]` for
+ * validation errors). We surface just `detail` when present so the UI
+ * shows the Spanish message backend authors wrote, instead of the raw
+ * JSON wrapper or the unhelpful "Internal Server Error" status text.
+ */
+async function extractErrorMessage(res: Response): Promise<string> {
+  const text = await res.text();
+  try {
+    const parsed = JSON.parse(text);
+    if (typeof parsed?.detail === "string") return parsed.detail;
+    if (Array.isArray(parsed?.detail) && parsed.detail[0]?.msg) {
+      return parsed.detail.map((d: { msg: string }) => d.msg).join("; ");
+    }
+  } catch {
+    // Not JSON — fall through.
+  }
+  return text ? `Error ${res.status}: ${text}` : `Error ${res.status}`;
 }
 
 /** Fetch that does NOT auto-clear auth on 401 (for login flow). Returns raw Response for header inspection. */
@@ -57,8 +77,7 @@ async function fetchRawResponse(path: string, options?: RequestInit): Promise<Re
 async function fetchRaw<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetchRawResponse(path, options);
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`API error ${res.status}: ${body}`);
+    throw new Error(await extractErrorMessage(res));
   }
   return res.json();
 }
