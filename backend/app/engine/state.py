@@ -1224,17 +1224,71 @@ class RaceStateManager:
     def _compute_pit_status_dict(self) -> dict:
         """Wrapper that calls into `app.engine.pit_gate.compute_pit_status`
         and returns the result as a plain dict ready for JSON serialization.
-        Failures are swallowed: the pit-gate is non-critical telemetry, we
-        don't want a bug in the feasibility check to take down the WS
-        broadcast for the rest of the race state.
+
+        Fail-safe on exception: returns `is_open=False` with a synthetic
+        `compute_error` close reason. Previously this fell back to
+        `is_open=True`, which is the wrong default — if the feasibility
+        check crashes we'd rather the strategist see PIT CERRADO and
+        ask "why?" than see PIT ABIERTO and trust an answer the engine
+        wasn't able to compute. The result is intentionally indistinguishable
+        from a normal close in the badge label, so a transient bug doesn't
+        broadcast a misleading green badge to the live race screen.
         """
         try:
             from app.engine.pit_gate import compute_pit_status
-            return compute_pit_status(self).to_dict()
+            result = compute_pit_status(self)
+            # Diagnostic log when the gate opens despite min_driver_time
+            # constraints being on the table. Keeps the data we need to
+            # reconstruct any future "should have been closed" report
+            # without flooding the normal log volume — only fires when
+            # someone has a chance of being affected.
+            try:
+                if (
+                    result.is_open
+                    and (getattr(self, "min_driver_time_min", 0) or 0) > 0
+                    and result.drivers
+                    and any(d.remaining_ms > 0 for d in result.drivers)
+                ):
+                    our_kart_n = getattr(self, "our_kart_number", 0) or 0
+                    our_kart = next(
+                        (k for k in self.karts.values() if k.kart_number == our_kart_n),
+                        None,
+                    )
+                    pit_count = getattr(our_kart, "pit_count", -1) if our_kart else -1
+                    pit_status_val = (
+                        getattr(our_kart, "pit_status", "?") if our_kart else "?"
+                    )
+                    import logging
+                    logging.getLogger(__name__).info(
+                        "pit_gate OPEN with unmet driver_min: "
+                        f"our_kart={our_kart_n} pit_count={pit_count} "
+                        f"pit_status={pit_status_val} min_pits={self.min_pits} "
+                        f"countdown_ms={self.countdown_ms} "
+                        f"min_driver_time_min={self.min_driver_time_min} "
+                        f"team_drivers_count={getattr(self, 'team_drivers_count', 0)} "
+                        f"min_stint={self.min_stint_min} max_stint={self.max_stint_min} "
+                        f"pit_time_s={self.pit_time_s} "
+                        f"drivers=" + str([
+                            f"{d.name!r}:acc={d.accumulated_ms}ms,rem={d.remaining_ms}ms"
+                            for d in result.drivers
+                        ])
+                    )
+            except Exception:
+                pass  # never let logging itself crash the broadcast
+            return result.to_dict()
         except Exception:
             import logging
-            logging.getLogger(__name__).exception("pit_gate compute failed")
-            return {"is_open": True, "close_reason": None, "drivers": []}
+            logging.getLogger(__name__).exception(
+                "pit_gate compute failed — falling back to CLOSED (fail-safe)"
+            )
+            return {
+                "is_open": False,
+                "close_reason": "compute_error",
+                "blocking_driver": None,
+                "blocking_driver_remaining_ms": 0,
+                "next_open_countdown_ms": None,
+                "drivers": [],
+            }
 
     async def _broadcast(self, message: dict):
         """Send message to all connected browser clients."""
