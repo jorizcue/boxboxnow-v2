@@ -2,6 +2,7 @@
 
 import { Navbar } from "@/components/landing/Navbar";
 import { PricingToggle } from "@/components/landing/PricingToggle";
+import { FeatureComparisonTable } from "@/components/landing/FeatureComparisonTable";
 import { LiveTicker } from "@/components/landing/LiveTicker";
 import { MiniRaceTable } from "@/components/landing/MiniRaceTable";
 import { TrialCTA, TrialSubtitle } from "@/components/landing/TrialCTA";
@@ -399,6 +400,7 @@ export function MarketingHome() {
             </p>
           </div>
           <PricingToggle />
+          <FeatureComparisonTable />
         </div>
       </section>
 

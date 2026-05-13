@@ -35,13 +35,112 @@ interface GroupedPlan {
   sort_order: number;
 }
 
-// Hardcoded fallback if API is unavailable
+// Fallback when /api/plans returns nothing. The admin should populate
+// real plans + Stripe price_ids from Admin → Plataforma → Productos;
+// these fallback rows are what the landing shows in development /
+// before that's done. The 5-plan layout below mirrors what we
+// announced commercially:
+//
+//   Individual            → mensual + anual
+//   Endurance Básico      → solo mensual
+//   Endurance Pro         → mensual + anual
+//
+// Each card aggregates monthly + annual prices of the same `base_type`
+// (Individual / Endurance Pro), and the toggle picks which to show.
+// Endurance Básico has no annual row, so when the toggle is on
+// "Anual" the card stays in monthly mode with a "Solo mensual" hint
+// (handled in render — see `pickAnnualOrFallbackMonthly`).
 const FALLBACK_PLANS: PlanData[] = [
-  { plan_type: "basic_monthly", display_name: "Basico", description: null, features: ["1 circuito incluido", "Posiciones en tiempo real", "Gestion de boxes", "Clasificacion real", "Vista de piloto", "Hasta 2 dispositivos"], price_amount: 49, billing_interval: "month", is_popular: false, sort_order: 1 },
-  { plan_type: "basic_annual", display_name: "Basico", description: null, features: ["1 circuito incluido", "Posiciones en tiempo real", "Gestion de boxes", "Clasificacion real", "Vista de piloto", "Hasta 2 dispositivos"], price_amount: 490, billing_interval: "year", is_popular: false, sort_order: 1 },
-  { plan_type: "pro_monthly", display_name: "Pro", description: null, features: ["1 circuito incluido", "Todo en Basico +", "Analitica de karts", "GPS Insights", "Replay de carreras", "Hasta 5 dispositivos", "Soporte prioritario"], price_amount: 79, billing_interval: "month", is_popular: true, sort_order: 2 },
-  { plan_type: "pro_annual", display_name: "Pro", description: null, features: ["1 circuito incluido", "Todo en Basico +", "Analitica de karts", "GPS Insights", "Replay de carreras", "Hasta 5 dispositivos", "Soporte prioritario"], price_amount: 790, billing_interval: "year", is_popular: true, sort_order: 2 },
-  { plan_type: "event", display_name: "Evento", description: null, features: ["Acceso completo 48h", "1 circuito", "Todas las funcionalidades", "Hasta 3 dispositivos", "Sin compromiso"], price_amount: 50, billing_interval: "one_time", is_popular: false, sort_order: 3 },
+  // ── Individual ──
+  {
+    plan_type: "individual_monthly",
+    display_name: "Individual",
+    description: "Para el piloto que corre por su cuenta",
+    features: [
+      "1 circuito",
+      "App móvil · 1 usuario",
+      "Vista de piloto",
+      "Configuración de carrera",
+    ],
+    price_amount: 8.99,
+    billing_interval: "month",
+    is_popular: false,
+    sort_order: 1,
+  },
+  {
+    plan_type: "individual_annual",
+    display_name: "Individual",
+    description: "Para el piloto que corre por su cuenta",
+    features: [
+      "Todos los circuitos",
+      "App móvil · 1 usuario",
+      "Vista de piloto",
+      "Configuración de carrera",
+      "GPS Insights",
+      "2 meses gratis",
+    ],
+    price_amount: 89.9,
+    billing_interval: "year",
+    is_popular: false,
+    sort_order: 1,
+  },
+
+  // ── Endurance Básico (sólo mensual) ──
+  {
+    plan_type: "endurance_basic_monthly",
+    display_name: "Endurance Básico",
+    description: "Para equipos o circuitos pequeños que empiezan",
+    features: [
+      "1 circuito",
+      "App móvil · 2 usuarios",
+      "Acceso web · 1 usuario",
+      "Módulo carrera + módulo box",
+      "Live Apex",
+    ],
+    price_amount: 49,
+    billing_interval: "month",
+    is_popular: false,
+    sort_order: 2,
+  },
+
+  // ── Endurance Pro ──
+  {
+    plan_type: "endurance_pro_monthly",
+    display_name: "Endurance Pro",
+    description: "Para equipos avanzados y circuitos serios",
+    features: [
+      "3 circuitos",
+      "App móvil · 6 usuarios",
+      "Acceso web · 2 usuarios",
+      "Todo lo de Endurance Básico",
+      "Análisis de karts",
+      "Replay y GPS Insights (limitado)",
+      "Soporte prioritario",
+    ],
+    price_amount: 79,
+    billing_interval: "month",
+    is_popular: true,
+    sort_order: 3,
+  },
+  {
+    plan_type: "endurance_pro_annual",
+    display_name: "Endurance Pro",
+    description: "Para equipos avanzados y circuitos serios",
+    features: [
+      "Todos los circuitos",
+      "App móvil · 6 usuarios",
+      "Acceso web · 2 usuarios",
+      "Todo lo de Endurance Básico",
+      "Análisis de karts",
+      "Replay y GPS Insights completos",
+      "Soporte prioritario",
+      "2 meses gratis",
+    ],
+    price_amount: 790,
+    billing_interval: "year",
+    is_popular: true,
+    sort_order: 3,
+  },
 ];
 
 /**
@@ -95,17 +194,28 @@ function groupPlans(raw: PlanData[]): GroupedPlan[] {
   return Array.from(map.values()).sort((a, b) => a.sort_order - b.sort_order);
 }
 
+// Accent gradient for the 1px bar at the top of each card. Keys are
+// substring-matched against base_type (e.g. "endurance_pro" matches
+// the "endurance_pro" key). The order below matters — the most
+// specific key has to win, so "endurance_pro" is checked before
+// "endurance_basic" before "individual".
 const tierColors: Record<string, string> = {
-  basic: "from-muted/30 to-muted/10",
+  endurance_pro: "from-accent to-accent-hover",
+  endurance_basic: "from-cyan-400 to-cyan-600",
+  individual: "from-muted/30 to-muted/10",
+  // Legacy keys kept so admin-created plans with the old names still
+  // render a sensible bar instead of falling through to the default.
   pro: "from-accent to-accent-hover",
+  basic: "from-cyan-400 to-cyan-600",
   event: "from-gold to-yellow-500",
 };
 
 function getTierGradient(baseType: string): string {
+  const bt = baseType.toLowerCase();
   for (const key of Object.keys(tierColors)) {
-    if (baseType.toLowerCase().includes(key)) return tierColors[key];
+    if (bt.includes(key)) return tierColors[key];
   }
-  return tierColors.basic;
+  return tierColors.individual;
 }
 
 export function PricingToggle() {
@@ -158,6 +268,14 @@ export function PricingToggle() {
     return () => io.disconnect();
   }, [loading, trackFunnel]);
 
+  /** True iff the visitor flipped the toggle to "Anual" AND this plan
+   *  actually has an annual price. Endurance Básico for example has
+   *  no annual row in the catalog, so it stays on monthly even when
+   *  the toggle is on — pricing display + CTA both fall back to the
+   *  monthly plan rather than disappearing from the grid. */
+  const effectivelyAnnual = (p: GroupedPlan): boolean =>
+    annual && p.price_annual != null;
+
   const planLink = (p: GroupedPlan) => {
     // Use the exact plan_type from the DB so the /register → /dashboard
     // round-trip preserves it (required so per_circuit lookup matches).
@@ -165,22 +283,28 @@ export function PricingToggle() {
       const evt = p.plan_type_event ?? "event";
       return `/register?plan=${encodeURIComponent(evt)}`;
     }
-    const exact = annual ? p.plan_type_annual : p.plan_type_monthly;
-    // Fallback (shouldn't happen with real data): reconstruct from base.
-    const planParam = exact ?? `${p.base_type}${annual ? "_annual" : "_monthly"}`;
+    // Pick the annual plan_type when the toggle is on AND it exists;
+    // otherwise drop back to monthly so the CTA still works for the
+    // monthly-only Endurance Básico.
+    const exact = effectivelyAnnual(p) ? p.plan_type_annual : p.plan_type_monthly;
+    const planParam = exact ?? `${p.base_type}${effectivelyAnnual(p) ? "_annual" : "_monthly"}`;
     return `/register?plan=${encodeURIComponent(planParam)}`;
   };
 
   const planButtonText = (p: GroupedPlan) => {
     if (p.is_event) return "Comprar evento";
-    if (p.is_popular) return trialDays > 0 ? "Empezar ahora" : "Empezar ahora";
-    return trialDays > 0 ? `Probar gratis ${trialDays} dias` : "Suscribirse";
+    if (p.is_popular) return "Empezar ahora";
+    return trialDays > 0 ? `Probar gratis ${trialDays} días` : "Suscribirse";
   };
 
-  const planButtonHref = (p: GroupedPlan) => {
-    if (trialDays > 0 || p.is_event) return planLink(p);
-    return planLink(p);
-  };
+  const planButtonHref = (p: GroupedPlan) => planLink(p);
+
+  /** Pretty-print a price in es-ES (e.g. 89.90 → "89,90"). */
+  const formatPrice = (value: number): string =>
+    value.toLocaleString("es-ES", {
+      minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+      maximumFractionDigits: 2,
+    });
 
   if (loading) {
     return (
@@ -225,7 +349,7 @@ export function PricingToggle() {
         </span>
         {annual && (
           <span className="rounded-full bg-accent/15 border border-accent/20 px-3 py-1 text-xs font-bold text-accent font-mono">
-            -17%
+            2 meses gratis
           </span>
         )}
       </div>
@@ -270,19 +394,48 @@ export function PricingToggle() {
                 <div className="flex items-baseline gap-1">
                   <span className="stat-number text-4xl font-bold text-white">
                     {plan.is_event
-                      ? `${plan.price_event ?? 0}`
-                      : annual
-                      ? `${plan.price_annual ?? 0}`
-                      : `${plan.price_monthly ?? 0}`}
+                      ? formatPrice(plan.price_event ?? 0)
+                      : effectivelyAnnual(plan)
+                        ? formatPrice(plan.price_annual ?? 0)
+                        : formatPrice(plan.price_monthly ?? 0)}
                   </span>
                   <span className="text-lg text-muted/40">&euro;</span>
                   <span className="text-sm text-muted/30 ml-1">
-                    {plan.is_event ? "/evento" : annual ? "/a\u00F1o" : "/mes"}
+                    {plan.is_event ? "/evento" : effectivelyAnnual(plan) ? "/a\u00F1o" : "/mes"}
                   </span>
                 </div>
-                {annual && !plan.is_event && plan.price_monthly && (
+
+                {/* Equivalent monthly under an annual price \u2014 keep 2
+                    decimals because individual_annual is 89,90 \u20AC \u2192
+                    7,49 \u20AC/mes (rounding to 7 would mislead). */}
+                {effectivelyAnnual(plan) && plan.price_annual && (
                   <p className="font-mono text-xs text-muted/25 mt-1">
-                    equiv. {Math.round((plan.price_annual ?? 0) / 12)}&euro;/mes
+                    equiv. {formatPrice((plan.price_annual ?? 0) / 12)}&euro;/mes
+                  </p>
+                )}
+
+                {/* Honest savings badge on the annual variant. Only
+                    when the plan also has a monthly price to compare
+                    against \u2014 Endurance B\u00E1sico doesn't qualify. */}
+                {effectivelyAnnual(plan) && plan.price_monthly && plan.price_annual && (
+                  (() => {
+                    const fullYear = plan.price_monthly * 12;
+                    const savePct = Math.round((1 - plan.price_annual / fullYear) * 100);
+                    if (savePct <= 0) return null;
+                    return (
+                      <span className="inline-block mt-2 rounded-full bg-accent/15 border border-accent/30 px-2.5 py-0.5 text-[10px] font-semibold text-accent">
+                        2 meses gratis \u00B7 ahorras {savePct}%
+                      </span>
+                    );
+                  })()
+                )}
+
+                {/* User flipped the toggle to "Anual" but this plan
+                    only sells monthly. We keep the card visible and
+                    explain why instead of vanishing from the grid. */}
+                {annual && !plan.is_event && plan.price_annual == null && (
+                  <p className="mt-2 text-[11px] text-muted/40">
+                    Solo disponible en mensual.
                   </p>
                 )}
               </div>
@@ -314,15 +467,16 @@ export function PricingToggle() {
                   // Funnel: plan click. We don't preventDefault — the
                   // navigation continues. tracker.ts uses sendBeacon on
                   // pagehide so the event survives the page transition.
+                  const isAnnual = effectivelyAnnual(plan);
                   const planParam =
                     plan.is_event
                       ? (plan.plan_type_event ?? "event")
-                      : (annual ? plan.plan_type_annual : plan.plan_type_monthly)
-                          ?? `${plan.base_type}${annual ? "_annual" : "_monthly"}`;
+                      : (isAnnual ? plan.plan_type_annual : plan.plan_type_monthly)
+                          ?? `${plan.base_type}${isAnnual ? "_annual" : "_monthly"}`;
                   trackFunnel("pricing.plan_click", {
                     plan_type: planParam,
                     base_type: plan.base_type,
-                    interval: plan.is_event ? "event" : annual ? "annual" : "monthly",
+                    interval: plan.is_event ? "event" : isAnnual ? "annual" : "monthly",
                     is_popular: plan.is_popular,
                   });
                 }}
