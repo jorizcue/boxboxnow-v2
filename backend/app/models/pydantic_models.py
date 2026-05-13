@@ -332,7 +332,7 @@ class RaceSessionOut(BaseModel):
     box_karts: int
     our_kart_number: int
     refresh_interval_s: int
-    auto_load_teams: bool = True
+    auto_load_teams: bool = False
     # Number of drivers in the team. 0 = not configured; the pit-gate
     # feasibility check falls back to counting Apex-observed drivers.
     team_drivers_count: int = 0
@@ -358,7 +358,7 @@ class RaceSessionCreate(BaseModel):
     box_karts: int = 30
     our_kart_number: int = 0
     refresh_interval_s: int = 30
-    auto_load_teams: bool = True
+    auto_load_teams: bool = False
     team_drivers_count: int = 0
 
 

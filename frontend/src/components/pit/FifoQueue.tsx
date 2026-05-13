@@ -321,12 +321,27 @@ export function FifoQueue() {
             )}
           </div>
 
-          {/* Laps to max stint */}
+          {/* Laps to max stint — same colour logic as the equivalent card
+              in DriverView (Vista Piloto): red when pit is forced closed or
+              ≤ 2 laps left, orange at ≤ 5, green when the pit window is open,
+              neutral otherwise. Previously this read text-neutral-200 always,
+              which was inconsistent with the Carrera/Driver view. */}
           <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.lapsToMaxStint")}
             </span>
-            <span className="text-lg sm:text-xl font-mono font-black leading-none text-neutral-200">
+            <span className={clsx(
+              "text-lg sm:text-xl font-mono font-black leading-none",
+              pitStatus?.isOpen === false
+                ? "text-red-400"
+                : lapsToMaxStint > 0 && lapsToMaxStint <= 2
+                  ? "text-red-400 animate-pulse"
+                  : lapsToMaxStint > 0 && lapsToMaxStint <= 5
+                    ? "text-orange-400"
+                    : pitStatus?.isOpen === true
+                      ? "text-green-400"
+                      : "text-neutral-200"
+            )}>
               {lapsToMaxStint > 0 ? lapsToMaxStint.toFixed(1) : "0"}
             </span>
           </div>

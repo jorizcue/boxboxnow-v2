@@ -171,8 +171,14 @@ class RaceSession(Base):
     our_kart_number = Column(Integer, default=0)
     refresh_interval_s = Column(Integer, default=30)
 
-    # Team auto-load
-    auto_load_teams = Column(Boolean, default=True, nullable=False)
+    # Team auto-load — desactivado por defecto. Cuando está ON la app
+    # vuelve a recargar la plantilla de equipos/pilotos del backend cada
+    # vez que llega un `teams_updated` por WebSocket (típicamente al
+    # arrancar la carrera). Por petición del usuario lo dejamos OFF por
+    # defecto: que el strategist active manualmente la opción si quiere
+    # ese comportamiento — la mayoría prefiere editar a mano los
+    # equipos sin que un broadcast sobreescriba su trabajo.
+    auto_load_teams = Column(Boolean, default=False, nullable=False)
 
     # Number of drivers in the team. Used by the pit-gate feasibility check
     # (pit_gate.py) to decide whether pitting now still allows every driver

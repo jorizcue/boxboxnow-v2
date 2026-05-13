@@ -48,7 +48,12 @@ export function TeamEditor() {
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
-  const [autoLoad, setAutoLoad] = useState(true);
+  // Off-by-default: the user prefers manual control of the teams panel
+  // and not have a `teams_updated` broadcast clobber their edits at
+  // race-start. Backend default also changed to False; the `?? false`
+  // below is a belt-and-braces fallback for legacy sessions where the
+  // API returns null.
+  const [autoLoad, setAutoLoad] = useState(false);
   const teamsUpdatedAt = useRaceStore((s) => s.teamsUpdatedAt);
   const initialLoadDone = useRef(false);
 
@@ -63,7 +68,7 @@ export function TeamEditor() {
       try {
         const session = await api.getActiveSession();
         if (session) {
-          setAutoLoad(session.auto_load_teams ?? true);
+          setAutoLoad(session.auto_load_teams ?? false);
         }
       } catch {}
       await loadTeams();
