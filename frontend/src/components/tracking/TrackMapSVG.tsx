@@ -62,7 +62,8 @@ import {
   polylineBounds,
   type LatLonBounds,
 } from "@/lib/svgPath";
-import { isKartInPit } from "@/lib/kartPosition";
+import { computeKartProgressM, isKartInPit } from "@/lib/kartPosition";
+import { pointAtDistance } from "@/lib/polyline";
 
 function tierColor(score: number | undefined): string {
   const s = score ?? 0;
@@ -87,36 +88,17 @@ interface Props {
   direction: "forward" | "reversed";
 }
 
-/** Resolve the path used to constrain a kart's motion AND the duration
- *  of one full traversal of that path. For now we always use the
- *  full-lap "track" path with lap-time duration: sectors are deferred
- *  until we have hand-drawn per-segment paths and a per-segment
- *  duration estimate from `lastSectorCountdownMs` deltas. */
-function resolveSegment(
-  kart: KartState,
-  trackPath: string,
-  lapMs: number,
-): { d: string; durationMs: number } {
-  // `lapMs` is already the kart's best single-number lap estimate; the
-  // caller picked it (lastLapMs → avgLapMs → 0 fallback handled below).
-  return { d: trackPath, durationMs: lapMs };
-}
-
-/** Compute the 0…100 percentage along the kart's current segment. */
-function progressPercent(
-  kart: KartState,
-  countdownMs: number,
-  durationMs: number,
-  direction: "forward" | "reversed",
-): number {
-  const anchor = kart.lastLapCompleteCountdownMs ?? 0;
-  if (anchor <= 0 || durationMs <= 0) return 0;
-  const elapsed = Math.max(0, anchor - countdownMs);
-  // Hard cap at 99.5 % so the marker doesn't visually finish the lap
-  // before the LAP event lands and trigger a backward snap on event
-  // arrival.
-  const raw = Math.min(0.995, elapsed / durationMs);
-  return direction === "reversed" ? (1 - raw) * 100 : raw * 100;
+/** Convert a polyline-walk distance (m) to a percentage along the SVG
+ *  path. The auto-generated path starts at polyline[0] and follows
+ *  vertices in order, so `polyline-walk = 0m` → 0 % and
+ *  `polyline-walk = trackLengthM` → 100 %. This mapping holds
+ *  regardless of where META lives on the polyline because we already
+ *  passed `direction` to `computeKartProgressM` and it returned the
+ *  correct polyline-walk distance. */
+function pctFromPolylineWalk(walkM: number, totalM: number): number {
+  if (totalM <= 0) return 0;
+  const wrapped = ((walkM % totalM) + totalM) % totalM;
+  return (wrapped / totalM) * 100;
 }
 
 export function TrackMapSVG({
@@ -149,18 +131,18 @@ export function TrackMapSVG({
   }, [trackConfig.svgViewbox, trackConfig.svgPaths, trackConfig.trackPolyline]);
 
   // Pit-in / pit-out / META in SVG coords (for the static markers).
+  // META is the polyline point at `metaDistanceM` — NOT polyline[0],
+  // which is only the start of the operator's tracing. For Ariza,
+  // metaDistanceM = 619.48 on a 707.90 m polyline, so polyline[0] is
+  // at the bottom-right of the track and META is up on the top straight.
   const sensorPoints = useMemo(() => {
     if (!geom.bounds) return { meta: null, pitIn: null, pitOut: null };
     const proj = (lat: number, lon: number) => projectLatLon(lat, lon, geom.bounds as LatLonBounds);
     const polyline = trackConfig.trackPolyline;
     let meta: [number, number] | null = null;
-    if (polyline && polyline.length > 0) {
-      // META on the polyline at `metaDistanceM`. We don't reuse the
-      // backend's pointAtDistance here for simplicity: vertex 0 is a
-      // good-enough proxy for circuits where metaDistanceM is small,
-      // and for circuits with a non-zero offset the operator will
-      // eventually trace the SVG path with META at the path's start.
-      const [lat, lon] = polyline[0];
+    if (polyline && polyline.length >= 2) {
+      const metaDist = trackConfig.metaDistanceM ?? 0;
+      const [lat, lon] = pointAtDistance(polyline, metaDist, true);
       meta = proj(lat, lon);
     }
     const pitIn = trackConfig.pitEntryLat != null && trackConfig.pitEntryLon != null
@@ -172,27 +154,33 @@ export function TrackMapSVG({
     return { meta, pitIn, pitOut };
   }, [geom.bounds, trackConfig]);
 
-  // Kart positions on every render. The expensive geometry is memoised
-  // above; this loop is cheap arithmetic per kart.
+  // Kart positions on every render. We delegate the actual math to
+  // `computeKartProgressM`, which already returns a polyline-walk
+  // distance in metres accounting for race direction, anchor (META or
+  // sector crossing), `meta_distance_m`, and the cap to prevent
+  // overshoot. We just convert that walk distance to a percentage of
+  // total length, which IS the offset-distance for our SVG path
+  // (because the path is built from the polyline vertices in order).
+  const totalM = trackConfig.trackLengthM ?? 0;
   const kartRows = useMemo(() => {
     let pitFanIdx = 0;
     return karts
       .filter((k) => k.kartNumber > 0)
       .map((kart) => {
         const isPit = isKartInPit(kart);
-        const lapMs = kart.lastLapMs > 0 ? kart.lastLapMs : (kart.avgLapMs > 0 ? kart.avgLapMs : 0);
-        const seg = resolveSegment(kart, geom.trackPath, lapMs);
-        const pct = progressPercent(kart, countdownMs, seg.durationMs, direction);
-        // In-pit overrides everything: stack at the pit-in lat/lon (in
-        // SVG coords) with a small fan offset.
+        const walkM = isPit ? null : computeKartProgressM(kart, trackConfig, countdownMs, direction);
+        const pct = walkM != null ? pctFromPolylineWalk(walkM, totalM) : 0;
+        // In-pit karts: stack at the PIT-IN lat/lon (in SVG coords)
+        // with a small fan offset so multiple in-pit karts don't
+        // fully overlap.
         let pitOffsetY: number | null = null;
         if (isPit) {
-          pitOffsetY = pitFanIdx * 10; // 10 SVG units per kart
+          pitOffsetY = pitFanIdx * 10;
           pitFanIdx += 1;
         }
-        return { kart, isPit, segD: seg.d, pct, pitOffsetY };
+        return { kart, isPit, pct, walkM, pitOffsetY };
       });
-  }, [karts, geom.trackPath, countdownMs, direction]);
+  }, [karts, trackConfig, countdownMs, direction, totalM]);
 
   return (
     <div className="relative">
@@ -270,7 +258,7 @@ export function TrackMapSVG({
             stays pinned to the track. The CSS transition on
             offset-distance smooths motion between React re-renders. */}
         <g>
-          {kartRows.map(({ kart, isPit, segD, pct, pitOffsetY }) => {
+          {kartRows.map(({ kart, isPit, pct, pitOffsetY }) => {
             const isMine = kart.kartNumber === myKartNumber;
             const isSelected = kart.kartNumber === selectedKart;
             const fill = tierColor(kart.tierScore);
@@ -301,7 +289,7 @@ export function TrackMapSVG({
                 key={kart.kartNumber}
                 className="tracking-svg-kart"
                 style={{
-                  offsetPath: segD ? `path("${segD}")` : undefined,
+                  offsetPath: geom.trackPath ? `path("${geom.trackPath}")` : undefined,
                   offsetDistance: `${pct.toFixed(3)}%`,
                   transition: "offset-distance 220ms linear",
                   cursor: "pointer",
