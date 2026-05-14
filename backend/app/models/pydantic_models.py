@@ -262,11 +262,24 @@ class TrackConfigOut(BaseModel):
     s1_distance_m: float | None = None
     s2_distance_m: float | None = None
     s3_distance_m: float | None = None
+    # Pit-in / pit-out: coordenadas libres (no snap a polyline).
+    # `*_distance_m` siguen existiendo en BD por compat pero el
+    # frontend renderiza por lat/lon cuando están presentes.
     pit_entry_distance_m: float | None = None
     pit_exit_distance_m: float | None = None
+    pit_entry_lat: float | None = None
+    pit_entry_lon: float | None = None
+    pit_exit_lat: float | None = None
+    pit_exit_lon: float | None = None
     pit_lane_polyline: list[list[float]] | None = None
     pit_lane_length_m: float | None = None
     pit_box_distance_m: float | None = None
+    # Distancia (m) desde polyline[0] hasta la línea de META.
+    # 0 = META coincide con el primer vértice (caso por defecto).
+    # Cuando el operador mueve la META a otro punto, guardamos la
+    # distancia aquí; el algoritmo de interpolación de kart la usa
+    # como ancla en cada cruce de meta (LAP event).
+    meta_distance_m: float = 0.0
     default_direction: str = "forward"
 
     model_config = {"from_attributes": True}
@@ -282,8 +295,13 @@ class TrackConfigUpdate(BaseModel):
     s3_distance_m: float | None = None
     pit_entry_distance_m: float | None = None
     pit_exit_distance_m: float | None = None
+    pit_entry_lat: float | None = None
+    pit_entry_lon: float | None = None
+    pit_exit_lat: float | None = None
+    pit_exit_lon: float | None = None
     pit_lane_polyline: list[list[float]] | None = None
     pit_box_distance_m: float | None = None
+    meta_distance_m: float | None = None
     default_direction: str | None = None  # "forward" | "reversed"
 
 

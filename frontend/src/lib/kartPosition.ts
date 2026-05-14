@@ -54,8 +54,12 @@ function pickAnchor(
     if (dist != null) return [lastSec, dist];
   }
 
-  // Fall back to the lap-complete anchor (distance = 0 from meta).
-  if (lastLap > 0) return [lastLap, 0];
+  // Fall back to the lap-complete anchor. Anchor distance = META
+  // position on the polyline. Usually 0 (polyline[0] = META) but the
+  // operator can move META elsewhere via the editor — in that case
+  // we still want the kart to render AT META right after a LAP event,
+  // not at polyline[0].
+  if (lastLap > 0) return [lastLap, cfg.metaDistanceM || 0];
   return null;
 }
 

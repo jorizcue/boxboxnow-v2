@@ -86,11 +86,29 @@ class Circuit(Base):
     s1_distance_m = Column(Float, nullable=True)
     s2_distance_m = Column(Float, nullable=True)
     s3_distance_m = Column(Float, nullable=True)
-    pit_entry_distance_m = Column(Float, nullable=True)
+    pit_entry_distance_m = Column(Float, nullable=True)  # legacy — superseded by pit_entry_lat/lon
     pit_exit_distance_m = Column(Float, nullable=True)
+    # Pit-in / pit-out se guardan como (lat, lon) libres porque el
+    # operador quiere ponerlos en la entrada/salida REAL del pit
+    # (físicamente al lado del trazado), no forzados sobre el
+    # polyline. El algoritmo de interpolación de karts NO usa estas
+    # distancias — son solo marcadores visuales sobre el mapa, así
+    # que coordenadas crudas son suficientes.
+    pit_entry_lat = Column(Float, nullable=True)
+    pit_entry_lon = Column(Float, nullable=True)
+    pit_exit_lat = Column(Float, nullable=True)
+    pit_exit_lon = Column(Float, nullable=True)
     pit_lane_polyline = Column(Text, nullable=True)  # JSON polyline abierto pit-in → boxes → pit-out
     pit_lane_length_m = Column(Float, nullable=True)
     pit_box_distance_m = Column(Float, nullable=True)  # punto en el pit_lane donde se aparcan los karts
+    # Distancia desde polyline[0] hasta la META. Por defecto 0 (META
+    # coincide con el primer vértice del polyline, que es lo que pasa
+    # cuando el operador empieza a trazar desde la línea de meta).
+    # Cuando el operador mueve la META a otro punto, guardamos la
+    # distancia aquí en lugar de rotar el array del polyline — más
+    # simple y el algoritmo de interpolación usa esta distancia como
+    # ancla cuando un kart cruza meta (LAP event).
+    meta_distance_m = Column(Float, default=0.0, nullable=False)
     default_direction = Column(String(16), default="forward", nullable=False)  # "forward" | "reversed"
 
     user_access = relationship("UserCircuitAccess", back_populates="circuit", cascade="all, delete-orphan")

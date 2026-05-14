@@ -91,9 +91,14 @@ async def init_db():
             "ALTER TABLE circuits ADD COLUMN s3_distance_m FLOAT",
             "ALTER TABLE circuits ADD COLUMN pit_entry_distance_m FLOAT",
             "ALTER TABLE circuits ADD COLUMN pit_exit_distance_m FLOAT",
+            "ALTER TABLE circuits ADD COLUMN pit_entry_lat FLOAT",
+            "ALTER TABLE circuits ADD COLUMN pit_entry_lon FLOAT",
+            "ALTER TABLE circuits ADD COLUMN pit_exit_lat FLOAT",
+            "ALTER TABLE circuits ADD COLUMN pit_exit_lon FLOAT",
             "ALTER TABLE circuits ADD COLUMN pit_lane_polyline TEXT",
             "ALTER TABLE circuits ADD COLUMN pit_lane_length_m FLOAT",
             "ALTER TABLE circuits ADD COLUMN pit_box_distance_m FLOAT",
+            "ALTER TABLE circuits ADD COLUMN meta_distance_m FLOAT DEFAULT 0.0 NOT NULL",
             "ALTER TABLE circuits ADD COLUMN default_direction VARCHAR(16) DEFAULT 'forward' NOT NULL",
         ):
             try:

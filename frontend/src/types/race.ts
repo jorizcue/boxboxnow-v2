@@ -78,11 +78,22 @@ export interface TrackConfig {
   s1DistanceM: number | null;
   s2DistanceM: number | null;
   s3DistanceM: number | null;
+  // Pit-in / pit-out: lat/lon libres (los `*DistanceM` quedan por
+  // compat con configs anteriores; el renderer prefiere lat/lon
+  // cuando están presentes).
   pitEntryDistanceM: number | null;
   pitExitDistanceM: number | null;
+  pitEntryLat: number | null;
+  pitEntryLon: number | null;
+  pitExitLat: number | null;
+  pitExitLon: number | null;
   pitLanePolyline: [number, number][] | null;  // open path pit-in → boxes → pit-out
   pitLaneLengthM: number | null;
   pitBoxDistanceM: number | null;
+  // Distancia (m) desde polyline[0] hasta META. 0 = META coincide
+  // con el primer vértice. La interpolación de kart usa este valor
+  // como ancla en cada LAP event.
+  metaDistanceM: number;
   defaultDirection: "forward" | "reversed";
 }
 

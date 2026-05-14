@@ -50,6 +50,10 @@ interface Props {
   countdownMs: number;
   selectedKart: number | null;
   onSelectKart: (k: number | null) => void;
+  // Effective race direction (override from TrackingTab top bar OR
+  // trackConfig.defaultDirection). Passed in so the map and the side
+  // panel always agree on the sentido that's currently active.
+  direction: "forward" | "reversed";
 }
 
 export function TrackMap({
@@ -59,6 +63,7 @@ export function TrackMap({
   countdownMs,
   selectedKart,
   onSelectKart,
+  direction,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -158,10 +163,13 @@ export function TrackMap({
       }).addTo(map);
     }
 
-    // Sector + meta + pit-in/out markers. Tiny circles + label.
+    // Sector + meta markers. Tiny circles + label. Distance is mapped
+    // through `effectiveDistanceForward(direction, …)` so the sensors
+    // visually flip along with the active sentido without touching the
+    // stored values.
     const drawSensorTick = (distanceM: number | null, label: string, color: string) => {
       if (distanceM == null || !trackConfig.trackPolyline || !trackConfig.trackLengthM) return;
-      const dist = effectiveDistanceForward(distanceM, trackConfig.defaultDirection, trackConfig.trackLengthM);
+      const dist = effectiveDistanceForward(distanceM, direction, trackConfig.trackLengthM);
       const pt = pointAtDistance(trackConfig.trackPolyline, dist, true);
       const marker = L.circleMarker([pt[0], pt[1]], {
         radius: 5,
@@ -172,13 +180,39 @@ export function TrackMap({
       }).bindTooltip(label, { permanent: true, direction: "top", className: "track-sensor-tooltip" }).addTo(map);
       refs.sectors.push(marker);
     };
-    drawSensorTick(0, "META", "#fff");
+    // META at the operator-defined distance (0 = polyline[0], which is
+    // the default — but venues with the start/finish line in the middle
+    // of a straight rather than at a vertex use a non-zero offset).
+    drawSensorTick(trackConfig.metaDistanceM ?? 0, "META", "#fff");
     drawSensorTick(trackConfig.s1DistanceM, "S1", "#9fe556");
     drawSensorTick(trackConfig.s2DistanceM, "S2", "#9fe556");
     drawSensorTick(trackConfig.s3DistanceM, "S3", "#9fe556");
-    drawSensorTick(trackConfig.pitEntryDistanceM, "PIT-IN", "#e59a2e");
-    drawSensorTick(trackConfig.pitExitDistanceM, "PIT-OUT", "#e59a2e");
-  }, [L, trackConfig]);
+
+    // Pit-in / pit-out: prefer the free lat/lon (placed by the operator
+    // on the physical sensor) and fall back to the legacy
+    // distance-along-polyline value when not yet migrated.
+    const drawFreeTick = (latLon: [number, number] | null, label: string, color: string) => {
+      if (!latLon) return;
+      const marker = L.circleMarker([latLon[0], latLon[1]], {
+        radius: 5,
+        color,
+        weight: 2,
+        fillColor: "#000",
+        fillOpacity: 1,
+      }).bindTooltip(label, { permanent: true, direction: "top", className: "track-sensor-tooltip" }).addTo(map);
+      refs.sectors.push(marker);
+    };
+    if (trackConfig.pitEntryLat != null && trackConfig.pitEntryLon != null) {
+      drawFreeTick([trackConfig.pitEntryLat, trackConfig.pitEntryLon], "PIT-IN", "#e59a2e");
+    } else {
+      drawSensorTick(trackConfig.pitEntryDistanceM, "PIT-IN", "#e59a2e");
+    }
+    if (trackConfig.pitExitLat != null && trackConfig.pitExitLon != null) {
+      drawFreeTick([trackConfig.pitExitLat, trackConfig.pitExitLon], "PIT-OUT", "#e59a2e");
+    } else {
+      drawSensorTick(trackConfig.pitExitDistanceM, "PIT-OUT", "#e59a2e");
+    }
+  }, [L, trackConfig, direction]);
 
   // Update kart markers on every render — cheap because we mutate
   // existing markers instead of recreating them.
@@ -200,7 +234,7 @@ export function TrackMap({
       } else {
         const progress = computeKartProgressM(kart, trackConfig, countdownMs);
         if (progress != null) {
-          const forwardDist = effectiveDistanceForward(progress, trackConfig.defaultDirection, trackConfig.trackLengthM);
+          const forwardDist = effectiveDistanceForward(progress, direction, trackConfig.trackLengthM);
           latlon = pointAtDistance(trackConfig.trackPolyline, forwardDist, true);
         }
       }
@@ -255,7 +289,7 @@ export function TrackMap({
         refs.markers.delete(num);
       }
     });
-  }, [L, karts, countdownMs, trackConfig, myKartNumber, selectedKart, onSelectKart]);
+  }, [L, karts, countdownMs, trackConfig, direction, myKartNumber, selectedKart, onSelectKart]);
 
   const popupKart = useMemo(
     () => karts.find((k) => k.kartNumber === selectedKart) ?? null,

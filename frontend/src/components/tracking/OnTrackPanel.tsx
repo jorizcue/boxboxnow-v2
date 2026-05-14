@@ -62,6 +62,10 @@ interface Props {
   myKartNumber: number;
   selectedKart: number | null;
   onSelectKart: (k: number | null) => void;
+  // Effective race direction (TrackingTab override + stored default).
+  // Drives the forward-distance projection so the per-row sector
+  // indicator flips together with the map.
+  direction: "forward" | "reversed";
 }
 
 export function OnTrackPanel({
@@ -71,19 +75,19 @@ export function OnTrackPanel({
   myKartNumber,
   selectedKart,
   onSelectKart,
+  direction,
 }: Props) {
   const t = useT();
 
   // Compute progress + race-position for each kart once per render.
   const rows = useMemo(() => {
     const total = trackConfig.trackLengthM ?? 0;
-    const dir = trackConfig.defaultDirection;
     return karts
       .map((k) => {
         const inPit = isKartInPit(k);
         const rawProgress = inPit ? null : computeKartProgressM(k, trackConfig, countdownMs);
         const fwdDist = rawProgress != null && total > 0
-          ? effectiveDistanceForward(rawProgress, dir, total)
+          ? effectiveDistanceForward(rawProgress, direction, total)
           : null;
         const sector = fwdDist != null ? sectorProgress(fwdDist, trackConfig) : null;
         return { kart: k, inPit, fwdDist, sector };
@@ -94,7 +98,7 @@ export function OnTrackPanel({
         // sorting purely by polyline distance).
         return (a.kart.position || 999) - (b.kart.position || 999);
       });
-  }, [karts, trackConfig, countdownMs]);
+  }, [karts, trackConfig, countdownMs, direction]);
 
   return (
     <aside className="bg-surface border border-border rounded-xl p-3">

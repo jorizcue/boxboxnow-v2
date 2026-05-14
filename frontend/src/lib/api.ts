@@ -15,9 +15,14 @@ function _snakeToTrackConfig(raw: any): TrackConfig {
     s3DistanceM: raw?.s3_distance_m ?? null,
     pitEntryDistanceM: raw?.pit_entry_distance_m ?? null,
     pitExitDistanceM: raw?.pit_exit_distance_m ?? null,
+    pitEntryLat: raw?.pit_entry_lat ?? null,
+    pitEntryLon: raw?.pit_entry_lon ?? null,
+    pitExitLat: raw?.pit_exit_lat ?? null,
+    pitExitLon: raw?.pit_exit_lon ?? null,
     pitLanePolyline: raw?.pit_lane_polyline ?? null,
     pitLaneLengthM: raw?.pit_lane_length_m ?? null,
     pitBoxDistanceM: raw?.pit_box_distance_m ?? null,
+    metaDistanceM: typeof raw?.meta_distance_m === "number" ? raw.meta_distance_m : 0,
     defaultDirection: (raw?.default_direction === "reversed" ? "reversed" : "forward"),
   };
 }
@@ -201,8 +206,13 @@ export const api = {
     s3DistanceM: number | null;
     pitEntryDistanceM: number | null;
     pitExitDistanceM: number | null;
+    pitEntryLat: number | null;
+    pitEntryLon: number | null;
+    pitExitLat: number | null;
+    pitExitLon: number | null;
     pitLanePolyline: [number, number][] | null;
     pitBoxDistanceM: number | null;
+    metaDistanceM: number | null;
     defaultDirection: "forward" | "reversed";
   }>) => {
     const body: Record<string, unknown> = {};
@@ -212,8 +222,13 @@ export const api = {
     if ("s3DistanceM" in payload) body.s3_distance_m = payload.s3DistanceM;
     if ("pitEntryDistanceM" in payload) body.pit_entry_distance_m = payload.pitEntryDistanceM;
     if ("pitExitDistanceM" in payload) body.pit_exit_distance_m = payload.pitExitDistanceM;
+    if ("pitEntryLat" in payload) body.pit_entry_lat = payload.pitEntryLat;
+    if ("pitEntryLon" in payload) body.pit_entry_lon = payload.pitEntryLon;
+    if ("pitExitLat" in payload) body.pit_exit_lat = payload.pitExitLat;
+    if ("pitExitLon" in payload) body.pit_exit_lon = payload.pitExitLon;
     if ("pitLanePolyline" in payload) body.pit_lane_polyline = payload.pitLanePolyline;
     if ("pitBoxDistanceM" in payload) body.pit_box_distance_m = payload.pitBoxDistanceM;
+    if ("metaDistanceM" in payload) body.meta_distance_m = payload.metaDistanceM;
     if ("defaultDirection" in payload) body.default_direction = payload.defaultDirection;
     const raw = await fetchApi<any>(`/api/admin/circuits/${circuitId}/track-config`, {
       method: "PUT",

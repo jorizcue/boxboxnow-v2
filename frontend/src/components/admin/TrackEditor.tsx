@@ -54,9 +54,18 @@ export function TrackEditor({ circuitId, onClose }: Props) {
 
   const [trackPolyline, setTrackPolyline] = useState<[number, number][] | null>(null);
   const [pitLanePolyline, setPitLanePolyline] = useState<[number, number][] | null>(null);
-  const [markerDistances, setMarkerDistances] = useState<Record<MarkerKey, number | null>>({
-    meta: 0, s1: null, s2: null, s3: null, pitIn: null, pitOut: null, pitBox: null,
+  // Distances stored along their respective polyline:
+  //   meta, s1, s2, s3 → track polyline
+  //   pitBox → pit lane polyline
+  const [markerDistances, setMarkerDistances] = useState<Record<"meta" | "s1" | "s2" | "s3" | "pitBox", number | null>>({
+    meta: 0, s1: null, s2: null, s3: null, pitBox: null,
   });
+  // Pit-in / pit-out: free [lat, lon] (no snap). The pit sensors are
+  // physically slightly off the racing line and the operator wants
+  // the marker exactly where the sensor is, not snapped back to the
+  // polyline.
+  const [pitInLatLon, setPitInLatLon] = useState<[number, number] | null>(null);
+  const [pitOutLatLon, setPitOutLatLon] = useState<[number, number] | null>(null);
   const [direction, setDirection] = useState<"forward" | "reversed">("forward");
   const [placingMarker, setPlacingMarker] = useState<MarkerKey | null>(null);
   const [importing, setImporting] = useState(false);
@@ -81,14 +90,18 @@ export function TrackEditor({ circuitId, onClose }: Props) {
         if (cfg.trackPolyline) setTrackPolyline(cfg.trackPolyline as [number, number][]);
         if (cfg.pitLanePolyline) setPitLanePolyline(cfg.pitLanePolyline as [number, number][]);
         setMarkerDistances({
-          meta: 0,
+          meta: cfg.metaDistanceM ?? 0,
           s1: cfg.s1DistanceM,
           s2: cfg.s2DistanceM,
           s3: cfg.s3DistanceM,
-          pitIn: cfg.pitEntryDistanceM,
-          pitOut: cfg.pitExitDistanceM,
           pitBox: cfg.pitBoxDistanceM,
         });
+        if (cfg.pitEntryLat != null && cfg.pitEntryLon != null) {
+          setPitInLatLon([cfg.pitEntryLat, cfg.pitEntryLon]);
+        }
+        if (cfg.pitExitLat != null && cfg.pitExitLon != null) {
+          setPitOutLatLon([cfg.pitExitLat, cfg.pitExitLon]);
+        }
         setDirection(cfg.defaultDirection);
       } catch {
         // Empty editor — new circuit.
@@ -231,26 +244,53 @@ export function TrackEditor({ circuitId, onClose }: Props) {
       });
     };
 
+    // Free lat/lon markers (pit-in / pit-out): the operator places them
+    // where the physical sensor sits, which is usually slightly off the
+    // racing line. Render directly at the saved coordinates without
+    // snapping to the polyline.
+    const drawFreeMarker = (key: MarkerKey, latLon: [number, number] | null, label: string, color: string) => {
+      if (!latLon) return;
+      const m = L.circleMarker([latLon[0], latLon[1]], {
+        radius: 6, color, weight: 2, fillColor: "#000", fillOpacity: 1,
+      }).bindTooltip(label, { permanent: true, direction: "top", offset: [0, -4] });
+      m.addTo(map);
+      markerLayersRef.current[key] = m;
+    };
+
     drawMarker("meta", markerDistances.meta, "META", "#fff", trackPolyline, true);
     drawMarker("s1", markerDistances.s1, "S1", "#9fe556", trackPolyline, true);
     drawMarker("s2", markerDistances.s2, "S2", "#9fe556", trackPolyline, true);
     drawMarker("s3", markerDistances.s3, "S3", "#9fe556", trackPolyline, true);
-    drawMarker("pitIn", markerDistances.pitIn, "PIT-IN", "#e59a2e", trackPolyline, true);
-    drawMarker("pitOut", markerDistances.pitOut, "PIT-OUT", "#e59a2e", trackPolyline, true);
+    drawFreeMarker("pitIn", pitInLatLon, "PIT-IN", "#e59a2e");
+    drawFreeMarker("pitOut", pitOutLatLon, "PIT-OUT", "#e59a2e");
     drawMarker("pitBox", markerDistances.pitBox, "BOX", "#888", pitLanePolyline, false);
-  }, [L, markerDistances, trackPolyline, pitLanePolyline]);
+  }, [L, markerDistances, pitInLatLon, pitOutLatLon, trackPolyline, pitLanePolyline]);
 
-  // ── Placement mode: when active, the next map click snaps to the
-  //    appropriate polyline and assigns the distance to the selected marker.
+  // ── Placement mode: when active, the next map click positions the
+  //    selected marker. Meta / S1 / S2 / S3 snap to the track polyline,
+  //    pit-box snaps to the pit-lane polyline, and pit-in / pit-out are
+  //    free (the physical sensor sits off the racing line).
   useEffect(() => {
     if (!L || !mapRef.current || !placingMarker) return;
     const map = mapRef.current;
     const handler = (e: { latlng: { lat: number; lng: number } }) => {
+      // Pit-in / pit-out: store the raw click location (no snap).
+      if (placingMarker === "pitIn") {
+        setPitInLatLon([e.latlng.lat, e.latlng.lng]);
+        setPlacingMarker(null);
+        return;
+      }
+      if (placingMarker === "pitOut") {
+        setPitOutLatLon([e.latlng.lat, e.latlng.lng]);
+        setPlacingMarker(null);
+        return;
+      }
+      // Everything else snaps to the appropriate polyline.
       const pl: [number, number][] | null = placingMarker === "pitBox" ? pitLanePolyline : trackPolyline;
       const closed = placingMarker !== "pitBox";
       if (!pl || pl.length < 2) return;
       const [dist] = snapToPolyline(pl, [e.latlng.lat, e.latlng.lng], closed);
-      setMarkerDistances((prev) => ({ ...prev, [placingMarker]: dist }));
+      setMarkerDistances((prev) => ({ ...prev, [placingMarker as "meta" | "s1" | "s2" | "s3" | "pitBox"]: dist }));
       setPlacingMarker(null);
     };
     map.on("click", handler);
@@ -297,7 +337,9 @@ export function TrackEditor({ circuitId, onClose }: Props) {
 
   const handleClearTrack = () => {
     setTrackPolyline(null);
-    setMarkerDistances({ meta: 0, s1: null, s2: null, s3: null, pitIn: null, pitOut: null, pitBox: null });
+    setMarkerDistances({ meta: 0, s1: null, s2: null, s3: null, pitBox: null });
+    setPitInLatLon(null);
+    setPitOutLatLon(null);
   };
 
   const handleClearPitLane = () => {
@@ -319,9 +361,19 @@ export function TrackEditor({ circuitId, onClose }: Props) {
         s1DistanceM: markerDistances.s1,
         s2DistanceM: markerDistances.s2,
         s3DistanceM: markerDistances.s3,
-        pitEntryDistanceM: markerDistances.pitIn,
-        pitExitDistanceM: markerDistances.pitOut,
+        // Pit-in / pit-out: free lat/lon (off-polyline). When the
+        // operator clears them via the X button they go to null, which
+        // the backend stores as NULL — TrackMap falls back to the old
+        // distance-based fields in that case.
+        pitEntryLat: pitInLatLon ? pitInLatLon[0] : null,
+        pitEntryLon: pitInLatLon ? pitInLatLon[1] : null,
+        pitExitLat: pitOutLatLon ? pitOutLatLon[0] : null,
+        pitExitLon: pitOutLatLon ? pitOutLatLon[1] : null,
         pitBoxDistanceM: markerDistances.pitBox,
+        // Meta as forward-distance from polyline[0]. 0 = META coincides
+        // with the first vertex (default). Persisted so the kart
+        // interpolator can anchor at META on every LAP event.
+        metaDistanceM: markerDistances.meta ?? 0,
         defaultDirection: direction,
       });
       setSaved(true);
@@ -397,7 +449,20 @@ export function TrackEditor({ circuitId, onClose }: Props) {
                 { key: "pitBox", labelKey: "admin.tracking.marker.pitBox" },
               ] as { key: MarkerKey; labelKey: string }[]
             ).map(({ key, labelKey }) => {
-              const dist = markerDistances[key];
+              // Pit-in / pit-out: free lat/lon (no snap). Everything
+              // else is a distance along its polyline.
+              const isFree = key === "pitIn" || key === "pitOut";
+              const freeLatLon = key === "pitIn" ? pitInLatLon : key === "pitOut" ? pitOutLatLon : null;
+              const dist = isFree
+                ? null
+                : (markerDistances as Record<string, number | null>)[key] ?? null;
+              const display = isFree
+                ? freeLatLon
+                  ? `${freeLatLon[0].toFixed(5)}, ${freeLatLon[1].toFixed(5)}`
+                  : "—"
+                : dist == null
+                  ? "—"
+                  : `${dist.toFixed(0)} m`;
               const placeable = key === "pitBox" ? !!pitLanePolyline : !!trackPolyline;
               const active = placingMarker === key;
               return (
@@ -405,7 +470,7 @@ export function TrackEditor({ circuitId, onClose }: Props) {
                   <span className="text-[11px] text-neutral-300">{t(labelKey)}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-mono text-neutral-500">
-                      {dist == null ? "—" : `${dist.toFixed(0)} m`}
+                      {display}
                     </span>
                     <button
                       onClick={() => setPlacingMarker(active ? null : key)}

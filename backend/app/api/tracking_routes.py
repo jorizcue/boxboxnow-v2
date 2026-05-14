@@ -67,8 +67,13 @@ async def get_track_config(
         s3_distance_m=circuit.s3_distance_m,
         pit_entry_distance_m=circuit.pit_entry_distance_m,
         pit_exit_distance_m=circuit.pit_exit_distance_m,
+        pit_entry_lat=circuit.pit_entry_lat,
+        pit_entry_lon=circuit.pit_entry_lon,
+        pit_exit_lat=circuit.pit_exit_lat,
+        pit_exit_lon=circuit.pit_exit_lon,
         pit_lane_polyline=_polyline_to_list(circuit.pit_lane_polyline),
         pit_lane_length_m=circuit.pit_lane_length_m,
         pit_box_distance_m=circuit.pit_box_distance_m,
+        meta_distance_m=circuit.meta_distance_m or 0.0,
         default_direction=circuit.default_direction or "forward",
     )

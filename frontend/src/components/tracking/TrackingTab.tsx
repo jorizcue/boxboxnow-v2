@@ -45,6 +45,12 @@ export function TrackingTab() {
   const [trackConfig, setTrackConfig] = useState<TrackConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedKart, setSelectedKart] = useState<number | null>(null);
+  // Local runtime override for the race direction. `null` = use the
+  // value stored in trackConfig.defaultDirection; otherwise the operator
+  // flipped it from the top bar (occasional events go anti-clockwise,
+  // and the admin-stored default doesn't always match). Resets when the
+  // circuit changes.
+  const [directionOverride, setDirectionOverride] = useState<"forward" | "reversed" | null>(null);
 
   // Resolve which circuit we're viewing from the active session. This
   // is one API call on mount — the active session rarely changes
@@ -86,7 +92,18 @@ export function TrackingTab() {
   }, [circuitId]);
 
   const myKartNumber = config.ourKartNumber;
-  const direction = trackConfig?.defaultDirection ?? "forward";
+  // Effective direction = override (if set by the operator) → stored
+  // default → "forward". TrackMap and OnTrackPanel both receive this
+  // resolved value so kart interpolation flips consistently.
+  const direction: "forward" | "reversed" =
+    directionOverride ?? trackConfig?.defaultDirection ?? "forward";
+
+  // Reset the manual override every time the active circuit changes.
+  // Without this the override would stick across sessions and confuse
+  // the next opening of the page.
+  useEffect(() => {
+    setDirectionOverride(null);
+  }, [circuitId]);
 
   // Sort karts by progress on track (descending = leading kart first).
   // Resolved client-side in OnTrackPanel since it needs the same
@@ -134,11 +151,19 @@ export function TrackingTab() {
           <h2 className="text-sm font-bold text-white uppercase tracking-wider">
             {trackName || t("tracking.title")}
           </h2>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-accent border border-accent rounded px-1.5 py-0.5">
+          <button
+            type="button"
+            onClick={() =>
+              setDirectionOverride(direction === "forward" ? "reversed" : "forward")
+            }
+            title={t("tracking.direction.toggleHint")}
+            className="text-[10px] font-bold uppercase tracking-wider text-accent border border-accent rounded px-1.5 py-0.5 hover:bg-accent hover:text-black transition-colors cursor-pointer"
+          >
             {direction === "reversed"
               ? t("tracking.direction.reversed")
               : t("tracking.direction.forward")}
-          </span>
+            <span className="ml-1 opacity-60">⇄</span>
+          </button>
         </div>
         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-red-500 uppercase tracking-wider">
           <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -156,6 +181,7 @@ export function TrackingTab() {
             countdownMs={countdownMs}
             selectedKart={selectedKart}
             onSelectKart={setSelectedKart}
+            direction={direction}
           />
           {/* Legend */}
           <div className="flex items-center gap-3 mt-2 px-1 text-[10px] text-neutral-500 flex-wrap">
@@ -182,6 +208,7 @@ export function TrackingTab() {
           myKartNumber={myKartNumber}
           selectedKart={selectedKart}
           onSelectKart={setSelectedKart}
+          direction={direction}
         />
       </div>
     </div>
