@@ -154,13 +154,26 @@ export function OnTrackPanel({
   }, [karts]);
 
   // Compute progress + race-position for each kart once per render.
+  // `lapPct` is the kart's lap progress 0…100 % from META in race
+  // direction — drives the per-row progress bar.
+  // `currentLapMs` is the time elapsed since the kart last crossed
+  // META (live, ticks at the race-clock cadence).
   const rows = useMemo(() => {
+    const total = trackConfig.trackLengthM ?? 0;
     return karts
       .map((k) => {
         const inPit = isKartInPit(k);
         const progressM = inPit ? null : computeKartProgressM(k, trackConfig, countdownMs, direction);
         const sector = progressM != null ? sectorProgress(progressM, trackConfig, direction) : null;
-        return { kart: k, inPit, progressM, sector };
+        const raceProgress = progressM != null
+          ? raceProgressFromMeta(progressM, trackConfig, direction)
+          : null;
+        const lapPct = raceProgress != null && total > 0
+          ? Math.min(100, (raceProgress / total) * 100)
+          : 0;
+        const lastLap = k.lastLapCompleteCountdownMs ?? 0;
+        const currentLapMs = lastLap > 0 ? Math.max(0, lastLap - countdownMs) : 0;
+        return { kart: k, inPit, progressM, sector, lapPct, currentLapMs };
       })
       .sort((a, b) => {
         // Sort by race position from the timing table (existing field
@@ -176,12 +189,16 @@ export function OnTrackPanel({
         {t("tracking.panel.title")}
       </h3>
       <div className="space-y-0">
-        {rows.map(({ kart, inPit, sector }) => {
+        {rows.map(({ kart, inPit, sector, lapPct, currentLapMs }) => {
           const isMine = kart.kartNumber === myKartNumber;
           const isSelected = kart.kartNumber === selectedKart;
           const isCrossingMeta = flashKarts.has(kart.kartNumber);
           const fill = tierColor(kart.tierScore);
           const textColor = fill === "#e54444" ? "#fff" : "#000";
+          // The lap-progress bar uses the kart's tier colour so the
+          // operator can quickly spot fast vs slow karts even when the
+          // bar is short. Mi-kart gets the accent green halo by
+          // default via `bg-accent/[0.05]` above.
           return (
             <button
               key={kart.kartNumber}
@@ -200,34 +217,57 @@ export function OnTrackPanel({
               >
                 {kart.kartNumber}
               </span>
-              <div className="flex-1 min-w-0">
-                <div className="text-[11px] font-semibold text-neutral-200 truncate">
-                  {kart.driverName || "—"}
+              <div className="flex-1 min-w-0 space-y-0.5">
+                {/* Row 1: driver name + race position. */}
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[11px] font-semibold text-neutral-200 truncate">
+                    {kart.driverName || "—"}
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-neutral-400 shrink-0">
+                    P{kart.position || "?"}
+                  </span>
                 </div>
-                <div className="text-[9px] font-mono text-neutral-500 truncate">
-                  {inPit ? (
-                    <span className="text-orange-400 font-bold">
-                      {t("tracking.panel.inPit")}
+                {/* Row 2: lap status (pit / sector + pct) + lap times.
+                    The times block shows `lastLap → currentLap`. The
+                    arrow makes it obvious which is past and which is
+                    in-progress. Tabular-nums so dots line up between
+                    rows. */}
+                <div className="flex items-center justify-between gap-1 text-[9px] font-mono text-neutral-500">
+                  <span className="truncate">
+                    {inPit ? (
+                      <span className="text-orange-400 font-bold">
+                        {t("tracking.panel.inPit")}
+                      </span>
+                    ) : sector ? (
+                      <>
+                        v{kart.totalLaps} · <span className="text-accent font-bold">{sector.label}</span> · {sector.pct.toFixed(0)}%
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </span>
+                  <span className="tabular-nums shrink-0 text-neutral-400">
+                    {kart.lastLapMs > 0 ? msToLapTime(kart.lastLapMs) : "—"}
+                    <span className="mx-0.5 text-neutral-600">→</span>
+                    <span className={currentLapMs > 0 ? "text-accent" : ""}>
+                      {currentLapMs > 0 ? msToLapTime(currentLapMs) : "—"}
                     </span>
-                  ) : sector ? (
-                    <>
-                      v{kart.totalLaps} · <span className="text-accent font-bold">{sector.label}</span> · {sector.pct.toFixed(0)}%
-                    </>
-                  ) : (
-                    "—"
-                  )}
+                  </span>
                 </div>
-              </div>
-              {/* Right column: race position + last lap time, stacked.
-                  The lap time is monospace tabular-nums so the dot lines
-                  up across rows even with varying digit widths. */}
-              <div className="flex flex-col items-end shrink-0 leading-tight">
-                <span className="text-[10px] font-mono font-bold text-neutral-400">
-                  P{kart.position || "?"}
-                </span>
-                <span className="text-[9px] font-mono text-neutral-500 tabular-nums">
-                  {kart.lastLapMs > 0 ? msToLapTime(kart.lastLapMs) : "—"}
-                </span>
+                {/* Row 3: progress bar 0 → 100 % of the lap from META
+                    in race direction. The bar grows smoothly because
+                    `lapPct` is recomputed at the race-clock cadence
+                    (10 Hz on the Tracking tab). */}
+                <div className="h-1 bg-white/[0.05] rounded-sm overflow-hidden">
+                  <div
+                    className="h-full transition-[width] duration-200 ease-linear"
+                    style={{
+                      width: `${inPit ? 0 : lapPct.toFixed(1)}%`,
+                      background: inPit ? "transparent" : fill,
+                      opacity: inPit ? 0 : 0.85,
+                    }}
+                  />
+                </div>
               </div>
             </button>
           );
