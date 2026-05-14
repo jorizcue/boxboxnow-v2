@@ -5,7 +5,7 @@ import stripe
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 from app.config import get_settings
 from app.models.database import get_db
@@ -994,21 +994,34 @@ async def _apply_config_to_user(user_id: int, config: ProductTabConfig, db: Asyn
     capabilities. ProductTabConfig is the source of truth — no fallback
     to hardcoded defaults.
 
-    Concurrency semantics (matches the product requirement):
-      * User's concurrency_web / concurrency_mobile are re-derived from
-        the union of all ACTIVE subscriptions' plan configs (plus the
-        config being applied right now, in case its Subscription row
-        isn't committed yet).
+    Concurrency + tab access semantics:
+      * Both user.concurrency_web/mobile and UserTabAccess are
+        re-derived from the union of all ACTIVE subscriptions' plan
+        configs (plus the config being applied right now, in case its
+        Subscription row isn't committed yet).
       * "Don't downgrade" only applies when another active subscription
         still provides the higher value. If a user used to have a higher
         value from a plan that is no longer active (expired / cancelled)
         — or that was set manually in the admin panel without a backing
         plan — the new plan's value wins.
-      * NULL on the plan means "that plan doesn't care about this kind";
-        the value is simply excluded from the max calculation.
+      * NULL concurrency on the plan means "that plan doesn't care about
+        this kind"; the value is excluded from the max calculation.
       * If NO active plan defines a concurrency for a kind, the user's
         field is set back to NULL so the resolver falls through to
         max_devices (no stale value).
+
+    Tabs are FULLY REPLACED with the union of active-plan tabs. This
+    intentionally wipes:
+      * Trial / registration-default grants (these were added directly
+        to UserTabAccess at registration time without a backing plan).
+        Once the user pays for a real plan they should only see what
+        the plan covers, not the broader trial scope.
+      * Tabs left over from a now-cancelled subscription that the user
+        no longer pays for.
+      * Manual admin grants — admins re-apply via the admin panel
+        after a subscription event if they intentionally added extras.
+        The trade-off is acceptable because admin grants are rare and
+        explicit; orphan trial grants are common and confusing.
 
     `max_devices` keeps its upgrade-only semantics for now — it's the
     legacy single-field limit and lots of admin flows set it manually;
@@ -1021,11 +1034,15 @@ async def _apply_config_to_user(user_id: int, config: ProductTabConfig, db: Asyn
         logger.warning(f"_apply_config_to_user called with no config (user_id={user_id})")
         return
 
-    try:
-        tabs = _json.loads(config.tabs) if config.tabs else []
-    except Exception:
-        logger.warning(f"Invalid tabs JSON on product_tab_config id={config.id}")
-        tabs = []
+    def _parse_tabs(raw: str | None) -> list[str]:
+        if not raw:
+            return []
+        try:
+            parsed = _json.loads(raw)
+            return [t for t in parsed if isinstance(t, str)]
+        except Exception:
+            return []
+
     max_devices = config.max_devices or 1
 
     result = await db.execute(select(User).where(User.id == user_id))
@@ -1036,9 +1053,9 @@ async def _apply_config_to_user(user_id: int, config: ProductTabConfig, db: Asyn
     # max_devices: upgrade-only (see docstring).
     user.max_devices = max(user.max_devices, max_devices)
 
-    # Recompute per-kind concurrency from all active subs + this config.
-    # Use `db.flush()` first so the Subscription row that the caller just
-    # added becomes visible in this session's SELECTs.
+    # Flush so the Subscription row the caller just added (in
+    # _handle_checkout_completed / _handle_invoice_paid) becomes
+    # visible in the SELECTs below.
     try:
         await db.flush()
     except Exception:
@@ -1046,6 +1063,10 @@ async def _apply_config_to_user(user_id: int, config: ProductTabConfig, db: Asyn
         # just fall back to whatever the session currently sees.
         pass
 
+    # Pull every active subscription for this user. Returns
+    # (stripe_price_id, plan_type) tuples. We resolve each to its
+    # ProductTabConfig in a follow-up query so the per-plan logic
+    # below stays uniform.
     sub_rows = await db.execute(
         select(Subscription.stripe_price_id, Subscription.plan_type).where(
             Subscription.user_id == user_id,
@@ -1056,11 +1077,12 @@ async def _apply_config_to_user(user_id: int, config: ProductTabConfig, db: Asyn
 
     webs: list[int] = []
     mobiles: list[int] = []
+    # Set of tab keys granted across every active subscription. Always
+    # seed with the config currently being applied, since its
+    # Subscription row may not be visible to the query above on every
+    # code path (defensive — flush() above usually covers it).
+    desired_tabs: set[str] = set(_parse_tabs(config.tabs))
 
-    # Include the config being applied right now (covers the case where
-    # the Subscription row was just staged but not yet visible, and the
-    # case where an admin manually triggered a config apply outside the
-    # normal subscribe flow).
     if config.concurrency_web is not None and config.concurrency_web > 0:
         webs.append(config.concurrency_web)
     if config.concurrency_mobile is not None and config.concurrency_mobile > 0:
@@ -1073,6 +1095,7 @@ async def _apply_config_to_user(user_id: int, config: ProductTabConfig, db: Asyn
                 select(
                     ProductTabConfig.concurrency_web,
                     ProductTabConfig.concurrency_mobile,
+                    ProductTabConfig.tabs,
                 ).where(ProductTabConfig.stripe_price_id == price_id)
             )
             plan_cfg = row.first()
@@ -1081,34 +1104,36 @@ async def _apply_config_to_user(user_id: int, config: ProductTabConfig, db: Asyn
                 select(
                     ProductTabConfig.concurrency_web,
                     ProductTabConfig.concurrency_mobile,
+                    ProductTabConfig.tabs,
                 ).where(ProductTabConfig.plan_type == plan_type)
                 .order_by(ProductTabConfig.id)
                 .limit(1)
             )
             plan_cfg = row.first()
         if not plan_cfg:
+            # Trial subscriptions (plan_type="trial") have no
+            # ProductTabConfig — they contribute nothing to the
+            # recompute, which is exactly what we want (trial tabs
+            # were registration grants and are not preserved here).
             continue
-        cw, cm = plan_cfg
+        cw, cm, sub_tabs_raw = plan_cfg
         if cw is not None and cw > 0:
             webs.append(cw)
         if cm is not None and cm > 0:
             mobiles.append(cm)
+        desired_tabs.update(_parse_tabs(sub_tabs_raw))
 
     # Set to the max across all active plans, or None when no plan
     # provides a value (so the resolver falls back to max_devices).
     user.concurrency_web = max(webs) if webs else None
     user.concurrency_mobile = max(mobiles) if mobiles else None
 
-    # Add tabs (don't remove existing — users accumulate access across plans)
-    for tab in tabs:
-        existing = await db.execute(
-            select(UserTabAccess).where(
-                UserTabAccess.user_id == user_id,
-                UserTabAccess.tab == tab,
-            )
-        )
-        if not existing.scalar_one_or_none():
-            db.add(UserTabAccess(user_id=user_id, tab=tab))
+    # Replace UserTabAccess with the union of every active plan's tabs.
+    # Wipes registration-default tabs, leftover tabs from cancelled
+    # plans, and manual admin grants (see docstring).
+    await db.execute(delete(UserTabAccess).where(UserTabAccess.user_id == user_id))
+    for tab in desired_tabs:
+        db.add(UserTabAccess(user_id=user_id, tab=tab))
 
 
 @router.get("/subscriptions")
