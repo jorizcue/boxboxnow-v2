@@ -273,8 +273,23 @@ export function TrackEditor({ circuitId, onClose }: Props) {
         setTrackPolyline(pts);
         setImportMsg(null);
       }
-    } catch {
-      setImportMsg(t("admin.tracking.osmError"));
+    } catch (e) {
+      // The backend returns 400 with a clear Spanish message when a
+      // prerequisite is missing (e.g. circuit has no finish-line
+      // coordinates configured yet). Surface that message verbatim
+      // instead of the generic "OSM no responde", which only really
+      // applies to network / 5xx failures. `fetchApi` already extracts
+      // `detail` from the FastAPI response into `error.message`.
+      const err = e as { message?: string };
+      const msg = err?.message ?? "";
+      // Heuristic: any "configura primero..." / "finish" mention is a
+      // 400 from our own validator. Anything else looks like a network
+      // / Overpass outage and gets the generic OSM-down message.
+      if (msg && (msg.toLowerCase().includes("configura") || msg.toLowerCase().includes("meta") || msg.toLowerCase().includes("finish"))) {
+        setImportMsg(msg);
+      } else {
+        setImportMsg(msg || t("admin.tracking.osmError"));
+      }
     } finally {
       setImporting(false);
     }
