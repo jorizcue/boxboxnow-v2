@@ -474,7 +474,39 @@ async def create_checkout_session(
         },
     }
 
-    checkout_session = s.checkout.Session.create(**session_params)
+    # Stripe rejects archived/inactive prices with a 400. Without this
+    # try/except the exception bubbles up as a 500 and the embedded
+    # checkout dies with "Error 500: Internal Server Error" — totally
+    # opaque for the buyer. Surface a friendly Spanish message and log
+    # the stripe_price_id so the admin can identify which
+    # ProductTabConfig row to update (archived in Stripe).
+    try:
+        checkout_session = s.checkout.Session.create(**session_params)
+    except stripe.error.InvalidRequestError as e:
+        msg = (getattr(e, "user_message", None) or str(e)).strip()
+        logger.warning(
+            f"Stripe rejected checkout session create: price={price_id} "
+            f"plan_type={plan_type} user={user.id}: {msg}"
+        )
+        # Specific message for the "inactive price" case (most common
+        # operator-error scenario). Otherwise fall back to a generic
+        # but still legible Spanish translation of Stripe's message.
+        if "inactive" in msg.lower() and "price" in msg.lower():
+            user_msg = (
+                "Este plan no está disponible en este momento (su precio en "
+                "Stripe ha sido archivado). Si crees que es un error, contacta "
+                "con soporte y pasamos a actualizar el catálogo."
+            )
+        else:
+            user_msg = f"No se pudo iniciar el pago: {msg}"
+        raise HTTPException(400, user_msg)
+    except Exception as e:
+        logger.error(
+            f"Unexpected error creating checkout session: price={price_id} "
+            f"plan_type={plan_type} user={user.id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(400, "No se pudo iniciar el pago. Inténtalo de nuevo.")
 
     return {"client_secret": checkout_session.client_secret, "session_id": checkout_session.id}
 
