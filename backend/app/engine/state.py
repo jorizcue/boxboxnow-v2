@@ -247,6 +247,13 @@ class RaceStateManager:
         self.race_started: bool = False
         self.race_finished: bool = False
         self.countdown_ms: int = 0
+        # Wall/log timestamp (matches `_now_seconds()`) when
+        # `self.countdown_ms` was last updated by an Apex COUNTDOWN /
+        # COUNT_UP event. Apex only sends those every ~30 s, so
+        # `countdown_ms` itself has 30-second resolution in real terms.
+        # `_interpolated_countdown_ms()` uses this to give sub-second
+        # precision when assigning kart anchors on lap/sector crosses.
+        self._countdown_received_at: float = 0.0
         self.track_name: str = ""
         self.start_time: float = 0.0
         self._ws_clients: set = set()
@@ -346,6 +353,31 @@ class RaceStateManager:
         if self._current_log_time is not None:
             return self._current_log_time
         return time.monotonic()
+
+    def _interpolated_countdown_ms(self) -> int:
+        """Return `self.countdown_ms` interpolated to the current
+        moment.
+
+        Apex sends `dyn1|countdown|X` events every ~30 seconds, so
+        between updates `self.countdown_ms` is up to 30 seconds stale.
+        For kart anchor timestamps (`last_lap_complete_countdown_ms`,
+        `last_sector_countdown_ms`) we need sub-second precision: when
+        four karts cross META in the same 30-second window, they all
+        end up with the EXACT same anchor if we just use
+        `self.countdown_ms` — that's the "4 karts with current =
+        1:11.469 to the millisecond" bug.
+
+        Interpolation: countdown decreases at 1 ms per real ms, so
+        `countdown_now = countdown_at_last_update − elapsed_since_update`.
+        Works for both live mode (wall-clock) and replay mode (log
+        time), because `_now_seconds()` is consistent across both.
+        """
+        if self._countdown_received_at <= 0:
+            return self.countdown_ms
+        elapsed_s = self._now_seconds() - self._countdown_received_at
+        if elapsed_s < 0:
+            elapsed_s = 0
+        return max(0, self.countdown_ms - int(elapsed_s * 1000))
 
     def reset(self):
         """Reset all race state (used when starting/stopping replay)."""
@@ -516,11 +548,17 @@ class RaceStateManager:
         kart.stint_elapsed_ms += lap_ms
 
         # Tracking anchor: kart just crossed meta, so reset the sector
-        # reference. Frontend uses these timestamps to interpolate the
-        # kart's position along the circuit polyline.
-        kart.last_lap_complete_countdown_ms = self.countdown_ms
+        # reference. We INTERPOLATE the current countdown_ms to wall
+        # time because Apex only sends countdown updates every ~30 s.
+        # Without interpolation, every kart crossing META within the
+        # same 30-second window ends up with the EXACT same anchor
+        # value, and the frontend's live "current lap" counter shows
+        # identical values to the millisecond for tight packs (the bug
+        # observed at Ariza's 2HORAS AMATEUR Final).
+        anchor_ms = self._interpolated_countdown_ms()
+        kart.last_lap_complete_countdown_ms = anchor_ms
         kart.last_sector_n = 0
-        kart.last_sector_countdown_ms = self.countdown_ms
+        kart.last_sector_countdown_ms = anchor_ms
 
         # Include the freshly-updated tracking anchors. Without these,
         # the frontend WS handler patches `lastLapMs` + `totalLaps` but
@@ -922,8 +960,10 @@ class RaceStateManager:
             # Tracking anchor: record the moment the kart crossed this
             # sensor so the frontend can interpolate its position from
             # the corresponding sector distance along the polyline.
+            # Same interpolation rationale as the lap handler: Apex's
+            # countdown_ms only updates every ~30 s.
             kart.last_sector_n = sector_idx
-            kart.last_sector_countdown_ms = self.countdown_ms
+            kart.last_sector_countdown_ms = self._interpolated_countdown_ms()
 
             # Same as the lap event: include the freshly-updated anchor
             # so the Tracking renderer can re-pin the kart at the
@@ -962,6 +1002,7 @@ class RaceStateManager:
 
         elif event.type == EventType.COUNTDOWN:
             self.countdown_ms = int(event.value)
+            self._countdown_received_at = self._now_seconds()
             if not self.race_started:
                 self._trigger_race_start(trigger="countdown")
             elif self._first_countdown_ms == 0 and self.countdown_ms > 0:
@@ -976,6 +1017,7 @@ class RaceStateManager:
             elapsed_ms = int(event.value)
             race_duration_ms = self.duration_min * 60 * 1000
             self.countdown_ms = max(0, race_duration_ms - elapsed_ms)
+            self._countdown_received_at = self._now_seconds()
             if not self.race_started:
                 self._trigger_race_start(trigger="count_up")
             return {"event": "countdown", "ms": self.countdown_ms}
