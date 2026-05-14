@@ -249,9 +249,33 @@ export function OnTrackPanel({
                   <span className="tabular-nums shrink-0 text-neutral-400">
                     {kart.lastLapMs > 0 ? msToLapTime(kart.lastLapMs) : "—"}
                     <span className="mx-0.5 text-neutral-600">→</span>
-                    <span className={currentLapMs > 0 ? "text-accent" : ""}>
-                      {currentLapMs > 0 ? msToLapTime(currentLapMs) : "—"}
-                    </span>
+                    {/*
+                     * Colour-code the current-lap counter:
+                     *  - green (accent) when within ~120 % of the
+                     *    kart's last lap = normal in-progress lap.
+                     *  - orange when between 120 % and 200 % = lap is
+                     *    visibly slower than usual, could be traffic,
+                     *    yellow flag, OR a delayed/lost c7 event from
+                     *    Apex (the kart already crossed META but the
+                     *    backend hasn't seen the event yet).
+                     *  - red when > 200 % = almost certainly stale
+                     *    data — the kart has lapped at least once
+                     *    without us being told.
+                     */}
+                    {(() => {
+                      const ref = kart.lastLapMs > 0 ? kart.lastLapMs : 0;
+                      const ratio = ref > 0 && currentLapMs > 0 ? currentLapMs / ref : 1;
+                      const cls =
+                        currentLapMs <= 0 ? "" :
+                        ratio <= 1.2 ? "text-accent" :
+                        ratio <= 2.0 ? "text-orange-400 font-bold" :
+                        "text-red-500 font-bold";
+                      return (
+                        <span className={cls} title={ratio > 1.2 ? `lap overrun: ${(ratio * 100 - 100).toFixed(0)} % sobre la última` : undefined}>
+                          {currentLapMs > 0 ? msToLapTime(currentLapMs) : "—"}
+                        </span>
+                      );
+                    })()}
                   </span>
                 </div>
                 {/* Row 3: progress bar 0 → 100 % of the lap from META
