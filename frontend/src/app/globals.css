@@ -321,6 +321,28 @@ button {
   will-change: transform;
 }
 
+/*
+ * META-crossing highlight on the OnTrackPanel rows. Triggered each
+ * time a kart's `lastLapCompleteCountdownMs` changes (i.e. it just
+ * completed a lap). The keyframe rides on top of whatever background
+ * the row already has — selected rows, my-kart rows, hover, etc. —
+ * because the @keyframes only touch background-color/box-shadow for
+ * the 1.5 s the class is applied, then the row reverts cleanly.
+ */
+@keyframes tracking-meta-flash-kf {
+  0% {
+    background-color: rgba(159, 229, 86, 0.55);
+    box-shadow: inset 0 0 0 1px rgba(159, 229, 86, 0.9);
+  }
+  100% {
+    background-color: rgba(159, 229, 86, 0);
+    box-shadow: inset 0 0 0 1px rgba(159, 229, 86, 0);
+  }
+}
+.tracking-meta-flash {
+  animation: tracking-meta-flash-kf 1.5s ease-out;
+}
+
 /* ==================== REDUCED MOTION ==================== */
 @media (prefers-reduced-motion: reduce) {
   .speed-line,

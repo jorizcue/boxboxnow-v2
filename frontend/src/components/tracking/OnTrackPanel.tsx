@@ -12,7 +12,7 @@
  *
  * Clicking a row selects the kart in the map (opens its popup).
  */
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import type { KartState, TrackConfig } from "@/types/race";
 import { computeKartProgressM, isKartInPit } from "@/lib/kartPosition";
@@ -118,6 +118,41 @@ export function OnTrackPanel({
 }: Props) {
   const t = useT();
 
+  // META-crossing highlight: each time a kart's
+  // `lastLapCompleteCountdownMs` changes (new lap closed) we flash the
+  // corresponding row for ~1.5 s. The previous value is kept in a ref
+  // so we don't re-flash on every re-render — only on real transitions.
+  // First-observation values (no `prev` yet) are seeded into the ref
+  // silently so the panel doesn't flash every kart when the user first
+  // opens the tab.
+  const lastLapRef = useRef<Map<number, number>>(new Map());
+  const [flashKarts, setFlashKarts] = useState<Set<number>>(new Set());
+  useEffect(() => {
+    const justCrossed: number[] = [];
+    for (const k of karts) {
+      const curr = k.lastLapCompleteCountdownMs ?? 0;
+      const prev = lastLapRef.current.get(k.kartNumber);
+      if (prev != null && curr > 0 && prev !== curr) {
+        justCrossed.push(k.kartNumber);
+      }
+      lastLapRef.current.set(k.kartNumber, curr);
+    }
+    if (justCrossed.length === 0) return;
+    setFlashKarts((s) => {
+      const next = new Set(s);
+      justCrossed.forEach((n) => next.add(n));
+      return next;
+    });
+    const tid = setTimeout(() => {
+      setFlashKarts((s) => {
+        const next = new Set(s);
+        justCrossed.forEach((n) => next.delete(n));
+        return next;
+      });
+    }, 1500);
+    return () => clearTimeout(tid);
+  }, [karts]);
+
   // Compute progress + race-position for each kart once per render.
   const rows = useMemo(() => {
     return karts
@@ -144,6 +179,7 @@ export function OnTrackPanel({
         {rows.map(({ kart, inPit, sector }) => {
           const isMine = kart.kartNumber === myKartNumber;
           const isSelected = kart.kartNumber === selectedKart;
+          const isCrossingMeta = flashKarts.has(kart.kartNumber);
           const fill = tierColor(kart.tierScore);
           const textColor = fill === "#e54444" ? "#fff" : "#000";
           return (
@@ -152,7 +188,7 @@ export function OnTrackPanel({
               onClick={() => onSelectKart(isSelected ? null : kart.kartNumber)}
               className={`w-full text-left flex items-center gap-2 px-1.5 py-1.5 rounded-lg transition-colors border-b border-border/40 last:border-0 ${
                 isSelected ? "bg-white/[0.05]" : "hover:bg-white/[0.02]"
-              } ${isMine ? "bg-accent/[0.05]" : ""}`}
+              } ${isMine ? "bg-accent/[0.05]" : ""} ${isCrossingMeta ? "tracking-meta-flash" : ""}`}
             >
               <span
                 className="w-6 h-6 rounded-full flex items-center justify-center font-mono font-bold text-[10px] shrink-0"

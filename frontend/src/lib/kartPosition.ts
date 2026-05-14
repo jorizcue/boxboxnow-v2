@@ -111,33 +111,43 @@ export function computeKartProgressM(
   // on the lap order in this direction:
   //   - Forward:  META → S1 → S2 → S3 → META
   //   - Reversed: META → S3 → S2 → S1 → META
+  //
+  // When the operator hasn't placed any S1/S2/S3 sensors (sectors are
+  // optional), `nextDist` falls back to META itself, i.e. the segment
+  // length is one full lap. Without this fallback the marker drifts
+  // freely on the kart's `avgLapMs` estimate: if `avgLapMs` is off by
+  // even 2 s/lap, after ~60 s the kart visually overshoots META and
+  // wraps around, then snaps backward when the real LAP event lands.
+  // That snap is the "forward/backward" wobble visible in the field.
+  // Capping at 95 % of the segment keeps the marker just shy of the
+  // next reference so the eventual snap is always small and forward.
   const lastN = kart.lastSectorN ?? 0;
-  let nextDist: number | null = null;
+  const metaPos = cfg.metaDistanceM ?? 0;
+  let nextDist: number;
   if (direction === "forward") {
     nextDist =
-      lastN === 0 ? (cfg.s1DistanceM ?? null)
-      : lastN === 1 ? (cfg.s2DistanceM ?? null)
-      : lastN === 2 ? (cfg.s3DistanceM ?? null)
-      : lastN === 3 ? (cfg.metaDistanceM ?? 0)
-      : null;
+      lastN === 0 ? (cfg.s1DistanceM ?? cfg.s2DistanceM ?? cfg.s3DistanceM ?? metaPos)
+      : lastN === 1 ? (cfg.s2DistanceM ?? cfg.s3DistanceM ?? metaPos)
+      : lastN === 2 ? (cfg.s3DistanceM ?? metaPos)
+      : metaPos;
   } else {
     nextDist =
-      lastN === 0 ? (cfg.s3DistanceM ?? null)
-      : lastN === 3 ? (cfg.s2DistanceM ?? null)
-      : lastN === 2 ? (cfg.s1DistanceM ?? null)
-      : lastN === 1 ? (cfg.metaDistanceM ?? 0)
-      : null;
+      lastN === 0 ? (cfg.s3DistanceM ?? cfg.s2DistanceM ?? cfg.s1DistanceM ?? metaPos)
+      : lastN === 3 ? (cfg.s2DistanceM ?? cfg.s1DistanceM ?? metaPos)
+      : lastN === 2 ? (cfg.s1DistanceM ?? metaPos)
+      : metaPos;
   }
-  if (nextDist != null) {
-    // Race-direction distance from anchor to next sensor, with wrap.
+  {
     const rawDelta = direction === "forward"
       ? (nextDist - anchorDistance)
       : (anchorDistance - nextDist);
-    const segLen = ((rawDelta % total) + total) % total;
-    if (segLen > 0) {
-      const cap = segLen * 0.95;
-      if (traveled > cap) traveled = cap;
-    }
+    const wrapped = ((rawDelta % total) + total) % total;
+    // If anchor and next coincide (e.g. lastN→META with anchor=META),
+    // the wrapped delta is 0; treat it as a full lap to allow forward
+    // motion until the next LAP event arrives.
+    const segLen = wrapped === 0 ? total : wrapped;
+    const cap = segLen * 0.95;
+    if (traveled > cap) traveled = cap;
   }
 
   // Move along the polyline. In reversed direction the polyline-walk
