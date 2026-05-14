@@ -22,7 +22,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import type { KartState, TrackConfig } from "@/types/race";
-import { pointAtDistance, effectiveDistanceForward } from "@/lib/polyline";
+import { pointAtDistance } from "@/lib/polyline";
 import { computeKartProgressM, isKartInPit } from "@/lib/kartPosition";
 import { KartPopup } from "./KartPopup";
 
@@ -270,10 +270,14 @@ export function TrackMap({
           latlon = pointAtDistance(trackConfig.trackPolyline, trackConfig.pitEntryDistanceM, true);
         }
       } else {
-        const progress = computeKartProgressM(kart, trackConfig, countdownMs);
+        // `computeKartProgressM` already accounts for race direction and
+        // returns a polyline-walk distance, so we resolve it to lat/lon
+        // directly. No `effectiveDistanceForward` wrap needed — that
+        // legacy helper assumed meta=polyline[0] and broke for circuits
+        // with a non-zero `metaDistanceM`.
+        const progress = computeKartProgressM(kart, trackConfig, countdownMs, direction);
         if (progress != null) {
-          const forwardDist = effectiveDistanceForward(progress, direction, trackConfig.trackLengthM);
-          latlon = pointAtDistance(trackConfig.trackPolyline, forwardDist, true);
+          latlon = pointAtDistance(trackConfig.trackPolyline, progress, true);
         }
       }
 

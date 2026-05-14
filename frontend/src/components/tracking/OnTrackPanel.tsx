@@ -16,7 +16,6 @@ import { useMemo } from "react";
 import { useT } from "@/lib/i18n";
 import type { KartState, TrackConfig } from "@/types/race";
 import { computeKartProgressM, isKartInPit } from "@/lib/kartPosition";
-import { effectiveDistanceForward } from "@/lib/polyline";
 
 function tierColor(score: number | undefined): string {
   const s = score ?? 0;
@@ -27,32 +26,71 @@ function tierColor(score: number | undefined): string {
   return "#e54444";
 }
 
-/** Resolve which sector a forward-distance is in, plus the % progress
- *  within that sector. Used for the right-aligned status text in each
- *  row. Returns ("--", 0) if track config is incomplete. */
-function sectorProgress(
-  distM: number,
+/** Convert a polyline-walk distance into "distance from META in race
+ *  direction" — i.e. how far the kart has travelled since its last META
+ *  crossing. Monotonically grows from 0 to `total` during a lap. */
+function raceProgressFromMeta(
+  polylineDistM: number,
   cfg: TrackConfig,
+  direction: "forward" | "reversed",
+): number {
+  const total = cfg.trackLengthM ?? 0;
+  if (total <= 0) return 0;
+  const meta = cfg.metaDistanceM ?? 0;
+  const raw = direction === "forward" ? polylineDistM - meta : meta - polylineDistM;
+  return ((raw % total) + total) % total;
+}
+
+/** Resolve which sector the kart is in (using its race-progress from
+ *  META) plus the % progress within that sector. Sensors are ordered
+ *  by the race direction so the indicator flips together with the
+ *  toggle in the top bar.
+ *
+ *  Falls back to the pseudo-sector "S—" with the kart's overall lap
+ *  progress when the operator hasn't placed any S1/S2/S3 sensors yet. */
+function sectorProgress(
+  polylineDistM: number,
+  cfg: TrackConfig,
+  direction: "forward" | "reversed",
 ): { label: string; pct: number } {
   const total = cfg.trackLengthM ?? 0;
-  const s1 = cfg.s1DistanceM;
-  const s2 = cfg.s2DistanceM;
-  const s3 = cfg.s3DistanceM;
-  // Boundaries in forward direction (S1 < S2 < S3 < total)
-  const bounds = [
-    { name: "S1", start: 0, end: s1 ?? null },
-    { name: "S2", start: s1 ?? 0, end: s2 ?? null },
-    { name: "S3", start: s2 ?? 0, end: s3 ?? null },
-    { name: "S3", start: s3 ?? 0, end: total },
-  ];
-  for (const b of bounds) {
-    if (b.end == null) continue;
-    if (distM >= b.start && distM < b.end) {
-      const pct = b.end > b.start ? Math.min(100, Math.max(0, ((distM - b.start) / (b.end - b.start)) * 100)) : 0;
-      return { label: b.name, pct };
-    }
+  if (total <= 0) return { label: "—", pct: 0 };
+  const kartRace = raceProgressFromMeta(polylineDistM, cfg, direction);
+
+  // Sensors in race-order. In reversed direction the kart crosses
+  // them in the reverse SENSOR-NAME order (S3 first, then S2, then S1)
+  // — we still label them by their sensor name so the operator can
+  // mentally map "S3" back to the same physical point on the track.
+  const sensors = [
+    { name: "S1", polyline: cfg.s1DistanceM },
+    { name: "S2", polyline: cfg.s2DistanceM },
+    { name: "S3", polyline: cfg.s3DistanceM },
+  ]
+    .filter((s): s is { name: string; polyline: number } => s.polyline != null)
+    .map((s) => ({ name: s.name, race: raceProgressFromMeta(s.polyline, cfg, direction) }))
+    .sort((a, b) => a.race - b.race);
+
+  if (sensors.length === 0) {
+    // No sensors placed yet — show overall lap progress under a
+    // neutral label so the row isn't always blank.
+    return { label: "—", pct: (kartRace / total) * 100 };
   }
-  return { label: "—", pct: 0 };
+
+  let prevRace = 0;
+  for (const s of sensors) {
+    if (kartRace >= prevRace && kartRace < s.race) {
+      const span = s.race - prevRace;
+      const pct = span > 0 ? Math.min(100, ((kartRace - prevRace) / span) * 100) : 0;
+      return { label: s.name, pct };
+    }
+    prevRace = s.race;
+  }
+  // Final stretch back to META — still labelled with the LAST sensor
+  // crossed so the operator can read "S1 · 90 %" as "almost back at META".
+  const lastSensor = sensors[sensors.length - 1];
+  const span = total - lastSensor.race;
+  const pct = span > 0 ? Math.min(100, ((kartRace - lastSensor.race) / span) * 100) : 0;
+  return { label: lastSensor.name, pct };
 }
 
 interface Props {
@@ -81,16 +119,12 @@ export function OnTrackPanel({
 
   // Compute progress + race-position for each kart once per render.
   const rows = useMemo(() => {
-    const total = trackConfig.trackLengthM ?? 0;
     return karts
       .map((k) => {
         const inPit = isKartInPit(k);
-        const rawProgress = inPit ? null : computeKartProgressM(k, trackConfig, countdownMs);
-        const fwdDist = rawProgress != null && total > 0
-          ? effectiveDistanceForward(rawProgress, direction, total)
-          : null;
-        const sector = fwdDist != null ? sectorProgress(fwdDist, trackConfig) : null;
-        return { kart: k, inPit, fwdDist, sector };
+        const progressM = inPit ? null : computeKartProgressM(k, trackConfig, countdownMs, direction);
+        const sector = progressM != null ? sectorProgress(progressM, trackConfig, direction) : null;
+        return { kart: k, inPit, progressM, sector };
       })
       .sort((a, b) => {
         // Sort by race position from the timing table (existing field
