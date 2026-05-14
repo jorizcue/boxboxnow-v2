@@ -16,6 +16,7 @@ import { useMemo } from "react";
 import { useT } from "@/lib/i18n";
 import type { KartState, TrackConfig } from "@/types/race";
 import { computeKartProgressM, isKartInPit } from "@/lib/kartPosition";
+import { msToLapTime } from "@/lib/formatters";
 
 function tierColor(score: number | undefined): string {
   const s = score ?? 0;
@@ -181,9 +182,17 @@ export function OnTrackPanel({
                   )}
                 </div>
               </div>
-              <span className="text-[10px] font-mono font-bold text-neutral-400 shrink-0">
-                P{kart.position || "?"}
-              </span>
+              {/* Right column: race position + last lap time, stacked.
+                  The lap time is monospace tabular-nums so the dot lines
+                  up across rows even with varying digit widths. */}
+              <div className="flex flex-col items-end shrink-0 leading-tight">
+                <span className="text-[10px] font-mono font-bold text-neutral-400">
+                  P{kart.position || "?"}
+                </span>
+                <span className="text-[9px] font-mono text-neutral-500 tabular-nums">
+                  {kart.lastLapMs > 0 ? msToLapTime(kart.lastLapMs) : "—"}
+                </span>
+              </div>
             </button>
           );
         })}
