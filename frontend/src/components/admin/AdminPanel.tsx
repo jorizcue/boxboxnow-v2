@@ -217,6 +217,7 @@ const STANDARD_TAB_OPTIONS: [string, string][] = [
   ["race", "Carrera"],
   ["pit", "Box"],
   ["live", "Live"],
+  ["tracking", "Tracking"],
   ["config", "Config"],
   ["adjusted", "Clasif. Real"],
   ["driver", "Vista en vivo"],

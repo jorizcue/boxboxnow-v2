@@ -14,6 +14,7 @@ import { ClassificationTable } from "@/components/classification/ClassificationT
 import { ConfigPanel } from "@/components/config/ConfigPanel";
 import { AdminUsersPanel, AdminCircuitsPanel, AdminHubPanel, AdminPlatformPanel, AdminMarketingPanel } from "@/components/admin/AdminPanel";
 import { AdminAnalyticsPanel } from "@/components/admin/AdminAnalyticsPanel";
+import { AdminRankingPanel } from "@/components/admin/AdminRankingPanel";
 import { LiveTiming } from "@/components/live/LiveTiming";
 import { AdjustedClassification } from "@/components/classification/AdjustedClassification";
 import { ReplayTab } from "@/components/replay/ReplayTab";
@@ -399,6 +400,7 @@ function Dashboard({
           {activeTab === "admin-platform" && user?.is_admin && <AdminPlatformPanel />}
           {activeTab === "admin-marketing" && user?.is_admin && <AdminMarketingPanel />}
           {activeTab === "admin-analytics" && user?.is_admin && <AdminAnalyticsPanel />}
+          {activeTab === "admin-ranking" && user?.is_admin && <AdminRankingPanel />}
         </main>
       </div>
       {/* Floating support chatbot — visible only when user has the `chat`

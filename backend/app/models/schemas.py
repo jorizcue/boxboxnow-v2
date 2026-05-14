@@ -691,3 +691,146 @@ class ChatMessage(Base):
         Index("ix_chat_messages_user_session", "user_id", "session_id", "created_at"),
     )
 
+
+# ─── Ranking (Glicko-2) ──────────────────────────────────────────────────────
+#
+# Skill-rating system across all recorded Apex sessions. Pilots are
+# identified by name only (Apex doesn't emit unique IDs), so we keep a
+# canonical name + an alias table for the typo/casing/accent variants
+# the parser sees in the wild. The rating math is Glicko-2 (not pure
+# ELO) because the data per pilot is sparse — most have 1–4 sessions —
+# and Glicko's RD (rating deviation) gives an explicit confidence
+# bound. See `backend/app/services/ranking/` for the implementation.
+
+
+class Driver(Base):
+    """A pilot identified by a canonical (normalised) name. The original
+    raw strings the parser saw live in `DriverAlias` rows pointing at this
+    driver. Admin can merge two `Driver` rows (move all aliases + results
+    onto one canonical) or split one row back into two if a name collision
+    was a false positive."""
+    __tablename__ = "drivers"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    # Display form — usually the most common raw variant we saw, but the
+    # admin can override.
+    canonical_name = Column(String(120), nullable=False, index=True)
+    # Output of `ranking.normalizer.normalize_name`: uppercase, accent-
+    # stripped, single-spaced. Used for fast lookups when matching new
+    # Apex events to existing drivers.
+    normalized_key = Column(String(120), nullable=False, unique=True, index=True)
+    # Rolling counters maintained by the processor — cheap to keep
+    # denormalised so the admin Ranking page doesn't need to JOIN every
+    # session_results row to sort by activity.
+    sessions_count = Column(Integer, default=0, nullable=False)
+    total_laps = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+class DriverAlias(Base):
+    """Alternative name forms that all point at the same canonical
+    `Driver`. Populated automatically by the parser (one row per distinct
+    raw string seen) and editable by the admin via the merge tool.
+
+    Example: `MATÍAS GARCÍA` and `MATIAS GARCIA` both alias to one
+    `Driver` row with normalized_key='MATIAS GARCIA'."""
+    __tablename__ = "driver_aliases"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="CASCADE"), nullable=False, index=True)
+    alias = Column(String(120), nullable=False, unique=True, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+class DriverRating(Base):
+    """Current Glicko-2 state for a driver. One row per driver. Updated
+    in-place every time the processor consumes a new session containing
+    that driver. The full update trail lives in `RatingHistory`."""
+    __tablename__ = "driver_ratings"
+
+    driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="CASCADE"), primary_key=True)
+    rating = Column(Float, default=1500.0, nullable=False)
+    rd = Column(Float, default=350.0, nullable=False)           # rating deviation (uncertainty)
+    volatility = Column(Float, default=0.06, nullable=False)    # Glicko-2 sigma
+    sessions_count = Column(Integer, default=0, nullable=False)
+    last_session_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+class SessionResult(Base):
+    """One row per (recorded session, driver) — the materialised stats
+    that feed Glicko-2 per session. We keep these in the DB (rather than
+    re-deriving from the log every time) so the rating math is
+    reproducible: replaying the algorithm only needs SessionResult rows,
+    not the original 100 MB of Apex logs."""
+    __tablename__ = "session_results"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    # Session identity comes from the recording filename + the
+    # title1/title2 the operator set in Apex. Three fields together
+    # uniquely identify the session.
+    circuit_name = Column(String(64), nullable=False, index=True)
+    log_date = Column(String(10), nullable=False, index=True)   # YYYY-MM-DD
+    title1 = Column(String(120), default="", nullable=False)
+    title2 = Column(String(120), default="", nullable=False)
+    driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="CASCADE"), nullable=False, index=True)
+    kart_number = Column(Integer, nullable=True)
+    team_name = Column(String(120), default="", nullable=False)
+    total_laps = Column(Integer, default=0, nullable=False)
+    best_lap_ms = Column(Integer, default=0, nullable=False)
+    avg_lap_ms = Column(Float, default=0.0, nullable=False)
+    median_lap_ms = Column(Integer, default=0, nullable=False)
+    # Kart-bias correction: how much the kart this driver was in
+    # over/under-performed vs the session's field. Subtracted from
+    # avg/median to give the kart-corrected pace used for the
+    # Glicko-2 pairwise comparison.
+    kart_bias_ms = Column(Float, default=0.0, nullable=False)
+    corrected_avg_ms = Column(Float, default=0.0, nullable=False)
+    final_position = Column(Integer, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("circuit_name", "log_date", "title1", "title2", "driver_id",
+                         name="uq_session_result"),
+        Index("ix_session_results_session", "circuit_name", "log_date", "title1", "title2"),
+    )
+
+
+class RatingHistory(Base):
+    """Append-only log of every Glicko-2 update applied to a driver.
+    One row per (session_result, driver). Useful for audit / undo and for
+    the per-driver rating-over-time chart in the admin UI."""
+    __tablename__ = "rating_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="CASCADE"), nullable=False, index=True)
+    session_result_id = Column(Integer, ForeignKey("session_results.id", ondelete="CASCADE"), nullable=False, index=True)
+    rating_before = Column(Float, nullable=False)
+    rd_before = Column(Float, nullable=False)
+    rating_after = Column(Float, nullable=False)
+    rd_after = Column(Float, nullable=False)
+    delta = Column(Float, nullable=False)
+    computed_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+class ProcessedLog(Base):
+    """Tracks which `data/recordings/<Circuit>/<YYYY-MM-DD>.log[.gz]`
+    files the processor has already turned into SessionResult rows. The
+    daily batch only looks at files NOT in this table — fast incremental
+    operation. If the algorithm changes and we need to reprocess,
+    truncate this table + `session_results` + `rating_history` and
+    rerun."""
+    __tablename__ = "processed_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    circuit_name = Column(String(64), nullable=False, index=True)
+    log_date = Column(String(10), nullable=False, index=True)
+    sessions_count = Column(Integer, default=0, nullable=False)
+    laps_count = Column(Integer, default=0, nullable=False)
+    processed_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("circuit_name", "log_date", name="uq_processed_log"),
+    )
+

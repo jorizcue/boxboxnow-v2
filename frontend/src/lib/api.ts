@@ -695,7 +695,65 @@ export const api = {
       "/api/chat/admin/reindex",
       { method: "POST" }
     ),
+
+  // ── Driver ranking (Glicko-2) ──────────────────────────────────────
+  rankingLookup: (names: string[]) =>
+    fetchApi<{ results: RankingLookupRow[] }>(
+      "/api/ranking/lookup",
+      { method: "POST", body: JSON.stringify({ names }) },
+    ),
+  rankingAdminTop: (limit = 100, minSessions = 2) =>
+    fetchApi<{ drivers: RankingTopRow[] }>(
+      `/api/admin/ranking/top?limit=${limit}&min_sessions=${minSessions}`,
+    ),
+  rankingAdminSearch: (q: string) =>
+    fetchApi<{ drivers: RankingSearchRow[] }>(
+      `/api/admin/ranking/search?q=${encodeURIComponent(q)}`,
+    ),
+  rankingAdminMerge: (intoDriverId: number, fromDriverId: number) =>
+    fetchApi<{ ok: boolean; into?: number; from?: number; reason?: string }>(
+      "/api/admin/ranking/merge",
+      { method: "POST", body: JSON.stringify({ into_driver_id: intoDriverId, from_driver_id: fromDriverId }) },
+    ),
+  rankingAdminReprocess: () =>
+    fetchApi<{ processed: number; skipped: number; total_candidates: number }>(
+      "/api/admin/ranking/reprocess",
+      { method: "POST" },
+    ),
 };
+
+// ── Ranking response types ───────────────────────────────────────────
+export interface RankingLookupRow {
+  name: string;                  // raw input name
+  matched: boolean;
+  driver_id: number | null;
+  canonical_name: string | null;
+  rating: number | null;         // null only when matched=false AND we don't auto-default
+  rd: number | null;
+  sessions: number;
+}
+
+export interface RankingTopRow {
+  rank: number;
+  driver_id: number;
+  canonical_name: string;
+  rating: number;
+  rd: number;
+  volatility: number;
+  sessions_count: number;
+  total_laps: number;
+  last_session_at: string | null;
+}
+
+export interface RankingSearchRow {
+  driver_id: number;
+  canonical_name: string;
+  normalized_key: string;
+  sessions_count: number;
+  total_laps: number;
+  rating: number;
+  rd: number;
+}
 
 /**
  * Stream a chatbot answer over Server-Sent Events.

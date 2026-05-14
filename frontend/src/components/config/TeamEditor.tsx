@@ -36,6 +36,53 @@ interface Team {
   drivers: Driver[];
 }
 
+// Glicko-2 baseline used when a driver hasn't been seen in any historic
+// session, OR when a team has zero drivers. Matches `DEFAULT_RATING` in
+// `backend/app/services/ranking/glicko2.py`.
+const DEFAULT_RATING = 1500;
+
+interface DriverRatingInfo {
+  rating: number;
+  rd: number;
+  matched: boolean;
+  sessions: number;
+}
+
+/** Compute a team's average rating from its drivers' lookup results.
+ *  Empty teams (or teams whose drivers are all unrated rookies) fall
+ *  back to the default rating so the sorting step gives them a
+ *  middle-of-the-pack slot. */
+function teamAvgRating(
+  drivers: Driver[],
+  ratings: Map<string, DriverRatingInfo>,
+): { avg: number; ratedCount: number; total: number } {
+  const total = drivers.length;
+  if (total === 0) return { avg: DEFAULT_RATING, ratedCount: 0, total: 0 };
+  let sum = 0;
+  let ratedCount = 0;
+  for (const d of drivers) {
+    const key = (d.driver_name || "").trim();
+    const r = key ? ratings.get(key) : null;
+    if (r && r.matched) {
+      sum += r.rating;
+      ratedCount += 1;
+    } else {
+      // Unknown pilot → default rating so the team isn't penalised
+      // disproportionately, and so empty teams sort mid-pack.
+      sum += DEFAULT_RATING;
+    }
+  }
+  return { avg: sum / total, ratedCount, total };
+}
+
+function ratingTone(rating: number): string {
+  if (rating >= 1900) return "text-emerald-300";
+  if (rating >= 1700) return "text-lime-300";
+  if (rating >= 1550) return "text-amber-300";
+  if (rating >= 1400) return "text-orange-300";
+  return "text-rose-300";
+}
+
 let idCounter = 0;
 function newId() {
   return `team-${++idCounter}-${Date.now()}`;
@@ -54,6 +101,13 @@ export function TeamEditor() {
   // below is a belt-and-braces fallback for legacy sessions where the
   // API returns null.
   const [autoLoad, setAutoLoad] = useState(false);
+  // ELO cache. Keyed by the exact raw `driver_name` string the operator
+  // typed so a re-keystroke doesn't lose previous lookups. Refreshed
+  // whenever a team is saved/imported or via the manual "Refrescar
+  // ratings" button. Glicko-2 doesn't shift much between sessions,
+  // so we don't bother re-fetching on every keystroke.
+  const [ratings, setRatings] = useState<Map<string, DriverRatingInfo>>(new Map());
+  const [ratingsLoading, setRatingsLoading] = useState(false);
   const teamsUpdatedAt = useRaceStore((s) => s.teamsUpdatedAt);
   const initialLoadDone = useRef(false);
 
@@ -109,6 +163,61 @@ export function TeamEditor() {
       );
     } catch {}
     setLoading(false);
+  };
+
+  /** Pull ratings for every driver currently in the editor. Uses the
+   *  authenticated POST /api/ranking/lookup endpoint so we send all
+   *  names in a single request. Returns silently on auth or backfill
+   *  errors — ELO is a nice-to-have, not a blocker for team setup. */
+  const refreshRatings = async (teamsToQuery: Team[]) => {
+    const names = Array.from(new Set(
+      teamsToQuery.flatMap((t) => t.drivers.map((d) => (d.driver_name || "").trim()))
+        .filter((n) => n.length >= 2)
+    ));
+    if (names.length === 0) {
+      setRatings(new Map());
+      return;
+    }
+    setRatingsLoading(true);
+    try {
+      const res = await api.rankingLookup(names);
+      const map = new Map<string, DriverRatingInfo>();
+      for (const row of res.results) {
+        map.set(row.name, {
+          rating: row.rating ?? DEFAULT_RATING,
+          rd: row.rd ?? 350,
+          matched: row.matched,
+          sessions: row.sessions || 0,
+        });
+      }
+      setRatings(map);
+    } catch {
+      // Silent — the ranking endpoint may legitimately be unavailable
+      // (first deploy, backfill in progress, etc).
+    } finally {
+      setRatingsLoading(false);
+    }
+  };
+
+  // Refresh ratings whenever the team list itself (not just an in-flight
+  // edit) changes substantively. Triggered after load, save, import, or
+  // a manual button press.
+  useEffect(() => {
+    if (!loading && teams.length) {
+      refreshRatings(teams);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  const sortByEloDesc = () => {
+    setTeams((prev) => {
+      const withAvg = prev.map((t) => ({
+        team: t,
+        avg: teamAvgRating(t.drivers, ratings).avg,
+      }));
+      withAvg.sort((a, b) => b.avg - a.avg);
+      return withAvg.map((row, i) => ({ ...row.team, position: i + 1 }));
+    });
   };
 
   const saveTeams = async () => {
@@ -319,6 +428,14 @@ export function TeamEditor() {
             {importing ? t("teams.importing") : t("teams.loadLive")}
           </button>
           <button
+            onClick={sortByEloDesc}
+            disabled={ratingsLoading}
+            title="Ordenar equipos de mayor a menor ELO medio"
+            className="bg-black text-neutral-400 hover:text-white disabled:opacity-40 text-xs px-3 py-2 rounded-lg border border-border transition-colors"
+          >
+            {ratingsLoading ? "ELO…" : "Ordenar por ELO"}
+          </button>
+          <button
             onClick={addTeam}
             className="bg-black text-neutral-400 hover:text-white text-xs px-3 py-2 rounded-lg border border-border transition-colors"
           >
@@ -348,6 +465,7 @@ export function TeamEditor() {
               <SortableTeamRow
                 key={team.id}
                 team={team}
+                ratings={ratings}
                 isExpanded={expandedTeam === team.id}
                 onToggle={() =>
                   setExpandedTeam(
@@ -378,6 +496,7 @@ export function TeamEditor() {
 
 function SortableTeamRow({
   team,
+  ratings,
   isExpanded,
   onToggle,
   onUpdate,
@@ -387,6 +506,7 @@ function SortableTeamRow({
   onUpdateDriver,
 }: {
   team: Team;
+  ratings: Map<string, DriverRatingInfo>;
   isExpanded: boolean;
   onToggle: () => void;
   onUpdate: (id: string, field: keyof Team, value: any) => void;
@@ -400,6 +520,7 @@ function SortableTeamRow({
     value: any
   ) => void;
 }) {
+  const teamElo = teamAvgRating(team.drivers, ratings);
   const t = useT();
   const {
     attributes,
@@ -480,6 +601,19 @@ function SortableTeamRow({
           <span className="sm:hidden">{team.drivers.length}p</span>
         </span>
 
+        {/* Team-average ELO. When the team has zero drivers the helper
+            returns the default rating (1500) so sort behaviour places
+            them mid-grid. */}
+        <span
+          title={`ELO medio del equipo (${teamElo.ratedCount}/${teamElo.total} pilotos con histórico)`}
+          className={`text-[10px] sm:text-[11px] font-mono shrink-0 hidden sm:inline ${ratingTone(teamElo.avg)}`}
+        >
+          ELO {teamElo.avg.toFixed(0)}
+          {teamElo.total > 0 && teamElo.ratedCount < teamElo.total && (
+            <span className="text-neutral-600 ml-0.5">*</span>
+          )}
+        </span>
+
         {team.drivers.some((d) => d.differential_ms !== 0) && (
           <span className="text-[10px] text-accent font-medium px-1 py-0.5 rounded bg-accent/10 shrink-0 hidden sm:inline">
             DIFF
@@ -515,7 +649,10 @@ function SortableTeamRow({
             </p>
           ) : (
             <div className="space-y-2">
-              {team.drivers.map((driver, driverIdx) => (
+              {team.drivers.map((driver, driverIdx) => {
+                const trimmed = (driver.driver_name || "").trim();
+                const info = trimmed ? ratings.get(trimmed) : undefined;
+                return (
                 <div key={driverIdx} className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-2">
                   <input
                     value={driver.driver_name}
@@ -530,6 +667,24 @@ function SortableTeamRow({
                     className="flex-1 min-w-[120px] bg-surface border border-border rounded-md px-2 py-1.5 text-sm"
                     placeholder={t("teams.driverPlaceholder")}
                   />
+                  {/* Individual ELO badge: shows the driver's rating
+                      when our DB has a match, or a neutral "—" hint
+                      when the name is unknown (= rookie). RD is shown
+                      on hover so the strategist can judge confidence. */}
+                  {trimmed.length >= 2 && (
+                    <span
+                      title={info && info.matched
+                        ? `${info.sessions} sesiones · RD ${info.rd.toFixed(0)}`
+                        : "Sin histórico — se usa ELO base 1500 para promedios"}
+                      className={`text-[10px] font-mono shrink-0 px-1.5 py-0.5 rounded border ${
+                        info && info.matched
+                          ? `border-border bg-black/30 ${ratingTone(info.rating)}`
+                          : "border-border bg-black/20 text-neutral-600"
+                      }`}
+                    >
+                      {info && info.matched ? info.rating.toFixed(0) : "—"}
+                    </span>
+                  )}
                   <div className="flex items-center gap-1">
                     <input
                       type="number"
@@ -566,7 +721,8 @@ function SortableTeamRow({
                     X
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

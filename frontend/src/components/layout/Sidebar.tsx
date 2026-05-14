@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { useT } from "@/lib/i18n";
 import { useRaceStore } from "@/hooks/useRaceState";
 
-export type Tab = "race" | "pit" | "live" | "tracking" | "classification" | "adjusted" | "driver" | "driver-config" | "config" | "replay" | "analytics" | "insights" | "account" | "admin-users" | "admin-circuits" | "admin-hub" | "admin-platform" | "admin-marketing" | "admin-analytics";
+export type Tab = "race" | "pit" | "live" | "tracking" | "classification" | "adjusted" | "driver" | "driver-config" | "config" | "replay" | "analytics" | "insights" | "account" | "admin-users" | "admin-circuits" | "admin-hub" | "admin-platform" | "admin-marketing" | "admin-analytics" | "admin-ranking";
 
 interface SidebarProps {
   activeTab: Tab;
@@ -137,6 +137,11 @@ const TAB_ICONS: Record<string, JSX.Element> = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
     </svg>
   ),
+  "admin-ranking": (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.006 0h-5.006M9 12.75h6m-6 0v-1.5a3 3 0 116 0v1.5M9 6.75h6M9 4.5h6" />
+    </svg>
+  ),
   account: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
@@ -213,6 +218,9 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs, username }:
     { id: "admin-platform", labelKey: "Plataforma", tabAccess: "admin-hub" },
     { id: "admin-marketing", labelKey: "Marketing", tabAccess: "admin-hub" },
     { id: "admin-analytics", labelKey: "Analítica", tabAccess: "admin-hub" },
+    // Driver ranking lives under admin so it's never publicly visible
+    // — only admin users see the leaderboard + merge tool.
+    { id: "admin-ranking", labelKey: "Ranking", tabAccess: "admin-hub" },
   ];
 
   const visibleMainTabs = mainTabs.filter((tab) => {
