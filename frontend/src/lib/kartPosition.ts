@@ -92,7 +92,19 @@ export function computeKartProgressM(
 ): number | null {
   const total = cfg.trackLengthM ?? 0;
   if (total <= 0) return null;
-  if (!kart.avgLapMs || kart.avgLapMs <= 0) {
+  // Pace estimate: prefer `lastLapMs` (the kart's most recent actual
+  // lap) over the 20-lap rolling average. In an endurance race where
+  // lap-to-lap variance is small (the strategist's empirical finding),
+  // lastLap is the best single-number forecast for the lap in
+  // progress — it reacts immediately to driver changes, rain, traffic,
+  // etc., while `avgLapMs` lags behind by ~20 laps. We fall back to
+  // `avgLapMs` only when no full lap has been recorded yet (cold
+  // start) and bail out if we still don't have anything.
+  const lapMs =
+    kart.lastLapMs && kart.lastLapMs > 0
+      ? kart.lastLapMs
+      : (kart.avgLapMs && kart.avgLapMs > 0 ? kart.avgLapMs : 0);
+  if (lapMs <= 0) {
     // No pace estimate — drop the kart on its last anchor without
     // moving forward. Better than not rendering at all.
     const anchor = pickAnchor(kart, cfg);
@@ -104,23 +116,21 @@ export function computeKartProgressM(
   const [anchorCountdown, anchorDistance] = anchor;
 
   const elapsedMs = Math.max(0, anchorCountdown - countdownMs);
-  const speedMps = total / kart.avgLapMs;
+  const speedMps = total / lapMs;
   let traveled = elapsedMs * speedMps;
 
-  // Cap at the next sensor IN RACE DIRECTION. The cap segment depends
-  // on the lap order in this direction:
-  //   - Forward:  META → S1 → S2 → S3 → META
-  //   - Reversed: META → S3 → S2 → S1 → META
+  // Safety cap at 99 % of the segment to the next reference (next
+  // sector if placed, else META a vuelta entera). Esto es solo una
+  // RED DE SEGURIDAD para casos patológicos:
+  //   - Kart con `lastLapMs` claramente erróneo (boxes, trompo, primera
+  //     vuelta lenta tras safety car…).
+  //   - Eventos LAP que llegan con retraso anómalo de Apex.
   //
-  // When the operator hasn't placed any S1/S2/S3 sensors (sectors are
-  // optional), `nextDist` falls back to META itself, i.e. the segment
-  // length is one full lap. Without this fallback the marker drifts
-  // freely on the kart's `avgLapMs` estimate: if `avgLapMs` is off by
-  // even 2 s/lap, after ~60 s the kart visually overshoots META and
-  // wraps around, then snaps backward when the real LAP event lands.
-  // That snap is the "forward/backward" wobble visible in the field.
-  // Capping at 95 % of the segment keeps the marker just shy of the
-  // next reference so the eventual snap is always small and forward.
+  // En operación normal, con varianza ±0.5 % típica de un piloto
+  // consistente, el cap NUNCA se activa antes del evento LAP y el
+  // kart llega de forma natural a META justo cuando llega el evento.
+  // El cap del 95 % anterior era demasiado agresivo: se activaba con
+  // ±5 % de error y dejaba al marker congelado los últimos segundos.
   const lastN = kart.lastSectorN ?? 0;
   const metaPos = cfg.metaDistanceM ?? 0;
   let nextDist: number;
@@ -142,11 +152,11 @@ export function computeKartProgressM(
       ? (nextDist - anchorDistance)
       : (anchorDistance - nextDist);
     const wrapped = ((rawDelta % total) + total) % total;
-    // If anchor and next coincide (e.g. lastN→META with anchor=META),
-    // the wrapped delta is 0; treat it as a full lap to allow forward
+    // If anchor and next coincide (lastN→META with anchor=META), the
+    // wrapped delta is 0; treat it as a full lap to allow forward
     // motion until the next LAP event arrives.
     const segLen = wrapped === 0 ? total : wrapped;
-    const cap = segLen * 0.95;
+    const cap = segLen * 0.99;
     if (traveled > cap) traveled = cap;
   }
 
