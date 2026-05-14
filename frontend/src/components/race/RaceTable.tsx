@@ -49,6 +49,11 @@ export function RaceTable() {
   // Helper: compute stint seconds from race clock
   const durationMs = useRaceStore((s) => s.durationMs);
   const raceFinished = useRaceStore((s) => s.raceFinished);
+  // Authoritative pit-gate verdict from the backend (same source the
+  // StatusBar badge + Box panel use). When present we prefer this over
+  // the local heuristic below so all three views (Carrera, Box, Vista
+  // Piloto) agree on the colour of "Vueltas hasta stint máximo".
+  const pitStatusFromBackend = useRaceStore((s) => s.pitStatus);
   const stintSecondsFor = (kart: typeof karts[0]) => {
     if (raceClockMs === 0 || raceFinished) return 0;
     const stintStart = kart.stintStartCountdownMs || durationMs || raceClockMs;
@@ -132,7 +137,13 @@ export function RaceTable() {
     return "text-green-400";
   })();
 
-  // Pit window: open when stint >= realMinStint
+  // Pit window. The authoritative answer comes from the backend
+  // (`pitStatusFromBackend.isOpen`), which the StatusBar and Box panel
+  // also use — it includes the driver-min-time feasibility check that
+  // the local heuristic doesn't have. We only fall back to the local
+  // stint-length heuristic when the backend hasn't reported yet
+  // (initial WS frame, legacy server). This is what makes the colour
+  // of "Vueltas hasta stint máximo" line up with the Box panel.
   const realMinStintMin = (() => {
     if (!ourKart) return config.minStintMin;
     const stintStart = ourKart.stintStartCountdownMs || durationMs || raceClockMs;
@@ -141,9 +152,11 @@ export function RaceTable() {
     const reservePerPitMin = pendingPits > 0 ? (config.pitTimeS / 60 + config.maxStintMin) * pendingPits : 0;
     return Math.max(config.minStintMin, timeFromStintStartToEndMin - reservePerPitMin);
   })();
-  const pitWindowOpen = ourKart && raceClockMs > 0 && !raceFinished
-    ? ourStintMin >= realMinStintMin
-    : null;
+  const pitWindowOpen: boolean | null = (() => {
+    if (pitStatusFromBackend) return pitStatusFromBackend.isOpen;
+    if (!ourKart || raceClockMs === 0 || raceFinished) return null;
+    return ourStintMin >= realMinStintMin;
+  })();
 
   const timeToMaxColor = (() => {
     if (timeToMaxStint <= 0) return "text-red-400 animate-pulse";
