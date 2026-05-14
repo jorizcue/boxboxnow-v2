@@ -12,9 +12,18 @@ import { useRaceStore } from "@/hooks/useRaceState";
  * During replay, advances at the replay speed multiplier.
  * Pauses interpolation when replay is paused.
  *
+ * `intervalMs` controls the local refresh cadence:
+ *   - 1000 (default) — fine for the HH:MM:SS clock display and most
+ *     dashboards: minimises React re-renders to ~1 per second.
+ *   - 100 (10 Hz) — needed by the live Tracking map so the kart
+ *     interpolation has enough resolution for the CSS transition on
+ *     `.tracking-kart-icon` to render smooth motion between server
+ *     snapshots. At 1 Hz the kart visibly teleports once per second
+ *     even with the transition in place.
+ *
  * Returns the interpolated countdownMs value.
  */
-export function useRaceClock(): number {
+export function useRaceClock(intervalMs: number = 1000): number {
   const serverCountdownMs = useRaceStore((s) => s.countdownMs);
   const replayActive = useRaceStore((s) => s.replayActive);
   const replayPaused = useRaceStore((s) => s.replayPaused);
@@ -43,7 +52,7 @@ export function useRaceClock(): number {
     }
   }, [replayPaused]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Tick at 1s intervals, applying replay speed
+  // Tick at the requested interval, applying replay speed
   useEffect(() => {
     if (serverCountdownMs === 0 || replayPaused) return;
 
@@ -55,10 +64,10 @@ export function useRaceClock(): number {
       const serverVal = lastServerRef.current;
 
       setLocalMs(Math.max(0, serverVal - simElapsed));
-    }, 1000);
+    }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [serverCountdownMs, replayPaused, replayActive, replaySpeed]);
+  }, [serverCountdownMs, replayPaused, replayActive, replaySpeed, intervalMs]);
 
   return localMs;
 }

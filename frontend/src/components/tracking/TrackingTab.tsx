@@ -39,7 +39,11 @@ export function TrackingTab() {
   const karts = useRaceStore((s) => s.karts);
   const config = useRaceStore((s) => s.config);
   const trackName = useRaceStore((s) => s.trackName);
-  const countdownMs = useRaceClock();
+  // Tracking needs a 10 Hz clock so that `computeKartProgressM` updates
+  // every 100 ms instead of every 1 s. Combined with the CSS transition
+  // on `.tracking-kart-icon` (220 ms linear), the karts now glide
+  // smoothly along the polyline instead of teleporting once per second.
+  const countdownMs = useRaceClock(100);
 
   const [circuitId, setCircuitId] = useState<number | null>(null);
   const [trackConfig, setTrackConfig] = useState<TrackConfig | null>(null);
