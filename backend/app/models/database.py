@@ -100,6 +100,9 @@ async def init_db():
             "ALTER TABLE circuits ADD COLUMN pit_box_distance_m FLOAT",
             "ALTER TABLE circuits ADD COLUMN meta_distance_m FLOAT DEFAULT 0.0 NOT NULL",
             "ALTER TABLE circuits ADD COLUMN default_direction VARCHAR(16) DEFAULT 'forward' NOT NULL",
+            "ALTER TABLE circuits ADD COLUMN svg_viewbox VARCHAR(64)",
+            "ALTER TABLE circuits ADD COLUMN svg_paths_json TEXT",
+            "ALTER TABLE circuits ADD COLUMN svg_image_url VARCHAR(2048)",
         ):
             try:
                 await conn.execute(text(col_sql))

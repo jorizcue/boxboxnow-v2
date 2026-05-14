@@ -1,5 +1,6 @@
 """Admin routes: manage users, circuits, circuit access, and CircuitHub."""
 
+import json
 import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -422,6 +423,7 @@ async def admin_get_track_config(
     circuit = result.scalar_one_or_none()
     if not circuit:
         raise HTTPException(404, "Circuit not found")
+    from app.api.tracking_routes import _parse_svg_paths
     return TrackConfigOut(
         track_polyline=_polyline_to_list(circuit.track_polyline),
         track_length_m=circuit.track_length_m,
@@ -439,6 +441,9 @@ async def admin_get_track_config(
         pit_box_distance_m=circuit.pit_box_distance_m,
         meta_distance_m=circuit.meta_distance_m or 0.0,
         default_direction=circuit.default_direction or "forward",
+        svg_viewbox=circuit.svg_viewbox,
+        svg_paths=_parse_svg_paths(circuit.svg_paths_json),
+        svg_image_url=circuit.svg_image_url,
     )
 
 
@@ -506,8 +511,27 @@ async def admin_save_track_config(
             raise HTTPException(400, "default_direction must be forward|reversed")
         circuit.default_direction = payload.default_direction
 
+    # Renderer SVG. Los 3 campos son independientes y opcionales: el
+    # operador puede subir la imagen primero, luego el viewbox, luego
+    # los paths uno por uno. Cada campo se persiste sólo si llega
+    # presente en el payload (Pydantic v2 model_fields_set).
+    if "svg_viewbox" in payload.model_fields_set:
+        circuit.svg_viewbox = payload.svg_viewbox
+    if "svg_image_url" in payload.model_fields_set:
+        circuit.svg_image_url = payload.svg_image_url
+    if "svg_paths" in payload.model_fields_set:
+        if payload.svg_paths is None:
+            circuit.svg_paths_json = None
+        else:
+            # Filtra a claves conocidas + serializa. Pydantic ya nos da
+            # un dict[str, str] validado por el tipo.
+            known = {"track", "s1", "s2", "s3", "in", "out"}
+            clean = {k: v for k, v in payload.svg_paths.items() if k in known and v.strip()}
+            circuit.svg_paths_json = json.dumps(clean) if clean else None
+
     await db.commit()
 
+    from app.api.tracking_routes import _parse_svg_paths
     return TrackConfigOut(
         track_polyline=_polyline_to_list(circuit.track_polyline),
         track_length_m=circuit.track_length_m,
@@ -525,6 +549,9 @@ async def admin_save_track_config(
         pit_box_distance_m=circuit.pit_box_distance_m,
         meta_distance_m=circuit.meta_distance_m or 0.0,
         default_direction=circuit.default_direction or "forward",
+        svg_viewbox=circuit.svg_viewbox,
+        svg_paths=_parse_svg_paths(circuit.svg_paths_json),
+        svg_image_url=circuit.svg_image_url,
     )
 
 

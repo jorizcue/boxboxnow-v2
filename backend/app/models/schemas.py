@@ -111,6 +111,28 @@ class Circuit(Base):
     meta_distance_m = Column(Float, default=0.0, nullable=False)
     default_direction = Column(String(16), default="forward", nullable=False)  # "forward" | "reversed"
 
+    # Renderer SVG (arquitectura "Apex Timing"). Opcional — si está
+    # poblado, el frontend lo prefiere sobre el polyline Leaflet porque
+    # da movimiento suave a 60 fps via CSS `offset-path`, sin "saltar
+    # al medio del circuito" cuando el polyline tiene vértices dispersos.
+    #
+    #   svg_viewbox: cadena tipo "0 0 800 600" — el sistema de
+    #     coordenadas interno del SVG. Se elige una vez por circuito.
+    #   svg_paths_json: dict JSON con paths SVG `d` por segmento:
+    #     { "track": "M ... C ...",
+    #       "s1":    "M ... C ..." (META→S1),
+    #       "s2":    "..." (S1→S2),
+    #       "s3":    "..." (S2→S3),
+    #       "in":    "..." (pit-in → boxes),
+    #       "out":   "..." (boxes → pit-out) }
+    #   svg_image_url: URL de la imagen de fondo (foto cenital / dibujo
+    #     del trazado). Puede ser una URL absoluta, una ruta relativa
+    #     servida por nosotros, o un data: URL (base64) para evitar
+    #     gestionar ficheros estáticos.
+    svg_viewbox = Column(String(64), nullable=True)
+    svg_paths_json = Column(Text, nullable=True)
+    svg_image_url = Column(String(2048), nullable=True)
+
     user_access = relationship("UserCircuitAccess", back_populates="circuit", cascade="all, delete-orphan")
 
     @property

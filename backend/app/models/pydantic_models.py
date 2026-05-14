@@ -281,6 +281,12 @@ class TrackConfigOut(BaseModel):
     # como ancla en cada cruce de meta (LAP event).
     meta_distance_m: float = 0.0
     default_direction: str = "forward"
+    # Renderer SVG opcional ("arquitectura Apex"). Cuando estos tres
+    # campos están poblados, el frontend prefiere el renderer SVG sobre
+    # el de Leaflet porque da movimiento curvilíneo suave a 60 fps.
+    svg_viewbox: str | None = None
+    svg_paths: dict[str, str] | None = None   # serializado desde el campo TEXT svg_paths_json en BD
+    svg_image_url: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -302,6 +308,9 @@ class TrackConfigUpdate(BaseModel):
     pit_lane_polyline: list[list[float]] | None = None
     pit_box_distance_m: float | None = None
     meta_distance_m: float | None = None
+    svg_viewbox: str | None = None
+    svg_paths: dict[str, str] | None = None
+    svg_image_url: str | None = None
     default_direction: str | None = None  # "forward" | "reversed"
 
 

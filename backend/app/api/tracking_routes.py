@@ -42,6 +42,27 @@ def _polyline_to_list(raw: str | None) -> list[list[float]] | None:
     return out or None
 
 
+def _parse_svg_paths(raw: str | None) -> dict[str, str] | None:
+    """Decodifica el campo TEXT `svg_paths_json` a dict[str, str].
+    Devuelve None si está vacío o no es un dict de strings. Solo se
+    conservan las claves conocidas ('track', 's1', 's2', 's3', 'in',
+    'out') para no exponer datos arbitrarios al frontend."""
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    known = {"track", "s1", "s2", "s3", "in", "out"}
+    out: dict[str, str] = {}
+    for k, v in parsed.items():
+        if k in known and isinstance(v, str) and v.strip():
+            out[k] = v
+    return out or None
+
+
 @router.get("/circuits/{circuit_id}/track-config", response_model=TrackConfigOut)
 async def get_track_config(
     circuit_id: int,
@@ -76,4 +97,7 @@ async def get_track_config(
         pit_box_distance_m=circuit.pit_box_distance_m,
         meta_distance_m=circuit.meta_distance_m or 0.0,
         default_direction=circuit.default_direction or "forward",
+        svg_viewbox=circuit.svg_viewbox,
+        svg_paths=_parse_svg_paths(circuit.svg_paths_json),
+        svg_image_url=circuit.svg_image_url,
     )

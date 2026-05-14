@@ -24,6 +24,9 @@ function _snakeToTrackConfig(raw: any): TrackConfig {
     pitBoxDistanceM: raw?.pit_box_distance_m ?? null,
     metaDistanceM: typeof raw?.meta_distance_m === "number" ? raw.meta_distance_m : 0,
     defaultDirection: (raw?.default_direction === "reversed" ? "reversed" : "forward"),
+    svgViewbox: typeof raw?.svg_viewbox === "string" && raw.svg_viewbox.trim() ? raw.svg_viewbox : null,
+    svgPaths: raw?.svg_paths && typeof raw.svg_paths === "object" ? raw.svg_paths : null,
+    svgImageUrl: typeof raw?.svg_image_url === "string" && raw.svg_image_url.trim() ? raw.svg_image_url : null,
   };
 }
 
@@ -214,6 +217,9 @@ export const api = {
     pitBoxDistanceM: number | null;
     metaDistanceM: number | null;
     defaultDirection: "forward" | "reversed";
+    svgViewbox: string | null;
+    svgPaths: Partial<Record<"track" | "s1" | "s2" | "s3" | "in" | "out", string>> | null;
+    svgImageUrl: string | null;
   }>) => {
     const body: Record<string, unknown> = {};
     if ("trackPolyline" in payload) body.track_polyline = payload.trackPolyline;
@@ -230,6 +236,9 @@ export const api = {
     if ("pitBoxDistanceM" in payload) body.pit_box_distance_m = payload.pitBoxDistanceM;
     if ("metaDistanceM" in payload) body.meta_distance_m = payload.metaDistanceM;
     if ("defaultDirection" in payload) body.default_direction = payload.defaultDirection;
+    if ("svgViewbox" in payload) body.svg_viewbox = payload.svgViewbox;
+    if ("svgPaths" in payload) body.svg_paths = payload.svgPaths;
+    if ("svgImageUrl" in payload) body.svg_image_url = payload.svgImageUrl;
     const raw = await fetchApi<any>(`/api/admin/circuits/${circuitId}/track-config`, {
       method: "PUT",
       body: JSON.stringify(body),

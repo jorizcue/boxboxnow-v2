@@ -95,6 +95,19 @@ export interface TrackConfig {
   // como ancla en cada LAP event.
   metaDistanceM: number;
   defaultDirection: "forward" | "reversed";
+  // Renderer SVG opcional ("arquitectura Apex Timing"). Cuando los
+  // tres campos están poblados el frontend prefiere TrackMapSVG sobre
+  // TrackMap (Leaflet). svgPaths contiene una entrada por segmento:
+  //   "track" = vuelta entera (META → META)
+  //   "s1"    = META → sensor S1
+  //   "s2"    = S1   → sensor S2
+  //   "s3"    = S2   → sensor S3
+  //   "in"    = pit-in → boxes
+  //   "out"   = boxes → pit-out
+  // Cada valor es un atributo SVG `d` (e.g. "M 250 240 C 245 232 …").
+  svgViewbox: string | null;
+  svgPaths: Partial<Record<"track" | "s1" | "s2" | "s3" | "in" | "out", string>> | null;
+  svgImageUrl: string | null;
 }
 
 export interface SectorBest {

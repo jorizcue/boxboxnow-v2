@@ -31,7 +31,16 @@ import { useRaceClock } from "@/hooks/useRaceClock";
 import { useAuth } from "@/hooks/useAuth";
 import type { TrackConfig } from "@/types/race";
 import { TrackMap } from "./TrackMap";
+import { TrackMapSVG } from "./TrackMapSVG";
 import { OnTrackPanel } from "./OnTrackPanel";
+
+// LocalStorage key for the per-user renderer preference (Leaflet vs
+// SVG). The SVG renderer is in beta — it animates karts with CSS
+// `offset-path` so they glide smoothly along the polyline curves
+// instead of cutting across them. We let the user pick which one to
+// see while we validate it.
+const RENDERER_PREF_KEY = "boxboxnow.tracking.renderer";
+type RendererPref = "leaflet" | "svg";
 
 export function TrackingTab() {
   const t = useT();
@@ -55,6 +64,21 @@ export function TrackingTab() {
   // and the admin-stored default doesn't always match). Resets when the
   // circuit changes.
   const [directionOverride, setDirectionOverride] = useState<"forward" | "reversed" | null>(null);
+  // Renderer preference: "leaflet" (legacy, Leaflet + setLatLng) or
+  // "svg" (new, CSS offset-path). Persisted in localStorage so the
+  // operator's choice survives reloads. Default is "svg" because we
+  // expect it to be visibly smoother once we validate it.
+  const [renderer, setRenderer] = useState<RendererPref>("svg");
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(RENDERER_PREF_KEY);
+      if (stored === "leaflet" || stored === "svg") setRenderer(stored);
+    } catch {/* localStorage blocked in private mode */}
+  }, []);
+  const setRendererPref = (r: RendererPref) => {
+    setRenderer(r);
+    try { localStorage.setItem(RENDERER_PREF_KEY, r); } catch {/* ignore */}
+  };
 
   // Resolve which circuit we're viewing from the active session. This
   // is one API call on mount — the active session rarely changes
@@ -169,24 +193,60 @@ export function TrackingTab() {
             <span className="ml-1 opacity-60">⇄</span>
           </button>
         </div>
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-red-500 uppercase tracking-wider">
-          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          {t("tracking.live")}
-        </span>
+        <div className="flex items-center gap-3">
+          {/* Renderer picker. The SVG path-based renderer (offset-path)
+              is in beta — letting the operator A/B between them on
+              the fly is the fastest way to validate the new approach
+              without breaking the production view. */}
+          <div className="inline-flex rounded border border-border overflow-hidden text-[9px] font-bold uppercase tracking-wider">
+            <button
+              type="button"
+              onClick={() => setRendererPref("leaflet")}
+              className={`px-1.5 py-0.5 transition-colors ${
+                renderer === "leaflet" ? "bg-accent text-black" : "bg-surface text-neutral-400 hover:text-white"
+              }`}
+              title="Renderer: Leaflet (legacy)"
+            >Leaflet</button>
+            <button
+              type="button"
+              onClick={() => setRendererPref("svg")}
+              className={`px-1.5 py-0.5 transition-colors ${
+                renderer === "svg" ? "bg-accent text-black" : "bg-surface text-neutral-400 hover:text-white"
+              }`}
+              title="Renderer: SVG offset-path (beta)"
+            >SVG <sup>β</sup></button>
+          </div>
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-red-500 uppercase tracking-wider">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            {t("tracking.live")}
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-3">
         {/* Map */}
         <div className="bg-surface border border-border rounded-xl p-3 overflow-hidden">
-          <TrackMap
-            trackConfig={trackConfig}
-            karts={visibleKarts}
-            myKartNumber={myKartNumber}
-            countdownMs={countdownMs}
-            selectedKart={selectedKart}
-            onSelectKart={setSelectedKart}
-            direction={direction}
-          />
+          {renderer === "svg" ? (
+            <TrackMapSVG
+              trackConfig={trackConfig}
+              karts={visibleKarts}
+              myKartNumber={myKartNumber}
+              countdownMs={countdownMs}
+              selectedKart={selectedKart}
+              onSelectKart={setSelectedKart}
+              direction={direction}
+            />
+          ) : (
+            <TrackMap
+              trackConfig={trackConfig}
+              karts={visibleKarts}
+              myKartNumber={myKartNumber}
+              countdownMs={countdownMs}
+              selectedKart={selectedKart}
+              onSelectKart={setSelectedKart}
+              direction={direction}
+            />
+          )}
           {/* Legend */}
           <div className="flex items-center gap-3 mt-2 px-1 text-[10px] text-neutral-500 flex-wrap">
             <span className="font-semibold text-neutral-400">
