@@ -378,37 +378,22 @@ async def create_checkout_session(
     session_params.pop("success_url", None)
     session_params.pop("cancel_url", None)
 
-    # ── Datos fiscales visibles y obligatorios ──
+    # ── Club deportivo exento de IVA: solo recibos simplificados ──
     #
-    # Stripe no permite hacer campos obligatorios condicionalmente
-    # según la respuesta de un `custom_field`, así que el dropdown
-    # de "¿quieres factura?" anterior era engañoso: el comprador
-    # decía "Sí" pero podía pagar sin haber rellenado nada. Además
-    # con `billing_address_collection=auto` Stripe a veces no pedía
-    # la dirección, y con `tax_id_collection.enabled=true` el campo
-    # NIF quedaba escondido tras un toggle "compro como empresa".
+    # BoxBoxNow opera como club deportivo exento del IVA según el
+    # art. 20.1.13º LIVA, así que NO emitimos facturas con NIF +
+    # dirección fiscal. Configuramos el checkout para que NO recoja
+    # ningún dato fiscal: solo el mínimo de dirección que Stripe
+    # necesite por método de pago (típicamente país + postal para
+    # tarjeta), y desactivamos por completo `tax_id_collection`.
     #
-    # Cambio de criterio: forzamos ambos visibles y obligatorios.
-    # Todos los compradores rellenan dirección + NIF/CIF, y todos
-    # reciben factura legal — que es lo que cabe esperar de una
-    # plataforma B2B SaaS en España. Los compradores no españoles
-    # caen en `required: "if_supported"`, así que sólo Stripe les
-    # exige el tax ID si su país está soportado (no hay fricción
-    # injustificada).
-    session_params["billing_address_collection"] = "required"
-    session_params["tax_id_collection"] = {
-        "enabled": True,
-        "required": "if_supported",
-    }
-    session_params["customer_update"] = {
-        "address": "auto",
-        "name": "auto",
-    }
-    # `automatic_tax` requiere dirección de facturación. Ahora la
-    # estamos recogiendo siempre, así que podríamos activarlo —
-    # pero los precios del catálogo están configurados como
-    # tax-inclusive (IVA incluido) y no queremos que Stripe vuelva
-    # a calcular el IVA por encima. Lo dejamos desactivado.
+    # Stripe seguirá creando un objeto Invoice internamente (es el
+    # mecanismo de cobro de las subscriptions y no se puede
+    # desactivar), pero sin NIF/dirección fiscal ese documento
+    # funciona como recibo simplificado — que es lo correcto para
+    # un club exento.
+    session_params["billing_address_collection"] = "auto"
+    session_params["tax_id_collection"] = {"enabled": False}
     session_params["automatic_tax"] = {"enabled": False}
 
     # Promotion codes — Stripe renders an "Add promotion code" field in the
@@ -1549,42 +1534,23 @@ async def update_billing_info(
     return {"ok": True}
 
 
-def _classify_invoice_kind(inv) -> str:
-    """Return 'factura' if the invoice has full fiscal data, else 'recibo'.
-
-    For an invoice to count as a Spanish "factura legal" it needs the
-    customer's fiscal name + address + tax id (NIF / VAT). Stripe takes
-    a snapshot of these on the invoice itself at finalization time, so
-    we read from the invoice (not from the live Customer record, which
-    may have changed since).
-
-    Anything without that fiscal data is a "recibo simplificado" /
-    ticket — same PDF, but missing the fiscal identifiers required by
-    Spanish law to claim VAT back.
-    """
-    addr = getattr(inv, "customer_address", None)
-    has_address = bool(addr and getattr(addr, "line1", None))
-    tax_ids = getattr(inv, "customer_tax_ids", None) or []
-    has_tax_id = bool(tax_ids and len(tax_ids) > 0)
-    return "factura" if (has_address and has_tax_id) else "recibo"
-
-
 @router.get("/invoices")
 async def list_invoices(
     user: User = Depends(get_current_user),
 ):
-    """List user's Stripe invoices, tagged as 'factura' or 'recibo'.
+    """List the user's Stripe invoices as recibos simplificados.
 
-    The `kind` field tells the UI whether to show the document in the
-    "Facturas" tab (legal invoice with NIF + dirección) or in the
-    "Recibos" tab (recibo simplificado / ticket — same Stripe Invoice
-    object internally, but without the fiscal data needed for VAT
-    reclaim).
+    BoxBoxNow opera como club deportivo exento del IVA — no
+    emitimos facturas con datos fiscales. Cada Invoice de Stripe se
+    expone aquí únicamente como recibo del cobro, con su PDF
+    descargable directo. No surfaceamos `hosted_invoice_url` porque
+    el flujo "ver en Stripe" no aporta nada: el cliente sólo
+    necesita el PDF para guardar como justificante.
 
-    Note: one-time event purchases do NOT create Stripe Invoices, so
-    they won't appear here. The customer gets a card receipt by email
-    from Stripe directly (the "Successful payments" template in
-    dashboard.stripe.com/settings/emails).
+    One-time event purchases no aparecen aquí porque Stripe no crea
+    Invoice para `mode=payment` — sólo PaymentIntent + Charge. El
+    cliente recibe el card receipt por email de Stripe directamente
+    (template "Successful payments" en dashboard de Stripe).
     """
     s = get_stripe()
     if not user.stripe_customer_id:
@@ -1600,8 +1566,6 @@ async def list_invoices(
             "status": inv.status,
             "created": datetime.fromtimestamp(inv.created, tz=timezone.utc).isoformat(),
             "invoice_pdf": inv.invoice_pdf,
-            "hosted_invoice_url": inv.hosted_invoice_url,
-            "kind": _classify_invoice_kind(inv),
         }
         for inv in invoices.data
         if inv.status == "paid"
