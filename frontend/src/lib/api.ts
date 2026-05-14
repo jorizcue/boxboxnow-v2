@@ -365,12 +365,6 @@ export const api = {
     circuits: number | number[] | null,
     plan?: string,
     eventDates?: string[],
-    /** When true, the Stripe checkout will require dirección de
-     *  facturación + NIF/CIF (factura legal). When false / omitted,
-     *  no fiscal data is collected and the buyer gets a recibo
-     *  simplificado. Decided in the interstitial inside
-     *  `EmbeddedCheckout` before the session is created. */
-    wantsInvoice?: boolean,
   ) => {
     const circuitIds: number[] = Array.isArray(circuits)
       ? circuits.filter((c) => typeof c === "number" && c > 0)
@@ -386,7 +380,6 @@ export const api = {
         ...(primary ? { circuit_id: primary } : {}),
         ...(circuitIds.length ? { circuit_ids: circuitIds } : {}),
         ...(eventDates?.length ? { event_dates: eventDates } : {}),
-        wants_invoice: wantsInvoice === true,
       }),
     });
   },

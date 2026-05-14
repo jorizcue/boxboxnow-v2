@@ -197,14 +197,6 @@ async def create_checkout_session(
     circuit_id_legacy = body.get("circuit_id")
     raw_circuit_ids = body.get("circuit_ids")
     event_dates = body.get("event_dates")  # e.g. ["2026-04-15"] or ["2026-04-15", "2026-04-16"]
-    # The buyer's answer to "¿necesitas factura?". Picked in the
-    # interstitial step BEFORE the Stripe checkout loads (see
-    # `EmbeddedCheckout` frontend component). When True we force
-    # billing address + tax-id collection inside Stripe; when False we
-    # disable both and the buyer pays without any fiscal data and
-    # receives a recibo simplificado. Default False so older clients
-    # that don't send the flag fall into the recibo path.
-    wants_invoice = bool(body.get("wants_invoice"))
 
     # Normalize circuit_ids into a deduped, sorted list of ints.
     circuit_ids: list[int] = []
@@ -386,38 +378,29 @@ async def create_checkout_session(
     session_params.pop("success_url", None)
     session_params.pop("cancel_url", None)
 
-    # ── Recibo por defecto, factura solo si el cliente lo pide ──
+    # ── Recibo por defecto, factura sólo si el cliente lo pide ──
     #
-    # El cliente ya ha respondido a la pregunta "¿necesitas factura?"
-    # en el paso interstitial de nuestra propia UI (antes de cargar
-    # el checkout de Stripe). El custom_field nativo de Stripe sólo
-    # podía PREGUNTAR pero no exigir condicionalmente los campos
-    # fiscales — los dejaba como un colapsable opcional, así que un
-    # usuario que respondía "Sí" podía pagar sin rellenar NIF/dirección
-    # y acababa con un recibo simplificado igualmente.
+    # Stripe NO permite hacer campos obligatorios condicionalmente
+    # según la respuesta de un `custom_field` (limitación nativa de
+    # Checkout). Lo más cerca que llegamos es:
     #
-    # Ahora el flag llega en el body y configuramos Stripe en
-    # consecuencia:
-    #   * wants_invoice=False (recibo): nada de tax_id_collection,
-    #     `billing_address_collection=auto` (Stripe pide lo mínimo
-    #     que necesite el método de pago). El cobro se documenta
-    #     como recibo simplificado.
-    #   * wants_invoice=True (factura): `billing_address_collection`
-    #     obligatorio + tax_id_collection con `required=if_supported`
-    #     para que Stripe FUERCE rellenar NIF/dirección antes de
-    #     habilitar el botón de pago.
-    if wants_invoice:
-        session_params["billing_address_collection"] = "required"
-        session_params["tax_id_collection"] = {
-            "enabled": True,
-            "required": "if_supported",
-        }
-    else:
-        session_params["billing_address_collection"] = "auto"
-        session_params["tax_id_collection"] = {"enabled": False}
-
-    # Allow users to update their billing address / tax ID through the
-    # Customer Portal as well (applies retroactively to future invoices).
+    #   1. Mostrar un dropdown "¿necesitas factura?" — sirve para
+    #      registrar la INTENCIÓN del comprador y para que sepa que
+    #      tiene que ampliar la sección de datos fiscales si elige
+    #      "Sí".
+    #   2. Dejar `billing_address_collection=auto` (sección
+    #      colapsable, opcional) y `tax_id_collection.enabled=true`
+    #      (campo NIF visible dentro de esa sección).
+    #
+    # La clasificación REAL (factura vs recibo) la hace el endpoint
+    # `/invoices` mirando los datos fiscales snapshot que Stripe
+    # guarda en la propia invoice (`customer_address.line1` +
+    # `customer_tax_ids`). Si el comprador eligió "Sí" pero no
+    # rellenó los datos, sale recibo igualmente — no hay manera de
+    # forzar dentro de la pantalla de Stripe sin recurrir a pedirlo
+    # antes (que era el paso extra que el usuario rechazó).
+    session_params["tax_id_collection"] = {"enabled": True}
+    session_params["billing_address_collection"] = "auto"
     session_params["customer_update"] = {
         "address": "auto",
         "name": "auto",
@@ -428,15 +411,30 @@ async def create_checkout_session(
     # por lo que basta con desactivar el cálculo automático.
     session_params["automatic_tax"] = {"enabled": False}
 
-    # Stamp the buyer's choice on the session metadata so the webhook
-    # / /invoices endpoint can read it without depending on whether
-    # Stripe ended up generating an Invoice or just a PaymentIntent.
-    metadata["wants_invoice"] = "yes" if wants_invoice else "no"
-    session_params["metadata"] = metadata
-    if not is_one_time and "subscription_data" in session_params:
-        session_params["subscription_data"]["metadata"]["wants_invoice"] = (
-            "yes" if wants_invoice else "no"
-        )
+    # Pregunta explícita dentro del propio checkout de Stripe. La
+    # respuesta llega en el webhook (`session.custom_fields`) y se
+    # copia a metadata vía `s.Subscription.modify` para sobrevivir
+    # renovaciones; sirve sobre todo como señal de INTENCIÓN del
+    # comprador (analítica + soporte futuro). El documento que ve
+    # realmente el cliente lo decide /invoices según haya rellenado
+    # o no los datos fiscales.
+    session_params["custom_fields"] = [
+        {
+            "key": "wants_invoice",
+            "label": {
+                "type": "custom",
+                "custom": "¿Necesitas factura con datos fiscales?",
+            },
+            "type": "dropdown",
+            "dropdown": {
+                "options": [
+                    {"label": "No, solo recibo", "value": "no"},
+                    {"label": "Sí, necesito factura", "value": "yes"},
+                ],
+            },
+            "optional": False,
+        }
+    ]
 
     # Promotion codes — Stripe renders an "Add promotion code" field in the
     # embedded checkout. Users type a code (e.g. "LANZAMIENTO50") and Stripe
@@ -466,15 +464,19 @@ async def create_checkout_session(
     # terms_of_service_acceptance message overrides Stripe's default
     # checkbox label so we keep it in castellano regardless of locale
     # quirks and link straight to our own pages.
-    # Submit message: shorter now that the factura/recibo decision
-    # has been resolved before the user reaches this screen. When
-    # `wants_invoice` is True the buyer will see the (required) NIF +
-    # dirección fields inline — no extra copy needed.
+    # Submit message: recuerda al comprador que si ha marcado "Sí,
+    # necesito factura" tiene que ampliar la sección "Información
+    # de facturación" y rellenar NIF + dirección antes de pagar.
+    # Es la única forma de cerrar el bucle dentro del propio Stripe
+    # checkout sin un paso interstitial fuera de él.
     session_params["custom_text"] = {
         "submit": {
             "message": (
                 "Activación inmediata tras el pago. "
-                "Recibirás un email de confirmación con el detalle de tu plan."
+                "Recibirás un email de confirmación con el detalle de tu plan. "
+                "Si has marcado que necesitas factura, recuerda rellenar tu "
+                "nombre fiscal, dirección y NIF en **Información de facturación** "
+                "antes de pagar (si no, se emite recibo simplificado)."
             ),
         },
         "terms_of_service_acceptance": {
