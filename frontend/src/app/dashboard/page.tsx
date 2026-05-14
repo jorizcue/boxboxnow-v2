@@ -427,17 +427,6 @@ function NoSubscription({ username }: { username: string }) {
     router.push("/");
   };
 
-  const handlePortal = async () => {
-    try {
-      const { api } = await import("@/lib/api");
-      const data = await api.getCustomerPortal();
-      window.location.href = data.url;
-    } catch {
-      // No Stripe customer yet, redirect to pricing
-      router.push("/#pricing");
-    }
-  };
-
   return (
     <div className="min-h-screen bg-black flex items-center justify-center px-4">
       <div className="max-w-md w-full text-center">
@@ -474,17 +463,10 @@ function NoSubscription({ username }: { username: string }) {
 
           <a
             href="/#pricing"
-            className="block w-full bg-accent hover:bg-accent-hover text-black font-semibold py-3 rounded-lg transition-colors tracking-wide mb-3"
+            className="block w-full bg-accent hover:bg-accent-hover text-black font-semibold py-3 rounded-lg transition-colors tracking-wide"
           >
             Ver planes y precios
           </a>
-
-          <button
-            onClick={handlePortal}
-            className="w-full text-accent hover:text-accent-hover text-sm py-2 transition-colors"
-          >
-            Gestionar suscripcion existente
-          </button>
         </div>
 
         <button
