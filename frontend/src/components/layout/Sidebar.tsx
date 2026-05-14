@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { useT } from "@/lib/i18n";
 import { useRaceStore } from "@/hooks/useRaceState";
 
-export type Tab = "race" | "pit" | "live" | "classification" | "adjusted" | "driver" | "driver-config" | "config" | "replay" | "analytics" | "insights" | "account" | "admin-users" | "admin-circuits" | "admin-hub" | "admin-platform" | "admin-marketing" | "admin-analytics";
+export type Tab = "race" | "pit" | "live" | "tracking" | "classification" | "adjusted" | "driver" | "driver-config" | "config" | "replay" | "analytics" | "insights" | "account" | "admin-users" | "admin-circuits" | "admin-hub" | "admin-platform" | "admin-marketing" | "admin-analytics";
 
 interface SidebarProps {
   activeTab: Tab;
@@ -47,6 +47,13 @@ const TAB_ICONS: Record<string, JSX.Element> = {
   live: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.789m13.788 0c3.808 3.808 3.808 9.981 0 13.79M12 12h.008v.007H12V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+    </svg>
+  ),
+  tracking: (
+    // Pin + circular track — represents "kart on circuit map"
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+      <ellipse cx="12" cy="12" rx="8.5" ry="6" />
+      <circle cx="15" cy="9" r="1.5" fill="currentColor" stroke="none" />
     </svg>
   ),
   adjusted: (
@@ -180,6 +187,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs, username }:
     { id: "race", labelKey: "nav.race", tabAccess: "race" },
     { id: "pit", labelKey: "nav.box", tabAccess: "pit" },
     { id: "live", labelKey: "nav.live", tabAccess: "live" },
+    { id: "tracking", labelKey: "nav.tracking", tabAccess: "tracking" },
     { id: "config", labelKey: "nav.config", tabAccess: "config" },
   ];
 

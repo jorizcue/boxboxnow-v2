@@ -72,7 +72,36 @@ class Circuit(Base):
     # circuit because shorter tracks reach temperature in fewer laps.
     warmup_laps_to_skip = Column(Integer, default=3, nullable=False)
 
+    # ── Tracking module (vista de pista en vivo) ──
+    # `track_polyline` es un JSON con un array de [lat, lon] que define
+    # el trazado cerrado del circuito, en sentido "forward" (sentido por
+    # defecto). El editor admin lo guarda aquí. Las distancias `s1/s2/s3`
+    # y los pit-entry/exit son distancias acumuladas en metros desde la
+    # meta (que está siempre a 0) recorriendo el polyline en sentido
+    # forward. Cuando una carrera se corre al revés (`RaceSession.direction
+    # = "reversed"`) calculamos las distancias efectivas como
+    # `total - forward_distance` sin duplicar datos.
+    track_polyline = Column(Text, nullable=True)  # JSON: [[lat, lon], ...]
+    track_length_m = Column(Float, nullable=True)
+    s1_distance_m = Column(Float, nullable=True)
+    s2_distance_m = Column(Float, nullable=True)
+    s3_distance_m = Column(Float, nullable=True)
+    pit_entry_distance_m = Column(Float, nullable=True)
+    pit_exit_distance_m = Column(Float, nullable=True)
+    pit_lane_polyline = Column(Text, nullable=True)  # JSON polyline abierto pit-in → boxes → pit-out
+    pit_lane_length_m = Column(Float, nullable=True)
+    pit_box_distance_m = Column(Float, nullable=True)  # punto en el pit_lane donde se aparcan los karts
+    default_direction = Column(String(16), default="forward", nullable=False)  # "forward" | "reversed"
+
     user_access = relationship("UserCircuitAccess", back_populates="circuit", cascade="all, delete-orphan")
+
+    @property
+    def has_track_config(self) -> bool:
+        """True when the admin has saved a polyline for this circuit.
+        Surfaced to `CircuitOut.has_track_config` via Pydantic's
+        `from_attributes`, so the frontend can show/hide the Tracking
+        module per-circuit without a separate API call."""
+        return bool(self.track_polyline)
 
 
 class UserCircuitAccess(Base):

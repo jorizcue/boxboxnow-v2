@@ -244,8 +244,47 @@ class CircuitOut(BaseModel):
     finish_lat2: float | None = None
     finish_lon2: float | None = None
     warmup_laps_to_skip: int = 3
+    # Tracking module fields (None when the circuit doesn't have a
+    # track config saved yet — the frontend hides the Tracking tab in
+    # that case and the admin editor shows the empty-track state).
+    has_track_config: bool = False
+    default_direction: str = "forward"
 
     model_config = {"from_attributes": True}
+
+
+# Returned by GET /api/circuits/{id}/track-config. Everything that
+# describes the geometry of a single circuit for the live tracking
+# view. Returns None for circuits the operator hasn't traced yet.
+class TrackConfigOut(BaseModel):
+    track_polyline: list[list[float]] | None = None
+    track_length_m: float | None = None
+    s1_distance_m: float | None = None
+    s2_distance_m: float | None = None
+    s3_distance_m: float | None = None
+    pit_entry_distance_m: float | None = None
+    pit_exit_distance_m: float | None = None
+    pit_lane_polyline: list[list[float]] | None = None
+    pit_lane_length_m: float | None = None
+    pit_box_distance_m: float | None = None
+    default_direction: str = "forward"
+
+    model_config = {"from_attributes": True}
+
+
+# Body for PUT /api/admin/circuits/{id}/track-config. All fields optional
+# so the admin editor can save partial states (e.g. polyline only, no
+# pit lane yet). Server recomputes derived lengths from the polylines.
+class TrackConfigUpdate(BaseModel):
+    track_polyline: list[list[float]] | None = None
+    s1_distance_m: float | None = None
+    s2_distance_m: float | None = None
+    s3_distance_m: float | None = None
+    pit_entry_distance_m: float | None = None
+    pit_exit_distance_m: float | None = None
+    pit_lane_polyline: list[list[float]] | None = None
+    pit_box_distance_m: float | None = None
+    default_direction: str | None = None  # "forward" | "reversed"
 
 
 class CircuitCreate(BaseModel):

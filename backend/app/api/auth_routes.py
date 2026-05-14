@@ -412,6 +412,7 @@ async def get_current_user(
 
 ALL_TABS = [
     "race", "pit", "live", "config",
+    "tracking",  # live spatial map of every kart on the circuit
     "adjusted",
     "driver", "driver-config",
     "replay", "analytics", "insights",

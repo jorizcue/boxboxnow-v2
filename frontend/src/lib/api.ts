@@ -1,5 +1,27 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// Tracking module: backend wire format is snake_case to match the rest
+// of the Stripe/auth payloads. This translator returns the camelCase
+// `TrackConfig` shape expected by the frontend without dragging a
+// dependency like camelcase-keys.
+import type { TrackConfig } from "@/types/race";
+
+function _snakeToTrackConfig(raw: any): TrackConfig {
+  return {
+    trackPolyline: raw?.track_polyline ?? null,
+    trackLengthM: raw?.track_length_m ?? null,
+    s1DistanceM: raw?.s1_distance_m ?? null,
+    s2DistanceM: raw?.s2_distance_m ?? null,
+    s3DistanceM: raw?.s3_distance_m ?? null,
+    pitEntryDistanceM: raw?.pit_entry_distance_m ?? null,
+    pitExitDistanceM: raw?.pit_exit_distance_m ?? null,
+    pitLanePolyline: raw?.pit_lane_polyline ?? null,
+    pitLaneLengthM: raw?.pit_lane_length_m ?? null,
+    pitBoxDistanceM: raw?.pit_box_distance_m ?? null,
+    defaultDirection: (raw?.default_direction === "reversed" ? "reversed" : "forward"),
+  };
+}
+
 function getToken(): string | null {
   try {
     const stored = localStorage.getItem("boxboxnow-auth");
@@ -160,6 +182,50 @@ export const api = {
     fetchApi<any>(`/api/admin/circuits/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteCircuit: (id: number) =>
     fetchApi<any>(`/api/admin/circuits/${id}`, { method: "DELETE" }),
+
+  // Tracking module — circuit polyline + sectors + pit lane.
+  // Backend wire format uses snake_case; the helpers below translate
+  // to camelCase TrackConfig for the frontend.
+  getTrackConfig: async (circuitId: number) => {
+    const raw = await fetchApi<any>(`/api/tracking/circuits/${circuitId}/track-config`);
+    return _snakeToTrackConfig(raw);
+  },
+  adminGetTrackConfig: async (circuitId: number) => {
+    const raw = await fetchApi<any>(`/api/admin/circuits/${circuitId}/track-config`);
+    return _snakeToTrackConfig(raw);
+  },
+  adminSaveTrackConfig: async (circuitId: number, payload: Partial<{
+    trackPolyline: [number, number][] | null;
+    s1DistanceM: number | null;
+    s2DistanceM: number | null;
+    s3DistanceM: number | null;
+    pitEntryDistanceM: number | null;
+    pitExitDistanceM: number | null;
+    pitLanePolyline: [number, number][] | null;
+    pitBoxDistanceM: number | null;
+    defaultDirection: "forward" | "reversed";
+  }>) => {
+    const body: Record<string, unknown> = {};
+    if ("trackPolyline" in payload) body.track_polyline = payload.trackPolyline;
+    if ("s1DistanceM" in payload) body.s1_distance_m = payload.s1DistanceM;
+    if ("s2DistanceM" in payload) body.s2_distance_m = payload.s2DistanceM;
+    if ("s3DistanceM" in payload) body.s3_distance_m = payload.s3DistanceM;
+    if ("pitEntryDistanceM" in payload) body.pit_entry_distance_m = payload.pitEntryDistanceM;
+    if ("pitExitDistanceM" in payload) body.pit_exit_distance_m = payload.pitExitDistanceM;
+    if ("pitLanePolyline" in payload) body.pit_lane_polyline = payload.pitLanePolyline;
+    if ("pitBoxDistanceM" in payload) body.pit_box_distance_m = payload.pitBoxDistanceM;
+    if ("defaultDirection" in payload) body.default_direction = payload.defaultDirection;
+    const raw = await fetchApi<any>(`/api/admin/circuits/${circuitId}/track-config`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+    return _snakeToTrackConfig(raw);
+  },
+  adminImportOsm: (circuitId: number) =>
+    fetchApi<{ polyline: [number, number][] | null; reason?: string }>(
+      `/api/admin/circuits/${circuitId}/import-osm`,
+      { method: "POST" },
+    ),
 
   getUserAccess: (userId: number) => fetchApi<any[]>(`/api/admin/access/user/${userId}`),
   grantAccess: (data: any) =>

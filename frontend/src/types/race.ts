@@ -61,6 +61,29 @@ export interface KartState {
   bestS1Ms?: number;
   bestS2Ms?: number;
   bestS3Ms?: number;
+  // Tracking anchors — countdown_ms snapshots used by the live
+  // tracking map to interpolate where this kart sits along the
+  // circuit polyline. `lastSectorN` is 0 (just crossed meta) or 1-3
+  // (last sensor crossed).
+  lastLapCompleteCountdownMs?: number;
+  lastSectorN?: number;
+  lastSectorCountdownMs?: number;
+}
+
+// Tracking module — circuit geometry served by /api/tracking/circuits/{id}/track-config
+// and the admin-side editor.
+export interface TrackConfig {
+  trackPolyline: [number, number][] | null;  // closed loop [[lat, lon], ...]
+  trackLengthM: number | null;
+  s1DistanceM: number | null;
+  s2DistanceM: number | null;
+  s3DistanceM: number | null;
+  pitEntryDistanceM: number | null;
+  pitExitDistanceM: number | null;
+  pitLanePolyline: [number, number][] | null;  // open path pit-in → boxes → pit-out
+  pitLaneLengthM: number | null;
+  pitBoxDistanceM: number | null;
+  defaultDirection: "forward" | "reversed";
 }
 
 export interface SectorBest {

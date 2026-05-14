@@ -135,6 +135,25 @@ class KartState:
     best_s2_ms: int = 0
     best_s3_ms: int = 0
 
+    # ── Tracking module (live spatial map) ──
+    # Anchor timestamps used by the frontend to interpolate where a
+    # kart sits along the circuit polyline. All three are in
+    # countdown-clock units (ms), same domain as `stint_start_countdown_ms`,
+    # so the frontend can compute "elapsed since last cross" by
+    # subtracting from the live countdown reading.
+    #
+    # `last_lap_complete_countdown_ms`: countdown_ms value when the kart
+    # last crossed the meta line. Reset to 0 at race start, updated on
+    # each LAP event.
+    #
+    # `last_sector_n`: which sensor we crossed last (1, 2, 3, or 0 if
+    # the kart has just completed a lap → next reference is the meta).
+    # The frontend uses this together with `last_sector_countdown_ms` to
+    # know where on the polyline to anchor the interpolation.
+    last_lap_complete_countdown_ms: int = 0
+    last_sector_n: int = 0
+    last_sector_countdown_ms: int = 0
+
     def stint_duration_s(self) -> float:
         """Stint duration in seconds, based on accumulated lap times."""
         return self.stint_elapsed_ms / 1000.0
@@ -212,6 +231,11 @@ class KartState:
             "bestS1Ms": self.best_s1_ms,
             "bestS2Ms": self.best_s2_ms,
             "bestS3Ms": self.best_s3_ms,
+            # Tracking anchors — frontend interpolates kart position
+            # along the circuit polyline from these timestamps.
+            "lastLapCompleteCountdownMs": self.last_lap_complete_countdown_ms,
+            "lastSectorN": self.last_sector_n,
+            "lastSectorCountdownMs": self.last_sector_countdown_ms,
         }
 
 
@@ -490,6 +514,13 @@ class RaceStateManager:
 
         # Accumulate stint elapsed time
         kart.stint_elapsed_ms += lap_ms
+
+        # Tracking anchor: kart just crossed meta, so reset the sector
+        # reference. Frontend uses these timestamps to interpolate the
+        # kart's position along the circuit polyline.
+        kart.last_lap_complete_countdown_ms = self.countdown_ms
+        kart.last_sector_n = 0
+        kart.last_sector_countdown_ms = self.countdown_ms
 
         return {"event": "lap", "rowId": row_id,
                 "kartNumber": kart.kart_number,
@@ -877,6 +908,13 @@ class RaceStateManager:
                     kart.best_s3_ms = ms
 
             self.has_sectors = True
+
+            # Tracking anchor: record the moment the kart crossed this
+            # sensor so the frontend can interpolate its position from
+            # the corresponding sector distance along the polyline.
+            kart.last_sector_n = sector_idx
+            kart.last_sector_countdown_ms = self.countdown_ms
+
             return {"event": "sector", "rowId": row_id,
                     "kartNumber": kart.kart_number,
                     "sectorIdx": sector_idx,

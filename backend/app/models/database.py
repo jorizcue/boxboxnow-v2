@@ -80,6 +80,27 @@ async def init_db():
             pass
 
         # Add warmup_laps_to_skip to circuits (excluded from rolling 20-lap mean)
+        # Tracking module: per-circuit polyline + sectors + pit lane.
+        # Each ALTER is wrapped in try/except — SQLite raises if the column
+        # already exists (no IF NOT EXISTS for ALTER TABLE pre-3.35).
+        for col_sql in (
+            "ALTER TABLE circuits ADD COLUMN track_polyline TEXT",
+            "ALTER TABLE circuits ADD COLUMN track_length_m FLOAT",
+            "ALTER TABLE circuits ADD COLUMN s1_distance_m FLOAT",
+            "ALTER TABLE circuits ADD COLUMN s2_distance_m FLOAT",
+            "ALTER TABLE circuits ADD COLUMN s3_distance_m FLOAT",
+            "ALTER TABLE circuits ADD COLUMN pit_entry_distance_m FLOAT",
+            "ALTER TABLE circuits ADD COLUMN pit_exit_distance_m FLOAT",
+            "ALTER TABLE circuits ADD COLUMN pit_lane_polyline TEXT",
+            "ALTER TABLE circuits ADD COLUMN pit_lane_length_m FLOAT",
+            "ALTER TABLE circuits ADD COLUMN pit_box_distance_m FLOAT",
+            "ALTER TABLE circuits ADD COLUMN default_direction VARCHAR(16) DEFAULT 'forward' NOT NULL",
+        ):
+            try:
+                await conn.execute(text(col_sql))
+            except Exception:
+                pass  # column already exists
+
         try:
             await conn.execute(text("ALTER TABLE circuits ADD COLUMN warmup_laps_to_skip INTEGER DEFAULT 3 NOT NULL"))
         except Exception:

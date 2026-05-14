@@ -19,6 +19,7 @@ import { AdjustedClassification } from "@/components/classification/AdjustedClas
 import { ReplayTab } from "@/components/replay/ReplayTab";
 import { KartAnalyticsTab } from "@/components/analytics/KartAnalyticsTab";
 import { GpsInsightsTab } from "@/components/insights/GpsInsightsTab";
+import { TrackingTab } from "@/components/tracking/TrackingTab";
 import { DriverView } from "@/components/driver/DriverView";
 import { DriverConfigTab } from "@/components/driver/DriverConfigTab";
 import { MfaSetupRequired } from "@/components/auth/MfaSetupRequired";
@@ -382,6 +383,7 @@ function Dashboard({
               <LiveTiming />
             </div>
           )}
+          {activeTab === "tracking" && userTabs.includes("tracking") && <TrackingTab />}
           {activeTab === "classification" && <ClassificationTable />}
           {activeTab === "adjusted" && userTabs.includes("adjusted") && <AdjustedClassification />}
           {activeTab === "driver" && userTabs.includes("driver") && <DriverView />}

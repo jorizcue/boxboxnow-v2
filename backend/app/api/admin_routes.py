@@ -17,6 +17,7 @@ from app.models.pydantic_models import (
     CircuitOut, CircuitCreate, CircuitUpdate,
     CircuitAccessOut, CircuitAccessCreate, CircuitAccessUpdate,
     DeviceSessionOut,
+    TrackConfigOut, TrackConfigUpdate,
 )
 from app.api.auth_routes import require_admin, hash_password, _user_out
 
@@ -370,6 +371,185 @@ async def delete_circuit(circuit_id: int, request: Request, admin: User = Depend
     await db.delete(circuit)
     await db.commit()
     return {"deleted": True}
+
+
+# --- Tracking module: circuit polyline + sectors + pit lane editor ---
+
+def _polyline_to_storage(pl: list[list[float]] | None) -> tuple[str | None, float | None]:
+    """Validate + serialize a polyline payload from the editor.
+
+    Returns `(json_str, length_m)`. `(None, None)` for an empty/None
+    payload — that's how we represent "polyline cleared".
+    """
+    import json as _json
+    from app.engine.polyline_geometry import validate_polyline_json, total_length_m
+
+    if pl is None:
+        return None, None
+    pts = validate_polyline_json(pl)  # raises ValueError on garbage
+    if len(pts) < 4:
+        raise HTTPException(400, "Polyline must have at least 4 points")
+    length = total_length_m(pts, closed=True)
+    return _json.dumps([[lat, lon] for lat, lon in pts]), length
+
+
+def _pit_lane_to_storage(pl: list[list[float]] | None) -> tuple[str | None, float | None]:
+    """Same as `_polyline_to_storage` but for the OPEN pit lane polyline."""
+    import json as _json
+    from app.engine.polyline_geometry import validate_polyline_json, total_length_m
+
+    if pl is None:
+        return None, None
+    pts = validate_polyline_json(pl)
+    if len(pts) < 2:
+        raise HTTPException(400, "Pit lane polyline must have at least 2 points")
+    length = total_length_m(pts, closed=False)
+    return _json.dumps([[lat, lon] for lat, lon in pts]), length
+
+
+@router.get("/circuits/{circuit_id}/track-config", response_model=TrackConfigOut)
+async def admin_get_track_config(
+    circuit_id: int,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin-side read of the track config — same payload the live
+    Tracking module gets via `/api/tracking/...`, exposed here too so
+    the editor doesn't need to call the user endpoint."""
+    from app.api.tracking_routes import _polyline_to_list
+
+    result = await db.execute(select(Circuit).where(Circuit.id == circuit_id))
+    circuit = result.scalar_one_or_none()
+    if not circuit:
+        raise HTTPException(404, "Circuit not found")
+    return TrackConfigOut(
+        track_polyline=_polyline_to_list(circuit.track_polyline),
+        track_length_m=circuit.track_length_m,
+        s1_distance_m=circuit.s1_distance_m,
+        s2_distance_m=circuit.s2_distance_m,
+        s3_distance_m=circuit.s3_distance_m,
+        pit_entry_distance_m=circuit.pit_entry_distance_m,
+        pit_exit_distance_m=circuit.pit_exit_distance_m,
+        pit_lane_polyline=_polyline_to_list(circuit.pit_lane_polyline),
+        pit_lane_length_m=circuit.pit_lane_length_m,
+        pit_box_distance_m=circuit.pit_box_distance_m,
+        default_direction=circuit.default_direction or "forward",
+    )
+
+
+@router.put("/circuits/{circuit_id}/track-config", response_model=TrackConfigOut)
+async def admin_save_track_config(
+    circuit_id: int,
+    payload: TrackConfigUpdate,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Save the track polyline + sectors + pit lane + direction.
+
+    All fields optional: the editor can save piece by piece. Server
+    re-computes derived `track_length_m` / `pit_lane_length_m` from
+    the polylines so they're always consistent.
+    """
+    from app.api.tracking_routes import _polyline_to_list
+
+    result = await db.execute(select(Circuit).where(Circuit.id == circuit_id))
+    circuit = result.scalar_one_or_none()
+    if not circuit:
+        raise HTTPException(404, "Circuit not found")
+
+    if payload.track_polyline is not None:
+        try:
+            track_json, track_len = _polyline_to_storage(payload.track_polyline)
+        except ValueError as e:
+            raise HTTPException(400, f"Polyline inválido: {e}")
+        circuit.track_polyline = track_json
+        circuit.track_length_m = track_len
+
+    if payload.pit_lane_polyline is not None:
+        try:
+            pit_json, pit_len = _pit_lane_to_storage(payload.pit_lane_polyline)
+        except ValueError as e:
+            raise HTTPException(400, f"Pit lane inválido: {e}")
+        circuit.pit_lane_polyline = pit_json
+        circuit.pit_lane_length_m = pit_len
+
+    # Distances are optional and saved as-is. We don't validate them
+    # against the polyline length here (the editor does that client-side
+    # and snaps points to the polyline before sending). When the admin
+    # clears a marker, the field arrives as `null` from the editor.
+    for field in (
+        "s1_distance_m", "s2_distance_m", "s3_distance_m",
+        "pit_entry_distance_m", "pit_exit_distance_m", "pit_box_distance_m",
+    ):
+        if hasattr(payload, field):
+            val = getattr(payload, field)
+            # Only overwrite if explicitly present in the payload (None
+            # means "clear it"; missing means "leave as-is" — Pydantic's
+            # default __fields_set__ handling).
+            if field in payload.model_fields_set:
+                setattr(circuit, field, val)
+
+    if payload.default_direction is not None:
+        if payload.default_direction not in ("forward", "reversed"):
+            raise HTTPException(400, "default_direction must be forward|reversed")
+        circuit.default_direction = payload.default_direction
+
+    await db.commit()
+
+    return TrackConfigOut(
+        track_polyline=_polyline_to_list(circuit.track_polyline),
+        track_length_m=circuit.track_length_m,
+        s1_distance_m=circuit.s1_distance_m,
+        s2_distance_m=circuit.s2_distance_m,
+        s3_distance_m=circuit.s3_distance_m,
+        pit_entry_distance_m=circuit.pit_entry_distance_m,
+        pit_exit_distance_m=circuit.pit_exit_distance_m,
+        pit_lane_polyline=_polyline_to_list(circuit.pit_lane_polyline),
+        pit_lane_length_m=circuit.pit_lane_length_m,
+        pit_box_distance_m=circuit.pit_box_distance_m,
+        default_direction=circuit.default_direction or "forward",
+    )
+
+
+@router.post("/circuits/{circuit_id}/import-osm")
+async def admin_import_osm(
+    circuit_id: int,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Query Overpass API for a karting track near the circuit's
+    finish-line coordinates and return the candidate polyline.
+
+    Doesn't save anything — just returns the points so the editor
+    can preview them and let the admin tweak before persisting via
+    PUT /track-config. Falls back to `{"polyline": null}` when OSM
+    has nothing useful nearby (editor switches to manual tracing).
+    """
+    from app.engine.osm_import import import_from_osm
+
+    result = await db.execute(select(Circuit).where(Circuit.id == circuit_id))
+    circuit = result.scalar_one_or_none()
+    if not circuit:
+        raise HTTPException(404, "Circuit not found")
+
+    # Use finish-line midpoint as the search center; fall back to
+    # finish_lat1/lon1 alone if the second point isn't set.
+    if circuit.finish_lat1 is None or circuit.finish_lon1 is None:
+        raise HTTPException(
+            400,
+            "Configura primero la línea de meta (finish_lat1/lon1) "
+            "para que sepamos dónde buscar el trazado en OSM.",
+        )
+    lat = circuit.finish_lat1
+    lon = circuit.finish_lon1
+    if circuit.finish_lat2 is not None and circuit.finish_lon2 is not None:
+        lat = (circuit.finish_lat1 + circuit.finish_lat2) / 2
+        lon = (circuit.finish_lon1 + circuit.finish_lon2) / 2
+
+    pts = await import_from_osm(lat, lon)
+    if not pts:
+        return {"polyline": None, "reason": "no_match"}
+    return {"polyline": [[lat_, lon_] for lat_, lon_ in pts]}
 
 
 # --- Circuit Access ---

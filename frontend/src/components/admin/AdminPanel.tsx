@@ -6,6 +6,7 @@ import { useT } from "@/lib/i18n";
 import { CalendarPicker } from "@/components/shared/CalendarPicker";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
 import { ALL_DRIVER_CARDS, DRIVER_CARD_GROUPS } from "@/hooks/useDriverConfig";
+import { TrackEditor } from "@/components/admin/TrackEditor";
 
 const FinishLineMap = lazy(() => import("@/components/admin/FinishLineMap"));
 
@@ -1179,6 +1180,8 @@ function CircuitsManager() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CircuitForm>(emptyForm);
+  // When set, swap the form panel for the inline TrackEditor.
+  const [trackEditorFor, setTrackEditorFor] = useState<number | null>(null);
 
   useEffect(() => {
     loadCircuits();
@@ -1298,18 +1301,36 @@ function CircuitsManager() {
       </div>
 
       {/* Right: detail panel */}
-      {panelOpen && (
+      {panelOpen && trackEditorFor != null ? (
+        <div className="flex-1 min-w-0 bg-white/[0.03] rounded-xl border border-border p-5 animate-in slide-in-from-right-4 duration-200">
+          <TrackEditor
+            circuitId={trackEditorFor}
+            onClose={() => setTrackEditorFor(null)}
+          />
+        </div>
+      ) : panelOpen && (
         <div className="flex-1 min-w-0 bg-white/[0.03] rounded-xl border border-border p-5 space-y-4 animate-in slide-in-from-right-4 duration-200">
           <div className="flex items-center justify-between">
             <h4 className="text-sm text-neutral-200 font-medium uppercase tracking-wider">
               {editingId ? t("admin.editCircuit") : t("admin.newCircuit")}
             </h4>
-            <button
-              onClick={cancelEdit}
-              className="text-neutral-500 hover:text-white text-lg leading-none transition-colors"
-            >
-              &times;
-            </button>
+            <div className="flex items-center gap-2">
+              {editingId !== null && (
+                <button
+                  onClick={() => setTrackEditorFor(editingId)}
+                  className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
+                  title={t("admin.tracking.editTrackBtn")}
+                >
+                  {t("admin.tracking.editTrackBtn")}
+                </button>
+              )}
+              <button
+                onClick={cancelEdit}
+                className="text-neutral-500 hover:text-white text-lg leading-none transition-colors"
+              >
+                &times;
+              </button>
+            </div>
           </div>
 
           <div className="space-y-3 max-w-xl">
