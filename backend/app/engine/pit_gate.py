@@ -333,7 +333,20 @@ def compute_pit_status(state) -> PitStatus:
     # We compute both up-front so the badge text stays consistent: a
     # single "{driver} necesita X min más" surfaces the binding one.
     current_driver = getattr(our_kart, "driver_name", "") or None
-    stint_elapsed_ms = getattr(our_kart, "stint_elapsed_ms", 0) or 0
+    # Use the WALL-CLOCK stint duration (already computed above) instead
+    # of `kart.stint_elapsed_ms`. The latter is the sum of `lap_ms`
+    # values, and Apex's first lap after a pit-out *includes* the pit
+    # time inside that lap (so the stint sum over-counts by ~pit_time_s).
+    # That over-count is enough to make the current driver appear to
+    # have already met `min_driver_time_min` when they're still ~3 min
+    # short — and the gate then opens prematurely. Wall-clock from
+    # `stint_start_countdown_ms` is pit-time-free by construction
+    # (stint_start_countdown_ms is the countdown value at pit-OUT, so
+    # the time between pit-out and now is pure on-track time). This is
+    # also the same calculation the UI uses for "Stint en curso", so
+    # the strategist's view and the gate's view now agree on how long
+    # the current pilot has been driving.
+    stint_elapsed_ms = int(stint_sec * 1000)
     min_driver_time_min = getattr(state, "min_driver_time_min", 0) or 0
     team_drivers_count = getattr(state, "team_drivers_count", 0) or 0
     min_driver_time_ms = min_driver_time_min * 60 * 1000
@@ -524,7 +537,12 @@ def _predict_next_open_countdown_ms(state, our_kart) -> int | None:
     current_driver = getattr(our_kart, "driver_name", "") or None
     committed_total_ms = dict(getattr(our_kart, "driver_total_ms", {}))
     committed_now = committed_total_ms.get(current_driver, 0) if current_driver else 0
-    stint_elapsed_ms_now = getattr(our_kart, "stint_elapsed_ms", 0)
+    # Same wall-clock fix as in compute_pit_status — see comment there.
+    # `stint_elapsed_ms` over-counts by ~pit_time_s on the first lap
+    # after a pit-out because Apex folds the pit-time into the lap
+    # time. Wall-clock from stint_start_countdown_ms is pit-time-free.
+    t_start_s_now = stint_start_countdown_ms / 1000.0
+    stint_elapsed_ms_now = int(max(0.0, t_start_s_now - countdown_ms / 1000.0) * 1000)
 
     step_ms = 10_000  # 10 s slices
     max_horizon_min = 60
