@@ -300,6 +300,27 @@ button {
   50% { transform: rotate(0.5deg); }
 }
 
+/* ==================== TRACKING MAP ==================== */
+/*
+ * Smooth kart marker motion. The position of each kart is recomputed at
+ * the race-clock tick rate (≈10 Hz) via Leaflet's setLatLng, which
+ * applies a transform on the marker icon. A CSS transition makes the
+ * jump between successive positions visually smooth.
+ *
+ * 220 ms is slightly longer than the 100 ms tick so the kart is always
+ * mid-animation when the next position arrives — the transitions chain
+ * seamlessly. Linear easing avoids the ease-out "settling" feel that
+ * would otherwise look like the kart is braking at every tick.
+ *
+ * IMPORTANT: this only works because TrackMap caches divIcons per
+ * kart and avoids calling `setIcon` every frame — otherwise the DOM
+ * element would be recreated and the transition would never trigger.
+ */
+.leaflet-marker-icon.tracking-kart-icon {
+  transition: transform 220ms linear;
+  will-change: transform;
+}
+
 /* ==================== REDUCED MOTION ==================== */
 @media (prefers-reduced-motion: reduce) {
   .speed-line,

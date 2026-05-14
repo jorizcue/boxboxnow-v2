@@ -75,6 +75,13 @@ export function TrackMap({
     pitLane: null,
     sectors: [],
   });
+  // Per-kart cache of the visual state we baked into its divIcon.
+  // We only call `setIcon` when one of these changes — otherwise Leaflet
+  // would tear down and rebuild the DOM element on every countdown tick,
+  // which kills any CSS `transition: transform` on the marker. With the
+  // cache, the same DOM element survives across ticks and CSS smooths
+  // the kart's path between server snapshots.
+  const iconCacheRef = useRef<Map<number, { tier: number; isMine: boolean; isPit: boolean }>>(new Map());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [L, setL] = useState<any>(null);
 
@@ -163,14 +170,16 @@ export function TrackMap({
       }).addTo(map);
     }
 
-    // Sector + meta markers. Tiny circles + label. Distance is mapped
-    // through `effectiveDistanceForward(direction, …)` so the sensors
-    // visually flip along with the active sentido without touching the
-    // stored values.
+    // Sector + meta markers. Tiny circles + label.
+    //
+    // IMPORTANT: sensors are PHYSICAL points on the track. They do not
+    // move when the operator toggles the race direction — only the
+    // kart's instantaneous position needs the flip. So we draw them at
+    // their raw polyline-walk distance (the same coordinate system the
+    // editor uses when storing them).
     const drawSensorTick = (distanceM: number | null, label: string, color: string) => {
       if (distanceM == null || !trackConfig.trackPolyline || !trackConfig.trackLengthM) return;
-      const dist = effectiveDistanceForward(distanceM, direction, trackConfig.trackLengthM);
-      const pt = pointAtDistance(trackConfig.trackPolyline, dist, true);
+      const pt = pointAtDistance(trackConfig.trackPolyline, distanceM, true);
       const marker = L.circleMarker([pt[0], pt[1]], {
         radius: 5,
         color,
@@ -212,14 +221,29 @@ export function TrackMap({
     } else {
       drawSensorTick(trackConfig.pitExitDistanceM, "PIT-OUT", "#e59a2e");
     }
-  }, [L, trackConfig, direction]);
+    // No `direction` in deps: sensors are physical points and the
+    // visual position does NOT change with the direction toggle.
+  }, [L, trackConfig]);
 
   // Update kart markers on every render — cheap because we mutate
   // existing markers instead of recreating them.
+  //
+  // Smoothness note: we only invoke `setIcon` when one of the visual
+  // properties of the kart (tier color, mine-halo, pit-lane styling)
+  // actually changed; otherwise the divIcon DOM element survives the
+  // tick and CSS `transition: transform` on `.tracking-kart-icon` (see
+  // globals.css) interpolates the position between snapshots. Without
+  // the cache, `setIcon` would replace the DOM element on every tick
+  // (≈10 Hz) and there'd be nothing to transition from.
   useEffect(() => {
     if (!L || !mapRef.current || !trackConfig.trackPolyline || !trackConfig.trackLengthM) return;
     const map = mapRef.current;
     const refs = layerRefs.current;
+    const iconCache = iconCacheRef.current;
+
+    // Index of in-pit karts, used to fan them slightly when there's no
+    // pit-lane polyline and we have to stack them at the PIT-IN marker.
+    let pitFanIdx = 0;
 
     const seenKarts = new Set<number>();
     for (const kart of karts) {
@@ -227,9 +251,23 @@ export function TrackMap({
       let latlon: [number, number] | null = null;
 
       if (isPit) {
-        // Park on pit_lane at pit_box position, if both are configured.
+        // Preferred: park on pit_lane at pit_box position (operator
+        // traced the pit lane + box).
         if (trackConfig.pitLanePolyline && trackConfig.pitBoxDistanceM != null) {
           latlon = pointAtDistance(trackConfig.pitLanePolyline, trackConfig.pitBoxDistanceM, false);
+        }
+        // Fallback 1: no pit-lane traced yet but the operator did place
+        // PIT-IN. Stack the in-pit karts near that point with a small
+        // vertical fan so they don't fully overlap. ~3 m between karts.
+        else if (trackConfig.pitEntryLat != null && trackConfig.pitEntryLon != null) {
+          const dLat = (pitFanIdx * 3) / 111000;  // 1° lat ≈ 111 km
+          latlon = [trackConfig.pitEntryLat + dLat, trackConfig.pitEntryLon];
+          pitFanIdx += 1;
+        }
+        // Fallback 2: legacy distance-along-polyline pit-in (old configs
+        // that haven't been migrated to lat/lon yet).
+        else if (trackConfig.pitEntryDistanceM != null) {
+          latlon = pointAtDistance(trackConfig.trackPolyline, trackConfig.pitEntryDistanceM, true);
         }
       } else {
         const progress = computeKartProgressM(kart, trackConfig, countdownMs);
@@ -243,42 +281,56 @@ export function TrackMap({
       seenKarts.add(kart.kartNumber);
 
       const isMine = kart.kartNumber === myKartNumber;
-      const fill = tierColor(kart.tierScore);
-      const text = textColorForBg(fill);
-
-      const html = `
-        <div style="position:relative; width:30px; height:30px;">
-          ${isMine ? `<div style="position:absolute; inset:-4px; border-radius:50%; border:2px solid #9fe556; opacity:0.6;"></div>` : ""}
-          <div style="
-            position:absolute; inset:0;
-            border-radius:50%;
-            background:${fill};
-            border:1.5px solid ${isMine ? "#fff" : "#000"};
-            display:flex; align-items:center; justify-content:center;
-            font-family: ui-monospace, 'SF Mono', monospace;
-            font-size:11px; font-weight:700;
-            color:${text};
-            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-            cursor: pointer;
-          ">${kart.kartNumber}</div>
-        </div>
-      `;
-      const icon = L.divIcon({
-        html,
-        className: "tracking-kart-icon",
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
-      });
+      const tier = kart.tierScore ?? 0;
 
       const existing = refs.markers.get(kart.kartNumber);
+      const cached = iconCache.get(kart.kartNumber);
+      const visualChanged =
+        !cached || cached.tier !== tier || cached.isMine !== isMine || cached.isPit !== isPit;
+
+      // (Re)build the divIcon ONLY when visuals change — otherwise the
+      // marker DOM is preserved and the CSS transition can do its job.
+      const buildIcon = () => {
+        const fill = tierColor(tier);
+        const text = textColorForBg(fill);
+        const html = `
+          <div style="position:relative; width:30px; height:30px;">
+            ${isMine ? `<div style="position:absolute; inset:-4px; border-radius:50%; border:2px solid #9fe556; opacity:0.6;"></div>` : ""}
+            <div style="
+              position:absolute; inset:0;
+              border-radius:50%;
+              background:${fill};
+              border:1.5px solid ${isMine ? "#fff" : "#000"};
+              display:flex; align-items:center; justify-content:center;
+              font-family: ui-monospace, 'SF Mono', monospace;
+              font-size:11px; font-weight:700;
+              color:${text};
+              box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+              cursor: pointer;
+              ${isPit ? "outline: 2px dashed #e59a2e; outline-offset: 2px;" : ""}
+            ">${kart.kartNumber}</div>
+          </div>
+        `;
+        return L.divIcon({
+          html,
+          className: "tracking-kart-icon",
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
+        });
+      };
+
       if (existing) {
         existing.setLatLng(latlon);
-        existing.setIcon(icon);
+        if (visualChanged) {
+          existing.setIcon(buildIcon());
+          iconCache.set(kart.kartNumber, { tier, isMine, isPit });
+        }
       } else {
-        const m = L.marker(latlon, { icon, interactive: true });
+        const m = L.marker(latlon, { icon: buildIcon(), interactive: true });
         m.on("click", () => onSelectKart(kart.kartNumber === selectedKart ? null : kart.kartNumber));
         m.addTo(map);
         refs.markers.set(kart.kartNumber, m);
+        iconCache.set(kart.kartNumber, { tier, isMine, isPit });
       }
     }
 
@@ -287,6 +339,7 @@ export function TrackMap({
       if (!seenKarts.has(num)) {
         map.removeLayer(marker);
         refs.markers.delete(num);
+        iconCache.delete(num);
       }
     });
   }, [L, karts, countdownMs, trackConfig, direction, myKartNumber, selectedKart, onSelectKart]);
