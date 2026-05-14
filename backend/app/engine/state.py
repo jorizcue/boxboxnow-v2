@@ -1045,19 +1045,32 @@ class RaceStateManager:
         self.race_finished = False
         self.start_time = time.time()
 
-        if trigger == "countdown" and self.countdown_ms > 0:
-            # Auto-detect duration from first countdown value.
-            # Round up to nearest minute (e.g. 1080053 → 1080000 = 18min,
-            # 774582 → 780000 = 13min). This handles the small Apex delay.
-            import math
-            detected_ms = math.ceil(self.countdown_ms / 60000) * 60000
-            race_start_ms = detected_ms
-            detected_min = detected_ms // 60000
-            logger.info(f"Auto-detected race duration from countdown: "
-                        f"{self.countdown_ms}ms → {detected_min}min ({detected_ms}ms)")
-        else:
-            # COUNT_UP, green light, or lap_count: use configured duration
+        if self.duration_min > 0:
+            # Configured duration is the source of truth. Apex's first
+            # countdown emit is reliably within ~1 s of the real
+            # duration but can spill across a minute boundary
+            # (e.g. 7,200,563 ms for a configured 2 h race, 1,080,053 ms
+            # for an 18 min race). The legacy `math.ceil(... / 60000)`
+            # over-rounded those cases by an entire minute, pinning
+            # every first-stint kart's `stint_start_countdown_ms` one
+            # minute ahead of the actual race clock — surfaced as
+            # "STINT EN CURSO 00:01:00" the instant the race went
+            # green. Trusting `duration_min` here pins the reference
+            # at exactly the configured value and avoids that drift.
             race_start_ms = self.duration_min * 60 * 1000
+        elif trigger == "countdown" and self.countdown_ms > 0:
+            # No configured duration — fall back to auto-detect from
+            # Apex's emit. `round()` (not `ceil()`) so a tick that
+            # spills slightly OVER a minute boundary snaps DOWN to
+            # the nearest minute instead of bumping up to the next.
+            race_start_ms = round(self.countdown_ms / 60000) * 60000
+            detected_min = race_start_ms // 60000
+            logger.info(f"Auto-detected race duration from countdown: "
+                        f"{self.countdown_ms}ms → {detected_min}min ({race_start_ms}ms)")
+        else:
+            # COUNT_UP / green light / lap_count without configured
+            # duration: nothing reliable to derive from, leave at 0.
+            race_start_ms = 0
 
         self._race_start_ms = race_start_ms
 
@@ -1101,18 +1114,34 @@ class RaceStateManager:
         """Re-detect race duration when first countdown arrives after green light.
 
         This handles circuits like Eupen where green light comes BEFORE the
-        first countdown in the same init block. The green light uses configured
-        duration_min, but the actual countdown reveals the true duration.
+        first countdown in the same init block.
+
+        Strategy: when the strategist has configured `duration_min`, that
+        value is the source of truth — Apex's first countdown emit is
+        within ~1 s of the real duration but can spill over a minute
+        boundary (e.g. 7,200,563 ms for a configured 2 h race), and the
+        legacy `math.ceil(... / 60000)` over-rounded those cases by an
+        entire minute. That left every first-stint kart's
+        `stint_start_countdown_ms` one minute AHEAD of the actual race
+        clock, producing a false "STINT EN CURSO 00:01:00" the instant
+        the race went green. Only when no duration is configured do we
+        fall back to round() auto-detect — round() (vs. ceil) handles
+        both "slightly under" and "slightly over" minute boundaries
+        symmetrically.
         """
-        import math
-        detected_ms = math.ceil(self.countdown_ms / 60000) * 60000
+        if self.duration_min > 0:
+            detected_ms = self.duration_min * 60 * 1000
+            source = "configured duration_min"
+        else:
+            detected_ms = round(self.countdown_ms / 60000) * 60000
+            source = "auto-detect (round)"
         old_race_start = self._race_start_ms
         self._race_start_ms = detected_ms
         self._first_countdown_ms = detected_ms
         detected_min = detected_ms // 60000
-        logger.info(f"Recalibrated race duration from first countdown: "
-                    f"{self.countdown_ms}ms → {detected_min}min ({detected_ms}ms), "
-                    f"was {old_race_start}ms")
+        logger.info(f"Recalibrated race duration from {source}: "
+                    f"countdown={self.countdown_ms}ms → "
+                    f"{detected_min}min ({detected_ms}ms), was {old_race_start}ms")
 
         # Fix stint starts for all karts (they were set from the wrong value)
         for kart in self.karts.values():
