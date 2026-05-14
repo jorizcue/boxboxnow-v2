@@ -38,10 +38,23 @@ SEARCH_RADIUS_M = 300
 
 
 def _build_query(lat: float, lon: float, radius_m: int = SEARCH_RADIUS_M) -> str:
-    """Overpass QL query: pick up karting tracks first, then any track."""
+    """Overpass QL query: pick up karting tracks first, then any race track.
+
+    OSM has multiple conventions for racing tracks:
+      * `highway=raceway` (most common for kart tracks and motor circuits)
+      * `leisure=track` (athletics tracks; rarely a kart track)
+      * `sport=karting|motor` to disambiguate
+    We query the most specific tags first and fall back progressively.
+    `_extract_best_polyline` picks the way with the most nodes — that
+    favors the actual circuit ribbon over short access roads or pit
+    fences also tagged `raceway` nearby.
+    """
     return f"""
 [out:json][timeout:25];
 (
+  way[highway=raceway][sport=karting](around:{radius_m},{lat},{lon});
+  way[highway=raceway][sport=motor](around:{radius_m},{lat},{lon});
+  way[highway=raceway](around:{radius_m},{lat},{lon});
   way[leisure=track][sport=karting](around:{radius_m},{lat},{lon});
   way[leisure=track](around:{radius_m},{lat},{lon});
 );
@@ -56,11 +69,22 @@ async def import_from_osm(lat: float, lon: float, radius_m: int = SEARCH_RADIUS_
 
     Returns `None` when there's no match or the API is unreachable —
     callers should fall back to manual tracing in the admin editor.
+
+    Overpass requires:
+      * Body sent as `application/x-www-form-urlencoded` with the
+        query in a `data=...` form field. Sending raw text in the
+        body produces a 406 Not Acceptable.
+      * A non-default User-Agent — some mirrors reject httpx's stock
+        identifier with 429 / 406.
     """
     query = _build_query(lat, lon, radius_m)
+    headers = {
+        "User-Agent": "BoxBoxNow/1.0 (+https://boxboxnow.com) tracking-osm-import",
+        "Accept": "application/json",
+    }
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(OVERPASS_URL, content=query.encode("utf-8"))
+        async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
+            resp = await client.post(OVERPASS_URL, data={"data": query})
             resp.raise_for_status()
             payload = resp.json()
     except Exception as e:
