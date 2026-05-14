@@ -264,6 +264,21 @@ export const useRaceStore = create<RaceStore>((set) => ({
               kart.stintElapsedMs += ev.lapTimeMs; // Keep stint elapsed in sync
             }
             if (typeof ev.totalLaps === "number") kart.totalLaps = ev.totalLaps;
+            // Tracking anchors — the backend resets these to "now" when
+            // the kart crosses META, so the frontend's live "current lap"
+            // counter (`lastLapCompleteCountdownMs - countdownMs`) can
+            // restart at 0 instead of growing forever past the actual
+            // lap time. Without these in the event payload, the panel
+            // showed values like `current = 1:15.873` right after a 56 s
+            // lap closed because we kept the stale anchor from the
+            // initial snapshot.
+            if (typeof ev.lastLapCompleteCountdownMs === "number") {
+              kart.lastLapCompleteCountdownMs = ev.lastLapCompleteCountdownMs;
+            }
+            if (typeof ev.lastSectorN === "number") kart.lastSectorN = ev.lastSectorN;
+            if (typeof ev.lastSectorCountdownMs === "number") {
+              kart.lastSectorCountdownMs = ev.lastSectorCountdownMs;
+            }
             break;
           case "bestLap":
             if (typeof ev.lapTimeMs === "number") kart.bestLapMs = ev.lapTimeMs;
@@ -328,6 +343,15 @@ export const useRaceStore = create<RaceStore>((set) => ({
                 kart.currentS3Ms = ms;
                 if (!kart.bestS3Ms || ms < kart.bestS3Ms) kart.bestS3Ms = ms;
               }
+            }
+            // Tracking anchor — same rationale as the lap event: the
+            // backend already re-anchored the kart to this sensor's
+            // polyline position; we just need to mirror that into the
+            // client state so `computeKartProgressM` interpolates from
+            // the new sector, not from the previous one.
+            if (typeof ev.lastSectorN === "number") kart.lastSectorN = ev.lastSectorN;
+            if (typeof ev.lastSectorCountdownMs === "number") {
+              kart.lastSectorCountdownMs = ev.lastSectorCountdownMs;
             }
             break;
           }

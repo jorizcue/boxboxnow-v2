@@ -522,11 +522,21 @@ class RaceStateManager:
         kart.last_sector_n = 0
         kart.last_sector_countdown_ms = self.countdown_ms
 
+        # Include the freshly-updated tracking anchors. Without these,
+        # the frontend WS handler patches `lastLapMs` + `totalLaps` but
+        # the kart keeps its stale `lastLapCompleteCountdownMs` from the
+        # previous full snapshot, so the live "current lap" counter
+        # never resets at META and just keeps growing past the actual
+        # lap time. The Tracking panel was showing values like
+        # "current = 1:15" right after a 56 s lap closed because of this.
         return {"event": "lap", "rowId": row_id,
                 "kartNumber": kart.kart_number,
                 "lapTimeMs": lap_ms,
                 "lapClass": lap_class,
-                "totalLaps": kart.total_laps}
+                "totalLaps": kart.total_laps,
+                "lastLapCompleteCountdownMs": kart.last_lap_complete_countdown_ms,
+                "lastSectorN": kart.last_sector_n,
+                "lastSectorCountdownMs": kart.last_sector_countdown_ms}
 
     async def _apply_event(self, event: RaceEvent) -> dict | None:
         """Apply a single event to state. Returns update dict for broadcast.
@@ -915,10 +925,16 @@ class RaceStateManager:
             kart.last_sector_n = sector_idx
             kart.last_sector_countdown_ms = self.countdown_ms
 
+            # Same as the lap event: include the freshly-updated anchor
+            # so the Tracking renderer can re-pin the kart at the
+            # sector's polyline position instead of carrying a stale
+            # anchor from the previous full snapshot.
             return {"event": "sector", "rowId": row_id,
                     "kartNumber": kart.kart_number,
                     "sectorIdx": sector_idx,
-                    "ms": ms}
+                    "ms": ms,
+                    "lastSectorN": kart.last_sector_n,
+                    "lastSectorCountdownMs": kart.last_sector_countdown_ms}
 
         elif event.type == EventType.PIT_TIME and kart:
             kart.pit_time = event.value
