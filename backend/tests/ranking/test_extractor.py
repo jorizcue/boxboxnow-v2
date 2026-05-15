@@ -35,3 +35,13 @@ def test_no_double_counting_laps():
     sessions = extract_sessions(str(FIX / "rkc_inline.log"), circuit_name="RKC_Paris", log_date="2026-04-18")
     assert sessions
     assert max(s.total_laps for s in sessions) < 250
+
+
+def test_drteam_names_preserved_for_task6():
+    sessions = extract_sessions(str(FIX / "rkc_inline.log"), circuit_name="RKC_Paris", log_date="2026-04-18")
+    # RKC logs carry live drteam (person) names; at least one extracted
+    # driver-row must expose its raw drteam sequence so Task 6 can
+    # separate person identity from the team label.
+    assert any(s.drteam_names for s in sessions)
+    # EUPEN is kart-only (no live drteam) — empty list is acceptable there,
+    # so we only assert presence on the RKC fixture.

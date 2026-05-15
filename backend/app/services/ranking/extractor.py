@@ -69,6 +69,7 @@ class SessionExtract:
     driver_raw: str
     kart_number: int | None
     team_key: str
+    drteam_names: list[str] = field(default_factory=list)  # distinct drteam (person) names, first-seen order
     laps_ms: list[int] = field(default_factory=list)
     total_laps: int = 0
     best_lap_ms: int = 0
@@ -211,6 +212,7 @@ def _finalize_session(
                 team_mode=cls.team_mode,
                 driver_canonical=canonical,
                 driver_raw=raw_name,
+                drteam_names=list(st.drteam_names),
                 kart_number=kart_number,
                 team_key=team_key,
                 laps_ms=list(laps),
