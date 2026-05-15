@@ -10,10 +10,12 @@ live parser. ``app/apex/*`` is never mutated.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from app.apex.replay import parse_log_file
-from app.apex.parser import ApexMessageParser, EventType, time_to_ms
+from app.apex.parser import ApexMessageParser, EventType, time_to_ms, RaceEvent
 
 MIN_LAP_MS = 15_000
 MAX_LAP_MS = 600_000
@@ -63,8 +65,8 @@ class Segment:
     rows: dict[str, _RowState] = field(default_factory=dict)
     row_to_kart: dict[str, int] = field(default_factory=dict)
     init_team_name: dict[str, str] = field(default_factory=dict)
-    first_lap_ts: object | None = None
-    last_lap_ts: object | None = None
+    first_lap_ts: datetime | None = None
+    last_lap_ts: datetime | None = None
     had_chequered: bool = False
 
     def row(self, row_id: str) -> _RowState:
@@ -84,7 +86,7 @@ class Segment:
                    if self.row_to_kart.get(rid) is not None)
 
 
-def segment_events(stream) -> list[Segment]:
+def segment_events(stream: Iterable[tuple[datetime, list[RaceEvent]]]) -> list[Segment]:
     """Pure core. `stream` is an iterable of `(ts, list[RaceEvent])`."""
     segments: list[Segment] = []
     cur: Segment | None = None
@@ -107,6 +109,15 @@ def segment_events(stream) -> list[Segment]:
         block_has_lap = any(
             e.type in (EventType.LAP_MS, EventType.LAP) for e in events
         )
+        block_has_chequered = any(
+            e.type == EventType.FLAG and e.value == "chequered" for e in events
+        )
+
+        # A chequered flag ends the race currently in `cur` — record it
+        # on THAT segment before any split below moves us to a new one
+        # (the assembler's stitch gate relies on had_chequered).
+        if cur is not None and block_has_chequered and cur.has_laps:
+            cur.had_chequered = True
 
         if cur is None:
             cur = Segment(nt1, nt2)
@@ -128,6 +139,9 @@ def segment_events(stream) -> list[Segment]:
         cur_t1, cur_t2 = nt1, nt2
 
         for e in events:
+            if e.type in (EventType.LAP_MS, EventType.LAP, EventType.DRIVER_TEAM,
+                          EventType.TEAM, EventType.RANKING, EventType.STATUS) and not e.row_id:
+                continue
             if e.type == EventType.INIT and e.row_id:
                 tn = (e.extra or {}).get("team_name", "") if e.extra else ""
                 if tn and e.row_id not in cur.init_team_name:
@@ -151,18 +165,17 @@ def segment_events(stream) -> list[Segment]:
                     pass
             elif e.type == EventType.STATUS and e.value == "sr":
                 cur.row(e.row_id).retired = True
-            elif e.type == EventType.FLAG and e.value == "chequered":
-                if cur.has_laps:
-                    cur.had_chequered = True
 
         if block_has_lap:
             if cur.first_lap_ts is None:
                 cur.first_lap_ts = ts
             cur.last_lap_ts = ts
+            if block_has_chequered:
+                cur.had_chequered = True
 
     if cur is not None:
         segments.append(cur)
-    return segments
+    return [s for s in segments if s.has_laps]
 
 
 def segment_log(filepath: str, *, circuit_name: str, log_date: str) -> list[Segment]:
