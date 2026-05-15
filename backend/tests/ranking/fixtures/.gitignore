@@ -1,0 +1,2 @@
+# Allow test fixture log files despite the root *.log exclusion
+!*.log
