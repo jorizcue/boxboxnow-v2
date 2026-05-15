@@ -42,6 +42,20 @@ function formatLapMs(ms: number): string {
   return m > 0 ? `${m}:${rest.toFixed(3).padStart(6, "0")}` : rest.toFixed(3);
 }
 
+// Unified row for the leaderboard table — fed either by the loaded
+// top-N (RankingTopRow) or the server search (RankingSearchRow, which
+// has no global rank / last-session).
+type LeaderRow = {
+  rank: number | null;
+  driver_id: number;
+  canonical_name: string;
+  rating: number;
+  rd: number;
+  sessions_count: number;
+  total_laps: number;
+  last_session_at: string | null;
+};
+
 export function AdminRankingPanel() {
   const [rows, setRows] = useState<RankingTopRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,11 +70,13 @@ export function AdminRankingPanel() {
   const [circuits, setCircuits] = useState<RankingCircuitRow[]>([]);
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<RankingSearchRow[]>([]);
-  // Client-side filter for the leaderboard table below. Independent
-  // from `search` (which is server-side and drives the merge tool) —
-  // this just narrows the rows already loaded so you can jump to a
-  // name without re-querying.
+  // Server-side filter for the leaderboard table below. Uses the SAME
+  // endpoint as the merge tool (`rankingAdminSearch`) so "Izcue"
+  // matches "Jorge Izcue" and it searches EVERY driver — not just the
+  // loaded top-N / min-sessions slice.
   const [tableFilter, setTableFilter] = useState("");
+  const [tableSearchResults, setTableSearchResults] = useState<RankingSearchRow[]>([]);
+  const [tableSearching, setTableSearching] = useState(false);
   const [mergeMode, setMergeMode] = useState<{ from: RankingSearchRow | null }>({ from: null });
   const [reprocessStatus, setReprocessStatus] = useState<string | null>(null);
   const [reprocessing, setReprocessing] = useState(false);
@@ -97,6 +113,26 @@ export function AdminRankingPanel() {
       .catch(() => { if (!cancelled) setSearchResults([]); });
     return () => { cancelled = true; };
   }, [search]);
+
+  // Leaderboard table filter → server search across ALL drivers
+  // (debounced). < 2 chars falls back to the loaded leaderboard.
+  useEffect(() => {
+    const q = tableFilter.trim();
+    if (q.length < 2) {
+      setTableSearchResults([]);
+      setTableSearching(false);
+      return;
+    }
+    let cancelled = false;
+    setTableSearching(true);
+    const handle = setTimeout(() => {
+      api.rankingAdminSearch(q)
+        .then((data) => { if (!cancelled) setTableSearchResults(data.drivers); })
+        .catch(() => { if (!cancelled) setTableSearchResults([]); })
+        .finally(() => { if (!cancelled) setTableSearching(false); });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(handle); };
+  }, [tableFilter]);
 
   const handleStartMerge = (d: RankingSearchRow) => setMergeMode({ from: d });
 
@@ -181,11 +217,34 @@ export function AdminRankingPanel() {
     }
   };
 
-  const filteredRows = useMemo(() => {
-    const q = tableFilter.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => r.canonical_name.toLowerCase().includes(q));
-  }, [rows, tableFilter]);
+  // Active filter ⇒ show the server search results (all drivers);
+  // otherwise the loaded leaderboard. Normalized to one row shape:
+  // search rows have no global rank / last-session, shown as "—".
+  const isTableFiltering = tableFilter.trim().length >= 2;
+  const displayRows: LeaderRow[] = useMemo(() => {
+    if (isTableFiltering) {
+      return tableSearchResults.map((d) => ({
+        rank: null,
+        driver_id: d.driver_id,
+        canonical_name: d.canonical_name,
+        rating: d.rating,
+        rd: d.rd,
+        sessions_count: d.sessions_count,
+        total_laps: d.total_laps,
+        last_session_at: null,
+      }));
+    }
+    return rows.map((d) => ({
+      rank: d.rank,
+      driver_id: d.driver_id,
+      canonical_name: d.canonical_name,
+      rating: d.rating,
+      rd: d.rd,
+      sessions_count: d.sessions_count,
+      total_laps: d.total_laps,
+      last_session_at: d.last_session_at,
+    }));
+  }, [isTableFiltering, tableSearchResults, rows]);
 
   const ratingStats = useMemo(() => {
     if (!rows.length) return null;
@@ -364,13 +423,15 @@ export function AdminRankingPanel() {
         <div className="text-neutral-500 text-sm">Cargando…</div>
       ) : error ? (
         <div className="text-rose-400 text-sm">{error}</div>
-      ) : rows.length === 0 ? (
+      ) : isTableFiltering && tableSearching ? (
+        <div className="text-neutral-500 text-sm">Buscando &ldquo;{tableFilter}&rdquo;…</div>
+      ) : !isTableFiltering && rows.length === 0 ? (
         <div className="text-neutral-500 text-sm">
           {circuit
             ? `No hay pilotos con ratings en ${circuit} con ese mínimo de sesiones. Reduce el filtro o cambia de circuito.`
             : "Todavía no hay pilotos rankeados. Pulsa \"Procesar logs nuevos\" para arrancar el backfill."}
         </div>
-      ) : filteredRows.length === 0 ? (
+      ) : displayRows.length === 0 ? (
         <div className="text-neutral-500 text-sm">
           Ningún piloto coincide con &ldquo;{tableFilter}&rdquo;.{" "}
           <button onClick={() => setTableFilter("")} className="underline hover:text-white">
@@ -392,13 +453,13 @@ export function AdminRankingPanel() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredRows.map((d) => (
+              {displayRows.map((d) => (
                 <tr
                   key={d.driver_id}
                   className="hover:bg-black/20 cursor-pointer"
                   onClick={() => openDetail(d.driver_id)}
                 >
-                  <td className="px-3 py-2 text-neutral-500 font-mono">{d.rank}</td>
+                  <td className="px-3 py-2 text-neutral-500 font-mono">{d.rank ?? "—"}</td>
                   <td className="px-3 py-2 text-white truncate underline-offset-2 hover:underline">
                     {d.canonical_name}
                   </td>
