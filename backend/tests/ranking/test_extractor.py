@@ -140,3 +140,107 @@ async def test_conflicting_team_position_falls_back_to_pace_no_abort(db):
     # DriverRating rows must exist for the rated drivers.
     n_global = (await db.execute(select(func.count()).select_from(DriverRating))).scalar()
     assert n_global >= 3, f"expected >=3 DriverRating rows, got {n_global}"
+
+
+async def test_multi_stint_same_driver_aggregated_not_dropped(db):
+    """Regression: two SessionExtract rows in ONE group resolving to the SAME
+    canonical identity (one endurance driver doing two stints) must be
+    AGGREGATED into one logical driver, not silently dropped last-write-wins.
+
+    Note neither stint alone (4 laps) clears the endurance 5-lap floor; only
+    the combined 8 laps does — so a working aggregation is load-bearing here,
+    not just cosmetic."""
+    from sqlalchemy import select, func
+    from app.models.schemas import Driver
+
+    common = dict(
+        circuit_name="EnduroCircuit",
+        log_date="2026-02-02",
+        session_seq=1,
+        session_type="race",
+        team_mode="endurance",
+        kart_number=None,
+        drteam_names=[],
+        duration_s=7200,
+        title1="ENDURO",
+        title2="6H",
+    )
+
+    sessions = [
+        # Repeated driver — stint A (4 laps @ 60s) on teamA / position 1.
+        SessionExtract(
+            driver_canonical="ace driver", driver_raw="Ace Driver",
+            team_key="teamA", final_position=1,
+            laps_ms=[60000] * 4, total_laps=4,
+            avg_lap_ms=60000.0, best_lap_ms=60000, median_lap_ms=60000,
+            **common,
+        ),
+        # Repeated driver — stint B (4 laps @ 58s), SAME team/position.
+        SessionExtract(
+            driver_canonical="ace driver", driver_raw="Ace Driver",
+            team_key="teamA", final_position=1,
+            laps_ms=[58000] * 4, total_laps=4,
+            avg_lap_ms=58000.0, best_lap_ms=58000, median_lap_ms=58000,
+            **common,
+        ),
+        # Two OTHER distinct drivers so the group clears MIN_DRIVERS.
+        SessionExtract(
+            driver_canonical="bob racer", driver_raw="Bob Racer",
+            team_key="teamB", final_position=2,
+            laps_ms=[61000] * 6, total_laps=6,
+            avg_lap_ms=61000.0, best_lap_ms=61000, median_lap_ms=61000,
+            **common,
+        ),
+        SessionExtract(
+            driver_canonical="cara speed", driver_raw="Cara Speed",
+            team_key="teamC", final_position=3,
+            laps_ms=[62000] * 6, total_laps=6,
+            avg_lap_ms=62000.0, best_lap_ms=62000, median_lap_ms=62000,
+            **common,
+        ),
+    ]
+
+    result = await apply_extracts(sessions, db)
+    await db.commit()
+    assert result["sessions"] >= 1
+
+    # Resolve the repeated driver by its canonical key.
+    ace = (await db.execute(
+        select(Driver).where(Driver.normalized_key == "ace driver")
+    )).scalar_one()
+
+    # Exactly ONE SessionResult row for that driver in that group.
+    ace_rows = (await db.execute(
+        select(SessionResult).where(
+            SessionResult.circuit_name == "EnduroCircuit",
+            SessionResult.log_date == "2026-02-02",
+            SessionResult.session_seq == 1,
+            SessionResult.driver_id == ace.id,
+        )
+    )).scalars().all()
+    assert len(ace_rows) == 1, (
+        f"expected exactly 1 aggregated SessionResult for the repeated "
+        f"driver, got {len(ace_rows)}"
+    )
+
+    row = ace_rows[0]
+    # Stints combined: 8 laps, mean of the 8 combined = 59000, best = 58000.
+    assert row.total_laps == 8, f"expected 8 combined laps, got {row.total_laps}"
+    assert row.avg_lap_ms == 59000.0, f"expected avg 59000.0, got {row.avg_lap_ms}"
+    assert row.best_lap_ms == 58000, f"expected best 58000, got {row.best_lap_ms}"
+
+    # A DriverRating row exists for the aggregated driver.
+    ace_rating = (await db.execute(
+        select(func.count()).select_from(DriverRating)
+        .where(DriverRating.driver_id == ace.id)
+    )).scalar()
+    assert ace_rating == 1, "aggregated driver must have a DriverRating row"
+
+    # The other two drivers also have SessionResult rows (group intact).
+    n_results = (await db.execute(
+        select(func.count()).select_from(SessionResult)
+    )).scalar()
+    assert n_results == 3, (
+        f"expected 3 SessionResult rows total (1 aggregated + 2 others), "
+        f"got {n_results}"
+    )

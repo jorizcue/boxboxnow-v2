@@ -199,10 +199,96 @@ async def apply_extracts(
 
     applied = 0
     for (circuit_name, log_date, session_seq), group in sorted(by_group.items()):
+        # ── Aggregate same-canonical rows within the group (spec §6: one
+        # Glicko update per (driver, session); endurance pace = the
+        # driver's pace across ALL their stints). Two SessionExtract rows
+        # in the same group can resolve to the SAME canonical identity
+        # (one driver doing multiple stints on different rows/karts in an
+        # endurance race, or two raw labels that normalize identically).
+        # Without this pre-pass the name-keyed dicts below would be
+        # last-write-wins and silently drop the earlier stint from both
+        # SessionResult and the Glicko field. We merge by canon BEFORE
+        # the lap-floor / MIN_DRIVERS filters so the floor applies to the
+        # driver's combined laps, not to a single short stint.
+        def _identity(s: SessionExtract) -> tuple[str, str]:
+            # Person identity for endurance: the row's driver is the
+            # PERSON, not the team label — use the last distinct drteam
+            # name when the extractor saw a live drteam channel for that
+            # row, else the extractor's canonical (kart-only logs / no
+            # live name).
+            if s.drteam_names:
+                person = s.drteam_names[-1]
+                return normalize_name(person) or s.driver_canonical, person
+            return s.driver_canonical, (s.driver_raw or "")
+
+        rows_by_canon: dict[str, list[SessionExtract]] = {}
+        for s in group:
+            canon, _raw = _identity(s)
+            rows_by_canon.setdefault(canon, []).append(s)
+
+        agg_group: list[SessionExtract] = []
+        for canon, rows in rows_by_canon.items():
+            if len(rows) == 1:
+                agg_group.append(rows[0])
+                continue
+            # Representative row for kart/team/position/titles: the one
+            # with the most laps. In real endurance a driver stays on one
+            # team/kart so these agree across stints; representative-by-
+            # laps is a safe tiebreak for the rare cross-row case.
+            rep = max(rows, key=lambda r: r.total_laps)
+            combined_laps: list[int] = []
+            for r in rows:
+                combined_laps.extend(r.laps_ms)
+            if combined_laps:
+                # Recompute from combined laps with the SAME semantics the
+                # extractor uses (best=min, avg=fmean, median=int(median)).
+                total_laps = len(combined_laps)
+                best_lap_ms = min(combined_laps)
+                avg_lap_ms = statistics.fmean(combined_laps)
+                median_lap_ms = int(statistics.median(combined_laps))
+            else:
+                # Defensive: rows with no per-lap list — fall back to a
+                # lap-count-weighted mean / summed totals.
+                total_laps = sum(r.total_laps for r in rows)
+                best_lap_ms = min(r.best_lap_ms for r in rows if r.best_lap_ms) or rep.best_lap_ms
+                if total_laps > 0:
+                    avg_lap_ms = (
+                        sum(r.avg_lap_ms * r.total_laps for r in rows) / total_laps
+                    )
+                else:
+                    avg_lap_ms = rep.avg_lap_ms
+                median_lap_ms = rep.median_lap_ms
+            logger.info(
+                "ranking: merged %d stint-rows for driver %s in %s/%s/seq%s",
+                len(rows), canon, circuit_name, log_date, session_seq,
+            )
+            agg_group.append(SessionExtract(
+                circuit_name=rep.circuit_name,
+                log_date=rep.log_date,
+                title1=rep.title1,
+                title2=rep.title2,
+                session_seq=rep.session_seq,
+                session_type=rep.session_type,
+                team_mode=rep.team_mode,
+                driver_canonical=rep.driver_canonical,
+                driver_raw=rep.driver_raw,
+                kart_number=rep.kart_number,
+                team_key=rep.team_key,
+                drteam_names=list(rep.drteam_names),
+                laps_ms=combined_laps,
+                total_laps=total_laps,
+                best_lap_ms=best_lap_ms,
+                avg_lap_ms=avg_lap_ms,
+                median_lap_ms=median_lap_ms,
+                final_position=rep.final_position,
+                duration_s=rep.duration_s,
+            ))
+
         # Short heats legitimately have very few laps; lower the floor for
-        # sprint/individual sessions (spec §4 validity filters).
-        laps_floor = 3 if group[0].team_mode == "individual" else MIN_LAPS_PER_DRIVER
-        rated_se = [s for s in group if s.total_laps >= laps_floor]
+        # sprint/individual sessions (spec §4 validity filters). Applied to
+        # the AGGREGATED drivers (combined laps), not raw stint rows.
+        laps_floor = 3 if agg_group[0].team_mode == "individual" else MIN_LAPS_PER_DRIVER
+        rated_se = [s for s in agg_group if s.total_laps >= laps_floor]
         if len(rated_se) < MIN_DRIVERS_PER_SESSION:
             continue
 
@@ -219,21 +305,14 @@ async def apply_extracts(
         bias = {k: m - field_mean for k, m in team_mean.items()}
 
         is_race = (
-            group[0].session_type == "race"
+            agg_group[0].session_type == "race"
             and any(s.final_position is not None for s in rated_se)
         )
 
         # ── Ordering key (lower = better) ──
-        # Person identity for endurance: the row's driver is the PERSON,
-        # not the team label — use the last distinct drteam name when the
-        # extractor saw a live drteam channel for that row, else the
-        # extractor's canonical (kart-only logs / no live name).
-        def _identity(s: SessionExtract) -> tuple[str, str]:
-            if s.drteam_names:
-                person = s.drteam_names[-1]
-                return normalize_name(person) or s.driver_canonical, person
-            return s.driver_canonical, (s.driver_raw or "")
-
+        # rated_se is now the aggregated-per-driver list, so each canon
+        # appears exactly once and the name-keyed dicts below are
+        # collision-free.
         corrected_by_key: dict[str, float] = {}
         canon_of: dict[str, SessionExtract] = {}
         field: list[RatedDriver] = []
@@ -368,7 +447,7 @@ async def apply_extracts(
         log_date_obj: datetime | None = None
         try:
             log_date_obj = datetime.strptime(log_date, "%Y-%m-%d")
-        except Exception:
+        except ValueError:
             log_date_obj = None
 
         for i, (se_i, drv_i, sr_i, canon_i) in enumerate(driver_objs):
@@ -463,6 +542,7 @@ async def process_log_file(
     # Extract ratable sessions (drives the live Apex parser read-only,
     # handles every circuit's schema) then apply the Glicko-2 methodology.
     sessions = extract_sessions(str(path), circuit_name=circuit_name, log_date=log_date)
+    # No per-group catch here: apply_extracts handles dirty groups internally; any raise → whole-log rollback+retry in process_pending.
     res = await apply_extracts(sessions, db)
     laps_count = sum(s.total_laps for s in sessions)
     sessions_count = res["sessions"]
