@@ -76,3 +76,67 @@ async def test_apply_extracts_populates_global_and_circuit_ratings(db):
     assert n_global > 0
     assert n_circuit > 0          # the prod bug: this was 0
     assert n_results > 0
+
+
+async def test_conflicting_team_position_falls_back_to_pace_no_abort(db):
+    """Regression: same team_key with conflicting final_position values used to
+    raise FrozenInstanceError (via ``rd.team_position = None`` on a frozen
+    dataclass), which aborted the whole run.  The fix removes the dead mutation
+    loop; the group must be rated via pace ordering, not aborted."""
+    from sqlalchemy import select, func
+
+    # Three drivers in ONE group: teamA has two drivers with CONFLICTING
+    # final_position (1 vs 2) — enough to trigger the ValueError in
+    # effective_scores.  teamB has a single driver as a control.
+    # All have >=6 laps (endurance floor is 5).
+    common = dict(
+        circuit_name="TestCircuit",
+        log_date="2026-01-01",
+        session_seq=1,
+        session_type="race",
+        team_mode="endurance",
+        kart_number=None,
+        driver_raw="",
+        drteam_names=[],
+        laps_ms=[60000] * 6,
+        total_laps=6,
+        avg_lap_ms=60000.0,
+        best_lap_ms=60000,
+        median_lap_ms=60000,
+        duration_s=3600,
+        title1="T1",
+        title2="T2",
+    )
+
+    sessions = [
+        # teamA: driver1 claims position 1
+        SessionExtract(driver_canonical="driver1", team_key="teamA", final_position=1, **common),
+        # teamA: driver2 claims position 2 → conflict!
+        SessionExtract(driver_canonical="driver2", team_key="teamA", final_position=2, **common),
+        # teamB: single driver, position 2 — no conflict within its own team
+        SessionExtract(driver_canonical="driver3", team_key="teamB", final_position=2, **common),
+    ]
+
+    # Must NOT raise — fallback to pace ordering, run continues.
+    result = await apply_extracts(sessions, db)
+    await db.commit()
+
+    assert result["sessions"] >= 1, "group must be rated (pace fallback), not aborted"
+
+    # All three drivers must have SessionResult rows.
+    n_results = (await db.execute(select(func.count()).select_from(SessionResult))).scalar()
+    assert n_results >= 3, f"expected >=3 SessionResult rows, got {n_results}"
+
+    # final_position must be NULL for all rows (is_race was set to False).
+    from app.models.schemas import SessionResult as SR
+    rows = (await db.execute(select(SR))).scalars().all()
+    for row in rows:
+        assert row.final_position is None, (
+            f"driver {row.driver_id}: expected final_position=None in pace fallback, "
+            f"got {row.final_position}"
+        )
+        assert row.session_type == "race"
+
+    # DriverRating rows must exist for the rated drivers.
+    n_global = (await db.execute(select(func.count()).select_from(DriverRating))).scalar()
+    assert n_global >= 3, f"expected >=3 DriverRating rows, got {n_global}"

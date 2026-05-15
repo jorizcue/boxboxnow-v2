@@ -262,8 +262,6 @@ async def apply_extracts(
                     circuit_name, log_date, session_seq,
                 )
                 is_race = False
-                for rd in field:
-                    rd.team_position = None
                 order = sorted(field, key=lambda d: d.corrected_avg_ms)
                 n = len(order)
                 key = {d.name: (0.0 if n == 1 else i / (n - 1))
