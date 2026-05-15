@@ -207,7 +207,7 @@ private fun OrderRow(
         }
         Spacer(Modifier.width(12.dp))
         Text(
-            card.display,
+            t(card.labelKey),
             color = Color.White,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
@@ -249,7 +249,7 @@ private fun PreviewCell(card: DriverCard, modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.width(4.dp))
             Text(
-                card.display,
+                t(card.labelKey),
                 color = Color.White,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Medium,

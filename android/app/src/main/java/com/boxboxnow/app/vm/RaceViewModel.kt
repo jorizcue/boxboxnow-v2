@@ -77,6 +77,14 @@ class RaceViewModel @Inject constructor(
     private val _circuitUpdatedEvents = MutableSharedFlow<Int>(extraBufferCapacity = 4)
     val circuitUpdatedEvents = _circuitUpdatedEvents.asSharedFlow()
 
+    /** Emits when the backend broadcasts that the user changed their
+     * default driver-view template from the web. DriverScreen collects
+     * it and re-applies the default preset live, so a strategist can
+     * swap the pilot's layout mid-race without the pilot reopening the
+     * view. Mirrors iOS `RaceViewModel.presetDefaultChanged`. */
+    private val _presetDefaultChangedEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
+    val presetDefaultChangedEvents = _presetDefaultChangedEvents.asSharedFlow()
+
     private val _boxScore = MutableStateFlow(0.0)
     val boxScore = _boxScore.asStateFlow()
 
@@ -472,6 +480,14 @@ class RaceViewModel @Inject constructor(
                 val cid = (el["data"] as? JsonObject)
                     ?.get("circuit_id")?.asIntOrNull() ?: -1
                 _circuitUpdatedEvents.tryEmit(cid)
+            }
+
+            "preset_default_changed" -> {
+                // Web flipped the default driver-view template. Mirror
+                // iOS: fan out so DriverScreen re-applies the new default
+                // while the pilot stays on track. We don't fetch here —
+                // presets live on DriverViewModel.
+                _presetDefaultChangedEvents.tryEmit(Unit)
             }
         }
     }

@@ -237,39 +237,14 @@ export function DriverConfigTab() {
         )}
       </div>
 
-      {/* Circuit selector */}
-      <div className="bg-surface border border-border rounded-xl p-4 space-y-3">
-        <h3 className="text-xs font-bold text-accent uppercase tracking-wider">{t("driverConfig.tab.circuitGps")}</h3>
-        <p className="text-[11px] text-neutral-500">{t("driverConfig.tab.circuitGpsHint")}</p>
-        <select
-          value={config.selectedCircuitId ?? ""}
-          onChange={(e) => config.setCircuitId(e.target.value ? Number(e.target.value) : null)}
-          className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white focus:border-accent focus:outline-none"
-        >
-          <option value="">{t("driverConfig.tab.circuitAutoOption")}</option>
-          {circuits.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name} {c.finish_lat1 ? t("driverConfig.tab.circuitGpsConfigured") : ""}
-            </option>
-          ))}
-        </select>
-        {loading && <span className="text-[10px] text-neutral-500">{t("driverConfig.panel.loadingCircuits")}</span>}
-      </div>
-
-      {/* Kart number */}
-      <div className="bg-surface border border-border rounded-xl p-4 space-y-3">
-        <h3 className="text-xs font-bold text-accent uppercase tracking-wider">{t("driverConfig.panel.kartNumber")}</h3>
-        <p className="text-[11px] text-neutral-500">{t("driverConfig.tab.kartHint")}</p>
-        <input
-          type="number"
-          min={0}
-          max={999}
-          value={config.selectedKartNumber ?? ""}
-          onChange={(e) => config.setKartNumber(e.target.value ? Number(e.target.value) : null)}
-          placeholder={t("driverConfig.tab.circuitAutoOption")}
-          className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:border-accent focus:outline-none"
-        />
-      </div>
+      {/*
+        Circuit selector and Kart number were intentionally removed from
+        the preset config UI per product request — the driver view always
+        resolves circuit + kart from the active session, so exposing these
+        per-preset overrides only confused users. The underlying config
+        state (setCircuitId / setKartNumber) is kept in the hook in case
+        we reintroduce it elsewhere, but it's no longer user-editable here.
+      */}
 
       {/* Card visibility */}
       <div className="bg-surface border border-border rounded-xl p-4 space-y-4">

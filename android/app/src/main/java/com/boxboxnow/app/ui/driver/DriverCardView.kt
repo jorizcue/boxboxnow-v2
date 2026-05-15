@@ -73,7 +73,7 @@ fun DriverCardView(
     bestLapMs: Double?,
     deltaBestMs: Double?,
     gps: GPSSample?,
-    boxScore: Int,
+    boxScore: Double,
     hasSectors: Boolean,
     sectorMeta: SectorMeta?,
     cardHeight: Dp,
@@ -139,7 +139,7 @@ fun DriverCardView(
                         modifier = Modifier.size((11f * scale).dp),
                     )
                     Text(
-                        cardLabel(card, ourKart, raceVM, deltaBestMs),
+                        cardLabel(card, t(card.labelKey), ourKart, raceVM, deltaBestMs),
                         color = BoxBoxNowColors.SystemGray,
                         fontSize = labelFont,
                         fontWeight = FontWeight.Medium,
@@ -183,27 +183,30 @@ fun DriverCardView(
 
 private fun cardLabel(
     card: DriverCard,
+    // Already-translated base label (resolved by the caller via
+    // t(card.labelKey) so this stays a plain, non-Composable fn).
+    label: String,
     ourKart: KartState?,
     raceVM: RaceViewModel,
     deltaBestMs: Double?,
 ): String = when (card) {
     DriverCard.GapAhead -> {
         val ahead = raceVM.computeOurData()?.aheadKart
-        if (ahead != null) "${card.display} · K${ahead.kartNumber}" else card.display
+        if (ahead != null) "$label · K${ahead.kartNumber}" else label
     }
     DriverCard.GapBehind -> {
         val behind = raceVM.computeOurData()?.behindKart
-        if (behind != null) "${card.display} · K${behind.kartNumber}" else card.display
+        if (behind != null) "$label · K${behind.kartNumber}" else label
     }
     DriverCard.IntervalAhead -> {
         val ahead = raceVM.apexNeighbor(-1)
-        if (ahead != null) "${card.display} · K${ahead.kartNumber}" else card.display
+        if (ahead != null) "$label · K${ahead.kartNumber}" else label
     }
     DriverCard.IntervalBehind -> {
         val behind = raceVM.apexNeighbor(1)
-        if (behind != null) "${card.display} · K${behind.kartNumber}" else card.display
+        if (behind != null) "$label · K${behind.kartNumber}" else label
     }
-    else -> card.display
+    else -> label
 }
 
 private fun cardAccent(
@@ -266,7 +269,7 @@ private fun CardContent(
     bestLapMs: Double?,
     deltaBestMs: Double?,
     gps: GPSSample?,
-    boxScore: Int,
+    boxScore: Double,
     hasSectors: Boolean,
     sectorMeta: SectorMeta?,
     cardHeight: Dp,
@@ -379,14 +382,23 @@ private fun CardContent(
             )
         }
         DriverCard.Best3 -> {
-            val v = ourKart?.bestLapMs
+            // Best rolling 3-lap average, NOT the single best lap.
+            // `bestAvgMs` is the backend's best-3 metric (iOS reads the
+            // same field as `best3Ms`). Using `bestLapMs` here was the
+            // bug that made this card mirror the single best/last lap.
+            val v = ourKart?.bestAvgMs
             MonoValue(
                 if (v != null && v > 0) Formatters.msToLapTime(v) else "--:--.---",
                 Color.White, mainFont,
             )
         }
         DriverCard.AvgFutureStint -> {
-            val calc = raceVM.computeStintCalc()
+            // Pass the interpolated `raceClockMs` (10 Hz) — same fix as
+            // LapsToMaxStint below. Without it `computeStintCalc` falls
+            // back to `_raceTimerMs.value` which only moves on snapshot
+            // (~1 Hz), so the card looked frozen on Android while iOS
+            // (which feeds the live clock) updated smoothly.
+            val calc = raceVM.computeStintCalc(raceClockMs)
             val v = calc.realMaxStintMin
             if (v != null) {
                 val m = v.toInt()
@@ -397,8 +409,11 @@ private fun CardContent(
             }
         }
         DriverCard.BoxScore -> {
+            // 2-decimal precision to match iOS (`String(format:"%.2f")`).
+            // The card used to take an Int param so the fractional part
+            // of the FIFO score was silently truncated ("24" vs "24.31").
             Text(
-                if (boxScore > 0) boxScore.toString() else "0",
+                if (boxScore > 0) "%.2f".format(boxScore) else "0",
                 color = Color(0xFFFFCC00),
                 fontSize = bigFont,
                 fontWeight = FontWeight.Black,

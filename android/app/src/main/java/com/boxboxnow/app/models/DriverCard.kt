@@ -178,6 +178,13 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
         DeltaSectors -> Icons.Filled.ViewAgenda  // 3 stacked rows, matches the layout
     }
 
+    /** i18n catalog key for the card's user-visible label. Matches the
+     *  web (`card.<id>`) and iOS so the three platforms share one set of
+     *  translations. Render with `t(card.labelKey)` inside a Composable;
+     *  `display` stays as the Spanish fallback for non-Composable code
+     *  (e.g. the collator in `sortedByGroupAndName`). */
+    val labelKey: String get() = "card.$key"
+
     companion object {
         fun fromKey(key: String): DriverCard? = entries.firstOrNull { it.key == key }
 

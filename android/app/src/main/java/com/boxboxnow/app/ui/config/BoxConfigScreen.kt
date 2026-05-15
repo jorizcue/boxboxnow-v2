@@ -190,14 +190,20 @@ fun BoxConfigScreen(onBack: () -> Unit) {
             // field guaranteed unique by the backend.
             val listState = rememberLazyListState()
             val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
-                // Indices include the non-team items above the team list
-                // (auto-load row, actions row, header). We work directly
-                // on the data list using its OWN indices, which we
-                // recover by subtracting the lead offset.
-                val lead = 3 // auto-load + actions + header
-                val fromIdx = from.index - lead
-                val toIdx = to.index - lead
-                if (fromIdx in teams.indices && toIdx in teams.indices) {
+                // Move by STABLE KEY, not by a hard-coded "lead = 3"
+                // index offset. The old offset assumed exactly three
+                // non-team items (auto-load + actions + header) sit
+                // above the list, but that subtraction produced
+                // out-of-range indices for some drags (and the
+                // reorder silently no-op'd → "doesn't save the new
+                // order"). The team items are keyed `team_<kart>`, so
+                // resolving both endpoints by key is correct regardless
+                // of how many header items precede them.
+                val fromKey = from.key as? String ?: return@rememberReorderableLazyListState
+                val toKey = to.key as? String ?: return@rememberReorderableLazyListState
+                val fromIdx = teams.indexOfFirst { "team_${it.kart}" == fromKey }
+                val toIdx = teams.indexOfFirst { "team_${it.kart}" == toKey }
+                if (fromIdx in teams.indices && toIdx in teams.indices && fromIdx != toIdx) {
                     teams.add(toIdx, teams.removeAt(fromIdx))
                 }
             }

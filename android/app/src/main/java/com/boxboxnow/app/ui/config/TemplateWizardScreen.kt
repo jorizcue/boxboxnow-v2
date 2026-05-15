@@ -418,7 +418,7 @@ private fun WizardCardToggleRow(
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                card.display,
+                t(card.labelKey),
                 color = Color.White,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
@@ -644,7 +644,7 @@ private fun CardPreviewCell(
             .padding(6.dp),
     ) {
         Text(
-            card.display,
+            t(card.labelKey),
             color = BoxBoxNowColors.SystemGray,
             fontSize = 10.sp,
             fontWeight = FontWeight.Medium,

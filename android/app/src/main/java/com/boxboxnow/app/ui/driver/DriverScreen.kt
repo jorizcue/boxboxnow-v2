@@ -253,6 +253,17 @@ private fun DriverScreenContent(onBack: () -> Unit) {
         }
     }
 
+    // Live default-template switch: when the strategist flips the
+    // default preset on the web, the backend pushes
+    // `preset_default_changed` over the race WS. Re-apply it on the fly
+    // so the pilot's layout updates without leaving the driver view —
+    // matches iOS (`.presetDefaultChanged` → `applyDefaultPresetIfAny`).
+    LaunchedEffect(Unit) {
+        raceVM.presetDefaultChangedEvents.collect {
+            driverVM.applyDefaultPresetIfAny()
+        }
+    }
+
     // Apply the active circuit's GPS finish line to the LapTracker whenever
     // the circuits list or the active circuit id changes. Keyed on both so
     // an admin update (new list) or a session switch (new id) re-binds.
@@ -433,7 +444,7 @@ private fun DriverScreenContent(onBack: () -> Unit) {
                     bestLapMs = bestLap,
                     deltaBestMs = deltaBest,
                     gps = gps,
-                    boxScore = boxScore.toInt(),
+                    boxScore = boxScore,
                     hasSectors = hasSectors,
                     sectorMeta = sectorMeta,
                 )
@@ -562,7 +573,7 @@ private fun CardsGrid(
     bestLapMs: Double?,
     deltaBestMs: Double?,
     gps: com.boxboxnow.app.models.GPSSample?,
-    boxScore: Int,
+    boxScore: Double,
     hasSectors: Boolean,
     sectorMeta: SectorMeta?,
 ) {

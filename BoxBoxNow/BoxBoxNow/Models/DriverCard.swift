@@ -87,39 +87,17 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    var displayName: String {
-        switch self {
-        case .raceTimer:      return "Tiempo de carrera"
-        case .currentLapTime: return "Vuelta actual (tiempo real)"
-        case .lastLap:        return "Ultima vuelta"
-        case .deltaBestLap:   return "Delta vs Best Lap (GPS)"
-        case .gForceRadar:    return "G-Force (diana)"
-        case .position:       return "Posicion (tiempos medios)"
-        case .realPos:        return "Posicion (clasif. real)"
-        case .gapAhead:       return "Gap Real Kart delante"
-        case .gapBehind:      return "Gap Real Kart detras"
-        case .avgLap20:       return "Vuelta media (20v)"
-        case .best3:          return "Media Mejor 3 v"
-        case .avgFutureStint: return "Media stint futuro"
-        case .boxScore:       return "Puntuacion Box"
-        case .bestStintLap:   return "Mejor vuelta stint"
-        case .gpsLapDelta:    return "Delta vuelta anterior GPS"
-        case .gpsSpeed:       return "Velocidad GPS"
-        case .gpsGForce:      return "G-Force (números)"
-        case .lapsToMaxStint: return "Vueltas hasta stint máximo"
-        case .pitWindow:      return "Ventana de pit (open/closed)"
-        case .pitCount:       return "PITS (realizados / mínimos)"
-        case .currentPit:     return "Pit en curso"
-        case .deltaBestS1:    return "Δ Mejor S1"
-        case .deltaBestS2:    return "Δ Mejor S2"
-        case .deltaBestS3:    return "Δ Mejor S3"
-        case .theoreticalBestLap: return "Mejor vuelta teórica sectores"
-        case .intervalAhead:  return "Intervalo kart delante"
-        case .intervalBehind: return "Intervalo kart detrás"
-        case .apexPosition:   return "Posición Apex"
-        case .deltaSectors:   return "Δ Sectores"
-        }
-    }
+    /// i18n catalog key for this card's label — `card.<rawValue>`,
+    /// the exact key set shared with web (lib/i18n.ts) and Android
+    /// (Translations.kt / DriverCard.labelKey).
+    var labelKey: String { "card.\(rawValue)" }
+
+    /// Localized label. Routes through `t(_:)` so every existing call
+    /// site (`card.displayName` in the grid header, config screens,
+    /// accessibility) follows the active language with no further
+    /// changes. `t()` falls back to the Spanish catalog entry, then to
+    /// the key itself, so a missing translation never crashes the view.
+    var displayName: String { t(labelKey) }
 
     var iconName: String {
         switch self {

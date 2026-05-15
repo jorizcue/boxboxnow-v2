@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.boxboxnow.app.i18n.t
 import com.boxboxnow.app.models.DriverCard
 import com.boxboxnow.app.models.DriverCardGroup
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
@@ -170,7 +171,7 @@ private fun CardToggleRow(
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                card.display,
+                t(card.labelKey),
                 color = Color.White,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
