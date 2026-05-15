@@ -276,25 +276,107 @@ class RaceViewModel @Inject constructor(
      *  grid `data-type="rk"` column), distinct from [racePosition]
      *  which orders by avg-lap pace. Returns `(pos, total)` where
      *  total is the count of karts that have a position assigned. */
+    /** Parse an Apex gap/interval string to seconds. Apex shapes:
+     *   "" / null          → null (leader / no data)
+     *   "0.793"            → 0.793
+     *   "1:05.279"         → 65.279  (M:SS.fff)
+     *   "1 Tour" / "1L" …  → null    (laps-down marker, not a same-lap gap) */
+    fun apexSeconds(raw: String?): Double? {
+        val s = (raw ?: "").trim()
+        if (s.isEmpty()) return null
+        if (":" in s) {
+            val parts = s.split(":")
+            val m = parts[0].trim().toDoubleOrNull() ?: return null
+            val sec = parts.getOrNull(1)?.trim()?.toDoubleOrNull() ?: return null
+            return m * 60 + sec
+        }
+        return s.toDoubleOrNull()
+    }
+
+    /** Apex sends the `interval` (int) column for a whole session or
+     *  not at all. True when ANY kart carries a non-empty interval. */
+    fun sessionHasInterval(): Boolean =
+        _karts.value.any { !(it.interval ?: "").trim().isEmpty() }
+
+    /** Live classification order. The Apex `position` column only
+     *  refreshes on RANKING events (lap-line crossings) so it lags —
+     *  ordering by gap-to-leader instead updates on every gap event,
+     *  which is why the "behind"/ApexPosition cards used to freeze
+     *  until a position change. Key: leader (no gap)=0, numeric gap=
+     *  seconds, laps-down=large sentinel; stable tiebreak by the
+     *  (lagging) position then kart number so early-race (no gaps yet)
+     *  still has a deterministic order. */
+    private fun apexOrder(): List<KartState> {
+        fun key(k: KartState): Double {
+            val g = (k.gap ?: "").trim()
+            if (g.isEmpty()) return 0.0                       // leader
+            apexSeconds(g)?.let { return it }                 // same-lap gap
+            val laps = Regex("\\d+").find(g)?.value?.toDoubleOrNull() ?: 1.0
+            return 1_000_000.0 + laps * 1_000.0               // laps-down
+        }
+        return _karts.value.filter { it.position > 0 }
+            .sortedWith(compareBy({ key(it) }, { it.position }, { it.kartNumber }))
+    }
+
+    /** Raw Apex live timing position, but ordered by the CONTINUOUS
+     *  gap-to-leader classification (see [apexOrder]) so it tracks the
+     *  visible board live instead of lagging until the next RANKING
+     *  event. `total` = karts with a position assigned (unchanged). */
     fun apexPosition(): RacePosition? {
         val ourKart = _ourKartNumber.value
         if (ourKart <= 0 || _karts.value.isEmpty()) return null
-        val withPos = _karts.value.filter { it.position > 0 }
-        val kart = withPos.firstOrNull { it.kartNumber == ourKart } ?: return null
-        return RacePosition(kart.position, withPos.size)
+        val order = apexOrder()
+        val idx = order.indexOfFirst { it.kartNumber == ourKart }
+        if (idx < 0) return null
+        return RacePosition(idx + 1, order.size)
     }
 
-    /** Returns the kart at `offset` from our kart in the Apex live
-     *  timing order. offset=-1 is the kart immediately ahead, +1 the
-     *  kart immediately behind. `null` when our kart isn't placed yet
-     *  or the requested neighbor doesn't exist (e.g. ahead of leader). */
+    /** Returns the kart at `offset` from our kart in the live Apex
+     *  classification order (gap-based, continuous). offset=-1 is the
+     *  kart immediately ahead, +1 the kart immediately behind. `null`
+     *  when our kart isn't placed yet or the neighbor doesn't exist. */
     fun apexNeighbor(offset: Int): KartState? {
         val ourKart = _ourKartNumber.value
         if (ourKart <= 0 || _karts.value.isEmpty()) return null
-        val sorted = _karts.value.filter { it.position > 0 }.sortedBy { it.position }
-        val idx = sorted.indexOfFirst { it.kartNumber == ourKart }
+        val order = apexOrder()
+        val idx = order.indexOfFirst { it.kartNumber == ourKart }
         if (idx < 0) return null
-        return sorted.getOrNull(idx + offset)
+        return order.getOrNull(idx + offset)
+    }
+
+    /** "Interval to kart ahead" card value. Prefer the Apex `interval`
+     *  column when the session has it (our own interval IS our gap to
+     *  the kart ahead). Fallback when Apex sends no interval column:
+     *  derive it from the `gap`-to-leader deltas (my.gap − ahead.gap),
+     *  using the continuous classification order. */
+    fun intervalAheadDisplay(leaderLabel: String): String {
+        val ourKartNum = _ourKartNumber.value
+        val mine = _karts.value.firstOrNull { it.kartNumber == ourKartNum }
+        val ahead = apexNeighbor(-1) ?: return leaderLabel   // we lead
+        if (sessionHasInterval()) {
+            return formatApexInterval(mine?.interval, leaderSentinel = leaderLabel)
+        }
+        val my = apexSeconds(mine?.gap) ?: 0.0               // leader gap = 0
+        val a = apexSeconds(ahead.gap)
+            ?: return formatApexInterval(mine?.gap, leaderSentinel = leaderLabel)
+        return "%.3fs".format(maxOf(0.0, my - a))
+    }
+
+    /** "Interval to kart behind" card value. The kart behind is found
+     *  via the continuous classification order (fixes the freeze until
+     *  a RANKING event). With an interval column, that kart's own
+     *  `interval` IS its gap to me; without one, derive behind.gap −
+     *  my.gap from the gap-to-leader deltas. */
+    fun intervalBehindDisplay(): String {
+        val ourKartNum = _ourKartNumber.value
+        val mine = _karts.value.firstOrNull { it.kartNumber == ourKartNum }
+        val behind = apexNeighbor(1) ?: return "—"
+        if (sessionHasInterval()) {
+            return formatApexInterval(behind.interval, leaderSentinel = "—")
+        }
+        val my = apexSeconds(mine?.gap) ?: 0.0
+        val b = apexSeconds(behind.gap) ?: return "—"
+        return "%.3fs".format(maxOf(0.0, b - my))
     }
 
     /** Format an Apex `interval` string for the driver dashboard.

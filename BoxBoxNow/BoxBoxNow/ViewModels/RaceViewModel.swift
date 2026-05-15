@@ -216,25 +216,115 @@ final class RaceViewModel: ObservableObject {
     /// `racePosition` which orders by avg-lap pace. Returns
     /// `(pos, total)` where total is the number of karts that have a
     /// position assigned. `nil` until the first ranking arrives.
-    func apexPosition(ourKartNumber: Int) -> (pos: Int, total: Int)? {
-        guard ourKartNumber > 0, !karts.isEmpty else { return nil }
-        let withPos = karts.filter { $0.position > 0 }
-        guard let kart = withPos.first(where: { $0.kartNumber == ourKartNumber }) else { return nil }
-        return (pos: kart.position, total: withPos.count)
+    /// Parse an Apex gap/interval string to seconds. Apex shapes:
+    ///   "" / nil        → nil (leader / no data)
+    ///   "0.793"         → 0.793
+    ///   "1:05.279"      → 65.279  (M:SS.fff)
+    ///   "1 Tour" / "1L" → nil     (laps-down marker, not a same-lap gap)
+    func apexSeconds(_ raw: String?) -> Double? {
+        let s = (raw ?? "").trimmingCharacters(in: .whitespaces)
+        if s.isEmpty { return nil }
+        if s.contains(":") {
+            let parts = s.split(separator: ":")
+            guard parts.count >= 2,
+                  let m = Double(parts[0].trimmingCharacters(in: .whitespaces)),
+                  let sec = Double(parts[1].trimmingCharacters(in: .whitespaces))
+            else { return nil }
+            return m * 60 + sec
+        }
+        return Double(s)
     }
 
-    /// Returns the kart at offset N from `ourKartNumber` in the Apex
-    /// live timing order (sorted by `kart.position`). offset=-1 is the
-    /// kart immediately ahead, offset=+1 the kart immediately behind.
-    /// `nil` when our kart isn't placed yet, or the requested neighbor
-    /// doesn't exist (e.g. asking for ahead of the leader).
+    /// Apex sends the `interval` (int) column for a whole session or
+    /// not at all. True when ANY kart carries a non-empty interval.
+    func sessionHasInterval() -> Bool {
+        karts.contains { !($0.interval ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
+    }
+
+    /// Live classification order. The Apex `position` column only
+    /// refreshes on RANKING events (lap-line crossings) so it lags —
+    /// ordering by gap-to-leader instead updates on every gap event,
+    /// which is why the "behind"/ApexPosition cards used to freeze
+    /// until a position change. Key: leader (no gap)=0, numeric gap=
+    /// seconds, laps-down=large sentinel; stable tiebreak by the
+    /// (lagging) position then kart number so early-race (no gaps yet)
+    /// still has a deterministic order.
+    private func apexOrder() -> [KartState] {
+        func key(_ k: KartState) -> Double {
+            let g = (k.gap ?? "").trimmingCharacters(in: .whitespaces)
+            if g.isEmpty { return 0 }                         // leader
+            if let s = apexSeconds(g) { return s }            // same-lap gap
+            let laps = Double(g.prefix { $0.isNumber }) ?? 1  // laps-down
+            return 1_000_000 + laps * 1_000
+        }
+        return karts.filter { $0.position > 0 }.sorted {
+            let ka = key($0), kb = key($1)
+            if ka != kb { return ka < kb }
+            if $0.position != $1.position { return $0.position < $1.position }
+            return $0.kartNumber < $1.kartNumber
+        }
+    }
+
+    /// Raw Apex live timing position, but ordered by the CONTINUOUS
+    /// gap-to-leader classification (see `apexOrder`) so it tracks the
+    /// visible board live instead of lagging until the next RANKING
+    /// event. `total` = karts with a position assigned (unchanged).
+    func apexPosition(ourKartNumber: Int) -> (pos: Int, total: Int)? {
+        guard ourKartNumber > 0, !karts.isEmpty else { return nil }
+        let order = apexOrder()
+        guard let idx = order.firstIndex(where: { $0.kartNumber == ourKartNumber }) else { return nil }
+        return (pos: idx + 1, total: order.count)
+    }
+
+    /// Returns the kart at offset N from `ourKartNumber` in the live
+    /// Apex classification order (gap-based, continuous). offset=-1 is
+    /// the kart immediately ahead, +1 the kart immediately behind.
+    /// `nil` when our kart isn't placed yet or the neighbor doesn't exist.
     func apexNeighbor(ourKartNumber: Int, offset: Int) -> KartState? {
         guard ourKartNumber > 0, !karts.isEmpty else { return nil }
-        let sorted = karts.filter { $0.position > 0 }.sorted { $0.position < $1.position }
-        guard let idx = sorted.firstIndex(where: { $0.kartNumber == ourKartNumber }) else { return nil }
+        let order = apexOrder()
+        guard let idx = order.firstIndex(where: { $0.kartNumber == ourKartNumber }) else { return nil }
         let target = idx + offset
-        guard target >= 0, target < sorted.count else { return nil }
-        return sorted[target]
+        guard target >= 0, target < order.count else { return nil }
+        return order[target]
+    }
+
+    /// "Interval to kart ahead" card value. Prefer the Apex `interval`
+    /// column when the session has it (our own interval IS our gap to
+    /// the kart ahead). Fallback when Apex sends no interval column:
+    /// derive it from the `gap`-to-leader deltas (my.gap − ahead.gap),
+    /// using the continuous classification order.
+    func intervalAheadDisplay(ourKartNumber: Int, leaderLabel: String) -> String {
+        let mine = karts.first(where: { $0.kartNumber == ourKartNumber })
+        guard let ahead = apexNeighbor(ourKartNumber: ourKartNumber, offset: -1) else {
+            return leaderLabel  // we lead
+        }
+        if sessionHasInterval() {
+            return formatApexInterval(mine?.interval, leaderSentinel: leaderLabel)
+        }
+        let my = apexSeconds(mine?.gap) ?? 0                  // leader gap = 0
+        guard let a = apexSeconds(ahead.gap) else {
+            return formatApexInterval(mine?.gap, leaderSentinel: leaderLabel)
+        }
+        return String(format: "%.3fs", max(0, my - a))
+    }
+
+    /// "Interval to kart behind" card value. The kart behind is found
+    /// via the continuous classification order (fixes the freeze until
+    /// a RANKING event). With an interval column, that kart's own
+    /// `interval` IS its gap to me; without one, derive behind.gap −
+    /// my.gap from the gap-to-leader deltas.
+    func intervalBehindDisplay(ourKartNumber: Int) -> String {
+        let mine = karts.first(where: { $0.kartNumber == ourKartNumber })
+        guard let behind = apexNeighbor(ourKartNumber: ourKartNumber, offset: 1) else {
+            return "—"
+        }
+        if sessionHasInterval() {
+            return formatApexInterval(behind.interval, leaderSentinel: "—")
+        }
+        let my = apexSeconds(mine?.gap) ?? 0
+        guard let b = apexSeconds(behind.gap) else { return "—" }
+        return String(format: "%.3fs", max(0, b - my))
     }
 
     /// Format an Apex `interval` string for display on the driver

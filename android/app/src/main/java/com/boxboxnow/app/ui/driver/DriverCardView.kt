@@ -711,7 +711,9 @@ private fun CardContent(
         // (per pilot feedback, "—" reads as "no data" not "leader").
         DriverCard.IntervalAhead -> {
             val leaderLabel = t("driver.cardLeader")
-            val display = raceVM.formatApexInterval(ourKart?.interval, leaderSentinel = leaderLabel)
+            // Prefers the Apex interval column; falls back to gap-delta
+            // when the session has no interval column (see RaceViewModel).
+            val display = raceVM.intervalAheadDisplay(leaderLabel)
             MonoValue(
                 display,
                 if (display == leaderLabel) Color(0xFFFFCC00) else Color.White,
@@ -725,10 +727,7 @@ private fun CardContent(
         // the apex sort has its own `.interval` equal to its gap to me
         // — exactly what the local card needs to show.
         DriverCard.IntervalBehind -> {
-            val behind = raceVM.apexNeighbor(1)
-            val display = if (behind == null) "—"
-                else raceVM.formatApexInterval(behind.interval, leaderSentinel = "—")
-            MonoValue(display, Color.White, mainFont)
+            MonoValue(raceVM.intervalBehindDisplay(), Color.White, mainFont)
         }
 
         // ── Apex live timing: raw position (P{n}/{total}) ──
