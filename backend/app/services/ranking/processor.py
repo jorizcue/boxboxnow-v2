@@ -60,6 +60,48 @@ MIN_DRIVERS_PER_SESSION = 3
 # their "average" was a 3-minute pit-through.
 MIN_LAPS_PER_DRIVER = 5
 
+from dataclasses import dataclass as _dataclass
+
+
+@_dataclass
+class RatedDriver:
+    name: str
+    team_key: str
+    corrected_avg_ms: float
+    team_position: int | None  # real finishing position (team or individual)
+
+
+def _pace_pctile(field: list["RatedDriver"]) -> dict[str, float]:
+    order = sorted(field, key=lambda d: d.corrected_avg_ms)
+    n = len(order)
+    if n == 1:
+        return {order[0].name: 0.0}
+    return {d.name: i / (n - 1) for i, d in enumerate(order)}
+
+
+def effective_scores(field: list["RatedDriver"], *, w: float = 0.7) -> dict[str, float]:
+    """Lower = better. Race ordering key (spec §6.A).
+    effective = w*norm_team_pos + (1-w)*pace_pctile, both in [0,1].
+    n_teams == 1 → pure pace."""
+    pace = _pace_pctile(field)
+    teams = sorted({d.team_key for d in field if d.team_position is not None})
+    pos_by_team = {}
+    for d in field:
+        if d.team_position is not None:
+            pos_by_team.setdefault(d.team_key, d.team_position)
+    n_teams = len(teams)
+    if n_teams <= 1:
+        return dict(pace)
+    ranked_teams = sorted(teams, key=lambda tk: pos_by_team[tk])
+    norm_team = {tk: i / (n_teams - 1) for i, tk in enumerate(ranked_teams)}
+    out: dict[str, float] = {}
+    for d in field:
+        if d.team_position is None or d.team_key not in norm_team:
+            out[d.name] = pace[d.name]
+        else:
+            out[d.name] = w * norm_team[d.team_key] + (1 - w) * pace[d.name]
+    return out
+
 
 # ─── Driver canonicalisation helpers ─────────────────────────────────────
 
