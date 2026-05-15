@@ -827,6 +827,49 @@ async def get_driver_detail(driver_id: int, db: AsyncSession) -> dict | None:
         .order_by(SessionResult.log_date.desc(), SessionResult.id.desc())
         .limit(20)
     )
+    recent = list(sres.scalars().all())
+
+    # ELO delta per session: session_result_id → delta from
+    # rating_history. Sessions that weren't rateable have no entry.
+    rec_ids = [s.id for s in recent]
+    elo_map: dict[int, float] = {}
+    if rec_ids:
+        dres = await db.execute(
+            select(RatingHistory.session_result_id, RatingHistory.delta).where(
+                RatingHistory.driver_id == driver_id,
+                RatingHistory.session_result_id.in_(rec_ids),
+            )
+        )
+        elo_map = {sid: round(d, 1) for sid, d in dres.all()}
+
+    # Field size per session: how many drivers ran in the same
+    # (circuit, date, session_seq). One row per driver (unique
+    # constraint) ⇒ COUNT(*) == participants. Filter by the circuits
+    # and dates of the recent set (cross-dialect safe — no tuple IN),
+    # then resolve the exact session_seq in Python.
+    field_map: dict[tuple, int] = {}
+    if recent:
+        circuits_in = {s.circuit_name for s in recent}
+        dates_in = {s.log_date for s in recent}
+        fres = await db.execute(
+            select(
+                SessionResult.circuit_name,
+                SessionResult.log_date,
+                SessionResult.session_seq,
+                func.count(SessionResult.id),
+            )
+            .where(
+                SessionResult.circuit_name.in_(circuits_in),
+                SessionResult.log_date.in_(dates_in),
+            )
+            .group_by(
+                SessionResult.circuit_name,
+                SessionResult.log_date,
+                SessionResult.session_seq,
+            )
+        )
+        field_map = {(c, d, sq): n for c, d, sq, n in fres.all()}
+
     recent_sessions = [
         {
             "circuit_name": s.circuit_name,
@@ -841,8 +884,10 @@ async def get_driver_detail(driver_id: int, db: AsyncSession) -> dict | None:
             "final_position": s.final_position,
             "session_type": s.session_type,
             "effective_score": round(s.effective_score, 4) if s.effective_score is not None else None,
+            "elo_delta": elo_map.get(s.id),
+            "field_size": field_map.get((s.circuit_name, s.log_date, s.session_seq)),
         }
-        for s in sres.scalars().all()
+        for s in recent
     ]
 
     return {

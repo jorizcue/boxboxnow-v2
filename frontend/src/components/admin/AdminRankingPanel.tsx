@@ -60,7 +60,7 @@ export function AdminRankingPanel() {
   const [rows, setRows] = useState<RankingTopRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [limit, setLimit] = useState(100);
+  const [limit, setLimit] = useState<number | null>(100);
   const [minSessions, setMinSessions] = useState(2);
   // Circuit selector. "" ⇒ global rating. Otherwise the per-circuit
   // leaderboard. Initial list of circuits comes from a separate
@@ -318,14 +318,15 @@ export function AdminRankingPanel() {
         </select>
         <label className="text-neutral-400 ml-3">Top</label>
         <select
-          value={limit}
-          onChange={(e) => setLimit(parseInt(e.target.value, 10))}
+          value={limit === null ? "all" : String(limit)}
+          onChange={(e) => setLimit(e.target.value === "all" ? null : parseInt(e.target.value, 10))}
           className="bg-surface border border-border rounded-lg px-2 py-1 text-white"
         >
-          <option value={50}>50</option>
-          <option value={100}>100</option>
-          <option value={250}>250</option>
-          <option value={500}>500</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="250">250</option>
+          <option value="500">500</option>
+          <option value="all">Todos</option>
         </select>
         <label className="text-neutral-400 ml-3">Mín. sesiones</label>
         <select
@@ -643,22 +644,40 @@ function DriverDetailModal({
                     <th className="text-right px-3 py-2">Vueltas</th>
                     <th className="text-right px-3 py-2">Mejor</th>
                     <th className="text-right px-3 py-2">Pos</th>
+                    <th className="text-right px-3 py-2" title="Pilotos contra los que corrió en esa sesión">Rivales</th>
+                    <th className="text-right px-3 py-2" title="Puntos ELO ganados/perdidos en esa sesión">ΔELO</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {detail.recent_sessions.map((s, i) => (
+                  {detail.recent_sessions.map((s, i) => {
+                    const fullSession = [s.title1, s.title2].filter(Boolean).join(" / ") || "—";
+                    const rivals = s.field_size != null ? s.field_size - 1 : null;
+                    return (
                     <tr key={`${s.log_date}-${s.title1}-${s.title2}-${i}`}>
                       <td className="px-3 py-1.5 text-neutral-400 font-mono">{s.log_date}</td>
                       <td className="px-3 py-1.5 text-white">{s.circuit_name}</td>
-                      <td className="px-3 py-1.5 text-neutral-300 truncate max-w-[180px]">
-                        {[s.title1, s.title2].filter(Boolean).join(" / ") || "—"}
+                      <td className="px-3 py-1.5 text-neutral-300 truncate max-w-[180px]" title={fullSession}>
+                        {fullSession}
                       </td>
                       <td className="px-3 py-1.5 text-right text-neutral-400 font-mono">{s.kart_number ?? "—"}</td>
                       <td className="px-3 py-1.5 text-right text-neutral-300 font-mono">{s.total_laps}</td>
                       <td className="px-3 py-1.5 text-right text-neutral-300 font-mono">{formatLapMs(s.best_lap_ms)}</td>
                       <td className="px-3 py-1.5 text-right text-neutral-400 font-mono">{s.final_position ?? "—"}</td>
+                      <td className="px-3 py-1.5 text-right text-neutral-400 font-mono">
+                        {rivals != null && rivals >= 0 ? rivals : "—"}
+                      </td>
+                      <td className="px-3 py-1.5 text-right font-mono">
+                        {s.elo_delta == null ? (
+                          <span className="text-neutral-600">—</span>
+                        ) : (
+                          <span className={s.elo_delta >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                            {s.elo_delta >= 0 ? "+" : ""}{s.elo_delta.toFixed(1)}
+                          </span>
+                        )}
+                      </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

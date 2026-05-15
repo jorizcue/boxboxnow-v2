@@ -703,11 +703,10 @@ export const api = {
       "/api/ranking/lookup",
       { method: "POST", body: JSON.stringify({ names }) },
     ),
-  rankingAdminTop: (limit = 100, minSessions = 2, circuit: string | null = null) => {
-    const qs = new URLSearchParams({
-      limit: String(limit),
-      min_sessions: String(minSessions),
-    });
+  rankingAdminTop: (limit: number | null = 100, minSessions = 2, circuit: string | null = null) => {
+    const qs = new URLSearchParams({ min_sessions: String(minSessions) });
+    // limit omitted ⇒ backend returns ALL ranked drivers ("Todos").
+    if (limit != null) qs.set("limit", String(limit));
     if (circuit) qs.set("circuit", circuit);
     return fetchApi<{ drivers: RankingTopRow[]; circuit: string | null }>(
       `/api/admin/ranking/top?${qs.toString()}`,
@@ -820,6 +819,10 @@ export interface RankingDriverDetail {
     best_lap_ms: number;
     avg_lap_ms: number;
     final_position: number | null;
+    // ELO points won/lost that session (null when the session wasn't
+    // rateable). field_size = total drivers in that session.
+    elo_delta: number | null;
+    field_size: number | null;
   }>;
 }
 
