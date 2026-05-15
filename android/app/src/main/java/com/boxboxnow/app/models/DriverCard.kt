@@ -95,7 +95,12 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
 
     val group: DriverCardGroup get() = when (this) {
         BoxScore, PitCount, CurrentPit, PitWindow -> DriverCardGroup.BOX
-        DeltaBestLap, GForceRadar, GpsLapDelta, GpsSpeed, GpsGForce -> DriverCardGroup.GPS
+        // CurrentLapTime moved from RACE_BBN to GPS on 2026-05-15:
+        // it's the only race-tab card that needs a live GPS fix to be
+        // useful (it ticks while the kart is mid-lap), so grouping it
+        // with the rest of the GPS-required cards is clearer for
+        // operators picking which cards to enable.
+        CurrentLapTime, DeltaBestLap, GForceRadar, GpsLapDelta, GpsSpeed, GpsGForce -> DriverCardGroup.GPS
         // Carrera - Apex: raw Apex live-timing values, mirrors what
         // the pilot would see on Apex's own live timing screen.
         RaceTimer, LastLap, BestStintLap, ApexPosition,

@@ -115,18 +115,54 @@ fun BoxConfigScreen(onBack: () -> Unit) {
         loading = false
     }
 
+    /** Persist the current teams list. Used by:
+     *   - The explicit "GUARDAR CAMBIOS" button further down.
+     *   - The "Listo" button in the top bar (exiting edit mode).
+     *   - The back-arrow handler so changes survive a navigation away
+     *     from the screen without an explicit save tap.
+     *
+     * Pre-2026-05-15 the screen only saved via the bottom button, so
+     * dragging a team into a new order and then pressing "Listo" or
+     * the back arrow silently discarded the change. Same for adding
+     * pilots inside a team. Now any exit path commits. */
+    suspend fun saveCurrentTeams() {
+        if (loading) return
+        try {
+            val ordered = teams.mapIndexed { idx, t -> t.copy(position = idx + 1) }
+            api.replaceTeams(ordered)
+        } catch (_: Throwable) {}
+    }
+
     Scaffold(
         containerColor = Color.Black,
         topBar = {
             TopAppBar(
                 title = { Text("Configuración Box", color = Color.White) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = {
+                        // Commit any pending edits before leaving the
+                        // screen — protects the user from losing a
+                        // reorder or a freshly-added pilot just because
+                        // they didn't scroll down to the save button.
+                        scope.launch {
+                            saveCurrentTeams()
+                            onBack()
+                        }
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
                     }
                 },
                 actions = {
-                    TextButton(onClick = { isEditing = !isEditing }) {
+                    TextButton(onClick = {
+                        val wasEditing = isEditing
+                        isEditing = !isEditing
+                        // Treat "Listo" (exiting edit mode) as an
+                        // implicit save — matches iOS, where leaving
+                        // edit mode commits the team list.
+                        if (wasEditing) {
+                            scope.launch { saveCurrentTeams() }
+                        }
+                    }) {
                         Text(
                             if (isEditing) "Listo" else "Editar",
                             color = BoxBoxNowColors.Accent,
@@ -628,11 +664,29 @@ private fun DiffMsField(
     // Display format: "+1.2" / "-0.5" / "0" — mirrors the read-only
     // formatter further up so the field doesn't visually jump when
     // entering / leaving edit mode.
-    val formatted = remember(valueMs) {
-        if (valueMs == 0) "0"
-        else "%+.1f".format(valueMs / 1000.0)
+    fun format(ms: Int) = if (ms == 0) "0" else "%+.1f".format(ms / 1000.0)
+
+    // Local text buffer survives recompositions and does NOT reset when
+    // `valueMs` changes because of OUR own onValueChange — otherwise
+    // every keystroke would clobber the user's typing with the 1-decimal-
+    // rounded format (typing "5" over "+0.6" → "+0.65" → 0.65 s →
+    // valueMs=650 → reformat as "+0.7" → text snaps back to "+0.7" →
+    // every subsequent digit visually adds another 0.1).
+    //
+    // External resets (selecting a different team, loading config) DO
+    // need to push into the buffer. We track the last value we
+    // committed from inside the field; the LaunchedEffect only resyncs
+    // when the parent's `valueMs` diverges from that, which means it
+    // came from somewhere else.
+    var text by remember { mutableStateOf(format(valueMs)) }
+    val lastCommittedFromField = remember { mutableStateOf(valueMs) }
+
+    LaunchedEffect(valueMs) {
+        if (valueMs != lastCommittedFromField.value) {
+            text = format(valueMs)
+            lastCommittedFromField.value = valueMs
+        }
     }
-    var text by remember(valueMs) { mutableStateOf(formatted) }
 
     OutlinedTextField(
         value = text,
@@ -647,8 +701,11 @@ private fun DiffMsField(
             val normalised = cleaned.replace(',', '.')
             val parsed = normalised.toDoubleOrNull()
             if (parsed != null) {
-                onValueChange((parsed * 1000.0).toInt())
+                val ms = (parsed * 1000.0).toInt()
+                lastCommittedFromField.value = ms
+                onValueChange(ms)
             } else if (cleaned.isEmpty()) {
+                lastCommittedFromField.value = 0
                 onValueChange(0)
             }
         },

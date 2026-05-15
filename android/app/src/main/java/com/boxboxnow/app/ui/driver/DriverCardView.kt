@@ -78,7 +78,19 @@ fun DriverCardView(
     cardHeight: Dp,
     modifier: Modifier = Modifier,
 ) {
-    val accent = cardAccent(card, lastLapMs, bestLapMs, deltaBestMs, ourKart, raceClockMs)
+    // PitWindow's accent depends on the backend's live `pitStatus.isOpen`
+    // — we collect it here at the top of the composable so it flows
+    // through to both the card background (in `cardAccent`) and the
+    // content body. Pre-2026-05-15 the accent was a fixed
+    // SuccessGreen and only the inner "CLOSED" text turned red, which
+    // produced the inverted look in the user's photo: green background
+    // with red text. Now closed = red bg + red text, open = green bg +
+    // green text — matches iOS.
+    val pitStatusForAccent = raceVM.pitStatus.collectAsState().value
+    val accent = cardAccent(
+        card, lastLapMs, bestLapMs, deltaBestMs, ourKart, raceClockMs,
+        pitOpen = pitStatusForAccent?.isOpen,
+    )
     val prominent = card == DriverCard.Position || card == DriverCard.RealPos || card == DriverCard.PitWindow
     val bgAlpha = if (prominent) 0.18f else 0.12f
     val borderAlpha = if (prominent) 0.7f else 0.5f
@@ -200,6 +212,7 @@ private fun cardAccent(
     deltaBestMs: Double?,
     ourKart: KartState?,
     raceClockMs: Double,
+    pitOpen: Boolean? = null,
 ): Color {
     val gray = BoxBoxNowColors.SystemGray
     return when (card) {
@@ -227,6 +240,15 @@ private fun cardAccent(
         }
         DriverCard.BestStintLap ->
             if ((ourKart?.bestStintLapMs ?: 0.0) > 0) Color(0xFF9C27B0) else gray
+        // Pit window: green when open, red when closed, gray when
+        // unknown. The card's static `card.accent` is just used as a
+        // fallback for the "unknown" case (initial load before the
+        // first snapshot arrives).
+        DriverCard.PitWindow -> when (pitOpen) {
+            true  -> BoxBoxNowColors.SuccessGreen
+            false -> BoxBoxNowColors.ErrorRed
+            null  -> gray
+        }
         else -> card.accent
     }
 }
@@ -426,7 +448,15 @@ private fun CardContent(
             }
         }
         DriverCard.LapsToMaxStint -> {
-            val laps = raceVM.computeStintCalc().lapsToMax
+            // Pass the interpolated `raceClockMs` so the value updates
+            // at the same rate as the live race timer (~10 Hz from
+            // `RaceViewModel.startInterpolation()`) rather than only
+            // on snapshot pushes (~1 Hz). Without this argument
+            // `computeStintCalc` falls back to `_raceTimerMs.value`
+            // which only changes on snapshot — that's why the card
+            // looked frozen on Android while the adjacent
+            // `BoxScore`/timer cards refreshed normally.
+            val laps = raceVM.computeStintCalc(raceClockMs).lapsToMax
             Text(
                 laps?.let { "%.1f".format(it) } ?: "0",
                 color = Color.White,
@@ -520,6 +550,12 @@ private fun CardContent(
             val text: String
             val color: Color
             val cur = ps
+            // Text colour matches the card accent — the background is
+            // a 0.18α tint of the same colour, so using a fully-saturated
+            // version of the accent for the headline keeps high contrast
+            // (light-red text on pale-red bg, light-green text on pale-
+            // green bg). Pre-2026-05-15 the closed state used red text
+            // on a green background because the accent was fixed.
             when {
                 cur == null -> { text = "--"; color = BoxBoxNowColors.SystemGray }
                 cur.isOpen  -> { text = "OPEN";   color = BoxBoxNowColors.SuccessGreen }

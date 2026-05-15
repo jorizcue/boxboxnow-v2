@@ -74,7 +74,12 @@ export const ALL_DRIVER_CARDS: {
   { id: "intervalBehind", labelKey: "card.intervalBehind", label: "Intervalo kart detrás", requiresGps: false, group: "raceApex" },
 
   // --- CARRERA - BBN (BoxBoxNow-derived analytics) ---
-  { id: "currentLapTime", labelKey: "card.currentLapTime", label: "Vuelta actual (tiempo real)", requiresGps: true, group: "raceBbn" },
+  // Note: `currentLapTime` lives in the GPS block (see below) because
+  // it's the only race-tab card that requires a GPS fix to be useful
+  // — without GPS we don't know "where in the lap" the kart is and
+  // the running timer is meaningless. Pre-2026-05-15 it sat here in
+  // raceBbn, which confused operators picking the card without
+  // realising it'd be dead on a kart with no GPS module.
   { id: "avgLap20", labelKey: "card.avgLap20", label: "Vuelta media (20v)", requiresGps: false, group: "raceBbn" },
   { id: "best3", labelKey: "card.best3", label: "Media Mejor 3 v", requiresGps: false, group: "raceBbn" },
   { id: "position", labelKey: "card.position", label: "Posición (tiempos medios)", requiresGps: false, group: "raceBbn" },
@@ -99,6 +104,7 @@ export const ALL_DRIVER_CARDS: {
   { id: "pitWindow", labelKey: "card.pitWindow", label: "Ventana de pit (open/closed)", requiresGps: false, group: "box" },
 
   // --- GPS group (alphabetical by label) ---
+  { id: "currentLapTime", labelKey: "card.currentLapTime", label: "Vuelta actual (tiempo real)", requiresGps: true, group: "gps" },
   { id: "deltaBestLap", labelKey: "card.deltaBestLap", label: "Delta vs Best Lap (GPS)", requiresGps: true, group: "gps" },
   { id: "gpsLapDelta", labelKey: "card.gpsLapDelta", label: "Delta vuelta anterior GPS", requiresGps: true, group: "gps" },
   { id: "gForceRadar", labelKey: "card.gForceRadar", label: "G-Force (diana)", requiresGps: true, group: "gps" },

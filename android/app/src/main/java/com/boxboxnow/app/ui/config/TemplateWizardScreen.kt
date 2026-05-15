@@ -203,6 +203,7 @@ fun TemplateWizardScreen(onBack: () -> Unit, editPresetId: Int? = null) {
                     visibleCards = visibleCards,
                     cardOrder = cardOrder,
                     onReorder = { cardOrder = it },
+                    orientationLock = orientationLock,
                     onBack = { step = 2 },
                     onNext = { step = 4 },
                 )
@@ -450,9 +451,23 @@ private fun StepCardOrder(
     visibleCards: Map<String, Boolean>,
     cardOrder: List<String>,
     onReorder: (List<String>) -> Unit,
+    orientationLock: OrientationLock,
     onBack: () -> Unit,
     onNext: () -> Unit,
 ) {
+    // Preview-grid column count must match what the pilot will see in
+    // the actual DriverScreen (see DriverScreen.kt::CardsGrid):
+    //   PORTRAIT → 2 columns
+    //   LANDSCAPE → 3 columns
+    //   FREE → default to 3 (race usage is overwhelmingly landscape).
+    // Before this fix the preview was hard-coded to 2 cols, so a
+    // landscape preset showed 3 rows × 2 in the wizard but rendered
+    // 2 rows × 3 once saved — confusing for the operator.
+    val previewCols = when (orientationLock) {
+        OrientationLock.PORTRAIT -> 2
+        OrientationLock.LANDSCAPE -> 3
+        OrientationLock.FREE -> 3
+    }
     val orderedVisible: List<DriverCard> = cardOrder.mapNotNull { key ->
         if (visibleCards[key] == true) DriverCard.fromKey(key) else null
     }
@@ -536,14 +551,12 @@ private fun StepCardOrder(
                 )
             }
 
-            // 2-column grid matching iOS CardPreviewCell layout.
-            // Wrapped with a reorderable state so the user can long-
-            // press + drag a card to reorder. The legacy "tap to
-            // swap" path is still wired below for accessibility
-            // (one-handed use without long-press).
+            // Grid columns adapt to the orientation the operator
+            // picked in step 4 (or the default). See `previewCols`
+            // above for the mapping.
             LazyVerticalGrid(
                 state = gridState,
-                columns = GridCells.Fixed(2),
+                columns = GridCells.Fixed(previewCols),
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
