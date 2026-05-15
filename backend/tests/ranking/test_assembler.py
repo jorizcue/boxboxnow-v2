@@ -59,3 +59,33 @@ def test_different_title_does_not_stitch():
     b = _seg("HEAT C-D", karts=[1, 2, 3], t0_s=320, t1_s=600, chequered=False)
     races = assemble_races([a, b])
     assert len(races) == 2
+
+
+def test_same_group_sprint_heats_no_chequered_do_NOT_stitch():
+    """Critical regression: two short sprint heats (individual), same title/karts,
+    no chequered, small gap — must NOT stitch because they are not endurance."""
+    a = _seg("HEAT B-C", karts=[1, 2, 3, 4, 5, 6], t0_s=0, t1_s=600, chequered=False, laps_per=12)
+    b = _seg("HEAT B-C", karts=[1, 2, 3, 4, 5, 6], t0_s=640, t1_s=1240, chequered=False, laps_per=12)
+    races = assemble_races([a, b])
+    assert len(races) == 2
+
+
+def test_endurance_pair_still_stitches():
+    """Two long fragments (≥2400 s each ⇒ endurance), same title/karts, no chequered,
+    small gap — must stitch into a single Race with two segments."""
+    a = _seg("12 HORAS", karts=[8, 9, 10], t0_s=0, t1_s=4000, chequered=False, laps_per=300)
+    b = _seg("12 HORAS", karts=[8, 9, 10], t0_s=4100, t1_s=8000, chequered=False, laps_per=250)
+    races = assemble_races([a, b])
+    assert len(races) == 1
+    assert len(races[0].segments) == 2
+
+
+def test_title_internal_whitespace_normalized():
+    """_norm must handle case and trailing whitespace differences — the two segments
+    should stitch because their titles are equivalent after normalisation."""
+    a = _seg("12 HORAS", karts=[8, 9, 10], t0_s=0, t1_s=4000, chequered=False, laps_per=300)
+    b = _seg("12 HORAS", karts=[8, 9, 10], t0_s=4100, t1_s=8000, chequered=False, laps_per=250)
+    # Mutate title2 on b's segment to differ only in case and trailing space
+    b.title2 = "12 horas "
+    races = assemble_races([a, b])
+    assert len(races) == 1

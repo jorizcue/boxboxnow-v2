@@ -4,11 +4,13 @@ Default: one segment = one race (fixes Apex reusing a title across
 consecutive heats / superpole — they are distinct grids). Stitch a
 segment onto the previous race only when it is the SAME ongoing race
 that Apex re-gridded mid-event (endurance reconnect): same title, no
-chequered yet, short gap, same competitors. Ambiguity ⇒ do NOT stitch
-(a clean split is less harmful than an over-merge).
+chequered yet, short gap, same competitors, AND both sides classify as
+endurance. Ambiguity ⇒ do NOT stitch (a clean split is less harmful
+than an over-merge).
 """
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass, field
 
 from .segmenter import Segment
@@ -52,13 +54,32 @@ class Race:
 
 
 def _norm(s: str) -> str:
-    return (s or "").strip().upper()
+    s = unicodedata.normalize("NFKD", s or "")
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return s.strip().upper()
 
 
 def _overlap(a: set[int], b: set[int]) -> float:
     if not a or not b:
         return 0.0
     return len(a & b) / len(a | b)
+
+
+def classify_race(race: Race):
+    """SessionClass for the assembled race (combined duration + any swap
+    across its segments)."""
+    had_swap = any(
+        len(getattr(r, "drteam_names", []) or []) > 1
+        for s in race.segments for r in s.rows.values()
+    )
+    return classify_session(
+        race.title1, race.title2,
+        duration_s=race.duration_s, had_driver_swap=had_swap,
+    )
+
+
+def _is_endurance(race: Race) -> bool:
+    return classify_race(race).team_mode == "endurance"
 
 
 def assemble_races(segments: list[Segment]) -> list[Race]:
@@ -76,21 +97,11 @@ def assemble_races(segments: list[Segment]) -> list[Race]:
             and (seg.first_lap_ts - prev_last.last_lap_ts).total_seconds() <= STITCH_GAP_S
         )
         karts_ok = _overlap(prev.kart_set, seg.kart_set) >= STITCH_KART_OVERLAP
-        if same_title and not prev_last.had_chequered and gap_ok and karts_ok:
+        prev_endurance = _is_endurance(prev)
+        seg_endurance = _is_endurance(Race([seg]))
+        if (same_title and not prev_last.had_chequered and gap_ok
+                and karts_ok and prev_endurance and seg_endurance):
             prev.segments.append(seg)
         else:
             races.append(Race([seg]))
     return races
-
-
-def classify_race(race: Race):
-    """SessionClass for the assembled race (combined duration + any swap
-    across its segments)."""
-    had_swap = any(
-        len(r.drteam_names) > 1
-        for s in race.segments for r in s.rows.values()
-    )
-    return classify_session(
-        race.title1, race.title2,
-        duration_s=race.duration_s, had_driver_swap=had_swap,
-    )
