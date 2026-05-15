@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -393,7 +394,7 @@ private fun CardContent(
             val od = raceVM.computeOurData()
             if (od?.aheadKart != null) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("-%.1fs".format(od.aheadSeconds), color = Color(0xFFFF453A), fontSize = mainFont, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                    Text("-%.1fs".format(od.aheadSeconds), color = Color(0xFFFF453A), fontSize = mainFont, fontWeight = FontWeight.Black, style = NumericValueStyle)
                     val name = od.aheadKart.teamName ?: od.aheadKart.driverName
                     if (name != null) {
                         Text(name, color = BoxBoxNowColors.SystemGray, fontSize = smallFont, maxLines = 1)
@@ -407,7 +408,7 @@ private fun CardContent(
             val od = raceVM.computeOurData()
             if (od?.behindKart != null) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("+%.1fs".format(od.behindSeconds), color = Color(0xFF30D158), fontSize = mainFont, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                    Text("+%.1fs".format(od.behindSeconds), color = Color(0xFF30D158), fontSize = mainFont, fontWeight = FontWeight.Black, style = NumericValueStyle)
                     val name = od.behindKart.teamName ?: od.behindKart.driverName
                     if (name != null) {
                         Text(name, color = BoxBoxNowColors.SystemGray, fontSize = smallFont, maxLines = 1)
@@ -496,7 +497,7 @@ private fun CardContent(
             if (gps != null) {
                 val latG = abs(gps.gForceX)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("%.1fG".format(latG), color = Color.White, fontSize = (28f * scale).sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                    Text("%.1fG".format(latG), color = Color.White, fontSize = (28f * scale).sp, fontWeight = FontWeight.Black, style = NumericValueStyle)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(t("driver.cardLat", "value" to "%.1f".format(gps.gForceX)), color = BoxBoxNowColors.SystemGray, fontSize = smallFont, fontFamily = FontFamily.Monospace)
                         Text(t("driver.cardBrake", "value" to "%.1f".format(gps.gForceY)), color = BoxBoxNowColors.SystemGray, fontSize = smallFont, fontFamily = FontFamily.Monospace)
@@ -529,7 +530,7 @@ private fun CardContent(
                 color = lapsTextColor,
                 fontSize = bigFont,
                 fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Monospace,
+                style = NumericValueStyle,
             )
         }
         DriverCard.PitCount -> {
@@ -580,7 +581,7 @@ private fun CardContent(
                         color = Color(0xFF00BCD4).copy(alpha = alpha.value),
                         fontSize = mainFont,
                         fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
+                        style = NumericValueStyle,
                         maxLines = 1,
                     )
                     Text(
@@ -1010,6 +1011,17 @@ private fun DeltaSectorsLine(
     }
 }
 
+/**
+ * Tabular-figures style for big numeric values. The system monospace
+ * family on Android has NO 900 weight, so `FontFamily.Monospace` +
+ * `FontWeight.Black` rendered visibly thin (lighter than the BoxScore
+ * card, which already used the default Roboto Black). Roboto *does*
+ * ship a real Black weight, and `fontFeatureSettings = "tnum"` enables
+ * tabular (fixed-width) digits so a ticking timer keeps its columns
+ * aligned just like monospace did — only now properly heavy.
+ */
+private val NumericValueStyle = TextStyle(fontFeatureSettings = "tnum")
+
 @Composable
 private fun MonoValue(text: String, color: Color, size: TextUnit) {
     Text(
@@ -1017,7 +1029,7 @@ private fun MonoValue(text: String, color: Color, size: TextUnit) {
         color = color,
         fontSize = size,
         fontWeight = FontWeight.Black,
-        fontFamily = FontFamily.Monospace,
+        style = NumericValueStyle,
         maxLines = 1,
         softWrap = false,
         overflow = TextOverflow.Clip,
