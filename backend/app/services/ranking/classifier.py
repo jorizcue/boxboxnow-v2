@@ -14,15 +14,15 @@ _NON_RACE = (
     "ESSAIS", "CHRONOS", "CRONOS", "QUALI", "LIBRE", "LIBRES", "PRACTICE",
     "FREE", "PROVE", "ENTRENO", "ENTRENAMIENTO", "WARM", "BRIEFING", "ACCUEIL",
 )
-_NON_RACE_RE = re.compile(r"\b(Q\d+|FP\d+)\b", re.I)
-_SESSION_GENERIC_RE = re.compile(r"^\s*SESS(ION|ION|ION|ION)?\s*\d*\s*$", re.I)
+_NON_RACE_RE = re.compile(r"\b(Q\d+|FP\d+)\b")
+_SESSION_GENERIC_RE = re.compile(r"^\s*SESS(?:ION)?\s*\d*\s*$")
 _RACE = (
     "CARRERA", "COURSE", "RACE", "GARA", "RENNEN", "FINAL", "FINALE", "GP",
     "GRAN PREMIO", "GRAND PRIX", "MANGA", "HEAT", "RACING", "RESIST",
     "ENDURANCE",
 )
 _DURATION_RE = re.compile(r"\d+\s*(H|HEURES|HOURS|HORAS|ORE|STUNDEN|HRS?)\b", re.I)
-_ENDURANCE_KW = ("HEURE", "HOUR", "HORA", "ORE", "STUNDEN", "ENDURANCE", "RESIST")
+_ENDURANCE_RE = re.compile(r"\b(HEURE|HOUR|HORA|ORE|STUNDEN|ENDURANCE|RESIST)\w*")
 
 
 @dataclass
@@ -46,7 +46,7 @@ def classify_session(
         or bool(_SESSION_GENERIC_RE.match(blob))
     has_race = any(k in blob for k in _RACE) or bool(_DURATION_RE.search(blob))
 
-    if has_non_race and not (has_race and not has_non_race):
+    if has_non_race:
         session_type = "pace"
     elif has_race:
         session_type = "race"
@@ -56,7 +56,7 @@ def classify_session(
     endurance = (
         had_driver_swap
         or duration_s >= ENDURANCE_THRESHOLD_S
-        or any(k in blob for k in _ENDURANCE_KW)
+        or bool(_ENDURANCE_RE.search(blob))
     )
     return SessionClass(
         session_type=session_type,
