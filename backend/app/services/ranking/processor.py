@@ -390,10 +390,10 @@ async def apply_extracts(
                 kart_bias_ms=b,
                 corrected_avg_ms=corrected,
                 final_position=(s.final_position if is_race else None),
-                session_type=group[0].session_type,
-                team_mode=group[0].team_mode,
+                session_type=agg_group[0].session_type,
+                team_mode=agg_group[0].team_mode,
                 effective_score=key[canon],
-                duration_s=group[0].duration_s,
+                duration_s=agg_group[0].duration_s,
             )
             db.add(sr)
             await db.flush()

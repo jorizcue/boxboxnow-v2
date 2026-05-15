@@ -1,5 +1,6 @@
 from pathlib import Path
 from app.services.ranking.extractor import extract_sessions, SessionExtract
+from app.services.ranking.normalizer import normalize_name
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -45,6 +46,104 @@ def test_drteam_names_preserved_for_task6():
     assert any(s.drteam_names for s in sessions)
     # EUPEN is kart-only (no live drteam) — empty list is acceptable there,
     # so we only assert presence on the RKC fixture.
+
+
+def test_retired_driver_ranked_behind_classified():
+    """Spec §5: a retired (`sr`) driver is classified BEHIND every
+    classified runner (worst positions), and retired drivers are ordered
+    among THEMSELVES by laps completed DESC (more laps = better DNF).
+
+    Tests the `_finalize_session` seam directly — the most targeted level
+    — by constructing `_RowState`s on a `_SessionAccumulator`.  Driver C
+    classifies P3 (last classified) with 8 laps; driver L retires holding
+    a nominal P2 but only 3 laps; driver M retires with 6 laps.  Expected
+    final positions: C=3 (real), then retired ordered by laps desc → M (6
+    laps) BEFORE L (3 laps): M=4, L=5 — both strictly worse than C's 3.
+    """
+    from app.services.ranking.extractor import (
+        _SessionAccumulator, _finalize_session,
+    )
+
+    acc = _SessionAccumulator("ENDURANCE RACE", "6H")
+
+    # Classified runner C — finishes P3, completed 8 laps.
+    c = acc.row("rC")
+    c.lap_ms.extend([60000] * 8)
+    c.note_name("Driver C", is_drteam=True)
+    c.last_position = 3
+    c.retired = False
+
+    # Retired runner L — last seen holding P2, but only 3 laps (engine
+    # blew early).  Must NOT keep P2.
+    l = acc.row("rL")
+    l.lap_ms.extend([61000] * 3)
+    l.note_name("Driver L", is_drteam=True)
+    l.last_position = 2
+    l.retired = True
+
+    # Retired runner M — 6 laps before retiring.  More laps than L ⇒ must
+    # rank ahead of L among the DNFs (but still behind classified C).
+    m = acc.row("rM")
+    m.lap_ms.extend([62000] * 6)
+    m.note_name("Driver M", is_drteam=True)
+    m.last_position = 1
+    m.retired = True
+
+    acc.first_lap_ts = acc.last_lap_ts = None
+
+    out = _finalize_session(
+        acc,
+        circuit_name="TestCircuit",
+        log_date="2026-01-01",
+        session_seq=1,
+        row_to_kart={"rC": 11, "rL": 22, "rM": 33},
+        init_team_name={},
+    )
+
+    pos = {s.driver_canonical: s.final_position for s in out}
+    assert set(pos) == {
+        normalize_name("Driver C"),
+        normalize_name("Driver L"),
+        normalize_name("Driver M"),
+    }
+    p_c = pos[normalize_name("Driver C")]
+    p_l = pos[normalize_name("Driver L")]
+    p_m = pos[normalize_name("Driver M")]
+
+    # Classified C keeps its real position.
+    assert p_c == 3
+    # BOTH retired drivers sort strictly behind the worst classified (3).
+    assert p_l > p_c and p_m > p_c
+    # Retired ordered among themselves by laps DESC: M (6 laps) better
+    # (smaller position) than L (3 laps).
+    assert p_m < p_l
+    # Concretely: contiguous worst positions after the classified max.
+    assert p_m == 4 and p_l == 5
+
+
+def test_retired_classified_none_position_pace_fallback_preserved():
+    """A classified row with NO position event keeps final_position=None
+    (the processor pace-fallback path).  Only retired rows get a derived
+    numeric position; classified-without-position is left None as before.
+    """
+    from app.services.ranking.extractor import (
+        _SessionAccumulator, _finalize_session,
+    )
+
+    acc = _SessionAccumulator("ESSAIS", "")  # pace title, position-less
+    a = acc.row("rA")
+    a.lap_ms.extend([60000] * 5)
+    a.note_name("Pacer A", is_drteam=True)
+    a.last_position = None
+    a.retired = False
+    acc.first_lap_ts = acc.last_lap_ts = None
+
+    out = _finalize_session(
+        acc, circuit_name="C", log_date="2026-01-02", session_seq=1,
+        row_to_kart={"rA": 7}, init_team_name={},
+    )
+    assert len(out) == 1
+    assert out[0].final_position is None
 
 
 import pytest

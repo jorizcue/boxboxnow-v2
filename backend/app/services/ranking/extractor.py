@@ -13,11 +13,19 @@ lap, a pair of events:
   * ``EventType.LAP_MS``  — inline ``r<N>|*|<ms>|`` path, value = integer ms
   * ``EventType.LAP``     — column cell-update path, value = "M:SS.mmm"
 
-They describe the SAME lap (e.g. RKC ``67626`` == ``1:07.626``). Summing
-both double-counts every lap. Rule implemented here, per the empirical
-finding: for each row keep two separate buffers; the row's laps are its
-LAP_MS buffer if it produced *any* LAP_MS event, otherwise its LAP-string
-buffer (parsed via ``time_to_ms``). The two are NEVER mixed for one row.
+These USUALLY describe the same lap (e.g. RKC ``67626`` == ``1:07.626``),
+so summing both would double-count. Rule implemented here: for each row
+keep two separate buffers; the row's laps are its LAP_MS buffer if it
+produced *any* LAP_MS event, otherwise its LAP-string buffer (parsed via
+``time_to_ms``). The two are NEVER mixed for one row.
+
+Honest caveat: the two paths are not guaranteed to capture an identical
+*count* of laps for a given row — the column path can occasionally observe
+extra laps the inline path missed. We deliberately prefer the inline
+``LAP_MS`` buffer and accept a small, bounded undercount on those rows.
+This is safe: per-row averages are taken over tens of laps (robust to a
+handful of missing samples), and ``total_laps`` is only used to gate the
+lap-floor in the processor (a coarse threshold, not a precise count).
 
 Driver attribution
 ------------------
@@ -172,7 +180,30 @@ def _finalize_session(
         acc.title1, acc.title2, duration_s=duration_s, had_driver_swap=had_swap
     )
 
-    out: list[SessionExtract] = []
+    # Build the ratable rows first WITHOUT assigning final_position; we
+    # need the whole field in scope to place retired (DNF) drivers behind
+    # every classified runner (spec §5). `retired` (set on STATUS=="sr")
+    # is READ here — it is no longer a dead store.
+    #
+    # NOTE on the "excluded entirely if below minimum valid laps" clause of
+    # spec §5: that lap-floor exclusion (MIN_LAPS_PER_DRIVER, or 3 for
+    # individual) is applied UNIFORMLY to every driver — retired or not —
+    # downstream in processor.apply_extracts. A retired driver below the
+    # floor is therefore already dropped there, regardless of retired
+    # status. We deliberately do NOT duplicate the floor here (single
+    # responsibility); this function only enforces the BEHIND-CLASSIFIED
+    # ORDERING that spec §5 additionally requires for retired drivers.
+    @dataclass
+    class _Emitted:
+        row_id: str
+        st: _RowState
+        kart_number: int | None
+        raw_name: str
+        canonical: str
+        team_key: str
+        laps: list[int]
+
+    emitted: list[_Emitted] = []
     for row_id, st in acc.rows.items():
         # Single lap source per row: LAP_MS if the row produced ANY, else
         # fall back to the LAP-string buffer. Never mix the two.
@@ -196,11 +227,39 @@ def _finalize_session(
             continue
 
         team_key = str(kart_number) if kart_number is not None else f"row:{row_id}"
+        emitted.append(
+            _Emitted(row_id, st, kart_number, raw_name, canonical, team_key, laps)
+        )
 
-        best = min(laps)
-        avg = statistics.fmean(laps)
-        median = int(statistics.median(laps))
+    # ── Assign final_position (spec §5) ──────────────────────────────────
+    # Classified rows (not retired) keep their real last-seen Apex position
+    # (None preserved → processor pace-fallback). Retired rows sort STRICTLY
+    # behind every classified runner: positions worst_classified+1, +2, …
+    # ordered among themselves by laps completed DESC (more laps = better
+    # among DNFs, per spec). Ties in lap count: deterministic stable
+    # tiebreak by driver_canonical so reprocesses are reproducible.
+    # This is computed unconditionally; apply_extracts nulls final_position
+    # for non-race / is_race=False groups, so it only effectively affects
+    # race ratings (the processor's is_race logic is untouched).
+    classified = [e for e in emitted if not e.st.retired]
+    retired = [e for e in emitted if e.st.retired]
+    classified_positions = [
+        e.st.last_position for e in classified if e.st.last_position is not None
+    ]
+    worst_classified = max(classified_positions) if classified_positions else 0
 
+    final_pos: dict[str, int | None] = {}
+    for e in classified:
+        final_pos[e.row_id] = e.st.last_position  # real position; None kept
+    retired.sort(key=lambda e: (-len(e.laps), e.canonical))
+    for offset, e in enumerate(retired, start=1):
+        final_pos[e.row_id] = worst_classified + offset
+
+    out: list[SessionExtract] = []
+    for e in emitted:
+        best = min(e.laps)
+        avg = statistics.fmean(e.laps)
+        median = int(statistics.median(e.laps))
         out.append(
             SessionExtract(
                 circuit_name=circuit_name,
@@ -210,17 +269,17 @@ def _finalize_session(
                 session_seq=session_seq,
                 session_type=cls.session_type,
                 team_mode=cls.team_mode,
-                driver_canonical=canonical,
-                driver_raw=raw_name,
-                drteam_names=list(st.drteam_names),
-                kart_number=kart_number,
-                team_key=team_key,
-                laps_ms=list(laps),
-                total_laps=len(laps),
+                driver_canonical=e.canonical,
+                driver_raw=e.raw_name,
+                drteam_names=list(e.st.drteam_names),
+                kart_number=e.kart_number,
+                team_key=e.team_key,
+                laps_ms=list(e.laps),
+                total_laps=len(e.laps),
                 best_lap_ms=best,
                 avg_lap_ms=avg,
                 median_lap_ms=median,
-                final_position=st.last_position,
+                final_position=final_pos[e.row_id],
                 duration_s=duration_s,
             )
         )
