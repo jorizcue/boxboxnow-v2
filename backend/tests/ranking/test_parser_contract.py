@@ -45,9 +45,9 @@ from app.apex.parser import ApexMessageParser, EventType
 FIX = Path(__file__).parent / "fixtures"
 
 
-def _event_types(log_name: str) -> Counter:
+def _event_types(log_name: str) -> Counter[EventType]:
     parser = ApexMessageParser()
-    counts: Counter = Counter()
+    counts: Counter[EventType] = Counter()
     for _ts, message in parse_log_file(str(FIX / log_name)):
         for ev in parser.parse(message):
             counts[ev.type] += 1
@@ -56,6 +56,7 @@ def _event_types(log_name: str) -> Counter:
 
 def test_rkc_inline_emits_core_events():
     c = _event_types("rkc_inline.log")
+    # RKC also emits both: LAP_MS (inline ms path) and LAP (cell-update path)
     assert c[EventType.LAP_MS] > 0, f"Expected LAP_MS > 0, got {c[EventType.LAP_MS]}"
     assert c[EventType.LAP] > 0, f"Expected LAP > 0, got {c[EventType.LAP]}"
     assert c[EventType.RANKING] > 0, f"Expected RANKING > 0, got {c[EventType.RANKING]}"
@@ -68,3 +69,4 @@ def test_eupen_column_emits_core_events():
     assert c[EventType.LAP] > 0, f"Expected LAP > 0, got {c[EventType.LAP]}"
     assert c[EventType.LAP_MS] > 0, f"Expected LAP_MS > 0, got {c[EventType.LAP_MS]}"
     assert c[EventType.RANKING] > 0, f"Expected RANKING > 0, got {c[EventType.RANKING]}"
+    assert c[EventType.INIT] > 0
