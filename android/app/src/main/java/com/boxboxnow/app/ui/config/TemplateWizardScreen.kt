@@ -65,6 +65,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.boxboxnow.app.i18n.t
 import com.boxboxnow.app.models.DriverCard
 import com.boxboxnow.app.models.DriverCardGroup
 import com.boxboxnow.app.models.DriverConfigPreset
@@ -149,10 +150,10 @@ fun TemplateWizardScreen(onBack: () -> Unit, editPresetId: Int? = null) {
     }
 
     val stepTitle = when (step) {
-        1 -> "Nombre"
-        2 -> "Tarjetas visibles"
-        3 -> "Orden de tarjetas"
-        4 -> "Opciones de pantalla"
+        1 -> t("wizard.stepName")
+        2 -> t("wizard.stepVisibility")
+        3 -> t("wizard.stepOrder")
+        4 -> t("wizard.stepOptions")
         else -> ""
     }
 
@@ -160,7 +161,7 @@ fun TemplateWizardScreen(onBack: () -> Unit, editPresetId: Int? = null) {
         containerColor = Color.Black,
         topBar = {
             TopAppBar(
-                title = { Text(if (isEditMode) "Editar plantilla" else "Nueva plantilla", color = Color.White) },
+                title = { Text(if (isEditMode) t("wizard.titleEdit") else t("wizard.titleNew"), color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = {
                         if (step > 1) step-- else onBack()
@@ -215,7 +216,7 @@ fun TemplateWizardScreen(onBack: () -> Unit, editPresetId: Int? = null) {
                     audioEnabled = audioEnabled,
                     onAudioChange = { audioEnabled = it },
                     saving = saving,
-                    saveLabel = if (isEditMode) "ACTUALIZAR PLANTILLA" else "GUARDAR PLANTILLA",
+                    saveLabel = if (isEditMode) t("wizard.updateTemplate") else t("wizard.saveTemplate"),
                     onBack = { step = 3 },
                     onSave = {
                         saving = true
@@ -278,7 +279,7 @@ private fun StepIndicator(current: Int, total: Int, label: String) {
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            "Paso $current de $total — $label",
+            t("wizard.progress", "current" to "$current", "total" to "$total", "label" to label),
             color = BoxBoxNowColors.SystemGray,
             fontSize = 12.sp,
         )
@@ -299,7 +300,7 @@ private fun StepName(
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Text(
-            "Elige un nombre para tu plantilla",
+            t("wizard.namePrompt"),
             color = Color.White,
             fontSize = 16.sp,
             fontWeight = FontWeight.SemiBold,
@@ -308,7 +309,7 @@ private fun StepName(
         OutlinedTextField(
             value = name,
             onValueChange = onNameChange,
-            label = { Text("Nombre de la plantilla") },
+            label = { Text(t("wizard.nameLabel")) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             colors = OutlinedTextFieldDefaults.colors(
@@ -324,7 +325,7 @@ private fun StepName(
         )
         Spacer(Modifier.weight(1f))
         WizardButton(
-            text = "Siguiente",
+            text = t("common.next"),
             enabled = name.trim().isNotEmpty(),
             onClick = onNext,
         )
@@ -424,7 +425,7 @@ private fun WizardCardToggleRow(
             )
             if (card.requiresGPS) {
                 Text(
-                    "Requiere GPS / RaceBox",
+                    t("wizard.requiresGps"),
                     color = BoxBoxNowColors.SystemGray,
                     fontSize = 11.sp,
                 )
@@ -515,7 +516,7 @@ private fun StepCardOrder(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    "No hay tarjetas visibles. Vuelve al paso anterior para activar alguna.",
+                    t("wizard.emptyVisible"),
                     color = BoxBoxNowColors.SystemGray,
                     fontSize = 13.sp,
                 )
@@ -541,9 +542,9 @@ private fun StepCardOrder(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = if (selectedIndex != null)
-                        "Toca otra tarjeta para intercambiar"
+                        t("wizard.swapHint")
                     else
-                        "Mantén pulsada una tarjeta y arrástrala para reordenar",
+                        t("wizard.dragHint"),
                     color = if (selectedIndex != null) BoxBoxNowColors.Accent
                             else BoxBoxNowColors.SystemGray,
                     fontSize = 12.sp,
@@ -686,7 +687,7 @@ private fun StepDisplayOptions(
     ) {
         // Contrast slider
         Text(
-            "CONTRASTE",
+            t("wizard.contrast"),
             color = BoxBoxNowColors.SystemGray3,
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
@@ -725,7 +726,7 @@ private fun StepDisplayOptions(
 
         // Orientation picker
         Text(
-            "ORIENTACION",
+            t("wizard.orientation"),
             color = BoxBoxNowColors.SystemGray3,
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
@@ -769,7 +770,7 @@ private fun StepDisplayOptions(
 
         // Audio toggle
         Text(
-            "AUDIO",
+            t("wizard.audio"),
             color = BoxBoxNowColors.SystemGray3,
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
@@ -792,7 +793,7 @@ private fun StepDisplayOptions(
             )
             Spacer(Modifier.width(12.dp))
             Text(
-                if (audioEnabled) "Audio activado" else "Audio desactivado",
+                if (audioEnabled) t("wizard.audioOn") else t("wizard.audioOff"),
                 color = Color.White,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
@@ -824,7 +825,7 @@ private fun StepDisplayOptions(
             contentPadding = PaddingValues(vertical = 14.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Atras", fontWeight = FontWeight.SemiBold)
+            Text(t("common.back"), fontWeight = FontWeight.SemiBold)
         }
 
         Spacer(Modifier.height(10.dp))
@@ -844,7 +845,7 @@ private fun StepDisplayOptions(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
-                if (saving) "GUARDANDO..." else saveLabel,
+                if (saving) t("common.saving") else saveLabel,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
             )
@@ -898,7 +899,7 @@ private fun WizardNavButtons(
             contentPadding = PaddingValues(vertical = 14.dp),
             modifier = Modifier.weight(1f),
         ) {
-            Text("Atras", fontWeight = FontWeight.SemiBold)
+            Text(t("common.back"), fontWeight = FontWeight.SemiBold)
         }
         Button(
             onClick = onNext,
@@ -910,7 +911,7 @@ private fun WizardNavButtons(
             contentPadding = PaddingValues(vertical = 14.dp),
             modifier = Modifier.weight(1f),
         ) {
-            Text("Siguiente", fontWeight = FontWeight.SemiBold)
+            Text(t("common.next"), fontWeight = FontWeight.SemiBold)
         }
     }
 }

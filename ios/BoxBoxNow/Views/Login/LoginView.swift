@@ -2,12 +2,27 @@ import SwiftUI
 
 struct LoginView: View {
     @EnvironmentObject var authVM: AuthViewModel
+    @EnvironmentObject var lang: LanguageStore
     @State private var email = ""
     @State private var password = ""
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
+
+            // Language picker available even before login, so a
+            // non-Spanish-speaking user can read the form. Placed in
+            // the top-trailing corner with a translucent backdrop so
+            // it doesn't dominate the splash layout.
+            VStack {
+                HStack {
+                    Spacer()
+                    LanguagePicker()
+                        .padding(.trailing, 16)
+                        .padding(.top, 16)
+                }
+                Spacer()
+            }
 
             VStack(spacing: 24) {
                 Spacer()
@@ -16,7 +31,7 @@ struct LoginView: View {
                     .font(.system(size: 36, weight: .bold))
                     .foregroundColor(.accentColor)
 
-                Text("Driver View")
+                Text(t("home.driverView", lang.current))
                     .font(.title3)
                     .foregroundColor(.gray)
 
@@ -34,13 +49,13 @@ struct LoginView: View {
 
     private var loginSection: some View {
         VStack(spacing: 16) {
-            TextField("Email", text: $email)
+            TextField(t("login.email", lang.current), text: $email)
                 .textFieldStyle(.roundedBorder)
                 .textContentType(.emailAddress)
                 .autocapitalization(.none)
                 .keyboardType(.emailAddress)
 
-            SecureField("Contrasena", text: $password)
+            SecureField(t("login.password", lang.current), text: $password)
                 .textFieldStyle(.roundedBorder)
                 .textContentType(.password)
 
@@ -53,7 +68,7 @@ struct LoginView: View {
             Button(action: { authVM.login(email: email, password: password) }) {
                 HStack {
                     if authVM.isLoading { ProgressView().tint(.black) }
-                    Text("Iniciar sesion")
+                    Text(t("login.signIn", lang.current))
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
@@ -66,7 +81,7 @@ struct LoginView: View {
             Button(action: { authVM.loginWithGoogle() }) {
                 HStack {
                     Image(systemName: "globe")
-                    Text("Continuar con Google")
+                    Text(t("login.googleSso", lang.current))
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
@@ -79,16 +94,16 @@ struct LoginView: View {
 
     private var mfaSection: some View {
         VStack(spacing: 16) {
-            Text("Verificacion en dos pasos")
+            Text(t("login.mfaTitle", lang.current))
                 .font(.headline)
                 .foregroundColor(.white)
 
-            TextField("Codigo MFA", text: $authVM.mfaCode)
+            TextField(t("login.mfaCode", lang.current), text: $authVM.mfaCode)
                 .textFieldStyle(.roundedBorder)
                 .keyboardType(.numberPad)
 
             Button(action: { authVM.verifyMfa(code: authVM.mfaCode) }) {
-                Text("Verificar")
+                Text(t("login.verify", lang.current))
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Color.accentColor)
@@ -97,7 +112,7 @@ struct LoginView: View {
             }
             .disabled(authVM.mfaCode.count < 6)
 
-            Button("Volver") {
+            Button(t("common.back", lang.current)) {
                 authVM.showMfa = false
                 authVM.tempToken = nil
             }

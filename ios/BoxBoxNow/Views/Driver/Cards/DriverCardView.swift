@@ -5,6 +5,7 @@ struct DriverCardView: View {
     let kart: KartState?
     let gps: GPSSample?
     let driverVM: DriverViewModel
+    @EnvironmentObject var lang: LanguageStore
 
     var body: some View {
         VStack(spacing: 4) {
@@ -12,7 +13,7 @@ struct DriverCardView: View {
                 Image(systemName: card.iconName)
                     .font(.caption)
                     .foregroundColor(.accentColor)
-                Text(card.displayName)
+                Text(t(card.i18nKey, lang.current))
                     .font(.caption2)
                     .foregroundColor(.gray)
                 Spacer()
@@ -114,7 +115,7 @@ struct DriverCardView: View {
                 .foregroundColor(.accentColor)
 
         case .lapHistory:
-            Text("Historial")
+            Text(t("card.lapHistory", lang.current))
                 .font(.caption)
                 .foregroundColor(.gray)
 

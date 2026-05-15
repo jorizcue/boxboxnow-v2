@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PresetsView: View {
     @EnvironmentObject var driverVM: DriverViewModel
+    @EnvironmentObject var lang: LanguageStore
     @State private var showSaveSheet = false
     @State private var presetName = ""
     @State private var errorMsg: String?
@@ -14,7 +15,9 @@ struct PresetsView: View {
                         HStack {
                             VStack(alignment: .leading) {
                                 Text(preset.name).foregroundColor(.white)
-                                Text("\(preset.visibleCards.filter { $0.value }.count) tarjetas")
+                                Text(t("preset.cardsCount", lang.current, params: [
+                                    "count": String(preset.visibleCards.filter { $0.value }.count),
+                                ]))
                                     .font(.caption).foregroundColor(.gray)
                             }
                             Spacer()
@@ -23,22 +26,25 @@ struct PresetsView: View {
                 }
                 .onDelete(perform: deletePresets)
             } header: {
-                Text("Plantillas (\(driverVM.presets.count)/\(Constants.maxPresets))")
+                Text(t("preset.cardSubtitle", lang.current, params: [
+                    "n": String(driverVM.presets.count),
+                    "max": String(Constants.maxPresets),
+                ]))
             }
 
             Section {
                 Button(action: { showSaveSheet = true }) {
-                    Label("Guardar configuracion actual", systemImage: "square.and.arrow.down")
+                    Label(t("preset.saveCurrent", lang.current), systemImage: "square.and.arrow.down")
                 }
                 .disabled(driverVM.presets.count >= Constants.maxPresets)
             }
         }
-        .navigationTitle("Plantillas")
+        .navigationTitle(t("preset.titlePlural", lang.current))
         .task { await driverVM.loadPresets() }
-        .alert("Guardar plantilla", isPresented: $showSaveSheet) {
-            TextField("Nombre", text: $presetName)
-            Button("Guardar") { savePreset() }
-            Button("Cancelar", role: .cancel) { presetName = "" }
+        .alert(t("preset.savePreset", lang.current), isPresented: $showSaveSheet) {
+            TextField(t("session.name", lang.current), text: $presetName)
+            Button(t("common.save", lang.current)) { savePreset() }
+            Button(t("common.cancel", lang.current), role: .cancel) { presetName = "" }
         }
     }
 

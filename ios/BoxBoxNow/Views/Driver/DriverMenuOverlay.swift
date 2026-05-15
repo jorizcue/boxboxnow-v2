@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DriverMenuOverlay: View {
     @EnvironmentObject var driverVM: DriverViewModel
+    @EnvironmentObject var lang: LanguageStore
     @Binding var isPresented: Bool
     var onDismiss: () -> Void
 
@@ -10,19 +11,19 @@ struct DriverMenuOverlay: View {
             Spacer()
 
             VStack(alignment: .leading, spacing: 20) {
-                Text("Menu")
+                Text(t("common.menu", lang.current))
                     .font(.title2.bold())
                     .foregroundColor(.white)
 
                 // Preset selector
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Plantilla")
+                    Text(t("preset.title", lang.current))
                         .font(.caption)
                         .foregroundColor(.gray)
 
                     if !driverVM.presets.isEmpty {
-                        Picker("Plantilla", selection: $driverVM.selectedPresetId) {
-                            Text("Ninguna").tag(nil as Int?)
+                        Picker(t("preset.title", lang.current), selection: $driverVM.selectedPresetId) {
+                            Text(t("common.none", lang.current)).tag(nil as Int?)
                             ForEach(driverVM.presets) { p in
                                 Text(p.name).tag(p.id as Int?)
                             }
@@ -38,7 +39,7 @@ struct DriverMenuOverlay: View {
 
                 // Brightness
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Brillo")
+                    Text(t("preset.brightness", lang.current))
                         .font(.caption)
                         .foregroundColor(.gray)
                     Slider(value: $driverVM.brightness, in: 0.1...1.0)
@@ -50,12 +51,12 @@ struct DriverMenuOverlay: View {
 
                 // Orientation
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Orientacion")
+                    Text(t("preset.orientation", lang.current))
                         .font(.caption)
                         .foregroundColor(.gray)
                     Picker("", selection: $driverVM.orientationLock) {
                         ForEach(OrientationLock.allCases, id: \.self) { o in
-                            Text(o.displayName).tag(o)
+                            Text(t(o.i18nKey, lang.current)).tag(o)
                         }
                     }
                     .pickerStyle(.segmented)
@@ -70,7 +71,7 @@ struct DriverMenuOverlay: View {
                 }) {
                     HStack {
                         Image(systemName: "arrow.left")
-                        Text("Volver")
+                        Text(t("common.back", lang.current))
                     }
                     .foregroundColor(.red)
                 }

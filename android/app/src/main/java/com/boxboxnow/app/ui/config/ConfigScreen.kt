@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.boxboxnow.app.i18n.t
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 
 /**
@@ -59,7 +60,7 @@ fun ConfigScreen(
         containerColor = Color.Black,
         topBar = {
             TopAppBar(
-                title = { Text("Configuración", color = Color.White) },
+                title = { Text(t("config.title"), color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -82,26 +83,26 @@ fun ConfigScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             ConfigRow(
-                label = "Sesión",
-                subtitle = "Duración, stints, pits y kart",
+                label = t("config.session"),
+                subtitle = t("config.sessionSubtitle"),
                 icon = Icons.Filled.Flag,
                 onClick = onOpenSession,
             )
             ConfigRow(
-                label = "Box",
-                subtitle = "Equipos y pilotos",
+                label = t("config.box"),
+                subtitle = t("config.boxSubtitle"),
                 icon = Icons.Filled.Build,
                 onClick = onOpenBox,
             )
             ConfigRow(
-                label = "Plantillas",
-                subtitle = "Guarda y aplica configuraciones",
+                label = t("config.presets"),
+                subtitle = t("config.presetsSubtitle"),
                 icon = Icons.Filled.GridView,
                 onClick = onOpenPresets,
             )
             ConfigRow(
-                label = "GPS / RaceBox",
-                subtitle = "Linea de meta y telemetria",
+                label = t("config.gps"),
+                subtitle = t("config.gpsSubtitle"),
                 icon = Icons.Filled.LocationOn,
                 onClick = onOpenGps,
             )

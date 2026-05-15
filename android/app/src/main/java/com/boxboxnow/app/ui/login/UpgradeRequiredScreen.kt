@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.boxboxnow.app.BuildConfig
+import com.boxboxnow.app.i18n.t
 import com.boxboxnow.app.net.AppUpgradeRequiredException
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 
@@ -61,7 +62,7 @@ fun UpgradeRequiredScreen(info: AppUpgradeRequiredException) {
             )
 
             Text(
-                "Actualización requerida",
+                t("update.title"),
                 color = Color.White,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
@@ -69,7 +70,7 @@ fun UpgradeRequiredScreen(info: AppUpgradeRequiredException) {
             )
 
             Text(
-                info.message ?: "Actualiza la app para continuar.",
+                info.message ?: t("update.body"),
                 color = Color.White.copy(alpha = 0.72f),
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,
@@ -89,10 +90,10 @@ fun UpgradeRequiredScreen(info: AppUpgradeRequiredException) {
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                metadataRow("Versión instalada", BuildConfig.VERSION_NAME)
-                info.minVersion?.let { metadataRow("Versión mínima requerida", it) }
+                metadataRow(t("update.installed"), BuildConfig.VERSION_NAME)
+                info.minVersion?.let { metadataRow(t("update.minRequired"), it) }
                 info.latestVersion?.takeIf { it != info.minVersion }?.let {
-                    metadataRow("Última versión disponible", it)
+                    metadataRow(t("update.latest"), it)
                 }
             }
 
@@ -116,7 +117,7 @@ fun UpgradeRequiredScreen(info: AppUpgradeRequiredException) {
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth().height(48.dp),
             ) {
-                Text("Abrir Play Store", fontWeight = FontWeight.SemiBold)
+                Text(t("update.openStore"), fontWeight = FontWeight.SemiBold)
             }
         }
     }

@@ -12,28 +12,37 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
 
     var id: String { rawValue }
 
-    var displayName: String {
+    /// Translation key for this card's user-visible label. The actual
+    /// text comes from `t(card.i18nKey, lang.current)` at the call site,
+    /// so renaming a label only requires an update to `Translations.swift`.
+    var i18nKey: String {
         switch self {
-        case .position:     return "Posicion"
-        case .lapCount:     return "Vueltas"
-        case .lastLap:      return "Ultima vuelta"
-        case .bestLap:      return "Mejor vuelta"
-        case .gapToLeader:  return "Gap al lider"
-        case .gapToAhead:   return "Gap al de delante"
-        case .speed:        return "Velocidad"
-        case .gForce:       return "Fuerza G"
-        case .currentStint: return "Stint actual"
-        case .pitStops:     return "Paradas en box"
-        case .sector:       return "Sector"
-        case .tireLife:     return "Vida neumaticos"
-        case .fuelLevel:    return "Combustible"
-        case .weather:      return "Clima"
-        case .trackTemp:    return "Temp. pista"
-        case .consistency:  return "Consistencia"
-        case .minimap:      return "Minimapa"
-        case .lapHistory:   return "Historial vueltas"
-        case .delta:        return "Delta"
+        case .position:     return "card.position"
+        case .lapCount:     return "card.lapCount"
+        case .lastLap:      return "card.lastLap"
+        case .bestLap:      return "card.bestLap"
+        case .gapToLeader:  return "card.gapToLeader"
+        case .gapToAhead:   return "card.gapToAhead"
+        case .speed:        return "card.speed"
+        case .gForce:       return "card.gForce"
+        case .currentStint: return "card.currentStint"
+        case .pitStops:     return "card.pitStops"
+        case .sector:       return "card.sector"
+        case .tireLife:     return "card.tireLife"
+        case .fuelLevel:    return "card.fuelLevel"
+        case .weather:      return "card.weather"
+        case .trackTemp:    return "card.trackTemp"
+        case .consistency:  return "card.consistency"
+        case .minimap:      return "card.minimap"
+        case .lapHistory:   return "card.lapHistory"
+        case .delta:        return "card.delta"
         }
+    }
+
+    /// Spanish fallback used only by code paths that aren't yet
+    /// translation-aware. Prefer `t(card.i18nKey, lang.current)` instead.
+    var displayName: String {
+        t(i18nKey, .es)
     }
 
     var iconName: String {

@@ -2,16 +2,17 @@ import SwiftUI
 
 struct CardVisibilityView: View {
     @EnvironmentObject var driverVM: DriverViewModel
+    @EnvironmentObject var lang: LanguageStore
 
     var body: some View {
         List {
             ForEach(DriverCard.allCases) { card in
                 Toggle(isOn: binding(for: card)) {
-                    Label(card.displayName, systemImage: card.iconName)
+                    Label(t(card.i18nKey, lang.current), systemImage: card.iconName)
                 }
             }
         }
-        .navigationTitle("Tarjetas visibles")
+        .navigationTitle(t("preset.visibleCards", lang.current))
         .onDisappear { driverVM.saveConfig() }
     }
 

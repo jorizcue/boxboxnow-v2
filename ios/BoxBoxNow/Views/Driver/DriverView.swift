@@ -66,6 +66,7 @@ struct DriverView: View {
 // MARK: - Box Call Overlay
 
 private struct BoxCallOverlayView: View {
+    @EnvironmentObject var lang: LanguageStore
     var onDismiss: () -> Void
     @State private var flashAlpha: Double = 0.3
 
@@ -76,13 +77,13 @@ private struct BoxCallOverlayView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 16) {
-                Text("BOX")
+                Text(t("box.title", lang.current))
                     .font(.system(size: 120, weight: .black))
                     .foregroundColor(.white)
-                Text("Toca para cerrar")
+                Text(t("driver.menuTap", lang.current))
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.7))
-                Text("Se cierra automáticamente")
+                Text(t("driver.menuAutoclose", lang.current))
                     .font(.caption2)
                     .foregroundColor(.white.opacity(0.4))
             }
@@ -103,6 +104,7 @@ private struct BoxCallOverlayView: View {
 // MARK: - Pit In Progress
 
 private struct PitInProgressView: View {
+    @EnvironmentObject var lang: LanguageStore
     let kart: KartState?
 
     var body: some View {
@@ -114,13 +116,13 @@ private struct PitInProgressView: View {
                     .font(.system(size: 90, weight: .black, design: .monospaced))
                     .foregroundColor(.green)
 
-                Text("EN CURSO")
+                Text(t("gps.inProgress", lang.current))
                     .font(.system(size: 22, weight: .bold, design: .monospaced))
                     .foregroundColor(.white.opacity(0.55))
                     .kerning(6)
 
                 if let k = kart, k.pitStops > 0 {
-                    Text("PARADA #\(k.pitStops)")
+                    Text(t("box.pitNumber", lang.current, params: ["n": String(k.pitStops)]))
                         .font(.system(size: 15, weight: .semibold, design: .monospaced))
                         .foregroundColor(Color.green.opacity(0.75))
                         .padding(.horizontal, 20)

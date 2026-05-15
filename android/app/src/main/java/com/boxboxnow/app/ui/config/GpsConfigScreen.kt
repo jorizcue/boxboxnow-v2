@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.boxboxnow.app.i18n.t
 import com.boxboxnow.app.imu.ImuCalibrator
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.vm.DriverViewModel
@@ -79,7 +80,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
         containerColor = Color.Black,
         topBar = {
             TopAppBar(
-                title = { Text("GPS / RaceBox", color = Color.White) },
+                title = { Text(t("gps.title"), color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
@@ -99,7 +100,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             // ── Section: Fuente GPS ──
-            SectionCard(title = "Fuente GPS") {
+            SectionCard(title = t("gps.source")) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth(),
@@ -130,7 +131,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
 
             // ── Section: RaceBox BLE (only when RaceBox source) ──
             if (source == GpsSource.RACEBOX) {
-                SectionCard(title = "RaceBox BLE") {
+                SectionCard(title = t("gps.raceboxBle")) {
                     if (connectedDevice != null) {
                         // Connected device row
                         Row(
@@ -145,7 +146,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                "RaceBox",
+                                t("gps.raceboxName"),
                                 color = Color.White,
                                 fontSize = 15.sp,
                             )
@@ -154,7 +155,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                                 vm.bleManager.disconnect()
                             }) {
                                 Text(
-                                    "Desconectar",
+                                    t("gps.disconnect"),
                                     color = BoxBoxNowColors.ErrorRed,
                                     fontSize = 13.sp,
                                 )
@@ -174,7 +175,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                                 )
                                 Spacer(Modifier.width(10.dp))
                                 Text(
-                                    "Buscando dispositivos...",
+                                    t("common.searching"),
                                     color = BoxBoxNowColors.SystemGray,
                                     fontSize = 14.sp,
                                 )
@@ -190,12 +191,12 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 Text(
-                                    "No se encontraron dispositivos",
+                                    t("gps.noDevices"),
                                     color = BoxBoxNowColors.SystemGray,
                                     fontSize = 14.sp,
                                 )
                                 Text(
-                                    "Asegurate de que tu RaceBox esta encendido y cerca",
+                                    t("gps.noDevicesHint"),
                                     color = BoxBoxNowColors.SystemGray3,
                                     fontSize = 12.sp,
                                 )
@@ -247,7 +248,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                                 modifier = Modifier.padding(top = 4.dp),
                             ) {
                                 Text(
-                                    "Buscar dispositivos",
+                                    t("gps.searchDevices"),
                                     color = BoxBoxNowColors.Accent,
                                     fontSize = 15.sp,
                                 )
@@ -268,9 +269,9 @@ fun GpsConfigScreen(onBack: () -> Unit) {
             // (~50Hz); this only controls how often the visible Text
             // flips. Mirrors iOS GPSConfigView.
             if (source == GpsSource.RACEBOX) {
-                SectionCard(title = "Pantalla") {
+                SectionCard(title = t("gps.displaySection")) {
                     Text(
-                        "Frecuencia delta",
+                        t("gps.deltaFrequency"),
                         color = Color.White,
                         fontSize = 15.sp,
                         modifier = Modifier.padding(bottom = 8.dp),
@@ -300,7 +301,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Cuantas veces por segundo se actualiza el delta en pantalla. Mas Hz = mas reactivo, pero el ultimo decimal puede bailar mas. 2 Hz es el equilibrio recomendado.",
+                        t("gps.deltaHint"),
                         color = BoxBoxNowColors.SystemGray,
                         fontSize = 12.sp,
                     )
@@ -309,8 +310,8 @@ fun GpsConfigScreen(onBack: () -> Unit) {
 
             // ── Section: Estado (when source is not NONE) ──
             if (source != GpsSource.NONE) {
-                SectionCard(title = "Estado") {
-                    StatusRow(label = "Conectado") {
+                SectionCard(title = t("gps.status")) {
+                    StatusRow(label = t("gps.connected")) {
                         Icon(
                             if (isConnected) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
                             contentDescription = null,
@@ -319,11 +320,11 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                         )
                     }
                     SectionDivider()
-                    StatusRow(label = "Senal") {
+                    StatusRow(label = t("gps.signal")) {
                         Text(signal.display, color = BoxBoxNowColors.SystemGray, fontSize = 15.sp)
                     }
                     SectionDivider()
-                    StatusRow(label = "Satelites") {
+                    StatusRow(label = t("gps.satellites")) {
                         Text(
                             "${lastSample?.numSatellites ?: 0}",
                             color = BoxBoxNowColors.SystemGray,
@@ -331,7 +332,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                         )
                     }
                     SectionDivider()
-                    StatusRow(label = "Frecuencia") {
+                    StatusRow(label = t("gps.frequency")) {
                         Text(
                             "${sampleRate.toInt()} Hz",
                             color = BoxBoxNowColors.SystemGray,
@@ -340,7 +341,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                     }
                     battery?.let { bat ->
                         SectionDivider()
-                        StatusRow(label = "Bateria RaceBox") {
+                        StatusRow(label = t("gps.battery")) {
                             Text(
                                 "${bat}%",
                                 color = BoxBoxNowColors.SystemGray,
@@ -353,9 +354,9 @@ fun GpsConfigScreen(onBack: () -> Unit) {
 
             // ── Section: Calibracion IMU (only for RaceBox) ──
             if (source == GpsSource.RACEBOX) {
-                SectionCard(title = "Calibracion IMU") {
+                SectionCard(title = t("gps.imuTitle")) {
                     // Phase row
-                    StatusRow(label = "Fase") {
+                    StatusRow(label = t("gps.phase")) {
                         Box(
                             modifier = Modifier
                                 .size(8.dp)
@@ -372,10 +373,10 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                         Spacer(Modifier.width(6.dp))
                         Text(
                             when (calibratorPhase) {
-                                ImuCalibrator.Phase.IDLE -> "Sin calibrar"
-                                ImuCalibrator.Phase.SAMPLING -> "Capturando gravedad..."
-                                ImuCalibrator.Phase.READY -> "Gravedad OK — alineando"
-                                ImuCalibrator.Phase.ALIGNED -> "Calibrado"
+                                ImuCalibrator.Phase.IDLE -> t("gps.phaseIdle")
+                                ImuCalibrator.Phase.SAMPLING -> t("gps.phaseSampling")
+                                ImuCalibrator.Phase.READY -> t("gps.phaseReady")
+                                ImuCalibrator.Phase.ALIGNED -> t("gps.phaseAligned")
                             },
                             color = BoxBoxNowColors.SystemGray,
                             fontSize = 15.sp,
@@ -387,7 +388,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                         SectionDivider()
                         Column(modifier = Modifier.padding(vertical = 4.dp)) {
                             Text(
-                                "Muestras: ${"%.0f".format(calibratorProgress * 100)}%",
+                                t("gps.samples", "pct" to "%.0f".format(calibratorProgress * 100)),
                                 color = BoxBoxNowColors.SystemGray,
                                 fontSize = 12.sp,
                             )
@@ -408,7 +409,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                     if (calibratorPhase == ImuCalibrator.Phase.READY) {
                         SectionDivider()
                         Text(
-                            "Conduce a mas de 15 km/h para alinear los ejes del dispositivo",
+                            t("gps.driveHint"),
                             color = Color(0xFF00BCD4),
                             fontSize = 13.sp,
                             modifier = Modifier.padding(vertical = 4.dp),
@@ -430,7 +431,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                "Calibracion completa",
+                                t("gps.calibrationComplete"),
                                 color = BoxBoxNowColors.SuccessGreen,
                                 fontSize = 14.sp,
                             )
@@ -447,7 +448,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                                 enabled = connectedDevice != null,
                             ) {
                                 Text(
-                                    "Iniciar calibracion",
+                                    t("gps.startCalibration"),
                                     color = if (connectedDevice != null) BoxBoxNowColors.Accent
                                     else BoxBoxNowColors.SystemGray3,
                                     fontSize = 15.sp,
@@ -455,7 +456,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                             }
                             if (connectedDevice == null) {
                                 Text(
-                                    "Conecta un RaceBox para calibrar",
+                                    t("gps.connectFirst"),
                                     color = BoxBoxNowColors.SystemGray3,
                                     fontSize = 12.sp,
                                     modifier = Modifier.padding(start = 12.dp, bottom = 4.dp),
@@ -464,7 +465,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                         }
                         ImuCalibrator.Phase.SAMPLING -> {
                             Text(
-                                "Manten el kart quieto...",
+                                t("gps.holdStill"),
                                 color = Color(0xFF2196F3),
                                 fontSize = 13.sp,
                                 modifier = Modifier.padding(vertical = 4.dp),
@@ -473,7 +474,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                         ImuCalibrator.Phase.READY -> {
                             TextButton(onClick = { vm.calibrator.skipAlignment() }) {
                                 Text(
-                                    "Omitir alineacion",
+                                    t("gps.skipAlign"),
                                     color = BoxBoxNowColors.Accent,
                                     fontSize = 15.sp,
                                 )
@@ -485,7 +486,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                                 vm.calibrator.startCalibration()
                             }) {
                                 Text(
-                                    "Recalibrar",
+                                    t("gps.recalibrate"),
                                     color = BoxBoxNowColors.Accent,
                                     fontSize = 15.sp,
                                 )
@@ -501,7 +502,7 @@ fun GpsConfigScreen(onBack: () -> Unit) {
                         )
                         TextButton(onClick = { vm.calibrator.reset() }) {
                             Text(
-                                "Resetear calibracion",
+                                t("gps.resetCalibration"),
                                 color = BoxBoxNowColors.ErrorRed,
                                 fontSize = 15.sp,
                             )

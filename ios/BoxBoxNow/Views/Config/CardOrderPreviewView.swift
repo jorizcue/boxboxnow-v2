@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CardOrderPreviewView: View {
     @EnvironmentObject var driverVM: DriverViewModel
+    @EnvironmentObject var lang: LanguageStore
 
     var body: some View {
         VStack(spacing: 0) {
@@ -11,7 +12,7 @@ struct CardOrderPreviewView: View {
                         Image(systemName: card.iconName)
                             .foregroundColor(.accentColor)
                             .frame(width: 30)
-                        Text(card.displayName)
+                        Text(t(card.i18nKey, lang.current))
                     }
                 }
                 .onMove(perform: move)
@@ -30,7 +31,7 @@ struct CardOrderPreviewView: View {
                             .fill(Color(.systemGray5))
                             .frame(height: 50)
                             .overlay(
-                                Text(card.displayName)
+                                Text(t(card.i18nKey, lang.current))
                                     .font(.caption2)
                                     .foregroundColor(.gray)
                             )
@@ -41,7 +42,7 @@ struct CardOrderPreviewView: View {
             .frame(height: 200)
             .background(Color.black)
         }
-        .navigationTitle("Orden y vista previa")
+        .navigationTitle(t("preset.orderAndPreview", lang.current))
         .toolbar { EditButton() }
         .onDisappear { driverVM.saveConfig() }
     }

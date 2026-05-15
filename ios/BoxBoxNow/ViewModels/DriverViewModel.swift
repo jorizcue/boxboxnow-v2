@@ -6,13 +6,17 @@ enum OrientationLock: String, CaseIterable {
     case portrait = "portrait"
     case landscape = "landscape"
 
-    var displayName: String {
+    /// Translation key — see comments on `DriverCard.i18nKey`.
+    var i18nKey: String {
         switch self {
-        case .free: return "Libre"
-        case .portrait: return "Vertical"
-        case .landscape: return "Horizontal"
+        case .free:      return "orientation.free"
+        case .portrait:  return "orientation.portrait"
+        case .landscape: return "orientation.landscape"
         }
     }
+
+    /// Spanish fallback for non-translation-aware call sites.
+    var displayName: String { t(i18nKey, .es) }
 }
 
 final class DriverViewModel: ObservableObject {

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject var authVM: AuthViewModel
+    @EnvironmentObject var lang: LanguageStore
     @State private var showDriver = false
 
     var body: some View {
@@ -15,16 +16,16 @@ struct HomeView: View {
                     NavigationLink(destination: ConfigView()) {
                         HomeCard(
                             icon: "gearshape.fill",
-                            title: "Configuracion",
-                            subtitle: "Carrera, Plantillas, GPS"
+                            title: t("home.config", lang.current),
+                            subtitle: t("home.configSubtitle", lang.current)
                         )
                     }
 
                     Button(action: { showDriver = true }) {
                         HomeCard(
                             icon: "gauge.open.with.lines.needle.33percent.and.arrowtriangle",
-                            title: "Vista Piloto",
-                            subtitle: "Pantalla completa"
+                            title: t("home.driverView", lang.current),
+                            subtitle: t("home.fullScreen", lang.current)
                         )
                     }
                     .fullScreenCover(isPresented: $showDriver) {
@@ -41,8 +42,14 @@ struct HomeView: View {
                     Text(authVM.user?.name ?? "")
                         .foregroundColor(.gray)
                 }
+                // Language picker — flag-only trigger that opens a menu
+                // with all five supported languages. Sits between the
+                // user-name badge (left) and Sign-out (right).
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Salir") { authVM.logout() }
+                    LanguagePicker()
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(t("common.signOut", lang.current)) { authVM.logout() }
                         .foregroundColor(.red)
                 }
             }

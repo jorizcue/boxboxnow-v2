@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.boxboxnow.app.i18n.t
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.vm.DriverViewModel
 import com.boxboxnow.app.vm.OrientationLock
@@ -99,12 +100,12 @@ fun DriverMenuOverlay(
                     .padding(horizontal = 20.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Menu", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(t("driver.menuTitle"), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onDismiss) {
                     Icon(
                         Icons.Default.Close,
-                        contentDescription = "Cerrar",
+                        contentDescription = t("common.close"),
                         tint = BoxBoxNowColors.SystemGray,
                     )
                 }
@@ -131,9 +132,10 @@ fun DriverMenuOverlay(
                 // so the active preset is unambiguous.
                 if (presets.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("PLANTILLA", color = BoxBoxNowColors.SystemGray3, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+                        Text(t("driver.menuTemplate"), color = BoxBoxNowColors.SystemGray3, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
                         var expanded by remember { mutableStateOf(false) }
-                        val selected = presets.firstOrNull { it.id == selectedPresetId }?.name ?: "Ninguna"
+                        val noneLabel = t("driver.menuNone")
+                        val selected = presets.firstOrNull { it.id == selectedPresetId }?.name ?: noneLabel
                         Box {
                             Row(
                                 modifier = Modifier
@@ -190,7 +192,7 @@ fun DriverMenuOverlay(
                                         trailingIcon = if (isActive) ({
                                             Icon(
                                                 Icons.Filled.Check,
-                                                contentDescription = "Plantilla activa",
+                                                contentDescription = t("driver.menuTemplateActive"),
                                                 tint = BoxBoxNowColors.Accent,
                                                 modifier = Modifier.size(18.dp),
                                             )
@@ -209,10 +211,10 @@ fun DriverMenuOverlay(
                 // Contrast / brightness slider
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("CONTRASTE", color = BoxBoxNowColors.SystemGray3, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+                        Text(t("driver.menuContrast"), color = BoxBoxNowColors.SystemGray3, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
                         Spacer(Modifier.weight(1f))
                         Text(
-                            if (brightness == 0.0) "Normal" else "+${(brightness * 100).toInt()}%",
+                            if (brightness == 0.0) t("driver.menuNormal") else "+${(brightness * 100).toInt()}%",
                             color = Color.White,
                             fontSize = 11.sp,
                         )
@@ -232,7 +234,7 @@ fun DriverMenuOverlay(
 
                 // Orientation segmented
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("ORIENTACION", color = BoxBoxNowColors.SystemGray3, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+                    Text(t("driver.menuOrientation"), color = BoxBoxNowColors.SystemGray3, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -264,7 +266,7 @@ fun DriverMenuOverlay(
                 // Audio narration toggle
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "AUDIO",
+                        t("driver.menuAudio"),
                         color = BoxBoxNowColors.SystemGray3,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -286,7 +288,7 @@ fun DriverMenuOverlay(
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            if (audioEnabled) "Narración activada" else "Narración desactivada",
+                            if (audioEnabled) t("driver.narrationOn") else t("driver.narrationOff"),
                             color = Color.White,
                             fontSize = 13.sp,
                             modifier = Modifier.weight(1f),
@@ -321,7 +323,7 @@ fun DriverMenuOverlay(
                 ) {
                     Icon(Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Salir", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text(t("driver.menuExit"), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 }
             }
         }

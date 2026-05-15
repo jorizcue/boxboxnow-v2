@@ -2,25 +2,26 @@ import SwiftUI
 
 struct SessionConfigView: View {
     @EnvironmentObject var configVM: ConfigViewModel
+    @EnvironmentObject var lang: LanguageStore
     @State private var circuitText = ""
 
     var body: some View {
         Form {
-            Section("Circuito") {
-                TextField("ID del circuito", text: $circuitText)
+            Section(t("session.circuit", lang.current)) {
+                TextField(t("session.circuitId", lang.current), text: $circuitText)
                     .keyboardType(.numberPad)
                     .onChange(of: circuitText) { val in
                         configVM.circuitId = Int(val)
                     }
             }
 
-            Section("Sesion") {
-                TextField("Nombre de sesion", text: $configVM.sessionName)
+            Section(t("config.session", lang.current)) {
+                TextField(t("session.name", lang.current), text: $configVM.sessionName)
             }
 
-            Section("Duracion") {
+            Section(t("session.duration", lang.current)) {
                 HStack {
-                    Text("Vueltas totales")
+                    Text(t("session.totalLaps", lang.current))
                     Spacer()
                     TextField("--", value: $configVM.totalLaps, format: .number)
                         .keyboardType(.numberPad)
@@ -28,7 +29,7 @@ struct SessionConfigView: View {
                         .frame(width: 80)
                 }
                 HStack {
-                    Text("Minutos totales")
+                    Text(t("session.totalMinutes", lang.current))
                     Spacer()
                     TextField("--", value: $configVM.totalMinutes, format: .number)
                         .keyboardType(.numberPad)
@@ -37,11 +38,15 @@ struct SessionConfigView: View {
                 }
             }
 
-            Section("Karts") {
-                Stepper("Karts: \(configVM.kartCount)", value: $configVM.kartCount, in: 1...60)
+            Section(t("session.kartCount", lang.current)) {
+                Stepper(
+                    t("session.kartCountValue", lang.current, params: ["count": String(configVM.kartCount)]),
+                    value: $configVM.kartCount,
+                    in: 1...60,
+                )
             }
         }
-        .navigationTitle("Sesion")
+        .navigationTitle(t("config.session", lang.current))
         .onAppear {
             circuitText = configVM.circuitId.map(String.init) ?? ""
         }

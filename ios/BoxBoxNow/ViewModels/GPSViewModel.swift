@@ -6,27 +6,35 @@ enum GPSSource: String, CaseIterable {
     case phone = "phone"
     case racebox = "racebox"
 
-    var displayName: String {
+    /// Translation key — call sites do `t(src.i18nKey, lang.current)`.
+    var i18nKey: String {
         switch self {
-        case .none: return "Ninguno"
-        case .phone: return "Telefono"
-        case .racebox: return "RaceBox BLE"
+        case .none:    return "gps.sourceNone"
+        case .phone:   return "gps.sourcePhone"
+        case .racebox: return "gps.raceboxBle"
         }
     }
+
+    /// Spanish fallback for non-translation-aware call sites.
+    var displayName: String { t(i18nKey, .es) }
 }
 
 enum SignalQuality {
     case none, poor, fair, good, excellent
 
-    var displayName: String {
+    /// Translation key — call sites do `t(quality.i18nKey, lang.current)`.
+    var i18nKey: String {
         switch self {
-        case .none: return "Sin senal"
-        case .poor: return "Debil"
-        case .fair: return "Aceptable"
-        case .good: return "Buena"
-        case .excellent: return "Excelente"
+        case .none:      return "gps.signalNone"
+        case .poor:      return "gps.signalPoor"
+        case .fair:      return "gps.signalFair"
+        case .good:      return "gps.signalGood"
+        case .excellent: return "gps.signalExcellent"
         }
     }
+
+    /// Spanish fallback for non-translation-aware call sites.
+    var displayName: String { t(i18nKey, .es) }
 }
 
 final class GPSViewModel: ObservableObject {

@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
+import com.boxboxnow.app.i18n.t
 import com.boxboxnow.app.models.DriverCard
 import com.boxboxnow.app.models.GPSSample
 import com.boxboxnow.app.models.KartState
@@ -367,7 +368,7 @@ private fun CardContent(
                     }
                 }
             } else {
-                Text("Ultimo", color = BoxBoxNowColors.SystemGray, fontSize = (20f * scale).sp, fontWeight = FontWeight.Black)
+                Text(t("driver.cardLast"), color = BoxBoxNowColors.SystemGray, fontSize = (20f * scale).sp, fontWeight = FontWeight.Black)
             }
         }
         DriverCard.AvgLap20 -> {
@@ -439,8 +440,8 @@ private fun CardContent(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("%.1fG".format(latG), color = Color.White, fontSize = (28f * scale).sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Lat: %.1f".format(gps.gForceX), color = BoxBoxNowColors.SystemGray, fontSize = smallFont, fontFamily = FontFamily.Monospace)
-                        Text("Fren: %.1f".format(gps.gForceY), color = BoxBoxNowColors.SystemGray, fontSize = smallFont, fontFamily = FontFamily.Monospace)
+                        Text(t("driver.cardLat", "value" to "%.1f".format(gps.gForceX)), color = BoxBoxNowColors.SystemGray, fontSize = smallFont, fontFamily = FontFamily.Monospace)
+                        Text(t("driver.cardBrake", "value" to "%.1f".format(gps.gForceY)), color = BoxBoxNowColors.SystemGray, fontSize = smallFont, fontFamily = FontFamily.Monospace)
                     }
                 }
             } else {
@@ -480,7 +481,7 @@ private fun CardContent(
                     Text("/$min", color = BoxBoxNowColors.SystemGray, fontSize = (14f * scale).sp, fontWeight = FontWeight.SemiBold)
                 }
                 if (missing > 0) {
-                    Text("Faltan $missing", color = Color(0xFFFF9F0A), fontSize = smallFont, fontWeight = FontWeight.Bold)
+                    Text(t("driver.cardFaltan", "count" to "$missing"), color = Color(0xFFFF9F0A), fontSize = smallFont, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -528,7 +529,7 @@ private fun CardContent(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     MonoValue("--:--", BoxBoxNowColors.SystemGray4, mainFont)
                     Text(
-                        "inactivo",
+                        t("driver.cardInactive"),
                         color = BoxBoxNowColors.SystemGray4,
                         fontSize = subFont,
                         fontWeight = FontWeight.Medium,
@@ -626,10 +627,11 @@ private fun CardContent(
         // we lead the apex order — show "LIDER" sentinel in that case
         // (per pilot feedback, "—" reads as "no data" not "leader").
         DriverCard.IntervalAhead -> {
-            val display = raceVM.formatApexInterval(ourKart?.interval, leaderSentinel = "LIDER")
+            val leaderLabel = t("driver.cardLeader")
+            val display = raceVM.formatApexInterval(ourKart?.interval, leaderSentinel = leaderLabel)
             MonoValue(
                 display,
-                if (display == "LIDER") Color(0xFFFFCC00) else Color.White,
+                if (display == leaderLabel) Color(0xFFFFCC00) else Color.White,
                 mainFont,
             )
         }
@@ -833,7 +835,7 @@ private fun TheoreticalBestLapContent(
         MonoValue(Formatters.msToLapTime(theoMs), Color(0xFFFF4081), mainFont)
         if (realBest > 0) {
             Text(
-                "Real: ${Formatters.msToLapTime(realBest)}",
+                t("driver.cardReal", "time" to Formatters.msToLapTime(realBest)),
                 color = BoxBoxNowColors.SystemGray,
                 fontSize = smallFont,
                 fontFamily = FontFamily.Monospace,

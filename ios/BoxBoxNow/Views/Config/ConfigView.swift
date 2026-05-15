@@ -1,25 +1,27 @@
 import SwiftUI
 
 struct ConfigView: View {
+    @EnvironmentObject var lang: LanguageStore
+
     var body: some View {
         List {
             NavigationLink(destination: SessionConfigView()) {
-                Label("Sesion", systemImage: "flag.checkered")
+                Label(t("config.session", lang.current), systemImage: "flag.checkered")
             }
             NavigationLink(destination: CardVisibilityView()) {
-                Label("Tarjetas visibles", systemImage: "eye")
+                Label(t("preset.visibleCards", lang.current), systemImage: "eye")
             }
             NavigationLink(destination: CardOrderPreviewView()) {
-                Label("Orden y vista previa", systemImage: "arrow.up.arrow.down")
+                Label(t("preset.orderAndPreview", lang.current), systemImage: "arrow.up.arrow.down")
             }
             NavigationLink(destination: PresetsView()) {
-                Label("Plantillas", systemImage: "doc.on.doc")
+                Label(t("preset.titlePlural", lang.current), systemImage: "doc.on.doc")
             }
             NavigationLink(destination: GPSConfigView()) {
-                Label("GPS / RaceBox", systemImage: "location.fill")
+                Label(t("config.gps", lang.current), systemImage: "location.fill")
             }
         }
-        .navigationTitle("Configuracion")
+        .navigationTitle(t("home.config", lang.current))
         .listStyle(.insetGrouped)
     }
 }

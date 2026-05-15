@@ -52,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.boxboxnow.app.i18n.t
 import com.boxboxnow.app.models.DriverConfigPreset
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.vm.DriverViewModel
@@ -85,7 +86,7 @@ fun PresetsScreen(
         containerColor = Color.Black,
         topBar = {
             TopAppBar(
-                title = { Text("Plantillas", color = Color.White) },
+                title = { Text(t("preset.title"), color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -110,7 +111,7 @@ fun PresetsScreen(
             // Section header
             item {
                 Text(
-                    "PLANTILLAS (${presets.size}/$MAX_PRESETS)",
+                    t("preset.header", "count" to "${presets.size}", "max" to "$MAX_PRESETS"),
                     color = BoxBoxNowColors.SystemGray3,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -122,7 +123,7 @@ fun PresetsScreen(
             if (presets.isEmpty()) {
                 item {
                     Text(
-                        "No tienes plantillas guardadas. Usa el botón de abajo para guardar la configuración actual.",
+                        t("preset.empty"),
                         color = BoxBoxNowColors.SystemGray,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(16.dp),
@@ -180,7 +181,7 @@ fun PresetsScreen(
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Crear nueva plantilla", fontWeight = FontWeight.SemiBold)
+                    Text(t("preset.createNew"), fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -193,19 +194,19 @@ fun PresetsScreen(
             containerColor = BoxBoxNowColors.SystemGray6,
             titleContentColor = Color.White,
             textContentColor = Color.White,
-            title = { Text("Eliminar plantilla") },
-            text = { Text("¿Quitar '${preset.name}'? Esta acción no se puede deshacer.") },
+            title = { Text(t("preset.deleteTitle")) },
+            text = { Text(t("preset.deleteConfirm", "name" to preset.name)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         driverVM.deletePreset(preset)
                         confirmDelete = null
                     },
-                ) { Text("Eliminar", color = BoxBoxNowColors.ErrorRed) }
+                ) { Text(t("common.delete"), color = BoxBoxNowColors.ErrorRed) }
             },
             dismissButton = {
                 TextButton(onClick = { confirmDelete = null }) {
-                    Text("Cancelar", color = BoxBoxNowColors.SystemGray)
+                    Text(t("common.cancel"), color = BoxBoxNowColors.SystemGray)
                 }
             },
         )
@@ -236,7 +237,7 @@ private fun PresetRow(
         ) {
             Icon(
                 if (preset.isDefault) Icons.Filled.Star else Icons.Filled.StarBorder,
-                contentDescription = if (preset.isDefault) "Quitar predefinida" else "Marcar predefinida",
+                contentDescription = if (preset.isDefault) t("preset.starOn") else t("preset.starOff"),
                 tint = if (preset.isDefault) BoxBoxNowColors.Accent else BoxBoxNowColors.SystemGray3,
                 modifier = Modifier.size(20.dp),
             )
@@ -255,7 +256,7 @@ private fun PresetRow(
                 )
             }
             Text(
-                "$visibleCount tarjetas",
+                t("preset.cards", "count" to "$visibleCount"),
                 color = BoxBoxNowColors.SystemGray,
                 fontSize = 11.sp,
             )
@@ -268,7 +269,7 @@ private fun PresetRow(
         ) {
             Icon(
                 Icons.Filled.Edit,
-                contentDescription = "Editar",
+                contentDescription = t("common.edit"),
                 tint = BoxBoxNowColors.Accent,
                 modifier = Modifier.size(24.dp),
             )
@@ -281,7 +282,7 @@ private fun PresetRow(
         ) {
             Icon(
                 Icons.Filled.Delete,
-                contentDescription = "Eliminar",
+                contentDescription = t("common.delete"),
                 tint = BoxBoxNowColors.ErrorRed,
                 modifier = Modifier.size(18.dp),
             )

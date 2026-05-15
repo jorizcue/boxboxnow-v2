@@ -135,7 +135,7 @@ fun HomeScreen(
                     Text("NOW", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = BoxBoxNowColors.Accent)
                 }
                 Text(
-                    "ESTRATEGIA DE KARTING EN TIEMPO REAL",
+                    t("home.brandingTagline"),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Medium,
                     letterSpacing = 1.5.sp,
@@ -163,7 +163,7 @@ fun HomeScreen(
                 icon = Icons.Default.Speed,
                 title = t("home.viewPilot"),
                 subtitle = if (hasSession)
-                    "Kart #${session.ourKartNumber} · ${session.durationMin} min"
+                    t("home.viewPilotSubtitle", "kart" to "${session.ourKartNumber}", "min" to "${session.durationMin}")
                 else t("home.fullScreen"),
                 accentBorder = true,
                 onClick = onOpenDriver,
@@ -189,7 +189,7 @@ fun HomeScreen(
 
 @Composable
 private fun SessionSummaryCard(session: RaceSession, circuitNames: Map<Int, String>) {
-    val circuitName = session.circuitId?.let { circuitNames[it] } ?: session.circuitName ?: "Sin circuito"
+    val circuitName = session.circuitId?.let { circuitNames[it] } ?: session.circuitName ?: t("home.noCircuit")
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -201,7 +201,7 @@ private fun SessionSummaryCard(session: RaceSession, circuitNames: Map<Int, Stri
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "SESIÓN ACTIVA",
+                t("home.activeSession"),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp,
@@ -211,13 +211,13 @@ private fun SessionSummaryCard(session: RaceSession, circuitNames: Map<Int, Stri
             Icon(Icons.Default.Flag, contentDescription = null, tint = BoxBoxNowColors.SystemGray3, modifier = Modifier.size(14.dp))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            InfoPill(label = "KART", value = "#${session.ourKartNumber}", accent = true, modifier = Modifier.weight(1f))
-            InfoPill(label = "DURACIÓN", value = "${session.durationMin} min", modifier = Modifier.weight(1f))
-            InfoPill(label = "PITS", value = session.minPits.toString(), modifier = Modifier.weight(1f))
+            InfoPill(label = t("home.pillKart"), value = "#${session.ourKartNumber}", accent = true, modifier = Modifier.weight(1f))
+            InfoPill(label = t("home.pillDuration"), value = "${session.durationMin} min", modifier = Modifier.weight(1f))
+            InfoPill(label = t("home.pillPits"), value = session.minPits.toString(), modifier = Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            InfoPill(label = "CIRCUITO", value = circuitName, modifier = Modifier.weight(1f))
-            InfoPill(label = "MAX STINT", value = "${session.maxStintMin} min", modifier = Modifier.weight(1f))
+            InfoPill(label = t("home.pillCircuit"), value = circuitName, modifier = Modifier.weight(1f))
+            InfoPill(label = t("home.pillMaxStint"), value = "${session.maxStintMin} min", modifier = Modifier.weight(1f))
         }
     }
 }

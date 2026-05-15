@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.boxboxnow.app.i18n.t
 import com.boxboxnow.app.models.DriverCard
 import com.boxboxnow.app.models.FinishLine
 import com.boxboxnow.app.models.GeoPoint
@@ -157,13 +158,13 @@ private fun NoPresetsGate(onBack: () -> Unit) {
                 modifier = Modifier.size(48.dp),
             )
             Text(
-                "Necesitas una plantilla",
+                t("driver.noPresetTitle"),
                 color = Color.White,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                "Crea al menos una plantilla en Configuración → Plantillas para usar la vista del piloto.",
+                t("driver.noPresetBody"),
                 color = Color(0xFF8E8E93),
                 fontSize = 14.sp,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -178,7 +179,7 @@ private fun NoPresetsGate(onBack: () -> Unit) {
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    "Volver",
+                    t("driver.back"),
                     color = Color.Black,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
@@ -490,7 +491,7 @@ private fun DriverScreenContent(onBack: () -> Unit) {
             ) {
                 CircularProgressIndicator(color = Color.White, strokeWidth = 1.5.dp, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Reconectando...", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(t("driver.reconnecting"), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -512,7 +513,7 @@ private fun DriverScreenContent(onBack: () -> Unit) {
             ) {
                 Icon(
                     Icons.Filled.VolumeUp,
-                    contentDescription = "Audio activado",
+                    contentDescription = t("driver.audioOn"),
                     tint = BoxBoxNowColors.Accent,
                     modifier = Modifier.size(14.dp),
                 )
@@ -697,7 +698,7 @@ private fun PitInProgressFullScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                "PIT EN CURSO",
+                t("driver.pitInProgress"),
                 color = Color(0xFF00BCD4).copy(alpha = alpha.value),
                 fontSize = headerSize,
                 fontWeight = FontWeight.Black,

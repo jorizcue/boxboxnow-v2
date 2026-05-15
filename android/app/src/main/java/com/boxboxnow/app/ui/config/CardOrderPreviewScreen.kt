@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.boxboxnow.app.i18n.t
 import com.boxboxnow.app.models.DriverCard
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.vm.DriverViewModel
@@ -81,7 +82,7 @@ fun CardOrderPreviewScreen(onBack: () -> Unit) {
         containerColor = Color.Black,
         topBar = {
             TopAppBar(
-                title = { Text("Orden y vista previa", color = Color.White) },
+                title = { Text(t("cardOrder.title"), color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -112,7 +113,7 @@ fun CardOrderPreviewScreen(onBack: () -> Unit) {
                 if (orderedVisible.isEmpty()) {
                     item {
                         Text(
-                            "No hay tarjetas visibles. Activa alguna en 'Tarjetas visibles'.",
+                            t("cardOrder.empty"),
                             color = BoxBoxNowColors.SystemGray,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(16.dp),
@@ -144,7 +145,7 @@ fun CardOrderPreviewScreen(onBack: () -> Unit) {
 
             // Mini preview (bottom, fixed height)
             Text(
-                "VISTA PREVIA",
+                t("cardOrder.preview"),
                 color = BoxBoxNowColors.SystemGray3,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -215,14 +216,14 @@ private fun OrderRow(
         IconButton(onClick = onMoveUp, enabled = canMoveUp) {
             Icon(
                 Icons.Filled.ArrowUpward,
-                contentDescription = "Subir",
+                contentDescription = t("cardOrder.moveUp"),
                 tint = if (canMoveUp) BoxBoxNowColors.Accent else BoxBoxNowColors.SystemGray4,
             )
         }
         IconButton(onClick = onMoveDown, enabled = canMoveDown) {
             Icon(
                 Icons.Filled.ArrowDownward,
-                contentDescription = "Bajar",
+                contentDescription = t("cardOrder.moveDown"),
                 tint = if (canMoveDown) BoxBoxNowColors.Accent else BoxBoxNowColors.SystemGray4,
             )
         }

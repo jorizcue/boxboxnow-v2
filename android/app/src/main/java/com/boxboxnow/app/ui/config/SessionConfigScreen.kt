@@ -69,6 +69,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.boxboxnow.app.i18n.t
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.vm.ConfigViewModel
 
@@ -93,7 +94,7 @@ fun SessionConfigScreen(onBack: () -> Unit) {
         containerColor = Color.Black,
         topBar = {
             TopAppBar(
-                title = { Text("Sesión de carrera", color = Color.White) },
+                title = { Text(t("session.title"), color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
@@ -116,7 +117,7 @@ fun SessionConfigScreen(onBack: () -> Unit) {
             if (circuits.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        "CIRCUITO",
+                        t("session.circuit"),
                         color = BoxBoxNowColors.SystemGray,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -143,7 +144,7 @@ fun SessionConfigScreen(onBack: () -> Unit) {
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                session.circuitName ?: "Seleccionar",
+                                session.circuitName ?: t("session.selectCircuit"),
                                 color = Color.White,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Medium,
@@ -173,30 +174,30 @@ fun SessionConfigScreen(onBack: () -> Unit) {
             }
 
             // ── Section: Carrera ──
-            ConfigSection(title = "CARRERA", icon = Icons.Default.Flag) {
+            ConfigSection(title = t("session.sectionRace"), icon = Icons.Default.Flag) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     NumberCard(
-                        title = "NUESTRO KART",
+                        title = t("session.kartTitle"),
                         value = session.ourKartNumber,
                         accent = true,
-                        tooltip = "Numero del kart de tu equipo",
+                        tooltip = t("session.kartTooltip"),
                         onValueChange = { vm.updateSession { s -> s.copy(ourKartNumber = it) } },
                         modifier = Modifier.weight(1f),
                     )
                     NumberCard(
-                        title = "DURACION (MIN)",
+                        title = t("session.durationTitle"),
                         value = session.durationMin,
-                        tooltip = "Duracion total de la carrera en minutos",
+                        tooltip = t("session.durationTooltip"),
                         onValueChange = { vm.updateSession { s -> s.copy(durationMin = it) } },
                         modifier = Modifier.weight(1f),
                     )
                     NumberCard(
-                        title = "PITS MINIMOS",
+                        title = t("session.minPitsTitle"),
                         value = session.minPits,
-                        tooltip = "Paradas obligatorias minimas segun reglamento",
+                        tooltip = t("session.minPitsTooltip"),
                         onValueChange = { vm.updateSession { s -> s.copy(minPits = it) } },
                         modifier = Modifier.weight(1f),
                     )
@@ -204,29 +205,29 @@ fun SessionConfigScreen(onBack: () -> Unit) {
             }
 
             // ── Section: Pit Stops ──
-            ConfigSection(title = "PIT STOPS", icon = Icons.Default.Build) {
+            ConfigSection(title = t("session.sectionPit"), icon = Icons.Default.Build) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     NumberCard(
-                        title = "TIEMPO PIT (S)",
+                        title = t("session.pitTimeTitle"),
                         value = session.pitTimeS,
-                        tooltip = "Segundos que tardas en hacer una parada en boxes",
+                        tooltip = t("session.pitTimeTooltip"),
                         onValueChange = { vm.updateSession { s -> s.copy(pitTimeS = it) } },
                         modifier = Modifier.weight(1f),
                     )
                     NumberCard(
-                        title = "PIT CERRADO\nINICIO (MIN)",
+                        title = t("session.pitClosedStartTitle"),
                         value = session.pitClosedStartMin,
-                        tooltip = "Minuto en el que se cierra la ventana de pit",
+                        tooltip = t("session.pitClosedStartTooltip"),
                         onValueChange = { vm.updateSession { s -> s.copy(pitClosedStartMin = it) } },
                         modifier = Modifier.weight(1f),
                     )
                     NumberCard(
-                        title = "PIT CERRADO\nFINAL (MIN)",
+                        title = t("session.pitClosedEndTitle"),
                         value = session.pitClosedEndMin,
-                        tooltip = "Minuto en el que se reabre la ventana de pit",
+                        tooltip = t("session.pitClosedEndTooltip"),
                         onValueChange = { vm.updateSession { s -> s.copy(pitClosedEndMin = it) } },
                         modifier = Modifier.weight(1f),
                     )
@@ -234,29 +235,29 @@ fun SessionConfigScreen(onBack: () -> Unit) {
             }
 
             // ── Section: Stints y Pilotos ──
-            ConfigSection(title = "STINTS Y PILOTOS", icon = Icons.Default.People) {
+            ConfigSection(title = t("session.sectionStints"), icon = Icons.Default.People) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     NumberCard(
-                        title = "STINT MIN (MIN)",
+                        title = t("session.minStintTitle"),
                         value = session.minStintMin,
-                        tooltip = "Tiempo mínimo que un piloto debe estar en pista",
+                        tooltip = t("session.minStintTooltip"),
                         onValueChange = { vm.updateSession { s -> s.copy(minStintMin = it) } },
                         modifier = Modifier.weight(1f),
                     )
                     NumberCard(
-                        title = "STINT MAX (MIN)",
+                        title = t("session.maxStintTitle"),
                         value = session.maxStintMin,
-                        tooltip = "Tiempo máximo que un piloto puede estar en pista",
+                        tooltip = t("session.maxStintTooltip"),
                         onValueChange = { vm.updateSession { s -> s.copy(maxStintMin = it) } },
                         modifier = Modifier.weight(1f),
                     )
                     NumberCard(
-                        title = "TIEMPO MIN\nPILOTO (MIN)",
+                        title = t("session.minDriverTimeTitle"),
                         value = session.minDriverTimeMin,
-                        tooltip = "Tiempo mínimo total que cada piloto debe conducir",
+                        tooltip = t("session.minDriverTimeTooltip"),
                         onValueChange = { vm.updateSession { s -> s.copy(minDriverTimeMin = it) } },
                         modifier = Modifier.weight(1f),
                     )
@@ -271,9 +272,9 @@ fun SessionConfigScreen(onBack: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     NumberCard(
-                        title = "PILOTOS\nDEL EQUIPO",
+                        title = t("session.teamDriversTitle"),
                         value = session.teamDriversCount,
-                        tooltip = "Número de pilotos del equipo. 0 = automático según Apex.",
+                        tooltip = t("session.teamDriversTooltip"),
                         onValueChange = { vm.updateSession { s -> s.copy(teamDriversCount = it) } },
                         modifier = Modifier.weight(1f),
                     )
@@ -287,7 +288,7 @@ fun SessionConfigScreen(onBack: () -> Unit) {
             // `session.rain` and persists it immediately so the
             // strategist can toggle wet/dry pace assumptions without
             // scrolling down to "Actualizar sesion".
-            ConfigSection(title = "MODO LLUVIA", icon = Icons.Default.WaterDrop) {
+            ConfigSection(title = t("session.sectionRain"), icon = Icons.Default.WaterDrop) {
                 RainToggleRow(
                     rain = session.rain,
                     onChange = { newVal ->
@@ -321,7 +322,7 @@ fun SessionConfigScreen(onBack: () -> Unit) {
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Text(
-                    if (showSaved) "GUARDADO ✓" else "ACTUALIZAR SESION",
+                    if (showSaved) t("session.saved") else t("session.updateSession"),
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                 )
@@ -393,13 +394,13 @@ private fun RainToggleRow(
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                if (rain) "Activado" else "Desactivado",
+                if (rain) t("session.rainOn") else t("session.rainOff"),
                 color = Color.White,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                "Desactiva el filtro de outliers en las medias para que la lluvia no falsee el ritmo.",
+                t("session.rainHint"),
                 color = BoxBoxNowColors.SystemGray,
                 fontSize = 11.sp,
                 lineHeight = 14.sp,
@@ -505,7 +506,7 @@ private fun NumberCard(
                 ) {
                     Icon(
                         Icons.Default.Info,
-                        contentDescription = "Info",
+                        contentDescription = t("common.info"),
                         tint = BoxBoxNowColors.SystemGray3,
                         modifier = Modifier.size(10.dp),
                     )
@@ -558,7 +559,7 @@ private fun NumberCard(
             text = { Text(tooltip) },
             confirmButton = {
                 TextButton(onClick = { showTooltip = false }) {
-                    Text("OK", color = BoxBoxNowColors.Accent)
+                    Text(t("common.ok"), color = BoxBoxNowColors.Accent)
                 }
             },
         )

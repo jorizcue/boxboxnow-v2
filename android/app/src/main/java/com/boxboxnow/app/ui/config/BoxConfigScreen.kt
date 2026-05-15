@@ -63,6 +63,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.boxboxnow.app.i18n.t
 import com.boxboxnow.app.models.Team
 import com.boxboxnow.app.models.TeamDriver
 import com.boxboxnow.app.net.ApiClient
@@ -137,7 +138,7 @@ fun BoxConfigScreen(onBack: () -> Unit) {
         containerColor = Color.Black,
         topBar = {
             TopAppBar(
-                title = { Text("Configuración Box", color = Color.White) },
+                title = { Text(t("box.title"), color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = {
                         // Commit any pending edits before leaving the
@@ -164,7 +165,7 @@ fun BoxConfigScreen(onBack: () -> Unit) {
                         }
                     }) {
                         Text(
-                            if (isEditing) "Listo" else "Editar",
+                            if (isEditing) t("common.done") else t("common.edit"),
                             color = BoxBoxNowColors.Accent,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -221,13 +222,13 @@ fun BoxConfigScreen(onBack: () -> Unit) {
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "Auto-cargar al iniciar",
+                                t("box.autoLoadTitle"),
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                "Refresca equipos desde Live Timing al arrancar la carrera.",
+                                t("box.autoLoadSubtitle"),
                                 color = BoxBoxNowColors.SystemGray,
                                 fontSize = 11.sp,
                             )
@@ -284,7 +285,7 @@ fun BoxConfigScreen(onBack: () -> Unit) {
                                 Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
                             }
                             Spacer(Modifier.width(6.dp))
-                            Text("Live Timing", fontSize = 13.sp)
+                            Text(t("box.liveTiming"), fontSize = 13.sp)
                         }
 
                         Button(
@@ -297,7 +298,7 @@ fun BoxConfigScreen(onBack: () -> Unit) {
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Equipo", fontSize = 13.sp)
+                            Text(t("box.team"), fontSize = 13.sp)
                         }
                     }
                 }
@@ -305,7 +306,7 @@ fun BoxConfigScreen(onBack: () -> Unit) {
                 // Header
                 item {
                     Text(
-                        "EQUIPOS (${teams.size})",
+                        t("box.teamsHeader", "count" to "${teams.size}"),
                         color = BoxBoxNowColors.SystemGray3,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -317,7 +318,7 @@ fun BoxConfigScreen(onBack: () -> Unit) {
                 if (teams.isEmpty()) {
                     item {
                         Text(
-                            "No hay equipos. Cargalos desde Live Timing o anadilos manualmente.",
+                            t("box.empty"),
                             color = BoxBoxNowColors.SystemGray,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(16.dp),
@@ -342,7 +343,7 @@ fun BoxConfigScreen(onBack: () -> Unit) {
                                 dragHandle = if (isEditing) ({
                                     Icon(
                                         Icons.Default.DragHandle,
-                                        contentDescription = "Reordenar",
+                                        contentDescription = t("box.reorderDescription"),
                                         tint = BoxBoxNowColors.SystemGray,
                                         modifier = Modifier
                                             .draggableHandle()
@@ -394,7 +395,7 @@ fun BoxConfigScreen(onBack: () -> Unit) {
                             CircularProgressIndicator(color = Color.Black, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                         }
-                        Text("GUARDAR CAMBIOS", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(t("box.saveChanges"), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
             }
@@ -408,14 +409,14 @@ fun BoxConfigScreen(onBack: () -> Unit) {
             containerColor = BoxBoxNowColors.SystemGray6,
             titleContentColor = Color.White,
             textContentColor = Color.White,
-            title = { Text("Anadir equipo") },
+            title = { Text(t("box.addTeamTitle")) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Nombre y número de kart del nuevo equipo.", color = BoxBoxNowColors.SystemGray, fontSize = 13.sp)
+                    Text(t("box.addTeamPrompt"), color = BoxBoxNowColors.SystemGray, fontSize = 13.sp)
                     OutlinedTextField(
                         value = newTeamName,
                         onValueChange = { newTeamName = it },
-                        label = { Text("Nombre") },
+                        label = { Text(t("box.fieldName")) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                         colors = fieldColors(),
@@ -423,7 +424,7 @@ fun BoxConfigScreen(onBack: () -> Unit) {
                     OutlinedTextField(
                         value = newTeamKart,
                         onValueChange = { newTeamKart = it.filter { c -> c.isDigit() } },
-                        label = { Text("Kart") },
+                        label = { Text(t("box.fieldKart")) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         colors = fieldColors(),
@@ -439,11 +440,11 @@ fun BoxConfigScreen(onBack: () -> Unit) {
                         isEditing = true
                     }
                     newTeamName = ""; newTeamKart = ""; showAddDialog = false
-                }) { Text("Anadir", color = BoxBoxNowColors.Accent) }
+                }) { Text(t("box.addConfirm"), color = BoxBoxNowColors.Accent) }
             },
             dismissButton = {
                 TextButton(onClick = { newTeamName = ""; newTeamKart = ""; showAddDialog = false }) {
-                    Text("Cancelar", color = BoxBoxNowColors.SystemGray)
+                    Text(t("common.cancel"), color = BoxBoxNowColors.SystemGray)
                 }
             },
         )
@@ -495,7 +496,7 @@ private fun TeamRow(
                 OutlinedTextField(
                     value = team.kart.toString(),
                     onValueChange = { onUpdate(team.copy(kart = it.toIntOrNull() ?: team.kart)) },
-                    label = { Text("Kart", fontSize = 10.sp) },
+                    label = { Text(t("box.fieldKart"), fontSize = 10.sp) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.width(64.dp),
@@ -505,7 +506,7 @@ private fun TeamRow(
                 OutlinedTextField(
                     value = team.teamName,
                     onValueChange = { onUpdate(team.copy(teamName = it)) },
-                    label = { Text("Equipo", fontSize = 10.sp) },
+                    label = { Text(t("box.team"), fontSize = 10.sp) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     colors = fieldColors(),
@@ -547,7 +548,10 @@ private fun TeamRow(
         // Collapsed summary
         if (!isExpanded && team.drivers.isNotEmpty()) {
             Text(
-                "${team.drivers.size} piloto${if (team.drivers.size != 1) "s" else ""}",
+                if (team.drivers.size == 1)
+                    t("box.pilotCount", "count" to "${team.drivers.size}")
+                else
+                    t("box.pilotCountPlural", "count" to "${team.drivers.size}"),
                 color = BoxBoxNowColors.SystemGray,
                 fontSize = 11.sp,
                 modifier = Modifier.padding(start = 26.dp, top = 4.dp),
@@ -569,7 +573,7 @@ private fun TeamRow(
                                     updated[dIdx] = driver.copy(driverName = name)
                                     onUpdate(team.copy(drivers = updated))
                                 },
-                                placeholder = { Text("Nombre", fontSize = 12.sp) },
+                                placeholder = { Text(t("box.driverPlaceholder"), fontSize = 12.sp) },
                                 singleLine = true,
                                 modifier = Modifier.weight(1f).height(48.dp),
                                 colors = fieldColors(),
@@ -601,8 +605,9 @@ private fun TeamRow(
                                 Icon(Icons.Default.Delete, contentDescription = null, tint = BoxBoxNowColors.ErrorRed.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
                             }
                         } else {
+                            val noNameLabel = t("box.driverNoName")
                             Text(
-                                driver.driverName.ifEmpty { "Sin nombre" },
+                                driver.driverName.ifEmpty { noNameLabel },
                                 color = Color.White,
                                 fontSize = 13.sp,
                                 modifier = Modifier.weight(1f),
@@ -627,7 +632,7 @@ private fun TeamRow(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp), tint = BoxBoxNowColors.Accent)
                         Spacer(Modifier.width(4.dp))
-                        Text("Piloto", color = BoxBoxNowColors.Accent, fontSize = 12.sp)
+                        Text(t("box.addPilot"), color = BoxBoxNowColors.Accent, fontSize = 12.sp)
                     }
                 }
             }

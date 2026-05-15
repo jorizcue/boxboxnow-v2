@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.boxboxnow.app.i18n.t
 
 /**
  * Full-screen flashing red overlay triggered when the box dashboard sends a
@@ -74,12 +75,12 @@ fun BoxCallOverlay(onDismiss: () -> Unit) {
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                "Toca para cerrar",
+                t("boxCall.tapToClose"),
                 color = Color.White.copy(alpha = 0.7f),
                 fontSize = 14.sp,
             )
             Text(
-                "Se cierra automáticamente",
+                t("boxCall.autoClose"),
                 color = Color.White.copy(alpha = 0.4f),
                 fontSize = 11.sp,
             )

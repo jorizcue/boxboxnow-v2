@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.boxboxnow.app.i18n.t
 import com.boxboxnow.app.ui.theme.BoxBoxNowColors
 import com.boxboxnow.app.vm.AuthViewModel
 
@@ -110,7 +111,7 @@ private fun Branding(small: Boolean = false) {
             Text("NOW", fontSize = subSize, fontWeight = FontWeight.Bold, color = BoxBoxNowColors.Accent)
         }
         Text(
-            "VISTA PILOTO",
+            t("home.brandingSubtitle"),
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             color = BoxBoxNowColors.SystemGray2,
@@ -141,7 +142,7 @@ private fun LoginForm(authVM: AuthViewModel, onStartGoogleSso: () -> Unit) {
         InputField(
             value = email,
             onChange = { email = it },
-            placeholder = "Email",
+            placeholder = t("login.email"),
             icon = Icons.Default.Mail,
             keyboardType = KeyboardType.Email,
         )
@@ -150,7 +151,7 @@ private fun LoginForm(authVM: AuthViewModel, onStartGoogleSso: () -> Unit) {
         InputField(
             value = password,
             onChange = { password = it },
-            placeholder = "Contraseña",
+            placeholder = t("login.password"),
             icon = Icons.Default.Lock,
             keyboardType = KeyboardType.Password,
             secure = !passwordVisible,
@@ -169,7 +170,7 @@ private fun LoginForm(authVM: AuthViewModel, onStartGoogleSso: () -> Unit) {
 
         Spacer(Modifier.height(16.dp))
         PrimaryAccentButton(
-            text = "Iniciar sesión",
+            text = t("login.signIn"),
             loading = isLoading,
             enabled = !isLoading && email.isNotBlank() && password.isNotBlank(),
             onClick = { authVM.login(email.trim(), password) },
@@ -178,13 +179,13 @@ private fun LoginForm(authVM: AuthViewModel, onStartGoogleSso: () -> Unit) {
         Spacer(Modifier.height(16.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Divider(Modifier.weight(1f), color = BoxBoxNowColors.SystemGray5)
-            Text("o", color = BoxBoxNowColors.SystemGray3, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
+            Text(t("login.or"), color = BoxBoxNowColors.SystemGray3, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
             Divider(Modifier.weight(1f), color = BoxBoxNowColors.SystemGray5)
         }
         Spacer(Modifier.height(14.dp))
 
         SecondaryButton(
-            text = if (isGoogleLoading) "Abriendo Google..." else "Continuar con Google",
+            text = if (isGoogleLoading) t("login.openingGoogle") else t("login.continueGoogle"),
             icon = Icons.Default.Language,
             enabled = !isLoading && !isGoogleLoading,
             loading = isGoogleLoading,
