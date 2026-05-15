@@ -32,9 +32,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -112,21 +115,22 @@ fun DriverCardView(
             .background(accent.copy(alpha = bgAlpha))
             .border(borderWidth, accent.copy(alpha = borderAlpha), RoundedCornerShape(10.dp)),
     ) {
-        // Match iOS so the numbers read just as big and bold. iOS uses
-        // `scale = clamp(cardHeight/90, 0.8, 2.0)` (height-only) with
-        // base 24 (main) / 32 (big) and weight .black, plus
-        // .minimumScaleFactor to auto-shrink wide strings. Android Text
-        // can't auto-shrink, so we keep a width guard — but with a
-        // looser divisor (180 vs the old 150) so it only kicks in on
-        // genuinely narrow cards; otherwise height drives the size like
-        // iOS. Net effect: same base sizes (24/32) and the same 0.8–2.0
-        // clamp as iOS → noticeably larger, heavier digits.
+        // The numbers were leaving a lot of empty space inside the
+        // cards. iOS uses .minimumScaleFactor to let text be large and
+        // auto-shrink only if it wouldn't fit; Compose 1.7 has no
+        // built-in equivalent, so the big numeric values now go through
+        // `MonoValue`, which measures the string and grows it to fill
+        // the card width (shrinking only to avoid clipping). That makes
+        // it safe to TARGET much larger sizes here: the long strings
+        // self-fit, the short ones (P3/12, 1.2G, 0:45…) stay bounded by
+        // the width guard. Bases bumped 24→34 / 32→48 and the clamp
+        // ceiling 2.0→2.8 so a roomy landscape card fills properly.
         val widthScale = maxWidth.value / 180f
         val heightScale = cardHeight.value / 90f
-        val scale: Float = min(2.0f, max(0.8f, min(widthScale, heightScale)))
+        val scale: Float = min(2.8f, max(0.8f, min(widthScale, heightScale)))
 
-        val mainFont: TextUnit = (24f * scale).sp
-        val bigFont: TextUnit = (32f * scale).sp
+        val mainFont: TextUnit = (34f * scale).sp
+        val bigFont: TextUnit = (48f * scale).sp
         val subFont: TextUnit = (10f * scale).sp
         val smallFont: TextUnit = (8f * scale).sp
         val labelFont: TextUnit = (9f * scale).sp
@@ -1022,16 +1026,47 @@ private fun DeltaSectorsLine(
  */
 private val NumericValueStyle = TextStyle(fontFeatureSettings = "tnum")
 
+/**
+ * Big numeric value that GROWS to fill the card width. `size` is the
+ * preferred/maximum; the string is measured and the font shrunk (down
+ * to 55% of `size`) only if it wouldn't otherwise fit on one line.
+ * This is the Compose-1.7 stand-in for iOS's `.minimumScaleFactor`:
+ * short values (a lap time, an average) get big and bold instead of
+ * floating in empty space, and a long value on a narrow card never
+ * clips. Measuring a <10-char string is microsecond-cheap.
+ */
 @Composable
 private fun MonoValue(text: String, color: Color, size: TextUnit) {
-    Text(
-        text,
-        color = color,
-        fontSize = size,
-        fontWeight = FontWeight.Black,
-        style = NumericValueStyle,
-        maxLines = 1,
-        softWrap = false,
-        overflow = TextOverflow.Clip,
-    )
+    BoxWithConstraints(contentAlignment = Alignment.Center) {
+        val measurer = rememberTextMeasurer()
+        val availPx = with(LocalDensity.current) { maxWidth.toPx() } * 0.96f
+        var fs = size.value
+        val floor = fs * 0.55f
+        var guard = 0
+        while (fs > floor && guard < 28) {
+            val w = measurer.measure(
+                AnnotatedString(text),
+                style = TextStyle(
+                    fontSize = fs.sp,
+                    fontWeight = FontWeight.Black,
+                    fontFeatureSettings = "tnum",
+                ),
+                maxLines = 1,
+                softWrap = false,
+            ).size.width
+            if (w <= availPx) break
+            fs *= 0.92f
+            guard++
+        }
+        Text(
+            text,
+            color = color,
+            fontSize = fs.sp,
+            fontWeight = FontWeight.Black,
+            style = NumericValueStyle,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
+        )
+    }
 }
