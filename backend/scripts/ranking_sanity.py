@@ -15,7 +15,7 @@ def main():
     circuits = q("SELECT COUNT(DISTINCT circuit_name) FROM session_results")
     sessions = q("SELECT COUNT(*) FROM (SELECT DISTINCT circuit_name,log_date,session_seq FROM session_results)")
     circ_ratings = q("SELECT COUNT(*) FROM driver_circuit_ratings")
-    max_sessions = q("SELECT MAX(sessions_count) FROM driver_ratings")
+    max_sessions = q("SELECT COALESCE(MAX(sessions_count), 0) FROM driver_ratings")
     eupen = q("SELECT COUNT(*) FROM session_results WHERE circuit_name='EUPEN'")
 
     print(f"processed_logs={processed} session_results={results} "
