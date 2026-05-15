@@ -750,7 +750,7 @@ class DriverRating(Base):
     update trail lives in `RatingHistory`.
 
     A driver's per-circuit rating lives in `DriverCircuitRating` below.
-    Both are maintained simultaneously by `processor._apply_session` —
+    Both are maintained simultaneously by `processor.apply_extracts` —
     the same pairwise outcomes drive both updates."""
     __tablename__ = "driver_ratings"
 

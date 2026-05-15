@@ -17,7 +17,7 @@ Public surface used by the rest of the app:
       TeamEditor) to their current rating + RD. Unknown names get the
       Glicko-2 default. Drives the pre-race team panel.
 
-  * `get_top_drivers(limit, min_sessions, db)`
+  * `get_top_drivers(db, limit=None, min_sessions=2)`  — `limit=None` returns ALL drivers (no cap).
       Ranking page query. Filters out drivers below `min_sessions` so
       the leaderboard isn't polluted by one-off entries with
       undefendable ratings.
