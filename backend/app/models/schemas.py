@@ -824,7 +824,7 @@ class SessionResult(Base):
     final_position = Column(Integer, nullable=True)
     session_seq = Column(Integer, default=1, nullable=False)
     session_type = Column(String(8), default="pace", nullable=False)   # race|pace
-    team_mode = Column(String(12), default="individual", nullable=False)
+    team_mode = Column(String(12), default="individual", nullable=False)  # endurance|individual
     effective_score = Column(Float, nullable=True)
     duration_s = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
