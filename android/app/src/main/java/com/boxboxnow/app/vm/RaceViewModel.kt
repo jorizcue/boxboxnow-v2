@@ -376,6 +376,34 @@ class RaceViewModel @Inject constructor(
         return StintCalc(laps, realMax)
     }
 
+    /** Average future stint — 1:1 port of iOS
+     *  `RaceViewModel.computeAvgFutureStint` (web lines 391-407).
+     *  Returns the average minutes each REMAINING stint should last so
+     *  the mandatory pit count is met within the race time left, plus a
+     *  `warn` flag (too early / too late). The old Android card wrongly
+     *  showed `computeStintCalc().realMaxStintMin`, which is clamped to
+     *  `maxStintMin` and therefore stuck at "40:00". */
+    data class AvgFutureStint(val avgMin: Double, val warn: Boolean)
+
+    fun computeAvgFutureStint(clockMs: Double = 0.0): AvgFutureStint? {
+        val clock = if (clockMs > 0) clockMs else _raceTimerMs.value
+        val ourKart = _ourKartNumber.value
+        if (ourKart <= 0 || clock <= 0 || _raceFinished.value) return null
+        val kart = _karts.value.firstOrNull { it.kartNumber == ourKart } ?: return null
+        val remainingPits = maxOf(0, _minPits.value - kart.pitCount)
+        if (remainingPits <= 0) return null
+        val totalRaceMin = _durationMin.value
+        val elapsedMs = if (_durationMs.value > 0) maxOf(0.0, _durationMs.value - clock) else 0.0
+        val elapsedMin = elapsedMs / 1000 / 60
+        val futureTimeInPitMin = remainingPits * _pitTimeS.value / 60
+        val availableRaceMin = totalRaceMin - elapsedMin - futureTimeInPitMin
+        if (availableRaceMin <= 0) return null
+        val avgMin = availableRaceMin / remainingPits
+        val tooEarly = avgMin > _maxStintMin.value
+        val tooLate = avgMin <= _minStintMin.value + 5
+        return AvgFutureStint(avgMin, tooEarly || tooLate)
+    }
+
     // ── WebSocket handling ──
 
     private fun handleMessage(text: String) {

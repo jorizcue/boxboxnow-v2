@@ -99,6 +99,10 @@ fun DriverCardView(
         // pointless) stint calc for every other card.
         lapsToMax = if (card == DriverCard.LapsToMaxStint)
             raceVM.computeStintCalc(raceClockMs).lapsToMax else null,
+        // Mirrors iOS cardAccentColor: AvgFutureStint card turns red
+        // when out of the safe window. Only computed for that card.
+        avgFutureWarn = if (card == DriverCard.AvgFutureStint)
+            raceVM.computeAvgFutureStint(raceClockMs)?.warn else null,
     )
     val prominent = card == DriverCard.Position || card == DriverCard.RealPos || card == DriverCard.PitWindow
     val bgAlpha = if (prominent) 0.18f else 0.12f
@@ -261,6 +265,7 @@ private fun cardAccent(
     raceClockMs: Double,
     pitOpen: Boolean? = null,
     lapsToMax: Double? = null,
+    avgFutureWarn: Boolean? = null,
 ): Color {
     val gray = BoxBoxNowColors.SystemGray
     return when (card) {
@@ -301,6 +306,10 @@ private fun cardAccent(
         // left, orange when getting tight, green when the window is
         // open, teal otherwise. `card.accent` is the teal fallback.
         DriverCard.LapsToMaxStint -> lapsToMaxStintColor(pitOpen, lapsToMax, card.accent)
+        // iOS cardAccentColor: warn → red, otherwise the teal
+        // `card.accent`. Keeps the card's frame in sync with its value.
+        DriverCard.AvgFutureStint ->
+            if (avgFutureWarn == true) Color(0xFFFF453A) else card.accent
         else -> card.accent
     }
 }
@@ -441,17 +450,20 @@ private fun CardContent(
             )
         }
         DriverCard.AvgFutureStint -> {
-            // Pass the interpolated `raceClockMs` (10 Hz) — same fix as
-            // LapsToMaxStint below. Without it `computeStintCalc` falls
-            // back to `_raceTimerMs.value` which only moves on snapshot
-            // (~1 Hz), so the card looked frozen on Android while iOS
-            // (which feeds the live clock) updated smoothly.
-            val calc = raceVM.computeStintCalc(raceClockMs)
-            val v = calc.realMaxStintMin
-            if (v != null) {
-                val m = v.toInt()
-                val s = ((v - m) * 60).toInt()
-                MonoValue("%d:%02d".format(m, s), Color.White, mainFont)
+            // 1:1 with iOS: average minutes the remaining stints should
+            // last (computeAvgFutureStint), NOT the maxStint-clamped
+            // realMaxStintMin (which was stuck at "40:00"). Text is red
+            // when out of the safe window (warn), white otherwise —
+            // mirrors iOS `data.warn ? .red : .white`. Value formatted
+            // M:SS from total seconds, like iOS `secondsToHMS`.
+            val data = raceVM.computeAvgFutureStint(raceClockMs)
+            if (data != null) {
+                val totalSec = (data.avgMin * 60).toInt()
+                MonoValue(
+                    "%d:%02d".format(totalSec / 60, totalSec % 60),
+                    if (data.warn) Color(0xFFFF453A) else Color.White,
+                    mainFont,
+                )
             } else {
                 MonoValue("--:--", BoxBoxNowColors.SystemGray, mainFont)
             }
