@@ -25,6 +25,11 @@ export const STORAGE_KEYS = {
   // Tied to a logged-in user — clear on logout.
   CHAT_SESSION: "boxboxnow-chat-session",
 
+  // "1" when the user dismissed the floating assistant launcher.
+  // Session-bound so it survives reloads but the assistant comes back
+  // on next login (the discreet re-activation path).
+  CHAT_HIDDEN: "bbn_chat_hidden",
+
   // RaceBox finish-line GPS coords cached by the lap tracker.
   RACEBOX_FINISH_LINE: "bbn-racebox-finishline",
 
@@ -57,6 +62,7 @@ const SESSION_BOUND_KEYS: readonly string[] = [
   STORAGE_KEYS.AUTH,
   STORAGE_KEYS.PENDING_PLAN,
   STORAGE_KEYS.CHAT_SESSION,
+  STORAGE_KEYS.CHAT_HIDDEN,
   STORAGE_KEYS.RACEBOX_FINISH_LINE,
 ];
 

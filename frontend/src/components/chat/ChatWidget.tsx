@@ -40,6 +40,17 @@ export function ChatWidget() {
   const user = useAuth((s) => s.user);
 
   const [open, setOpen] = useState(false);
+  // Persisted launcher dismissal. Lazy-init from localStorage so the
+  // bubble never flashes before an effect runs. Cleared on logout
+  // (SESSION_BOUND_KEYS) ⇒ reappears next login.
+  const [hidden, setHidden] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return localStorage.getItem(STORAGE_KEYS.CHAT_HIDDEN) === "1";
+    } catch {
+      return false;
+    }
+  });
   const [input, setInput] = useState("");
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -112,6 +123,15 @@ export function ChatWidget() {
   if (!token || !user) return null;
   const allowed = user.is_admin || (user.tab_access || []).includes("chat");
   if (!allowed) return null;
+  if (hidden) return null;
+
+  function hideWidget() {
+    setOpen(false);
+    setHidden(true);
+    try {
+      localStorage.setItem(STORAGE_KEYS.CHAT_HIDDEN, "1");
+    } catch {}
+  }
 
   function resetConversation() {
     setTurns([]);
@@ -210,13 +230,26 @@ export function ChatWidget() {
   return (
     <>
       {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          className="fixed bottom-5 right-5 z-[90] flex h-14 w-14 items-center justify-center rounded-full bg-accent text-black shadow-2xl shadow-black/50 transition-transform hover:scale-105 hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-accent/60"
-          aria-label="Abrir asistente"
-        >
-          <MessageCircle className="h-7 w-7" />
-        </button>
+        <div className="fixed bottom-5 right-5 z-[90]">
+          <button
+            onClick={() => setOpen(true)}
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-black shadow-2xl shadow-black/50 transition-transform hover:scale-105 hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-accent/60"
+            aria-label="Abrir asistente"
+          >
+            <MessageCircle className="h-7 w-7" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              hideWidget();
+            }}
+            title="Ocultar asistente (vuelve al cerrar sesión)"
+            aria-label="Ocultar asistente"
+            className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-card text-neutral-400 shadow-md transition-colors hover:bg-bg hover:text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
       )}
 
       {open && (
