@@ -281,6 +281,7 @@ async def apply_extracts(
                 avg_lap_ms=avg_lap_ms,
                 median_lap_ms=median_lap_ms,
                 final_position=rep.final_position,
+                apex_last_position=rep.apex_last_position,
                 duration_s=rep.duration_s,
             ))
 
@@ -390,6 +391,7 @@ async def apply_extracts(
                 kart_bias_ms=b,
                 corrected_avg_ms=corrected,
                 final_position=(s.final_position if is_race else None),
+                apex_last_position=s.apex_last_position,
                 session_type=agg_group[0].session_type,
                 team_mode=agg_group[0].team_mode,
                 effective_score=key[canon],
