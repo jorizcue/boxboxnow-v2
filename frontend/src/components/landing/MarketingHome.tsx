@@ -10,33 +10,32 @@ import { TrialCTA, TrialSubtitle } from "@/components/landing/TrialCTA";
 const features = [
   {
     title: "Posiciones en tiempo real",
-    desc: "Sigue cada kart en pista con actualizaciones al segundo. Posicion, vueltas, gaps e intervalos.",
-    stat: "0.3s",
-    statLabel: "latencia",
+    desc: "Sigue cada kart en pista con actualizaciones al instante. Posición, vueltas, gaps e intervalos.",
+    stat: "LIVE",
+    statLabel: "tiempo real",
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
       </svg>
     ),
-    large: true,
   },
   {
-    title: "Gestion de boxes",
-    desc: "Cola FIFO inteligente, prediccion de ventana de parada y analisis de tiempos de pit.",
-    stat: "FIFO",
-    statLabel: "cola inteligente",
+    title: "Gestión de boxes",
+    desc: "Cola inteligente, mapa de calor del box y análisis de tiempos de pit para clavar cada parada.",
+    stat: "BOX",
+    statLabel: "estrategia de paradas",
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
       </svg>
     ),
-    large: true,
   },
   {
-    title: "Clasificacion ajustada",
+    title: "Clasificación ajustada",
     desc: "Algoritmo propio que calcula posiciones reales considerando paradas y bonificaciones.",
-    stat: "100%",
-    statLabel: "precision",
+    stat: "PRO",
+    statLabel: "precisión",
+    soon: true,
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
@@ -44,21 +43,21 @@ const features = [
     ),
   },
   {
-    title: "Vista de piloto",
-    desc: "Interfaz optimizada para el piloto: siguiente stint, tiempos objetivo y estado del equipo.",
-    stat: "1-TAP",
-    statLabel: "acceso rapido",
+    title: "App móvil nativa",
+    desc: "Apps nativas iOS y Android para el piloto: siguiente stint, tiempos objetivo y estado del equipo.",
+    stat: "APP",
+    statLabel: "iOS y Android",
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
       </svg>
     ),
   },
   {
-    title: "Analitica de karts",
-    desc: "Historial de rendimiento por kart, rankings de velocidad y deteccion de outliers.",
-    stat: "200+",
-    statLabel: "metricas",
+    title: "Análisis de karts",
+    desc: "Historial de rendimiento por kart, rankings de velocidad y detección de outliers.",
+    stat: "+200",
+    statLabel: "métricas",
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
@@ -68,9 +67,9 @@ const features = [
   },
   {
     title: "GPS Insights",
-    desc: "Telemetria GPS con comparativa de vueltas, velocidad en curva y fuerzas G.",
-    stat: "10Hz",
-    statLabel: "frecuencia GPS",
+    desc: "Telemetría GPS con comparativa de vueltas, velocidad en curva y fuerzas G.",
+    stat: "50 Hz",
+    statLabel: "RaceBox",
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -78,40 +77,41 @@ const features = [
       </svg>
     ),
   },
+  {
+    title: "Replay de carreras",
+    desc: "Revive cualquier carrera con todos los datos en vivo para estudiar y afinar tu estrategia.",
+    stat: "REPLAY",
+    statLabel: "estudio de estrategia",
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+      </svg>
+    ),
+  },
+  {
+    title: "Integración con APEX",
+    desc: "Conexión 100% con el cronometraje oficial APEX Timing instalado en los circuitos.",
+    stat: "100%",
+    statLabel: "timing APEX",
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+      </svg>
+    ),
+  },
 ];
 
-const steps = [
-  {
-    num: "01",
-    title: "Configura tu carrera",
-    desc: "Selecciona circuito, duracion, equipos y parametros de stint.",
-    icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-  },
-  {
-    num: "02",
-    title: "Datos en tiempo real",
-    desc: "Recibe los tiempos del cronometraje oficial del circuito de forma instantanea.",
-    icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-      </svg>
-    ),
-  },
-  {
-    num: "03",
-    title: "Toma decisiones",
-    desc: "Visualiza datos en vivo y optimiza tu estrategia de paradas.",
-    icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-      </svg>
-    ),
-  },
+// The pains a karting endurance team has to answer on the wall, in
+// seconds (source: marketing brief §2). Replaces the old generic
+// "listo en 3 pasos" — leading with the real problem converts better.
+const problems = [
+  "¿Cuánto lleva mi piloto en pista?",
+  "¿Cuándo abre mi ventana de pit?",
+  "¿Cuántas vueltas quedan antes del stint máximo?",
+  "¿Qué karts entran a box en los próximos 2 minutos?",
+  "¿Estamos cumpliendo el tiempo mínimo de piloto?",
+  "¿Qué tiempo hace mi piloto frente a la media del campo?",
+  "¿Cuál es el kart más rápido hoy?",
 ];
 
 const circuits = [
@@ -129,7 +129,7 @@ const demoHighlights = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
       </svg>
     ),
-    text: "Actualizacion cada 0.3s",
+    text: "Actualización en tiempo real",
   },
   {
     icon: (
@@ -137,7 +137,7 @@ const demoHighlights = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
       </svg>
     ),
-    text: "6 columnas de datos en vivo",
+    text: "Más de 30 métricas calculadas en tiempo real",
   },
   {
     icon: (
@@ -145,7 +145,7 @@ const demoHighlights = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
       </svg>
     ),
-    text: "Deteccion automatica de pit stops",
+    text: "Detección automática de pit stops",
   },
 ];
 
@@ -180,7 +180,7 @@ export function MarketingHome() {
           <div className="animate-fade-in-up mb-3">
             <span className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/5 px-4 py-1.5 text-xs font-medium text-accent tracking-wide">
               <span className="led-dot" />
-              Usado por equipos en 5+ circuitos de Espana y Europa
+              Usado por equipos en circuitos de España y Europa
             </span>
           </div>
 
@@ -196,7 +196,7 @@ export function MarketingHome() {
             style={{ animationDelay: "0.25s" }}
           >
             Monitoriza posiciones, optimiza paradas en boxes y toma decisiones
-            estrategicas con datos en vivo. La herramienta que usan los equipos
+            estratégicas con datos en vivo. La herramienta que usan los equipos
             profesionales de endurance.
           </p>
 
@@ -217,7 +217,7 @@ export function MarketingHome() {
               href="#demo"
               className="group rounded-xl border border-border/60 px-8 py-4 text-base font-medium text-neutral-400 hover:border-accent/40 hover:text-white transition-all duration-300"
             >
-              Ver en accion
+              Ver en acción
               <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">&rarr;</span>
             </a>
           </div>
@@ -242,10 +242,10 @@ export function MarketingHome() {
         </div>
       </section>
 
-      {/* ===== FEATURES — Bento Grid ===== */}
-      <section id="funcionalidades" className="py-20 sm:py-28">
+      {/* ===== FEATURES — 8-card grid ===== */}
+      <section id="funcionalidades" className="py-14 sm:py-20">
         <div className="mx-auto max-w-6xl px-6">
-          <div className="mx-auto max-w-2xl text-center mb-20">
+          <div className="mx-auto max-w-2xl text-center mb-12">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent mb-4">
               Funcionalidades
             </p>
@@ -257,15 +257,17 @@ export function MarketingHome() {
             </h2>
           </div>
 
-          {/* Bento layout: 2 large cards on top, 4 smaller below */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {features.map((f) => (
               <div
                 key={f.title}
-                className={`group gradient-border p-6 transition-all duration-300 hover:-translate-y-1 ${
-                  f.large ? "lg:col-span-2" : ""
-                }`}
+                className="group gradient-border p-6 transition-all duration-300 hover:-translate-y-1 relative"
               >
+                {f.soon && (
+                  <span className="absolute top-4 right-4 rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[9px] font-bold text-amber-300 uppercase tracking-wider">
+                    Próximamente
+                  </span>
+                )}
                 {/* Icon + Stat row */}
                 <div className="flex items-start justify-between mb-5">
                   <div className="flex items-center gap-3">
@@ -295,61 +297,66 @@ export function MarketingHome() {
         </div>
       </section>
 
-      {/* ===== HOW IT WORKS ===== */}
-      <section className="relative py-20 sm:py-28 overflow-hidden">
+      {/* ===== THE PROBLEM WE SOLVE ===== */}
+      <section className="relative py-14 sm:py-20 overflow-hidden">
         {/* Subtle gradient background */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(159,229,86,0.03)_0%,transparent_50%)]" />
 
         <div className="relative mx-auto max-w-5xl px-6">
-          <div className="text-center mb-20">
+          <div className="text-center mb-12">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent mb-4">
-              Proceso
+              El problema
             </p>
-            <h2 className="text-3xl font-bold sm:text-4xl">
-              Listo en 3 pasos
+            <h2 className="text-3xl font-bold sm:text-4xl leading-tight">
+              Lo que tu equipo necesita saber{" "}
+              <span className="bg-gradient-to-r from-accent to-accent-hover bg-clip-text text-transparent">
+                en segundos
+              </span>
             </h2>
+            <p className="mt-4 text-neutral-500 max-w-2xl mx-auto">
+              El karting de resistencia se decide en el muro. Hoy se resuelve con
+              cronómetro de pulsera, hojas de Excel, walkie-talkies y pizarras.
+              BoxBoxNow te lo responde en tiempo real.
+            </p>
           </div>
 
-          <div className="relative">
-            {/* Timeline connector — thicker gradient */}
-            <div className="hidden md:block absolute top-12 left-[15%] right-[15%] h-[2px] bg-gradient-to-r from-transparent via-accent/30 to-transparent" />
-
-            <div className="grid gap-12 md:grid-cols-3 md:gap-8">
-              {steps.map((s) => (
-                <div key={s.num} className="relative text-center group">
-                  {/* Step circle — larger */}
-                  <div className="relative z-10 mx-auto flex h-24 w-24 items-center justify-center rounded-2xl border border-accent/20 bg-black/80 backdrop-blur text-accent transition-all duration-300 group-hover:border-accent/50 group-hover:shadow-[0_0_40px_rgba(159,229,86,0.12)]">
-                    {s.icon}
-                  </div>
-                  <span className="stat-number inline-block mt-4 text-[11px] font-bold text-accent/50 tracking-wider">
-                    {s.num}
-                  </span>
-                  <h3 className="mt-2 text-lg font-semibold text-white">
-                    {s.title}
-                  </h3>
-                  <p className="mt-2 text-sm text-neutral-500 max-w-[280px] mx-auto">{s.desc}</p>
-                </div>
-              ))}
-            </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {problems.map((q) => (
+              <div
+                key={q}
+                className="flex items-start gap-3 rounded-xl border border-border/50 bg-surface/40 px-5 py-4 transition-colors hover:border-accent/30"
+              >
+                <svg
+                  className="mt-0.5 h-5 w-5 shrink-0 text-accent"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm text-neutral-300">{q}</span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* ===== LIVE DEMO (Mini Race Table) ===== */}
-      <section id="demo" className="py-20 sm:py-28">
+      <section id="demo" className="py-14 sm:py-20">
         <div className="mx-auto max-w-5xl px-6">
-          <div className="text-center mb-16">
+          <div className="text-center mb-10">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent mb-4">
               Demo en vivo
             </p>
             <h2 className="text-3xl font-bold sm:text-4xl">
-              Miralo en{" "}
+              Míralo en{" "}
               <span className="bg-gradient-to-r from-accent to-accent-hover bg-clip-text text-transparent">
-                accion
+                acción
               </span>
             </h2>
             <p className="mt-4 text-neutral-500 max-w-lg mx-auto">
-              Datos actualizandose en tiempo real, como en una carrera de verdad.
+              Datos actualizándose en tiempo real, como en una carrera de verdad.
             </p>
           </div>
 
@@ -363,7 +370,7 @@ export function MarketingHome() {
               <span className="ml-4 font-mono text-[11px] text-neutral-600">app.boxboxnow.com/race</span>
             </div>
             {/* Content: animated mini race table */}
-            <div className="bg-black/40 p-4 sm:p-8">
+            <div className="bg-black/40 p-0">
               <MiniRaceTable />
             </div>
           </div>
@@ -383,7 +390,7 @@ export function MarketingHome() {
       {/* ===== PRICING ===== */}
       <section
         id="precios"
-        className="relative py-20 sm:py-28 overflow-hidden"
+        className="relative py-14 sm:py-20 overflow-hidden"
       >
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(159,229,86,0.03)_0%,transparent_50%)]" />
 
@@ -405,7 +412,7 @@ export function MarketingHome() {
       </section>
 
       {/* ===== FINAL CTA ===== */}
-      <section className="relative py-28 sm:py-36 overflow-hidden">
+      <section className="relative py-20 sm:py-28 overflow-hidden">
         {/* Mesh gradient background */}
         <div className="absolute inset-0">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(159,229,86,0.06)_0%,transparent_50%)]" />
@@ -414,14 +421,14 @@ export function MarketingHome() {
 
         <div className="relative mx-auto max-w-3xl px-6 text-center">
           <h2 className="text-3xl font-bold sm:text-4xl lg:text-5xl leading-tight">
-            &iquest;Listo para llevar tu estrategia al{" "}
+            ¿Listo para llevar tu estrategia al{" "}
             <span className="bg-gradient-to-r from-accent to-accent-hover bg-clip-text text-transparent">
               siguiente nivel
             </span>
             ?
           </h2>
           <p className="mx-auto mt-6 max-w-lg text-lg text-neutral-500">
-            Descubre como BoxBoxNow puede transformar tu estrategia de carrera.
+            Descubre cómo BoxBoxNow puede transformar tu estrategia de carrera.
           </p>
           <TrialCTA
             className="glow-pulse mt-10 inline-block rounded-xl bg-accent px-12 py-4 text-base font-bold text-black hover:bg-accent-hover transition-all duration-300 hover:scale-[1.03]"
@@ -443,7 +450,7 @@ export function MarketingHome() {
                 Estrategia de karting en tiempo real para equipos de endurance.
               </p>
               <p className="mt-2 text-xs text-neutral-600">
-                Hecho en Espana
+                Hecho en España
               </p>
             </div>
 
@@ -460,7 +467,7 @@ export function MarketingHome() {
               <div>
                 <h4 className="font-semibold text-neutral-400 mb-3">Legal</h4>
                 <ul className="space-y-2">
-                  <li><a href="/terminos" className="text-neutral-500 hover:text-accent transition-colors">Terminos</a></li>
+                  <li><a href="/terminos" className="text-neutral-500 hover:text-accent transition-colors">Términos</a></li>
                   <li><a href="/privacidad" className="text-neutral-500 hover:text-accent transition-colors">Privacidad</a></li>
                   <li><a href="/cookies" className="text-neutral-500 hover:text-accent transition-colors">Cookies</a></li>
                 </ul>
@@ -468,7 +475,7 @@ export function MarketingHome() {
               <div>
                 <h4 className="font-semibold text-neutral-400 mb-3">Contacto</h4>
                 <ul className="space-y-2">
-                  <li><a href="mailto:contacto@boxboxnow.com" className="text-neutral-500 hover:text-accent transition-colors">contacto@boxboxnow.com</a></li>
+                  <li><a href="mailto:info@kartingnow.com" className="text-neutral-500 hover:text-accent transition-colors">info@kartingnow.com</a></li>
                 </ul>
               </div>
             </div>

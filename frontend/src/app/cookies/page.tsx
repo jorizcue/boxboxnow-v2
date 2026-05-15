@@ -233,10 +233,10 @@ export default function CookiesPage() {
             Si tienes preguntas sobre el uso de cookies o quieres ejercer tus
             derechos, contacta con nosotros en{" "}
             <a
-              href="mailto:contacto@boxboxnow.com"
+              href="mailto:info@kartingnow.com"
               className="text-[#9fe556] hover:underline"
             >
-              contacto@boxboxnow.com
+              info@kartingnow.com
             </a>
             .
           </p>

@@ -12,6 +12,10 @@ interface PlanData {
   price_amount: number | null;
   billing_interval: string | null;  // "month", "year", "one_time"
   is_popular: boolean;
+  // Admin "venta próximamente" flag. Optional so FALLBACK_PLANS below
+  // (and any older cached payload) don't need the key — treated as
+  // false when absent.
+  coming_soon?: boolean;
   sort_order: number;
 }
 
@@ -31,6 +35,7 @@ interface GroupedPlan {
   plan_type_annual: string | null;
   plan_type_event: string | null;
   is_popular: boolean;
+  coming_soon: boolean;
   is_event: boolean;
   sort_order: number;
 }
@@ -169,6 +174,7 @@ function groupPlans(raw: PlanData[]): GroupedPlan[] {
         plan_type_annual: isAnnual ? p.plan_type : null,
         plan_type_event: isEvent ? p.plan_type : null,
         is_popular: p.is_popular,
+        coming_soon: p.coming_soon ?? false,
         is_event: isEvent,
         sort_order: p.sort_order,
       });
@@ -187,6 +193,7 @@ function groupPlans(raw: PlanData[]): GroupedPlan[] {
         existing.plan_type_event = p.plan_type;
       }
       if (p.is_popular) existing.is_popular = true;
+      if (p.coming_soon) existing.coming_soon = true;
       if (p.features.length > existing.features.length) existing.features = p.features;
     }
   }
@@ -424,7 +431,7 @@ export function PricingToggle() {
                     if (savePct <= 0) return null;
                     return (
                       <span className="inline-block mt-2 rounded-full bg-accent/15 border border-accent/30 px-2.5 py-0.5 text-[10px] font-semibold text-accent">
-                        2 meses gratis \u00B7 ahorras {savePct}%
+                        2 meses gratis &mdash; ahorras {savePct}%
                       </span>
                     );
                   })()
@@ -461,54 +468,61 @@ export function PricingToggle() {
                 ))}
               </ul>
 
-              <a
-                href={planButtonHref(plan)}
-                onClick={() => {
-                  // Funnel: plan click. We don't preventDefault — the
-                  // navigation continues. tracker.ts uses sendBeacon on
-                  // pagehide so the event survives the page transition.
-                  const isAnnual = effectivelyAnnual(plan);
-                  const planParam =
-                    plan.is_event
-                      ? (plan.plan_type_event ?? "event")
-                      : (isAnnual ? plan.plan_type_annual : plan.plan_type_monthly)
-                          ?? `${plan.base_type}${isAnnual ? "_annual" : "_monthly"}`;
-                  trackFunnel("pricing.plan_click", {
-                    plan_type: planParam,
-                    base_type: plan.base_type,
-                    interval: plan.is_event ? "event" : isAnnual ? "annual" : "monthly",
-                    is_popular: plan.is_popular,
-                  });
-                }}
-                className={`block w-full rounded-xl py-3.5 text-center text-sm font-bold uppercase tracking-wide transition-all duration-200 ${
-                  plan.is_popular
-                    ? "bg-accent text-black hover:bg-accent-hover shadow-[0_0_20px_rgba(159,229,86,0.15)] hover:shadow-[0_0_30px_rgba(159,229,86,0.3)]"
-                    : plan.is_event
-                      ? "bg-gradient-to-r from-gold/90 to-yellow-500/90 text-black border border-gold/50 hover:shadow-[0_0_20px_rgba(234,179,8,0.2)]"
-                      : "bg-white/[0.06] border-2 border-accent/30 text-accent hover:border-accent/60 hover:bg-accent/10 hover:shadow-[0_0_20px_rgba(159,229,86,0.1)]"
-                }`}
-              >
-                {planButtonText(plan)}
-              </a>
+              {plan.coming_soon ? (
+                <div
+                  aria-disabled="true"
+                  title="Este plan estará disponible próximamente"
+                  className="block w-full rounded-xl py-3.5 text-center text-sm font-bold uppercase tracking-wide bg-white/[0.04] border-2 border-border/60 text-muted/40 cursor-not-allowed select-none"
+                >
+                  Pr&oacute;ximamente
+                </div>
+              ) : (
+                <a
+                  href={planButtonHref(plan)}
+                  onClick={() => {
+                    // Funnel: plan click. We don't preventDefault — the
+                    // navigation continues. tracker.ts uses sendBeacon on
+                    // pagehide so the event survives the page transition.
+                    const isAnnual = effectivelyAnnual(plan);
+                    const planParam =
+                      plan.is_event
+                        ? (plan.plan_type_event ?? "event")
+                        : (isAnnual ? plan.plan_type_annual : plan.plan_type_monthly)
+                            ?? `${plan.base_type}${isAnnual ? "_annual" : "_monthly"}`;
+                    trackFunnel("pricing.plan_click", {
+                      plan_type: planParam,
+                      base_type: plan.base_type,
+                      interval: plan.is_event ? "event" : isAnnual ? "annual" : "monthly",
+                      is_popular: plan.is_popular,
+                    });
+                  }}
+                  className={`block w-full rounded-xl py-3.5 text-center text-sm font-bold uppercase tracking-wide transition-all duration-200 ${
+                    plan.is_popular
+                      ? "bg-accent text-black hover:bg-accent-hover shadow-[0_0_20px_rgba(159,229,86,0.15)] hover:shadow-[0_0_30px_rgba(159,229,86,0.3)]"
+                      : plan.is_event
+                        ? "bg-gradient-to-r from-gold/90 to-yellow-500/90 text-black border border-gold/50 hover:shadow-[0_0_20px_rgba(234,179,8,0.2)]"
+                        : "bg-white/[0.06] border-2 border-accent/30 text-accent hover:border-accent/60 hover:bg-accent/10 hover:shadow-[0_0_20px_rgba(159,229,86,0.1)]"
+                  }`}
+                >
+                  {planButtonText(plan)}
+                </a>
+              )}
             </div>
           </div>
         ))}
       </div>
 
       {/* Extra notes */}
-      <div className="mt-14 text-center space-y-2">
+      <div className="mt-14 text-center">
         <p className="text-sm text-muted/30">
-          Circuitos adicionales desde 15{"\u20AC"}/mes
-        </p>
-        <p className="text-sm text-muted/30">
-          &iquest;Eres un circuito?{" "}
+          &iquest;Tu circuito no est&aacute; disponible en la app? Escr&iacute;benos a{" "}
           <a
-            href="mailto:contacto@boxboxnow.com"
+            href="mailto:info@kartingnow.com"
             className="text-accent/70 hover:text-accent hover:underline transition-colors"
           >
-            Contacta para planes Enterprise
-          </a>
-          .
+            info@kartingnow.com
+          </a>{" "}
+          y lo a&ntilde;adimos.
         </p>
       </div>
     </div>

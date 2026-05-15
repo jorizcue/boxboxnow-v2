@@ -542,6 +542,7 @@ export const api = {
       price_amount: number | null;
       billing_interval: string | null;
       is_popular: boolean;
+      coming_soon: boolean;
       sort_order: number;
       per_circuit: boolean;
       circuits_to_select: number;

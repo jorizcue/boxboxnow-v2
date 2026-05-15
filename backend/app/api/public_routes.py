@@ -54,6 +54,7 @@ async def list_plans(db: AsyncSession = Depends(get_db)):
             "price_amount": c.price_amount,
             "billing_interval": c.billing_interval,
             "is_popular": c.is_popular,
+            "coming_soon": bool(c.coming_soon) if c.coming_soon is not None else False,
             "sort_order": c.sort_order,
             "per_circuit": bool(c.per_circuit) if c.per_circuit is not None else True,
             "circuits_to_select": int(c.circuits_to_select) if c.circuits_to_select else 1,

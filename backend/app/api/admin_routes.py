@@ -890,6 +890,7 @@ def _serialize_config(c, _json) -> dict:
         "price_amount": c.price_amount,
         "billing_interval": c.billing_interval,
         "is_popular": c.is_popular,
+        "coming_soon": bool(c.coming_soon) if c.coming_soon is not None else False,
         "is_visible": c.is_visible,
         "sort_order": c.sort_order,
         "email_template": c.email_template or "",
@@ -939,6 +940,7 @@ async def create_product_config(request: Request, admin: User = Depends(require_
         price_amount=body.get("price_amount"),
         billing_interval=body.get("billing_interval"),
         is_popular=body.get("is_popular", False),
+        coming_soon=body.get("coming_soon", False),
         is_visible=body.get("is_visible", True),
         sort_order=body.get("sort_order", 0),
         email_template=body.get("email_template") or None,
@@ -998,7 +1000,7 @@ async def update_product_config(config_id: int, request: Request, admin: User = 
     for field in ("price_amount",):
         if field in body:
             setattr(config, field, body[field])
-    for field in ("is_popular", "is_visible"):
+    for field in ("is_popular", "coming_soon", "is_visible"):
         if field in body:
             setattr(config, field, body[field])
     if "email_template" in body:

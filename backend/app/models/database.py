@@ -362,6 +362,11 @@ async def init_db():
             await conn.execute(text("ALTER TABLE product_tab_config ADD COLUMN per_circuit BOOLEAN DEFAULT 1 NOT NULL"))
         except Exception:
             pass
+        # "Venta próximamente" flag — plan announced but not yet on sale.
+        try:
+            await conn.execute(text("ALTER TABLE product_tab_config ADD COLUMN coming_soon BOOLEAN DEFAULT 0 NOT NULL"))
+        except Exception:
+            pass
 
         # Drop UNIQUE constraint on product_tab_config.plan_type so the same
         # label can be reused across multiple products. stripe_price_id remains

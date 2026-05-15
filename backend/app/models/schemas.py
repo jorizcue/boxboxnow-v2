@@ -424,6 +424,11 @@ class ProductTabConfig(Base):
     price_amount = Column(Float, nullable=True)  # Price in EUR for this specific interval
     billing_interval = Column(String(20), nullable=True)  # "month", "year", "one_time"
     is_popular = Column(Boolean, default=False, nullable=False)
+    # When True the plan is announced but not yet on sale: the landing
+    # disables its subscribe button ("Próximamente") and the comparison
+    # table flags the column. Purely presentational — does NOT block the
+    # Stripe checkout route, so an admin can still test purchases.
+    coming_soon = Column(Boolean, default=False, nullable=False)
     is_visible = Column(Boolean, default=True, nullable=False)
     sort_order = Column(Integer, default=0, nullable=False)
     # Optional custom HTML body for the subscription confirmation email.

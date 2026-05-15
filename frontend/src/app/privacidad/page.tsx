@@ -36,10 +36,10 @@ export default function PrivacidadPage() {
             Puedes contactar con nosotros para cualquier cuestión relativa a la
             privacidad en{" "}
             <a
-              href="mailto:contacto@boxboxnow.com"
+              href="mailto:info@kartingnow.com"
               className="text-[#9fe556] hover:underline"
             >
-              contacto@boxboxnow.com
+              info@kartingnow.com
             </a>
             .
           </p>
@@ -216,10 +216,10 @@ export default function PrivacidadPage() {
           <p>
             Para ejercer cualquiera de estos derechos, escríbenos a{" "}
             <a
-              href="mailto:contacto@boxboxnow.com"
+              href="mailto:info@kartingnow.com"
               className="text-[#9fe556] hover:underline"
             >
-              contacto@boxboxnow.com
+              info@kartingnow.com
             </a>
             . Asimismo, tienes derecho a presentar una reclamación ante la
             Agencia Española de Protección de Datos (
@@ -264,10 +264,10 @@ export default function PrivacidadPage() {
             completamente seguro; si detectas cualquier incidencia relacionada
             con tu cuenta, comunícalo de inmediato a{" "}
             <a
-              href="mailto:contacto@boxboxnow.com"
+              href="mailto:info@kartingnow.com"
               className="text-[#9fe556] hover:underline"
             >
-              contacto@boxboxnow.com
+              info@kartingnow.com
             </a>
             .
           </p>

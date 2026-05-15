@@ -1674,6 +1674,7 @@ function PlatformSettingsManager() {
     price_amount: null as number | null,
     billing_interval: "" as string,
     is_popular: false,
+    coming_soon: false,
     is_visible: true,
     sort_order: 0,
     email_template: "",
@@ -1712,6 +1713,7 @@ function PlatformSettingsManager() {
       price_amount: c.price_amount ?? null,
       billing_interval: c.billing_interval || "",
       is_popular: c.is_popular,
+      coming_soon: c.coming_soon ?? false,
       is_visible: c.is_visible,
       sort_order: c.sort_order,
       email_template: c.email_template || "",
@@ -2581,6 +2583,15 @@ function PlatformSettingsManager() {
                           className="accent-accent"
                         />
                         Visible en pricing
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-neutral-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={configForm.coming_soon}
+                          onChange={(e) => setConfigForm((p) => ({ ...p, coming_soon: e.target.checked }))}
+                          className="accent-accent"
+                        />
+                        Venta pr&oacute;ximamente
                       </label>
                     </div>
 

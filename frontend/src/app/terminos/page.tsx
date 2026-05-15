@@ -75,10 +75,10 @@ export default function TerminosPage() {
             Si detectas cualquier uso no autorizado, debes notificarlo de
             inmediato a{" "}
             <a
-              href="mailto:contacto@boxboxnow.com"
+              href="mailto:info@kartingnow.com"
               className="text-[#9fe556] hover:underline"
             >
-              contacto@boxboxnow.com
+              info@kartingnow.com
             </a>
             .
           </p>
@@ -194,10 +194,10 @@ export default function TerminosPage() {
             Para cualquier consulta relacionada con estos términos, puedes
             contactarnos en{" "}
             <a
-              href="mailto:contacto@boxboxnow.com"
+              href="mailto:info@kartingnow.com"
               className="text-[#9fe556] hover:underline"
             >
-              contacto@boxboxnow.com
+              info@kartingnow.com
             </a>
             .
           </p>

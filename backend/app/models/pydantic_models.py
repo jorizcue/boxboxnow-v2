@@ -665,6 +665,7 @@ class ProductTabConfigOut(BaseModel):
     price_amount: float | None = None
     billing_interval: str | None = None
     is_popular: bool = False
+    coming_soon: bool = False
     is_visible: bool = True
     sort_order: int = 0
 
@@ -689,6 +690,7 @@ class ProductTabConfigCreate(BaseModel):
     price_amount: float | None = None
     billing_interval: str | None = None
     is_popular: bool = False
+    coming_soon: bool = False
     is_visible: bool = True
     sort_order: int = 0
 
@@ -711,6 +713,7 @@ class ProductTabConfigUpdate(BaseModel):
     price_amount: float | None = None
     billing_interval: str | None = None
     is_popular: bool | None = None
+    coming_soon: bool | None = None
     is_visible: bool | None = None
     sort_order: int | None = None
 
@@ -724,6 +727,7 @@ class PlanPublicOut(BaseModel):
     price_amount: float | None = None
     billing_interval: str | None = None
     is_popular: bool = False
+    coming_soon: bool = False
     sort_order: int = 0
     per_circuit: bool = True
     # Mirrors ProductTabConfig.circuits_to_select. Exposed publicly so the

@@ -27,8 +27,9 @@
  * tweak features, edit that one array.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { api } from "@/lib/api";
 import { useTracker } from "@/hooks/useTracker";
 
 // Columns of the table — order is left → right.
@@ -48,6 +49,27 @@ const COLUMNS: readonly Column[] = [
 ] as const;
 
 type ColumnKey = Column["key"];
+
+// Map a backend plan (plan_type + billing_interval) to the table
+// column it represents, so the admin "venta próximamente" flag on a
+// product surfaces as a "Próximamente" badge on the right column.
+// Substring matching mirrors PricingToggle.getTierGradient — robust to
+// admin-created plan_types that don't follow the *_monthly/_annual
+// convention. Basic only has a monthly column.
+function colKeyForPlan(planType: string, interval: string | null): ColumnKey | null {
+  const t = (planType || "").toLowerCase();
+  const annual = interval === "year" || /_annual$|_year$/.test(t);
+  if (t.includes("endurance_pro") || (t.includes("pro") && !t.includes("basic"))) {
+    return annual ? "end_pro_a" : "end_pro_m";
+  }
+  if (t.includes("endurance_basic") || t.includes("basic")) {
+    return "end_b";
+  }
+  if (t.includes("individual")) {
+    return annual ? "ind_a" : "ind_m";
+  }
+  return null;
+}
 
 // Cell value primitives. Anything that's not a primitive falls back
 // to a literal string render.
@@ -197,8 +219,8 @@ const ROWS: Row[] = [
       ind_m: NO,
       ind_a: NO,
       end_b: NO,
-      end_pro_m: limited("Limitado"),
-      end_pro_a: YES,
+      end_pro_m: NO,
+      end_pro_a: NO,
     },
   },
   {
@@ -211,8 +233,8 @@ const ROWS: Row[] = [
       ind_m: NO,
       ind_a: YES,
       end_b: NO,
-      end_pro_m: limited("Limitado"),
-      end_pro_a: YES,
+      end_pro_m: NO,
+      end_pro_a: NO,
     },
   },
   {
@@ -232,6 +254,28 @@ export function FeatureComparisonTable() {
   const ref = useRef<HTMLDivElement | null>(null);
   const firedRef = useRef(false);
   const { trackFunnel } = useTracker();
+
+  // Columns flagged "venta próximamente" from the admin product config.
+  const [comingSoon, setComingSoon] = useState<Partial<Record<ColumnKey, boolean>>>({});
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getPlans()
+      .then((plans) => {
+        if (cancelled || !plans) return;
+        const map: Partial<Record<ColumnKey, boolean>> = {};
+        for (const p of plans) {
+          if (!p.coming_soon) continue;
+          const k = colKeyForPlan(p.plan_type, p.billing_interval);
+          if (k) map[k] = true;
+        }
+        setComingSoon(map);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   useEffect(() => {
     const el = ref.current;
     if (!el || firedRef.current) return;
@@ -293,9 +337,14 @@ export function FeatureComparisonTable() {
                       {col.label}
                     </span>
                     <span className="text-[11px] text-neutral-500">{col.sub}</span>
-                    {col.popular && (
+                    {col.popular && !comingSoon[col.key] && (
                       <span className="mt-1 rounded-full bg-accent px-2 py-0.5 text-[9px] font-bold text-black uppercase tracking-wider">
                         Popular
+                      </span>
+                    )}
+                    {comingSoon[col.key] && (
+                      <span className="mt-1 rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[9px] font-bold text-amber-300 uppercase tracking-wider">
+                        Pr&oacute;ximamente
                       </span>
                     )}
                   </div>

@@ -56,6 +56,11 @@ export function AdminRankingPanel() {
   const [circuits, setCircuits] = useState<RankingCircuitRow[]>([]);
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<RankingSearchRow[]>([]);
+  // Client-side filter for the leaderboard table below. Independent
+  // from `search` (which is server-side and drives the merge tool) —
+  // this just narrows the rows already loaded so you can jump to a
+  // name without re-querying.
+  const [tableFilter, setTableFilter] = useState("");
   const [mergeMode, setMergeMode] = useState<{ from: RankingSearchRow | null }>({ from: null });
   const [reprocessStatus, setReprocessStatus] = useState<string | null>(null);
   const [reprocessing, setReprocessing] = useState(false);
@@ -176,6 +181,12 @@ export function AdminRankingPanel() {
     }
   };
 
+  const filteredRows = useMemo(() => {
+    const q = tableFilter.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) => r.canonical_name.toLowerCase().includes(q));
+  }, [rows, tableFilter]);
+
   const ratingStats = useMemo(() => {
     if (!rows.length) return null;
     const ratings = rows.map((r) => r.rating);
@@ -268,6 +279,25 @@ export function AdminRankingPanel() {
           <option value={3}>3</option>
           <option value={5}>5</option>
         </select>
+        <div className="relative ml-auto">
+          <input
+            type="text"
+            value={tableFilter}
+            onChange={(e) => setTableFilter(e.target.value)}
+            placeholder="Filtrar por nombre de piloto…"
+            className="bg-surface border border-border rounded-lg pl-3 pr-7 py-1 text-white placeholder-neutral-500 min-w-[220px] focus:outline-none focus:border-accent"
+          />
+          {tableFilter && (
+            <button
+              type="button"
+              onClick={() => setTableFilter("")}
+              aria-label="Limpiar filtro"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white text-sm leading-none"
+            >
+              ×
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search + merge */}
@@ -340,6 +370,13 @@ export function AdminRankingPanel() {
             ? `No hay pilotos con ratings en ${circuit} con ese mínimo de sesiones. Reduce el filtro o cambia de circuito.`
             : "Todavía no hay pilotos rankeados. Pulsa \"Procesar logs nuevos\" para arrancar el backfill."}
         </div>
+      ) : filteredRows.length === 0 ? (
+        <div className="text-neutral-500 text-sm">
+          Ningún piloto coincide con &ldquo;{tableFilter}&rdquo;.{" "}
+          <button onClick={() => setTableFilter("")} className="underline hover:text-white">
+            Limpiar filtro
+          </button>
+        </div>
       ) : (
         <div className="bg-surface border border-border rounded-xl overflow-hidden">
           <table className="w-full text-sm">
@@ -355,7 +392,7 @@ export function AdminRankingPanel() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {rows.map((d) => (
+              {filteredRows.map((d) => (
                 <tr
                   key={d.driver_id}
                   className="hover:bg-black/20 cursor-pointer"
