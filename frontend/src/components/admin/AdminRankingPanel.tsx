@@ -656,7 +656,7 @@ function DriverDetailModal({
                     <tr key={`${s.log_date}-${s.title1}-${s.title2}-${i}`}>
                       <td className="px-3 py-1.5 text-neutral-400 font-mono">{s.log_date}</td>
                       <td className="px-3 py-1.5 text-white">{s.circuit_name}</td>
-                      <td className="px-3 py-1.5 text-neutral-300 truncate max-w-[180px]" title={fullSession}>
+                      <td className="px-3 py-1.5 text-neutral-300 max-w-[260px] whitespace-normal break-words leading-snug" title={fullSession}>
                         {fullSession}
                       </td>
                       <td className="px-3 py-1.5 text-right text-neutral-400 font-mono">{s.kart_number ?? "—"}</td>
