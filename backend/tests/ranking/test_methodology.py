@@ -40,3 +40,13 @@ def test_conflicting_team_position_raises():
          RatedDriver("B", "t1", 61000.0, 1)]
     with pytest.raises(ValueError):
         effective_scores(f, w=0.7)
+
+
+from app.services.ranking.processor import _ordered_candidates
+
+
+def test_candidates_sorted_globally_by_date_then_circuit():
+    cand = [("RKC_Paris", "2026-05-09"), ("Ariza", "2026-03-28"),
+            ("Gensk", "2026-05-02"), ("Ariza", "2026-03-28")]
+    assert _ordered_candidates(cand) == [
+        ("Ariza", "2026-03-28"), ("Gensk", "2026-05-02"), ("RKC_Paris", "2026-05-09")]

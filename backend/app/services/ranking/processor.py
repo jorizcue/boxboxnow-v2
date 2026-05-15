@@ -557,6 +557,13 @@ async def process_log_file(
     return {"skipped": False, "sessions": sessions_count, "laps": laps_count}
 
 
+def _ordered_candidates(candidates: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Global chronological order: oldest log_date first, deduped,
+    circuit name as deterministic tiebreak. Required so the global
+    Glicko rating evolves in true time order across circuits (spec §8)."""
+    return sorted(set(candidates), key=lambda cd: (cd[1], cd[0]))
+
+
 async def process_pending(db: AsyncSession, recordings_dir: Path) -> dict:
     """Scan `recordings_dir/<Circuit>/<YYYY-MM-DD>.log[.gz]` and process
     every file not yet in `processed_logs`. Done in date order so the
@@ -567,7 +574,7 @@ async def process_pending(db: AsyncSession, recordings_dir: Path) -> dict:
     res = await db.execute(select(ProcessedLog.circuit_name, ProcessedLog.log_date))
     done = {(r[0], r[1]) for r in res.all()}
 
-    candidates: list[tuple[str, str, Path]] = []
+    path_by_key: dict[tuple[str, str], Path] = {}
     for circuit_dir in recordings_dir.iterdir():
         if not circuit_dir.is_dir():
             continue
@@ -584,13 +591,12 @@ async def process_pending(db: AsyncSession, recordings_dir: Path) -> dict:
                 continue
             if (circuit_dir.name, log_date) in done:
                 continue
-            candidates.append((circuit_dir.name, log_date, log_path))
-
-    candidates.sort(key=lambda t: (t[1], t[0]))   # date asc, then circuit
+            path_by_key[(circuit_dir.name, log_date)] = log_path
 
     processed = 0
     skipped = 0
-    for circuit, log_date, path in candidates:
+    for circuit, log_date in _ordered_candidates(list(path_by_key.keys())):
+        path = path_by_key[(circuit, log_date)]
         try:
             result = await process_log_file(path, circuit, log_date, db)
             if result.get("skipped"):
@@ -601,7 +607,7 @@ async def process_pending(db: AsyncSession, recordings_dir: Path) -> dict:
             logger.exception("ranking.process_log_file failed for %s/%s", circuit, log_date)
             await db.rollback()
 
-    return {"processed": processed, "skipped": skipped, "total_candidates": len(candidates)}
+    return {"processed": processed, "skipped": skipped, "total_candidates": len(path_by_key)}
 
 
 async def lookup_ratings_by_names(
