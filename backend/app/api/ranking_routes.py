@@ -28,6 +28,7 @@ from app.models.schemas import User
 from app.services.ranking.processor import (
     get_top_drivers, search_drivers, lookup_ratings_by_names,
     merge_drivers, process_pending,
+    list_circuits_with_ratings, get_driver_detail, reset_ratings,
 )
 
 logger = logging.getLogger(__name__)
@@ -70,13 +71,46 @@ async def lookup_ratings(
 async def admin_top(
     limit: int = 100,
     min_sessions: int = 2,
+    circuit: str | None = None,
     _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Top N drivers ranked by Glicko-2 rating. `min_sessions` filters
-    out one-off entries whose rating is dominated by their initial RD."""
-    rows = await get_top_drivers(db, limit=limit, min_sessions=min_sessions)
-    return {"drivers": rows}
+    out one-off entries whose rating is dominated by their initial RD.
+
+    `circuit` switches between the global table and the per-circuit
+    one. Omit (or send empty string) for global; pass a circuit name
+    for the per-circuit ranking."""
+    circ = (circuit or "").strip() or None
+    rows = await get_top_drivers(db, limit=limit, min_sessions=min_sessions, circuit=circ)
+    return {"drivers": rows, "circuit": circ}
+
+
+@admin_router.get("/circuits")
+async def admin_circuits(
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """List circuits that have at least one per-circuit rating row.
+    Drives the circuit dropdown in the admin Ranking panel."""
+    rows = await list_circuits_with_ratings(db)
+    return {"circuits": rows}
+
+
+@admin_router.get("/driver/{driver_id}")
+async def admin_driver_detail(
+    driver_id: int,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Full per-driver detail: global rating, every per-circuit
+    rating, aliases, all rating-history entries (for the chart), and
+    the last 20 session results. One round-trip ⇒ the admin modal
+    renders everything without follow-up calls."""
+    detail = await get_driver_detail(driver_id, db)
+    if detail is None:
+        raise HTTPException(404, "Driver not found")
+    return detail
 
 
 @admin_router.get("/search")
@@ -129,6 +163,37 @@ async def admin_reprocess(
     if recordings_dir is None:
         raise HTTPException(500, "Recordings dir not found")
     result = await process_pending(db, recordings_dir)
+    return result
+
+
+class ResetRequest(BaseModel):
+    wipe_drivers: bool = False
+    reprocess: bool = True
+
+
+@admin_router.post("/reset")
+async def admin_reset(
+    payload: ResetRequest,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Wipe ratings + history + session_results + processed_logs and
+    re-run the backfill from scratch. Optionally also wipes the
+    drivers table (loses admin merges). Use after refining the
+    Glicko-2 algorithm or the parser — preserves no rating
+    calculation but is fully reproducible from the raw logs.
+
+    Returns the row counts deleted and the reprocess result. Be aware
+    the reprocess step is synchronous in the request; for a fresh DB
+    it can take a couple of minutes."""
+    counts = await reset_ratings(db, wipe_drivers=payload.wipe_drivers)
+    result: dict[str, Any] = {"deleted": counts}
+    if payload.reprocess:
+        recordings_dir = _recordings_dir()
+        if recordings_dir is None:
+            raise HTTPException(500, "Recordings dir not found")
+        rerun = await process_pending(db, recordings_dir)
+        result["reprocess"] = rerun
     return result
 
 

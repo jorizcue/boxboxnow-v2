@@ -702,10 +702,20 @@ export const api = {
       "/api/ranking/lookup",
       { method: "POST", body: JSON.stringify({ names }) },
     ),
-  rankingAdminTop: (limit = 100, minSessions = 2) =>
-    fetchApi<{ drivers: RankingTopRow[] }>(
-      `/api/admin/ranking/top?limit=${limit}&min_sessions=${minSessions}`,
-    ),
+  rankingAdminTop: (limit = 100, minSessions = 2, circuit: string | null = null) => {
+    const qs = new URLSearchParams({
+      limit: String(limit),
+      min_sessions: String(minSessions),
+    });
+    if (circuit) qs.set("circuit", circuit);
+    return fetchApi<{ drivers: RankingTopRow[]; circuit: string | null }>(
+      `/api/admin/ranking/top?${qs.toString()}`,
+    );
+  },
+  rankingAdminCircuits: () =>
+    fetchApi<{ circuits: RankingCircuitRow[] }>("/api/admin/ranking/circuits"),
+  rankingAdminDriverDetail: (driverId: number) =>
+    fetchApi<RankingDriverDetail>(`/api/admin/ranking/driver/${driverId}`),
   rankingAdminSearch: (q: string) =>
     fetchApi<{ drivers: RankingSearchRow[] }>(
       `/api/admin/ranking/search?q=${encodeURIComponent(q)}`,
@@ -719,6 +729,11 @@ export const api = {
     fetchApi<{ processed: number; skipped: number; total_candidates: number }>(
       "/api/admin/ranking/reprocess",
       { method: "POST" },
+    ),
+  rankingAdminReset: (wipeDrivers = false, reprocess = true) =>
+    fetchApi<{ deleted: Record<string, number>; reprocess?: { processed: number; skipped: number; total_candidates: number } }>(
+      "/api/admin/ranking/reset",
+      { method: "POST", body: JSON.stringify({ wipe_drivers: wipeDrivers, reprocess }) },
     ),
 };
 
@@ -743,6 +758,7 @@ export interface RankingTopRow {
   sessions_count: number;
   total_laps: number;
   last_session_at: string | null;
+  circuit_name: string | null;
 }
 
 export interface RankingSearchRow {
@@ -753,6 +769,57 @@ export interface RankingSearchRow {
   total_laps: number;
   rating: number;
   rd: number;
+}
+
+export interface RankingCircuitRow {
+  circuit_name: string;
+  drivers_count: number;
+  last_session_at: string | null;
+}
+
+export interface RankingDriverDetail {
+  driver_id: number;
+  canonical_name: string;
+  normalized_key: string;
+  sessions_count: number;
+  total_laps: number;
+  global_rating: {
+    rating: number;
+    rd: number;
+    volatility: number;
+    sessions_count: number;
+    last_session_at: string | null;
+  };
+  circuit_ratings: Array<{
+    circuit_name: string;
+    rating: number;
+    rd: number;
+    sessions_count: number;
+    last_session_at: string | null;
+  }>;
+  aliases: string[];
+  history: Array<{
+    circuit_name: string;
+    log_date: string;
+    title1: string;
+    title2: string;
+    rating_before: number;
+    rating_after: number;
+    rd_after: number;
+    delta: number;
+  }>;
+  recent_sessions: Array<{
+    circuit_name: string;
+    log_date: string;
+    title1: string;
+    title2: string;
+    kart_number: number | null;
+    team_name: string;
+    total_laps: number;
+    best_lap_ms: number;
+    avg_lap_ms: number;
+    final_position: number | null;
+  }>;
 }
 
 /**

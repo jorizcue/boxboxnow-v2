@@ -744,9 +744,14 @@ class DriverAlias(Base):
 
 
 class DriverRating(Base):
-    """Current Glicko-2 state for a driver. One row per driver. Updated
-    in-place every time the processor consumes a new session containing
-    that driver. The full update trail lives in `RatingHistory`."""
+    """Current Glicko-2 state for a driver across ALL circuits (global
+    rating). One row per driver. Updated in-place every time the
+    processor consumes a new session containing that driver. The full
+    update trail lives in `RatingHistory`.
+
+    A driver's per-circuit rating lives in `DriverCircuitRating` below.
+    Both are maintained simultaneously by `processor._apply_session` —
+    the same pairwise outcomes drive both updates."""
     __tablename__ = "driver_ratings"
 
     driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="CASCADE"), primary_key=True)
@@ -756,6 +761,35 @@ class DriverRating(Base):
     sessions_count = Column(Integer, default=0, nullable=False)
     last_session_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+class DriverCircuitRating(Base):
+    """Per-circuit Glicko-2 rating. Same algorithm as the global
+    `DriverRating` but isolated per circuit, so a driver who only races
+    at Ariza gets a meaningful Ariza-specific rating without being
+    diluted by single-shot appearances at other tracks.
+
+    Maintained alongside the global rating: every time the processor
+    runs a session, it updates BOTH the global state and the
+    per-circuit state for each participating driver. The pre-states
+    used for the pairwise comparisons differ (each rating uses its own
+    pre-state), so a driver can have wildly different global vs
+    per-circuit ratings — useful signal for the strategist who knows
+    one team is "the Ariza specialist" without dominating elsewhere."""
+    __tablename__ = "driver_circuit_ratings"
+
+    driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="CASCADE"), primary_key=True)
+    circuit_name = Column(String(64), primary_key=True)
+    rating = Column(Float, default=1500.0, nullable=False)
+    rd = Column(Float, default=350.0, nullable=False)
+    volatility = Column(Float, default=0.06, nullable=False)
+    sessions_count = Column(Integer, default=0, nullable=False)
+    last_session_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index("ix_driver_circuit_ratings_circuit", "circuit_name", "rating"),
+    )
 
 
 class SessionResult(Base):

@@ -33,8 +33,11 @@ from typing import Iterable
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import delete
+
 from app.models.schemas import (
-    Driver, DriverAlias, DriverRating, SessionResult, RatingHistory, ProcessedLog,
+    Driver, DriverAlias, DriverRating, DriverCircuitRating,
+    SessionResult, RatingHistory, ProcessedLog,
 )
 from .glicko2 import (
     Glicko2State, update, DEFAULT_RATING, DEFAULT_RD, DEFAULT_VOLATILITY,
@@ -196,15 +199,45 @@ async def _apply_session(
         sr.final_position = i + 1
 
     # ── Glicko-2 rating update ──
-    # Load current ratings.
-    pre: dict[int, Glicko2State] = {}
-    for _, driver, _ in driver_objs:
-        res = await db.execute(select(DriverRating).where(DriverRating.driver_id == driver.id))
-        row = res.scalar_one()
-        pre[driver.id] = Glicko2State(rating=row.rating, rd=row.rd, volatility=row.volatility)
+    # Load current pre-states for BOTH the global and the per-circuit
+    # tracks. Both rating systems use the SAME pairwise outcomes
+    # (corrected-avg-lap rank), but each track has its own pre-state
+    # — that's what lets a driver have e.g. global 1700 / Ariza 1900.
+    circuit_name = driver_objs[0][2].circuit_name
+    pre_global: dict[int, Glicko2State] = {}
+    pre_circuit: dict[int, Glicko2State] = {}
+    circuit_rows: dict[int, DriverCircuitRating] = {}
 
-    # Build pairwise outcomes for each driver vs every other driver in
-    # the session. Outcome: 1 if I'm faster, 0 if slower, 0.5 if tie.
+    for _, driver, _ in driver_objs:
+        # Global rating row is created with the Driver itself (in
+        # `_resolve_or_create_driver`), so it's always present.
+        gres = await db.execute(select(DriverRating).where(DriverRating.driver_id == driver.id))
+        grow = gres.scalar_one()
+        pre_global[driver.id] = Glicko2State(rating=grow.rating, rd=grow.rd, volatility=grow.volatility)
+
+        # Per-circuit row is lazy — created on first appearance of this
+        # driver at this circuit.
+        cres = await db.execute(
+            select(DriverCircuitRating).where(
+                DriverCircuitRating.driver_id == driver.id,
+                DriverCircuitRating.circuit_name == circuit_name,
+            )
+        )
+        crow = cres.scalar_one_or_none()
+        if crow is None:
+            crow = DriverCircuitRating(
+                driver_id=driver.id,
+                circuit_name=circuit_name,
+                rating=DEFAULT_RATING,
+                rd=DEFAULT_RD,
+                volatility=DEFAULT_VOLATILITY,
+            )
+            db.add(crow)
+            await db.flush()
+        circuit_rows[driver.id] = crow
+        pre_circuit[driver.id] = Glicko2State(rating=crow.rating, rd=crow.rd, volatility=crow.volatility)
+
+    # Build pairwise outcomes — same data feeds both updates.
     log_date_obj: datetime | None = None
     try:
         log_date_obj = datetime.strptime(driver_objs[0][2].log_date, "%Y-%m-%d")
@@ -212,7 +245,8 @@ async def _apply_session(
         log_date_obj = None
 
     for i, (sd_i, drv_i, sr_i) in enumerate(driver_objs):
-        opponents: list[tuple[Glicko2State, float]] = []
+        global_opps: list[tuple[Glicko2State, float]] = []
+        circuit_opps: list[tuple[Glicko2State, float]] = []
         for j, (sd_j, drv_j, sr_j) in enumerate(driver_objs):
             if i == j:
                 continue
@@ -222,31 +256,47 @@ async def _apply_session(
                 score = 0.0
             else:
                 score = 0.5
-            opponents.append((pre[drv_j.id], score))
+            global_opps.append((pre_global[drv_j.id], score))
+            circuit_opps.append((pre_circuit[drv_j.id], score))
 
-        new_state = update(pre[drv_i.id], opponents)
-        # Persist updated rating + history row
-        res = await db.execute(select(DriverRating).where(DriverRating.driver_id == drv_i.id))
-        rating_row = res.scalar_one()
-        prev_rating = rating_row.rating
-        prev_rd = rating_row.rd
-        rating_row.rating = new_state.rating
-        rating_row.rd = new_state.rd
-        rating_row.volatility = new_state.volatility
-        rating_row.sessions_count = (rating_row.sessions_count or 0) + 1
+        # ── Global update ──
+        new_global = update(pre_global[drv_i.id], global_opps)
+        gres = await db.execute(select(DriverRating).where(DriverRating.driver_id == drv_i.id))
+        grow = gres.scalar_one()
+        prev_global_rating = grow.rating
+        prev_global_rd = grow.rd
+        grow.rating = new_global.rating
+        grow.rd = new_global.rd
+        grow.volatility = new_global.volatility
+        grow.sessions_count = (grow.sessions_count or 0) + 1
         if log_date_obj is not None:
-            rating_row.last_session_at = log_date_obj
-        rating_row.updated_at = datetime.now(timezone.utc)
+            grow.last_session_at = log_date_obj
+        grow.updated_at = datetime.now(timezone.utc)
 
+        # Audit row for the GLOBAL rating change. Per-circuit history
+        # can be reconstructed by joining `rating_history` with
+        # `session_results.circuit_name` — we keep the audit table
+        # single-track so the schema stays clean.
         db.add(RatingHistory(
             driver_id=drv_i.id,
             session_result_id=sr_i.id,
-            rating_before=prev_rating,
-            rd_before=prev_rd,
-            rating_after=new_state.rating,
-            rd_after=new_state.rd,
-            delta=new_state.rating - prev_rating,
+            rating_before=prev_global_rating,
+            rd_before=prev_global_rd,
+            rating_after=new_global.rating,
+            rd_after=new_global.rd,
+            delta=new_global.rating - prev_global_rating,
         ))
+
+        # ── Per-circuit update ──
+        new_circuit = update(pre_circuit[drv_i.id], circuit_opps)
+        crow = circuit_rows[drv_i.id]
+        crow.rating = new_circuit.rating
+        crow.rd = new_circuit.rd
+        crow.volatility = new_circuit.volatility
+        crow.sessions_count = (crow.sessions_count or 0) + 1
+        if log_date_obj is not None:
+            crow.last_session_at = log_date_obj
+        crow.updated_at = datetime.now(timezone.utc)
 
         drv_i.sessions_count = (drv_i.sessions_count or 0) + 1
         drv_i.total_laps = (drv_i.total_laps or 0) + sd_i.total_laps
@@ -392,8 +442,39 @@ async def get_top_drivers(
     db: AsyncSession,
     limit: int = 100,
     min_sessions: int = 2,
+    circuit: str | None = None,
 ) -> list[dict]:
-    """Ranking page query. Sorted by rating descending."""
+    """Ranking page query. Sorted by rating descending.
+
+    When `circuit` is None (or empty), returns the GLOBAL ranking.
+    When `circuit` is a specific track name, returns the per-circuit
+    ranking from `driver_circuit_ratings` — the same Glicko-2 math
+    but only counting sessions at that track."""
+    if circuit:
+        res = await db.execute(
+            select(Driver, DriverCircuitRating)
+            .join(DriverCircuitRating, DriverCircuitRating.driver_id == Driver.id)
+            .where(DriverCircuitRating.circuit_name == circuit)
+            .where(DriverCircuitRating.sessions_count >= min_sessions)
+            .order_by(DriverCircuitRating.rating.desc())
+            .limit(limit)
+        )
+        out: list[dict] = []
+        for rank, (driver, rating) in enumerate(res.all(), start=1):
+            out.append({
+                "rank": rank,
+                "driver_id": driver.id,
+                "canonical_name": driver.canonical_name,
+                "rating": round(rating.rating, 1),
+                "rd": round(rating.rd, 1),
+                "volatility": round(rating.volatility, 4),
+                "sessions_count": rating.sessions_count,
+                "total_laps": driver.total_laps,
+                "last_session_at": rating.last_session_at.isoformat() if rating.last_session_at else None,
+                "circuit_name": circuit,
+            })
+        return out
+
     res = await db.execute(
         select(Driver, DriverRating)
         .join(DriverRating, DriverRating.driver_id == Driver.id)
@@ -401,9 +482,9 @@ async def get_top_drivers(
         .order_by(DriverRating.rating.desc())
         .limit(limit)
     )
-    out: list[dict] = []
+    out2: list[dict] = []
     for rank, (driver, rating) in enumerate(res.all(), start=1):
-        out.append({
+        out2.append({
             "rank": rank,
             "driver_id": driver.id,
             "canonical_name": driver.canonical_name,
@@ -413,8 +494,168 @@ async def get_top_drivers(
             "sessions_count": rating.sessions_count,
             "total_laps": driver.total_laps,
             "last_session_at": rating.last_session_at.isoformat() if rating.last_session_at else None,
+            "circuit_name": None,
+        })
+    return out2
+
+
+async def list_circuits_with_ratings(db: AsyncSession) -> list[dict]:
+    """List circuits that have any per-circuit ratings stored, with
+    counts. Drives the circuit dropdown in the admin Ranking panel."""
+    res = await db.execute(
+        select(
+            DriverCircuitRating.circuit_name,
+            func.count(DriverCircuitRating.driver_id).label("drivers"),
+            func.max(DriverCircuitRating.last_session_at).label("last"),
+        )
+        .group_by(DriverCircuitRating.circuit_name)
+        .order_by(func.count(DriverCircuitRating.driver_id).desc())
+    )
+    out: list[dict] = []
+    for row in res.all():
+        out.append({
+            "circuit_name": row[0],
+            "drivers_count": row[1],
+            "last_session_at": row[2].isoformat() if row[2] else None,
         })
     return out
+
+
+async def get_driver_detail(driver_id: int, db: AsyncSession) -> dict | None:
+    """Full per-driver detail: global rating, every per-circuit rating,
+    aliases, last 50 rating-history entries, and recent session
+    results. Drives the modal that opens when clicking a driver row in
+    the admin Ranking leaderboard."""
+    res = await db.execute(select(Driver).where(Driver.id == driver_id))
+    driver = res.scalar_one_or_none()
+    if driver is None:
+        return None
+
+    # Global rating
+    gres = await db.execute(select(DriverRating).where(DriverRating.driver_id == driver_id))
+    grow = gres.scalar_one_or_none()
+    global_rating = {
+        "rating": round(grow.rating, 1) if grow else DEFAULT_RATING,
+        "rd": round(grow.rd, 1) if grow else DEFAULT_RD,
+        "volatility": round(grow.volatility, 4) if grow else DEFAULT_VOLATILITY,
+        "sessions_count": grow.sessions_count if grow else 0,
+        "last_session_at": grow.last_session_at.isoformat() if grow and grow.last_session_at else None,
+    }
+
+    # All per-circuit ratings for this driver
+    cres = await db.execute(
+        select(DriverCircuitRating)
+        .where(DriverCircuitRating.driver_id == driver_id)
+        .order_by(DriverCircuitRating.rating.desc())
+    )
+    circuit_ratings = [
+        {
+            "circuit_name": c.circuit_name,
+            "rating": round(c.rating, 1),
+            "rd": round(c.rd, 1),
+            "sessions_count": c.sessions_count,
+            "last_session_at": c.last_session_at.isoformat() if c.last_session_at else None,
+        }
+        for c in cres.scalars().all()
+    ]
+
+    # Aliases
+    ares = await db.execute(
+        select(DriverAlias.alias).where(DriverAlias.driver_id == driver_id)
+        .order_by(DriverAlias.alias)
+    )
+    aliases = [r[0] for r in ares.all()]
+
+    # Rating history (joined with session results so we can show
+    # circuit + date next to each delta). Limited to last 50.
+    hres = await db.execute(
+        select(RatingHistory, SessionResult)
+        .join(SessionResult, SessionResult.id == RatingHistory.session_result_id)
+        .where(RatingHistory.driver_id == driver_id)
+        .order_by(RatingHistory.id.asc())
+    )
+    history_full = [
+        {
+            "circuit_name": sr.circuit_name,
+            "log_date": sr.log_date,
+            "title1": sr.title1,
+            "title2": sr.title2,
+            "rating_before": round(rh.rating_before, 1),
+            "rating_after": round(rh.rating_after, 1),
+            "rd_after": round(rh.rd_after, 1),
+            "delta": round(rh.delta, 1),
+        }
+        for rh, sr in hres.all()
+    ]
+    # Keep all of it — the chart needs the whole sequence to be
+    # meaningful, and there are at most a few hundred entries per
+    # driver.
+
+    # Recent session results (top 20 by date desc).
+    sres = await db.execute(
+        select(SessionResult)
+        .where(SessionResult.driver_id == driver_id)
+        .order_by(SessionResult.log_date.desc(), SessionResult.id.desc())
+        .limit(20)
+    )
+    recent_sessions = [
+        {
+            "circuit_name": s.circuit_name,
+            "log_date": s.log_date,
+            "title1": s.title1,
+            "title2": s.title2,
+            "kart_number": s.kart_number,
+            "team_name": s.team_name,
+            "total_laps": s.total_laps,
+            "best_lap_ms": s.best_lap_ms,
+            "avg_lap_ms": round(s.avg_lap_ms, 0),
+            "final_position": s.final_position,
+        }
+        for s in sres.scalars().all()
+    ]
+
+    return {
+        "driver_id": driver.id,
+        "canonical_name": driver.canonical_name,
+        "normalized_key": driver.normalized_key,
+        "sessions_count": driver.sessions_count,
+        "total_laps": driver.total_laps,
+        "global_rating": global_rating,
+        "circuit_ratings": circuit_ratings,
+        "aliases": aliases,
+        "history": history_full,
+        "recent_sessions": recent_sessions,
+    }
+
+
+async def reset_ratings(db: AsyncSession, wipe_drivers: bool = False) -> dict:
+    """Re-rate from scratch. Truncates `rating_history`,
+    `driver_circuit_ratings`, `driver_ratings`, `session_results` and
+    `processed_logs`. Drivers + aliases are preserved by default so
+    the admin's manual merges survive — pass `wipe_drivers=True` to
+    nuke those too.
+
+    After truncation the caller is expected to trigger the runner
+    (`process_pending`) which will re-parse every recording and
+    rebuild everything. We don't kick off the runner here; the route
+    does it explicitly so the admin sees a confirmation in the
+    response."""
+    counts = {}
+    counts["rating_history"] = (await db.execute(delete(RatingHistory))).rowcount
+    counts["driver_circuit_ratings"] = (await db.execute(delete(DriverCircuitRating))).rowcount
+    counts["driver_ratings"] = (await db.execute(delete(DriverRating))).rowcount
+    counts["session_results"] = (await db.execute(delete(SessionResult))).rowcount
+    counts["processed_logs"] = (await db.execute(delete(ProcessedLog))).rowcount
+    if wipe_drivers:
+        counts["driver_aliases"] = (await db.execute(delete(DriverAlias))).rowcount
+        counts["drivers"] = (await db.execute(delete(Driver))).rowcount
+    else:
+        # Even if we keep drivers, their denormalised counters should
+        # go back to zero — the next backfill will repopulate them.
+        from sqlalchemy import update as sa_update
+        await db.execute(sa_update(Driver).values(sessions_count=0, total_laps=0))
+    await db.commit()
+    return counts
 
 
 async def search_drivers(query: str, db: AsyncSession, limit: int = 50) -> list[dict]:
