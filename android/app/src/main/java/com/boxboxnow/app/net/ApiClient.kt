@@ -22,6 +22,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -266,8 +267,14 @@ class ApiClient @Inject constructor(
 
     suspend fun getTeams(): List<Team> = getJson("/config/teams")
 
+    // MUST be PUT: the backend only defines GET + PUT on /config/teams
+    // (see config_routes.py `@router.put("/teams")`), same as the web
+    // client (api.ts `method: "PUT"`). It used to POST, which the
+    // server answered 405 → the HttpResponseValidator threw, the
+    // caller's silent `catch` swallowed it, and team/pilot edits never
+    // persisted on Android.
     suspend fun replaceTeams(teams: List<Team>) {
-        client.post(url("/config/teams")) {
+        client.put(url("/config/teams")) {
             authorized()
             setBody(teams)
         }

@@ -111,15 +111,21 @@ fun DriverCardView(
             .background(accent.copy(alpha = bgAlpha))
             .border(borderWidth, accent.copy(alpha = borderAlpha), RoundedCornerShape(10.dp)),
     ) {
-        // Base dimensions target ~150dp wide × 90dp tall (iOS card baseline).
-        // Use the more restrictive axis so the card never produces fonts that
-        // overflow the shorter dimension.
-        val widthScale = maxWidth.value / 150f
+        // Match iOS so the numbers read just as big and bold. iOS uses
+        // `scale = clamp(cardHeight/90, 0.8, 2.0)` (height-only) with
+        // base 24 (main) / 32 (big) and weight .black, plus
+        // .minimumScaleFactor to auto-shrink wide strings. Android Text
+        // can't auto-shrink, so we keep a width guard — but with a
+        // looser divisor (180 vs the old 150) so it only kicks in on
+        // genuinely narrow cards; otherwise height drives the size like
+        // iOS. Net effect: same base sizes (24/32) and the same 0.8–2.0
+        // clamp as iOS → noticeably larger, heavier digits.
+        val widthScale = maxWidth.value / 180f
         val heightScale = cardHeight.value / 90f
-        val scale: Float = min(1.8f, max(0.7f, min(widthScale, heightScale)))
+        val scale: Float = min(2.0f, max(0.8f, min(widthScale, heightScale)))
 
-        val mainFont: TextUnit = (22f * scale).sp
-        val bigFont: TextUnit = (30f * scale).sp
+        val mainFont: TextUnit = (24f * scale).sp
+        val bigFont: TextUnit = (32f * scale).sp
         val subFont: TextUnit = (10f * scale).sp
         val smallFont: TextUnit = (8f * scale).sp
         val labelFont: TextUnit = (9f * scale).sp

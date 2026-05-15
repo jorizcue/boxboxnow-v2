@@ -1,5 +1,7 @@
 package com.boxboxnow.app.ui.config
 
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -53,6 +55,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -92,6 +95,7 @@ fun BoxConfigScreen(onBack: () -> Unit) {
     val vm: BoxConfigVM = hiltViewModel()
     val api = vm.api
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val teams = remember { mutableStateListOf<Team>() }
     var loading by remember { mutableStateOf(true) }
     var saving by remember { mutableStateOf(false) }
@@ -130,8 +134,20 @@ fun BoxConfigScreen(onBack: () -> Unit) {
         if (loading) return
         try {
             val ordered = teams.mapIndexed { idx, t -> t.copy(position = idx + 1) }
+            Log.d("BoxConfig", "saveCurrentTeams: PUT ${ordered.size} teams -> $ordered")
             api.replaceTeams(ordered)
-        } catch (_: Throwable) {}
+            Log.d("BoxConfig", "saveCurrentTeams: OK")
+        } catch (e: Throwable) {
+            // Was silently swallowed — that's why a failed save looked
+            // like "nothing happens". Log it and tell the operator so a
+            // lost pit-strategy edit can't pass unnoticed mid-race.
+            Log.e("BoxConfig", "saveCurrentTeams FAILED", e)
+            Toast.makeText(
+                context,
+                "No se pudo guardar equipos: ${e.message ?: e::class.simpleName}",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
     }
 
     Scaffold(
@@ -381,10 +397,19 @@ fun BoxConfigScreen(onBack: () -> Unit) {
                             scope.launch {
                                 try {
                                     val ordered = teams.mapIndexed { idx, t -> t.copy(position = idx + 1) }
+                                    Log.d("BoxConfig", "saveButton: PUT ${ordered.size} teams")
                                     api.replaceTeams(ordered)
                                     teams.clear()
                                     teams.addAll(ordered)
-                                } catch (_: Throwable) {}
+                                    Toast.makeText(context, "Equipos guardados", Toast.LENGTH_SHORT).show()
+                                } catch (e: Throwable) {
+                                    Log.e("BoxConfig", "saveButton FAILED", e)
+                                    Toast.makeText(
+                                        context,
+                                        "No se pudo guardar: ${e.message ?: e::class.simpleName}",
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                }
                                 saving = false
                             }
                         },
