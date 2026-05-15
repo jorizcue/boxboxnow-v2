@@ -84,3 +84,31 @@ def test_pace_session_still_emitted_with_positions():
     for s in out:
         assert s.session_type == expected_type
         assert s.final_position is not None
+
+
+def test_endurance_reconnect_unions_laps_across_different_row_ids():
+    s1 = Segment("24 HORAS", "CARRERA")
+    s1.rows["a1"] = _row("T9", [60000]*200, drteam=["A"]); s1.row_to_kart["a1"] = 9
+    s1.rows["b1"] = _row("T8", [60000]*250, drteam=["C"]); s1.row_to_kart["b1"] = 8
+    s2 = Segment("24 HORAS", "CARRERA")              # reconnect: NEW row_ids, same karts
+    s2.rows["a2"] = _row("T9", [60000]*150, drteam=["B"]); s2.row_to_kart["a2"] = 9
+    s2.rows["b2"] = _row("T8", [60000]*250, drteam=["C"]); s2.row_to_kart["b2"] = 8
+    out = list(reconstruct_race(Race([s1, s2]), circuit_name="X", log_date="d", session_seq=1))
+    k9 = [s for s in out if s.kart_number == 9]
+    k8 = [s for s in out if s.kart_number == 8]
+    # kart 9 total = 200+150 = 350 laps; kart 8 = 250+250 = 500 → kart 8 wins
+    assert {s.final_position for s in k8} == {1}
+    assert {s.final_position for s in k9} == {2}      # single shared position
+    assert len(k9) == 2                                # both row_ids emitted
+
+
+def test_partial_retired_endurance_kart_is_finisher():
+    seg = Segment("24 HORAS", "CARRERA")
+    seg.rows["p1"] = _row("T5", [60000]*100, drteam=["A"], retired=True);  seg.row_to_kart["p1"] = 5
+    seg.rows["p2"] = _row("T5", [60000]*100, drteam=["B"], retired=False); seg.row_to_kart["p2"] = 5
+    seg.rows["q1"] = _row("T6", [60000]*300, drteam=["C"], retired=True);  seg.row_to_kart["q1"] = 6
+    out = {s.kart_number: s.final_position for s in reconstruct_race(
+        Race([seg]), circuit_name="X", log_date="d", session_seq=1)}
+    # kart 5 partial-retired → treated as finisher → ahead of all-retired kart 6
+    assert out[5] == 1
+    assert out[6] == 2

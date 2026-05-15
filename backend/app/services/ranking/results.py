@@ -6,11 +6,20 @@ the kart's position is shared by every driver who drove it.
 """
 from __future__ import annotations
 
+import logging
 import statistics
 from dataclasses import dataclass, field
 
 from .assembler import Race, classify_race
 from .normalizer import normalize_name
+
+logger = logging.getLogger(__name__)
+
+
+def _tiebreak(cid: str):
+    """Numeric order for digit-only cids (kart numbers), lexical else.
+    Two-part so int and str are never compared."""
+    return (0, int(cid)) if cid.isdigit() else (1, cid)
 
 
 @dataclass
@@ -103,6 +112,13 @@ def reconstruct_race(
     comp_of: dict[str, str] = {}
     comp_rows: dict[str, list[_Row]] = {}
     for r in rows:
+        if endurance and r.kart_number is None:
+            logger.warning(
+                "ranking.results: endurance row %s has no kart_number in "
+                "%s/%s — driver %r rated as its own competitor (team "
+                "position NOT shared)", r.row_id, circuit_name, log_date,
+                r.raw_name,
+            )
         cid = (str(r.kart_number) if (endurance and r.kart_number is not None)
                else r.row_id)
         comp_of[r.row_id] = cid
@@ -112,7 +128,11 @@ def reconstruct_race(
     for cid, rs in comp_rows.items():
         all_laps = [ms for r in rs for ms in r.laps]
         comp_stats[cid] = {
-            "retired": all(r.retired for r in rs) if rs else False,
+            # all() not any(): an endurance reconnect can leave a stale
+            # STATUS=sr on the OLD row while the team keeps racing on a
+            # NEW row — a competitor is DNF only if EVERY stint retired.
+            # (rs is always non-empty by construction.)
+            "retired": all(r.retired for r in rs),
             "laps": len(all_laps),
             "time": sum(all_laps),
         }
@@ -122,7 +142,7 @@ def reconstruct_race(
             comp_stats[c]["retired"],
             -comp_stats[c]["laps"],
             comp_stats[c]["time"],
-            c,
+            _tiebreak(c),
         ),
     )
     pos_of = {cid: i + 1 for i, cid in enumerate(ordered)}
