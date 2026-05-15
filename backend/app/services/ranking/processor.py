@@ -43,16 +43,16 @@ from app.models.schemas import (
 from .glicko2 import (
     Glicko2State, update, DEFAULT_RATING, DEFAULT_RD, DEFAULT_VOLATILITY,
 )
-from .log_parser import parse_log, SessionDriverResult
+from .extractor import extract_sessions, SessionExtract
 from .normalizer import normalize_name, display_form
 
 logger = logging.getLogger(__name__)
 
 # Sessions with fewer than this many drivers don't get rating updates
 # (the math is meaningless with < 2 competitors, and we want to skip
-# "practice with one driver" sessions). Note: a single SESSION groups
-# all drivers by (circuit, log_date, title1, title2) — the parser
-# already emits one SessionDriverResult per (session, driver).
+# "practice with one driver" sessions). Note: a SESSION is grouped by
+# (circuit, log_date, session_seq); the extractor already emits one
+# SessionExtract per (session, ratable driver row).
 MIN_DRIVERS_PER_SESSION = 3
 
 # Drivers with fewer than this many laps in a session are excluded
@@ -166,186 +166,276 @@ async def _resolve_driver_by_alias(name: str, db: AsyncSession) -> Driver | None
 # ─── Per-session ingestion + rating update ────────────────────────────────
 
 
-async def _apply_session(
-    session_drivers: list[SessionDriverResult],
+async def apply_extracts(
+    sessions: list[SessionExtract],
     db: AsyncSession,
-):
-    """One session's worth of driver results → DB rows + Glicko-2 updates."""
-    if len(session_drivers) < MIN_DRIVERS_PER_SESSION:
-        return
+) -> dict:
+    """Apply a list of ``SessionExtract`` (the extractor's output) to the
+    DB: idempotent ``SessionResult`` upserts + Glicko-2 dual-track
+    (global + per-circuit) rating updates.
 
-    # Filter to drivers with enough laps to be ratable.
-    rated_drivers = [s for s in session_drivers if s.total_laps >= MIN_LAPS_PER_DRIVER]
-    if len(rated_drivers) < MIN_DRIVERS_PER_SESSION:
-        return
+    Sessions are grouped by ``(circuit, log_date, session_seq)`` and the
+    groups are processed in sorted order so a single log's sessions are
+    applied oldest-seq → newest. The pairwise Glicko outcomes are derived
+    from a per-session ordering ``key`` (lower = better) that is the
+    spec's race/pace methodology:
 
-    # ── Kart bias correction ──
-    # In endurance, kart mechanical differences (setup, wear) skew the
-    # avg lap by up to ±1 s. We compute the per-kart average across
-    # drivers that ran it, then subtract from each driver's avg to get
-    # a kart-corrected pace. This is a single-pass approximation — a
-    # purist approach would iterate driver-skill ⇄ kart-bias, but for
-    # rating purposes the first-order fix is plenty.
-    by_kart_avg: dict[int, list[float]] = {}
-    for s in rated_drivers:
-        if s.kart_number is not None:
-            by_kart_avg.setdefault(s.kart_number, []).append(s.avg_lap_ms)
-    kart_avg = {k: statistics.mean(v) for k, v in by_kart_avg.items()}
-    field_avg = statistics.mean(s.avg_lap_ms for s in rated_drivers)
-    kart_bias = {k: avg - field_avg for k, avg in kart_avg.items()}
+      * race (positions present)  → ``effective_scores`` (team pos blended
+        with kart-bias-corrected pace, w=0.7)
+      * pace (quali / practice / race-without-positions fallback) →
+        rank by kart-bias-corrected average lap ascending
 
-    # Resolve or create drivers and persist SessionResult rows.
-    driver_objs: list[tuple[SessionDriverResult, Driver, SessionResult]] = []
-    for sd in rated_drivers:
-        driver = await _resolve_or_create_driver(sd.raw_canonical, sd.raw_name_sample, db)
-        bias = kart_bias.get(sd.kart_number, 0.0) if sd.kart_number is not None else 0.0
-        corrected = sd.avg_lap_ms - bias
+    The dual-track Glicko block below is the previous per-session code,
+    unchanged in structure (same pre-state load, ``update()`` call,
+    ``RatingHistory`` audit, per-circuit lazy row). The ONLY behavioural
+    change is the pairwise score: it now reads the ordering ``key``
+    instead of comparing ``corrected_avg_ms`` directly. Keeping the
+    per-circuit branch is the fix for the empty ``driver_circuit_ratings``
+    table in prod.
+    """
+    by_group: dict[tuple[str, str, int], list[SessionExtract]] = {}
+    for s in sessions:
+        by_group.setdefault((s.circuit_name, s.log_date, s.session_seq), []).append(s)
 
-        # Upsert SessionResult — uq constraint on
-        # (circuit, date, title1, title2, driver) means we should skip
-        # if already present (a previous successful run for this log).
-        res = await db.execute(
-            select(SessionResult).where(
-                SessionResult.circuit_name == sd.circuit_name,
-                SessionResult.log_date == sd.log_date,
-                SessionResult.title1 == sd.title1,
-                SessionResult.title2 == sd.title2,
-                SessionResult.driver_id == driver.id,
+    applied = 0
+    for (circuit_name, log_date, session_seq), group in sorted(by_group.items()):
+        # Short heats legitimately have very few laps; lower the floor for
+        # sprint/individual sessions (spec §4 validity filters).
+        laps_floor = 3 if group[0].team_mode == "individual" else MIN_LAPS_PER_DRIVER
+        rated_se = [s for s in group if s.total_laps >= laps_floor]
+        if len(rated_se) < MIN_DRIVERS_PER_SESSION:
+            continue
+
+        # ── Kart bias correction ──
+        # Mechanical kart differences (setup, wear) skew the avg lap by up
+        # to ±1 s. Per `team_key` mean across drivers that ran it, minus
+        # the field mean, subtracted from each driver's avg → kart-
+        # corrected pace. Single-pass approximation (same as before).
+        by_team: dict[str, list[float]] = {}
+        for s in rated_se:
+            by_team.setdefault(s.team_key, []).append(s.avg_lap_ms)
+        team_mean = {k: statistics.mean(v) for k, v in by_team.items()}
+        field_mean = statistics.mean(s.avg_lap_ms for s in rated_se)
+        bias = {k: m - field_mean for k, m in team_mean.items()}
+
+        is_race = (
+            group[0].session_type == "race"
+            and any(s.final_position is not None for s in rated_se)
+        )
+
+        # ── Ordering key (lower = better) ──
+        # Person identity for endurance: the row's driver is the PERSON,
+        # not the team label — use the last distinct drteam name when the
+        # extractor saw a live drteam channel for that row, else the
+        # extractor's canonical (kart-only logs / no live name).
+        def _identity(s: SessionExtract) -> tuple[str, str]:
+            if s.drteam_names:
+                person = s.drteam_names[-1]
+                return normalize_name(person) or s.driver_canonical, person
+            return s.driver_canonical, (s.driver_raw or "")
+
+        corrected_by_key: dict[str, float] = {}
+        canon_of: dict[str, SessionExtract] = {}
+        field: list[RatedDriver] = []
+        for s in rated_se:
+            canon, _raw = _identity(s)
+            corrected = s.avg_lap_ms - bias.get(s.team_key, 0.0)
+            corrected_by_key[canon] = corrected
+            canon_of[canon] = s
+            field.append(RatedDriver(
+                name=canon,
+                team_key=s.team_key,
+                corrected_avg_ms=corrected,
+                team_position=s.final_position if is_race else None,
+            ))
+
+        if is_race:
+            try:
+                key = effective_scores(field, w=0.7)
+            except ValueError:
+                # Dirty upstream data: same team_key with conflicting
+                # team_position. Don't abort the whole run — fall back to
+                # the pure pace path for this one group.
+                logger.warning(
+                    "ranking.apply_extracts: team_position conflict in "
+                    "%s/%s/seq%s — falling back to pace ordering",
+                    circuit_name, log_date, session_seq,
+                )
+                is_race = False
+                for rd in field:
+                    rd.team_position = None
+                order = sorted(field, key=lambda d: d.corrected_avg_ms)
+                n = len(order)
+                key = {d.name: (0.0 if n == 1 else i / (n - 1))
+                       for i, d in enumerate(order)}
+        else:
+            order = sorted(field, key=lambda d: d.corrected_avg_ms)
+            n = len(order)
+            key = {d.name: (0.0 if n == 1 else i / (n - 1))
+                   for i, d in enumerate(order)}
+
+        # Resolve or create drivers and persist SessionResult rows. The
+        # SessionResult-exists check (new unique key: circuit, date,
+        # session_seq, driver) gates idempotent re-runs.
+        driver_objs: list[tuple[SessionExtract, Driver, SessionResult, str]] = []
+        for canon in key:
+            s = canon_of[canon]
+            _c, raw_sample = _identity(s)
+            driver = await _resolve_or_create_driver(canon, raw_sample, db)
+            team_key = s.team_key
+            b = bias.get(team_key, 0.0)
+            corrected = corrected_by_key[canon]
+
+            res = await db.execute(
+                select(SessionResult).where(
+                    SessionResult.circuit_name == circuit_name,
+                    SessionResult.log_date == log_date,
+                    SessionResult.session_seq == session_seq,
+                    SessionResult.driver_id == driver.id,
+                )
             )
-        )
-        existing = res.scalar_one_or_none()
-        if existing is not None:
-            continue  # idempotent: already processed
-        sr = SessionResult(
-            circuit_name=sd.circuit_name,
-            log_date=sd.log_date,
-            title1=sd.title1,
-            title2=sd.title2,
-            driver_id=driver.id,
-            kart_number=sd.kart_number,
-            team_name=sd.team_name or "",
-            total_laps=sd.total_laps,
-            best_lap_ms=sd.best_lap_ms,
-            avg_lap_ms=sd.avg_lap_ms,
-            median_lap_ms=sd.median_lap_ms,
-            kart_bias_ms=bias,
-            corrected_avg_ms=corrected,
-        )
-        db.add(sr)
-        await db.flush()
-        driver_objs.append((sd, driver, sr))
-
-    if len(driver_objs) < MIN_DRIVERS_PER_SESSION:
-        return
-
-    # Sort by corrected pace — faster = better.
-    driver_objs.sort(key=lambda t: t[2].corrected_avg_ms)
-    for i, (_, _, sr) in enumerate(driver_objs):
-        sr.final_position = i + 1
-
-    # ── Glicko-2 rating update ──
-    # Load current pre-states for BOTH the global and the per-circuit
-    # tracks. Both rating systems use the SAME pairwise outcomes
-    # (corrected-avg-lap rank), but each track has its own pre-state
-    # — that's what lets a driver have e.g. global 1700 / Ariza 1900.
-    circuit_name = driver_objs[0][2].circuit_name
-    pre_global: dict[int, Glicko2State] = {}
-    pre_circuit: dict[int, Glicko2State] = {}
-    circuit_rows: dict[int, DriverCircuitRating] = {}
-
-    for _, driver, _ in driver_objs:
-        # Global rating row is created with the Driver itself (in
-        # `_resolve_or_create_driver`), so it's always present.
-        gres = await db.execute(select(DriverRating).where(DriverRating.driver_id == driver.id))
-        grow = gres.scalar_one()
-        pre_global[driver.id] = Glicko2State(rating=grow.rating, rd=grow.rd, volatility=grow.volatility)
-
-        # Per-circuit row is lazy — created on first appearance of this
-        # driver at this circuit.
-        cres = await db.execute(
-            select(DriverCircuitRating).where(
-                DriverCircuitRating.driver_id == driver.id,
-                DriverCircuitRating.circuit_name == circuit_name,
-            )
-        )
-        crow = cres.scalar_one_or_none()
-        if crow is None:
-            crow = DriverCircuitRating(
-                driver_id=driver.id,
+            existing = res.scalar_one_or_none()
+            if existing is not None:
+                continue  # idempotent: already processed
+            sr = SessionResult(
                 circuit_name=circuit_name,
-                rating=DEFAULT_RATING,
-                rd=DEFAULT_RD,
-                volatility=DEFAULT_VOLATILITY,
+                log_date=log_date,
+                title1=s.title1,
+                title2=s.title2,
+                session_seq=session_seq,
+                driver_id=driver.id,
+                kart_number=s.kart_number,
+                team_name=s.driver_raw or "",
+                total_laps=s.total_laps,
+                best_lap_ms=s.best_lap_ms,
+                avg_lap_ms=s.avg_lap_ms,
+                median_lap_ms=s.median_lap_ms,
+                kart_bias_ms=b,
+                corrected_avg_ms=corrected,
+                final_position=(s.final_position if is_race else None),
+                session_type=group[0].session_type,
+                team_mode=group[0].team_mode,
+                effective_score=key[canon],
+                duration_s=group[0].duration_s,
             )
-            db.add(crow)
+            db.add(sr)
             await db.flush()
-        circuit_rows[driver.id] = crow
-        pre_circuit[driver.id] = Glicko2State(rating=crow.rating, rd=crow.rd, volatility=crow.volatility)
+            driver_objs.append((s, driver, sr, canon))
 
-    # Build pairwise outcomes — same data feeds both updates.
-    log_date_obj: datetime | None = None
-    try:
-        log_date_obj = datetime.strptime(driver_objs[0][2].log_date, "%Y-%m-%d")
-    except Exception:
-        log_date_obj = None
+        if len(driver_objs) < MIN_DRIVERS_PER_SESSION:
+            continue
 
-    for i, (sd_i, drv_i, sr_i) in enumerate(driver_objs):
-        global_opps: list[tuple[Glicko2State, float]] = []
-        circuit_opps: list[tuple[Glicko2State, float]] = []
-        for j, (sd_j, drv_j, sr_j) in enumerate(driver_objs):
-            if i == j:
-                continue
-            if sr_i.corrected_avg_ms < sr_j.corrected_avg_ms:
-                score = 1.0
-            elif sr_i.corrected_avg_ms > sr_j.corrected_avg_ms:
-                score = 0.0
-            else:
-                score = 0.5
-            global_opps.append((pre_global[drv_j.id], score))
-            circuit_opps.append((pre_circuit[drv_j.id], score))
+        # ── Glicko-2 rating update ──
+        # Load current pre-states for BOTH the global and the per-circuit
+        # tracks. Both rating systems use the SAME pairwise outcomes
+        # (derived from `key`), but each track has its own pre-state
+        # — that's what lets a driver have e.g. global 1700 / Ariza 1900.
+        pre_global: dict[int, Glicko2State] = {}
+        pre_circuit: dict[int, Glicko2State] = {}
+        circuit_rows: dict[int, DriverCircuitRating] = {}
 
-        # ── Global update ──
-        new_global = update(pre_global[drv_i.id], global_opps)
-        gres = await db.execute(select(DriverRating).where(DriverRating.driver_id == drv_i.id))
-        grow = gres.scalar_one()
-        prev_global_rating = grow.rating
-        prev_global_rd = grow.rd
-        grow.rating = new_global.rating
-        grow.rd = new_global.rd
-        grow.volatility = new_global.volatility
-        grow.sessions_count = (grow.sessions_count or 0) + 1
-        if log_date_obj is not None:
-            grow.last_session_at = log_date_obj
-        grow.updated_at = datetime.now(timezone.utc)
+        for _, driver, _, _ in driver_objs:
+            # Global rating row is created with the Driver itself (in
+            # `_resolve_or_create_driver`), so it's always present.
+            gres = await db.execute(select(DriverRating).where(DriverRating.driver_id == driver.id))
+            grow = gres.scalar_one()
+            pre_global[driver.id] = Glicko2State(rating=grow.rating, rd=grow.rd, volatility=grow.volatility)
 
-        # Audit row for the GLOBAL rating change. Per-circuit history
-        # can be reconstructed by joining `rating_history` with
-        # `session_results.circuit_name` — we keep the audit table
-        # single-track so the schema stays clean.
-        db.add(RatingHistory(
-            driver_id=drv_i.id,
-            session_result_id=sr_i.id,
-            rating_before=prev_global_rating,
-            rd_before=prev_global_rd,
-            rating_after=new_global.rating,
-            rd_after=new_global.rd,
-            delta=new_global.rating - prev_global_rating,
-        ))
+            # Per-circuit row is lazy — created on first appearance of this
+            # driver at this circuit. THIS is what populates
+            # driver_circuit_ratings (empty in prod before this rework).
+            cres = await db.execute(
+                select(DriverCircuitRating).where(
+                    DriverCircuitRating.driver_id == driver.id,
+                    DriverCircuitRating.circuit_name == circuit_name,
+                )
+            )
+            crow = cres.scalar_one_or_none()
+            if crow is None:
+                crow = DriverCircuitRating(
+                    driver_id=driver.id,
+                    circuit_name=circuit_name,
+                    rating=DEFAULT_RATING,
+                    rd=DEFAULT_RD,
+                    volatility=DEFAULT_VOLATILITY,
+                )
+                db.add(crow)
+                await db.flush()
+            circuit_rows[driver.id] = crow
+            pre_circuit[driver.id] = Glicko2State(rating=crow.rating, rd=crow.rd, volatility=crow.volatility)
 
-        # ── Per-circuit update ──
-        new_circuit = update(pre_circuit[drv_i.id], circuit_opps)
-        crow = circuit_rows[drv_i.id]
-        crow.rating = new_circuit.rating
-        crow.rd = new_circuit.rd
-        crow.volatility = new_circuit.volatility
-        crow.sessions_count = (crow.sessions_count or 0) + 1
-        if log_date_obj is not None:
-            crow.last_session_at = log_date_obj
-        crow.updated_at = datetime.now(timezone.utc)
+        # Build pairwise outcomes — same data feeds both updates. The
+        # pairwise score is derived from the ordering `key` (the ONLY
+        # change vs the old corrected_avg_ms comparison).
+        log_date_obj: datetime | None = None
+        try:
+            log_date_obj = datetime.strptime(log_date, "%Y-%m-%d")
+        except Exception:
+            log_date_obj = None
 
-        drv_i.sessions_count = (drv_i.sessions_count or 0) + 1
-        drv_i.total_laps = (drv_i.total_laps or 0) + sd_i.total_laps
-        drv_i.updated_at = datetime.now(timezone.utc)
+        for i, (se_i, drv_i, sr_i, canon_i) in enumerate(driver_objs):
+            global_opps: list[tuple[Glicko2State, float]] = []
+            circuit_opps: list[tuple[Glicko2State, float]] = []
+            for j, (se_j, drv_j, sr_j, canon_j) in enumerate(driver_objs):
+                if i == j:
+                    continue
+                ki = key[canon_i]
+                kj = key[canon_j]
+                if abs(ki - kj) < 1e-9:
+                    score = 0.5
+                elif ki < kj:
+                    score = 1.0
+                else:
+                    score = 0.0
+                global_opps.append((pre_global[drv_j.id], score))
+                circuit_opps.append((pre_circuit[drv_j.id], score))
+
+            # ── Global update ──
+            new_global = update(pre_global[drv_i.id], global_opps)
+            gres = await db.execute(select(DriverRating).where(DriverRating.driver_id == drv_i.id))
+            grow = gres.scalar_one()
+            prev_global_rating = grow.rating
+            prev_global_rd = grow.rd
+            grow.rating = new_global.rating
+            grow.rd = new_global.rd
+            grow.volatility = new_global.volatility
+            grow.sessions_count = (grow.sessions_count or 0) + 1
+            if log_date_obj is not None:
+                grow.last_session_at = log_date_obj
+            grow.updated_at = datetime.now(timezone.utc)
+
+            # Audit row for the GLOBAL rating change. Per-circuit history
+            # can be reconstructed by joining `rating_history` with
+            # `session_results.circuit_name` — we keep the audit table
+            # single-track so the schema stays clean.
+            db.add(RatingHistory(
+                driver_id=drv_i.id,
+                session_result_id=sr_i.id,
+                rating_before=prev_global_rating,
+                rd_before=prev_global_rd,
+                rating_after=new_global.rating,
+                rd_after=new_global.rd,
+                delta=new_global.rating - prev_global_rating,
+            ))
+
+            # ── Per-circuit update ──
+            new_circuit = update(pre_circuit[drv_i.id], circuit_opps)
+            crow = circuit_rows[drv_i.id]
+            crow.rating = new_circuit.rating
+            crow.rd = new_circuit.rd
+            crow.volatility = new_circuit.volatility
+            crow.sessions_count = (crow.sessions_count or 0) + 1
+            if log_date_obj is not None:
+                crow.last_session_at = log_date_obj
+            crow.updated_at = datetime.now(timezone.utc)
+
+            drv_i.sessions_count = (drv_i.sessions_count or 0) + 1
+            drv_i.total_laps = (drv_i.total_laps or 0) + se_i.total_laps
+            drv_i.updated_at = datetime.now(timezone.utc)
+
+        applied += 1
+
+    return {"sessions": applied}
 
 
 # ─── Public entry points ─────────────────────────────────────────────────
@@ -372,21 +462,12 @@ async def process_log_file(
     if res.scalar_one_or_none() is not None:
         return {"skipped": True, "reason": "already_processed"}
 
-    # Parse and bucket by session.
-    by_session: dict[tuple[str, str], list[SessionDriverResult]] = {}
-    for sd in parse_log(path, circuit_name, log_date):
-        by_session.setdefault((sd.title1, sd.title2), []).append(sd)
-
-    sessions_count = 0
-    laps_count = 0
-    for (t1, t2), drivers in by_session.items():
-        try:
-            await _apply_session(drivers, db)
-            sessions_count += 1
-            laps_count += sum(d.total_laps for d in drivers)
-        except Exception:
-            logger.exception("ranking._apply_session failed for %s/%s/%s/%s",
-                             circuit_name, log_date, t1, t2)
+    # Extract ratable sessions (drives the live Apex parser read-only,
+    # handles every circuit's schema) then apply the Glicko-2 methodology.
+    sessions = extract_sessions(str(path), circuit_name=circuit_name, log_date=log_date)
+    res = await apply_extracts(sessions, db)
+    laps_count = sum(s.total_laps for s in sessions)
+    sessions_count = res["sessions"]
 
     db.add(ProcessedLog(
         circuit_name=circuit_name,

@@ -45,3 +45,34 @@ def test_drteam_names_preserved_for_task6():
     assert any(s.drteam_names for s in sessions)
     # EUPEN is kart-only (no live drteam) — empty list is acceptable there,
     # so we only assert presence on the RKC fixture.
+
+
+import pytest
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from app.models.schemas import Base, DriverRating, SessionResult, DriverCircuitRating
+from app.services.ranking.processor import apply_extracts
+
+
+@pytest.fixture
+async def db():
+    eng = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with eng.begin() as c:
+        await c.run_sync(Base.metadata.create_all)
+    Session = async_sessionmaker(eng, expire_on_commit=False)
+    async with Session() as s:
+        yield s
+
+
+async def test_apply_extracts_populates_global_and_circuit_ratings(db):
+    sessions = extract_sessions(str(FIX / "rkc_inline.log"),
+                                circuit_name="RKC_Paris", log_date="2026-04-18")
+    assert sessions, "fixture must yield sessions"
+    await apply_extracts(sessions, db)
+    await db.commit()
+    from sqlalchemy import select, func
+    n_global = (await db.execute(select(func.count()).select_from(DriverRating))).scalar()
+    n_circuit = (await db.execute(select(func.count()).select_from(DriverCircuitRating))).scalar()
+    n_results = (await db.execute(select(func.count()).select_from(SessionResult))).scalar()
+    assert n_global > 0
+    assert n_circuit > 0          # the prod bug: this was 0
+    assert n_results > 0
