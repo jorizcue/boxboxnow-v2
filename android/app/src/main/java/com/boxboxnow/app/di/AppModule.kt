@@ -1,7 +1,6 @@
 package com.boxboxnow.app.di
 
 import android.content.Context
-import com.boxboxnow.app.audio.DriverSpeechService
 import com.boxboxnow.app.auth.BiometricService
 import com.boxboxnow.app.ble.BleManager
 import com.boxboxnow.app.gps.PhoneGpsManager
@@ -40,8 +39,4 @@ object AppModule {
 
     @Provides @Singleton
     fun provideBiometricService(@ApplicationContext context: Context) = BiometricService(context)
-
-    @Provides @Singleton
-    fun provideDriverSpeechService(@ApplicationContext context: Context) =
-        DriverSpeechService(context)
 }

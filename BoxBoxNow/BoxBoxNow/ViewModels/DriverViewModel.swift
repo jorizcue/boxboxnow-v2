@@ -22,7 +22,6 @@ final class DriverViewModel: ObservableObject {
     @Published var selectedPresetId: Int?
     @Published var brightness: Double = 0.0  // 0 = normal, 1 = max contrast boost
     @Published var orientationLock: OrientationLock = .free
-    @Published var audioEnabled: Bool = true
     /// True once `loadPresets()` has finished at least once for the
     /// current account. Lets DriverView distinguish "still loading the
     /// list" from "loaded and the user has zero presets" — the gate
@@ -53,9 +52,6 @@ final class DriverViewModel: ObservableObject {
         }
         let lockStr = defaults.string(forKey: Constants.Keys.orientation) ?? "free"
         orientationLock = OrientationLock(rawValue: lockStr) ?? .free
-        if defaults.object(forKey: Constants.Keys.audioEnabled) != nil {
-            audioEnabled = defaults.bool(forKey: Constants.Keys.audioEnabled)
-        }
 
         // Migrate cached config: ensure any newly-added DriverCard cases
         // are appended to cardOrder + visibleCards so they show up for
@@ -107,7 +103,6 @@ final class DriverViewModel: ObservableObject {
         selectedPresetId = nil
         brightness = 0.0
         orientationLock = .free
-        audioEnabled = true
         presetsLoaded = false
     }
 
@@ -118,7 +113,6 @@ final class DriverViewModel: ObservableObject {
         defaults.set(cardOrder, forKey: Constants.Keys.cardOrder)
         defaults.set(brightness, forKey: Constants.Keys.brightness)
         defaults.set(orientationLock.rawValue, forKey: Constants.Keys.orientation)
-        defaults.set(audioEnabled, forKey: Constants.Keys.audioEnabled)
     }
 
     func loadPresets(autoApplyDefault: Bool = false) async {
@@ -165,7 +159,6 @@ final class DriverViewModel: ObservableObject {
         if let o = preset.orientation, let lock = OrientationLock(rawValue: o) {
             orientationLock = lock
         }
-        if let a = preset.audioEnabled { audioEnabled = a }
         // Stale presets (saved before newer cards existed) don't carry
         // their rawValues in cardOrder. `orderedVisibleCards` iterates
         // cardOrder so a missing entry would silently never render —
@@ -215,28 +208,25 @@ final class DriverViewModel: ObservableObject {
     }
 
     func saveAsPreset(name: String, visibleCards: [String: Bool], cardOrder: [String],
-                      contrast: Double, orientation: String, audioEnabled: Bool,
+                      contrast: Double, orientation: String,
                       isDefault: Bool = false) async throws {
         let preset = try await APIClient.shared.createPreset(
             name: name, visibleCards: visibleCards, cardOrder: cardOrder,
-            isDefault: isDefault, contrast: contrast, orientation: orientation,
-            audioEnabled: audioEnabled)
+            isDefault: isDefault, contrast: contrast, orientation: orientation)
         await MainActor.run {
             if isDefault {
                 // Flip ONLY is_default on the other presets. The previous
-                // rebuild omitted contrast/orientation/audioEnabled, so
-                // those fields got silently nuked in the local copy —
-                // the next time the user applied one of those presets
-                // the driver view fell back to defaults. Fix: preserve
-                // every field and only toggle isDefault.
+                // rebuild omitted contrast/orientation, so those fields got
+                // silently nuked in the local copy — the next time the user
+                // applied one of those presets the driver view fell back to
+                // defaults. Fix: preserve every field and only toggle isDefault.
                 self.presets = self.presets.map { p in
                     DriverConfigPreset(
                         id: p.id, name: p.name,
                         visibleCards: p.visibleCards, cardOrder: p.cardOrder,
                         isDefault: false,
                         contrast: p.contrast,
-                        orientation: p.orientation,
-                        audioEnabled: p.audioEnabled
+                        orientation: p.orientation
                     )
                 }
             }
@@ -259,8 +249,7 @@ final class DriverViewModel: ObservableObject {
                         visibleCards: p.visibleCards, cardOrder: p.cardOrder,
                         isDefault: false,
                         contrast: p.contrast,
-                        orientation: p.orientation,
-                        audioEnabled: p.audioEnabled
+                        orientation: p.orientation
                     )
                 }
                 return p
@@ -269,10 +258,10 @@ final class DriverViewModel: ObservableObject {
     }
 
     func updatePresetFull(id: Int, name: String, visibleCards: [String: Bool], cardOrder: [String],
-                         contrast: Double, orientation: String, audioEnabled: Bool) async throws {
+                         contrast: Double, orientation: String) async throws {
         let updated = try await APIClient.shared.updatePreset(
             id: id, name: name, visibleCards: visibleCards, cardOrder: cardOrder,
-            contrast: contrast, orientation: orientation, audioEnabled: audioEnabled)
+            contrast: contrast, orientation: orientation)
         await MainActor.run {
             self.presets = self.presets.map { $0.id == updated.id ? updated : $0 }
         }

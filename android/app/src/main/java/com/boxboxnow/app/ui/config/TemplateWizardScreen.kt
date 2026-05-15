@@ -27,8 +27,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -82,7 +80,7 @@ private const val TOTAL_STEPS = 4
  *   Step 1: Name
  *   Step 2: Card visibility (grouped toggles)
  *   Step 3: Card order (reorderable list)
- *   Step 4: Display options (contrast, orientation, audio) + save
+ *   Step 4: Display options (contrast, orientation) + save
  *
  * When [editPresetId] is provided the wizard opens in **edit** mode:
  * fields are pre-populated from the existing preset and save calls
@@ -110,7 +108,6 @@ fun TemplateWizardScreen(onBack: () -> Unit, editPresetId: Int? = null) {
     var cardOrder by remember { mutableStateOf(DriverCard.defaultOrder) }
     var contrast by remember { mutableDoubleStateOf(0.5) }
     var orientationLock by remember { mutableStateOf(OrientationLock.FREE) }
-    var audioEnabled by remember { mutableStateOf(true) }
     var saving by remember { mutableStateOf(false) }
     var initialized by remember { mutableStateOf(editPresetId == null) }
 
@@ -127,7 +124,6 @@ fun TemplateWizardScreen(onBack: () -> Unit, editPresetId: Int? = null) {
             cardOrder = preset.cardOrder
             contrast = preset.contrast ?: 0.5
             orientationLock = OrientationLock.from(preset.orientation)
-            audioEnabled = preset.audioEnabled ?: true
 
             // Stale presets (saved before newer DriverCard entries
             // existed) don't carry the new keys in cardOrder. The
@@ -213,8 +209,6 @@ fun TemplateWizardScreen(onBack: () -> Unit, editPresetId: Int? = null) {
                     onContrastChange = { contrast = it },
                     orientationLock = orientationLock,
                     onOrientationChange = { orientationLock = it },
-                    audioEnabled = audioEnabled,
-                    onAudioChange = { audioEnabled = it },
                     saving = saving,
                     saveLabel = if (isEditMode) t("wizard.updateTemplate") else t("wizard.saveTemplate"),
                     onBack = { step = 3 },
@@ -228,7 +222,6 @@ fun TemplateWizardScreen(onBack: () -> Unit, editPresetId: Int? = null) {
                                 cardOrder = cardOrder,
                                 contrast = contrast,
                                 orientation = orientationLock.raw,
-                                audioEnabled = audioEnabled,
                                 onSuccess = { onBack() },
                                 onError = { saving = false },
                             )
@@ -239,7 +232,6 @@ fun TemplateWizardScreen(onBack: () -> Unit, editPresetId: Int? = null) {
                                 cardOrder = cardOrder,
                                 contrast = contrast,
                                 orientation = orientationLock.raw,
-                                audioEnabled = audioEnabled,
                                 onSuccess = { onBack() },
                                 onError = { saving = false },
                             )
@@ -673,8 +665,6 @@ private fun StepDisplayOptions(
     onContrastChange: (Double) -> Unit,
     orientationLock: OrientationLock,
     onOrientationChange: (OrientationLock) -> Unit,
-    audioEnabled: Boolean,
-    onAudioChange: (Boolean) -> Unit,
     saving: Boolean,
     saveLabel: String = "GUARDAR PLANTILLA",
     onBack: () -> Unit,
@@ -764,52 +754,6 @@ private fun StepDisplayOptions(
                     )
                 }
             }
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        // Audio toggle
-        Text(
-            t("wizard.audio"),
-            color = BoxBoxNowColors.SystemGray3,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.sp,
-        )
-        Spacer(Modifier.height(8.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(BoxBoxNowColors.SystemGray6)
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                if (audioEnabled) Icons.Filled.VolumeUp else Icons.Filled.VolumeOff,
-                contentDescription = null,
-                tint = if (audioEnabled) BoxBoxNowColors.Accent else BoxBoxNowColors.SystemGray,
-                modifier = Modifier.size(24.dp),
-            )
-            Spacer(Modifier.width(12.dp))
-            Text(
-                if (audioEnabled) t("wizard.audioOn") else t("wizard.audioOff"),
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f),
-            )
-            Switch(
-                checked = audioEnabled,
-                onCheckedChange = onAudioChange,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.White,
-                    checkedTrackColor = BoxBoxNowColors.Accent,
-                    uncheckedThumbColor = Color.White,
-                    uncheckedTrackColor = BoxBoxNowColors.SystemGray4,
-                    uncheckedBorderColor = BoxBoxNowColors.SystemGray4,
-                ),
-            )
         }
 
         Spacer(Modifier.weight(1f))

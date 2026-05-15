@@ -2,7 +2,6 @@ package com.boxboxnow.app.vm
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.boxboxnow.app.audio.DriverSpeechService
 import com.boxboxnow.app.lap.LapTracker
 import com.boxboxnow.app.models.DriverCard
 import com.boxboxnow.app.models.DriverConfigPreset
@@ -35,7 +34,6 @@ enum class OrientationLock(val raw: String, val display: String) {
 class DriverViewModel @Inject constructor(
     private val api: ApiClient,
     private val prefs: PreferencesStore,
-    private val speech: DriverSpeechService,
 ) : ViewModel() {
     val lapTracker: LapTracker by lazy {
         LapTracker(api, prefs, viewModelScope).also { it.loadFinishLine() }
@@ -60,9 +58,6 @@ class DriverViewModel @Inject constructor(
 
     private val _orientationLock = MutableStateFlow(OrientationLock.FREE)
     val orientationLock = _orientationLock.asStateFlow()
-
-    private val _audioEnabled = MutableStateFlow(true)
-    val audioEnabled = _audioEnabled.asStateFlow()
 
     private val _gpsData = MutableStateFlow<GPSSample?>(null)
     val gpsData = _gpsData.asStateFlow()
@@ -95,19 +90,12 @@ class DriverViewModel @Inject constructor(
             _brightness.value = prefs.getDouble(Constants.Keys.BRIGHTNESS)
         }
         _orientationLock.value = OrientationLock.from(prefs.getString(Constants.Keys.ORIENTATION))
-        if (prefs.contains(Constants.Keys.AUDIO_ENABLED)) {
-            _audioEnabled.value = prefs.getBoolean(Constants.Keys.AUDIO_ENABLED, true)
-        }
         if (prefs.contains(Constants.Keys.GPS_DELTA_REFRESH_HZ)) {
             // Clamp to the allowed set in case a future build expands or
             // restricts the option range — defends against stale prefs.
             val stored = prefs.getInt(Constants.Keys.GPS_DELTA_REFRESH_HZ, 2)
             _gpsDeltaRefreshHz.value = if (stored in setOf(1, 2, 4)) stored else 2
         }
-        // Keep the TTS service in sync with the persisted/preset flag so the
-        // pilot hears narration the moment a preset with audio=true is applied.
-        speech.enabled = _audioEnabled.value
-
         // Migrate newly-added cards into the cached order/visible maps.
         // Centralized so we can re-run after applyPreset (which would
         // otherwise wipe newer cards out of cardOrder when a preset
@@ -144,7 +132,6 @@ class DriverViewModel @Inject constructor(
         prefs.putStringList(Constants.Keys.CARD_ORDER, _cardOrder.value)
         prefs.putDouble(Constants.Keys.BRIGHTNESS, _brightness.value)
         prefs.putString(Constants.Keys.ORIENTATION, _orientationLock.value.raw)
-        prefs.putBoolean(Constants.Keys.AUDIO_ENABLED, _audioEnabled.value)
         prefs.putInt(Constants.Keys.GPS_DELTA_REFRESH_HZ, _gpsDeltaRefreshHz.value)
     }
 
@@ -154,37 +141,6 @@ class DriverViewModel @Inject constructor(
         if (hz !in setOf(1, 2, 4)) return
         _gpsDeltaRefreshHz.value = hz
         saveConfig()
-    }
-
-    fun setAudioEnabled(enabled: Boolean) {
-        _audioEnabled.value = enabled
-        speech.enabled = enabled
-        saveConfig()
-    }
-
-    /**
-     * Called by DriverScreen whenever a new lap is detected (lastLapMs changes).
-     * Delegates to `DriverSpeechService` which internally checks `enabled` + dedupes
-     * on lap ms, so repeated calls with the same lap are safe.
-     */
-    fun speakLapData(
-        lastLapMs: Double,
-        prevLapMs: Double,
-        lapDelta: String?,
-        realPosition: Int?,
-        totalKarts: Int?,
-        boxScore: Double,
-        lapsToMaxStint: Double?,
-    ) {
-        speech.speakLapData(
-            lastLapMs = lastLapMs,
-            prevLapMs = prevLapMs,
-            lapDelta = lapDelta,
-            realPosition = realPosition,
-            totalKarts = totalKarts,
-            boxScore = boxScore,
-            lapsToMaxStint = lapsToMaxStint,
-        )
     }
 
     fun setBrightness(v: Double) {
@@ -245,9 +201,7 @@ class DriverViewModel @Inject constructor(
         _selectedPresetId.value = null
         _brightness.value = 0.0
         _orientationLock.value = OrientationLock.FREE
-        _audioEnabled.value = true
         _presetsLoaded.value = false
-        speech.enabled = true
     }
 
     fun applyDefaultPresetIfAny() = loadPresets(autoApplyDefault = true)
@@ -258,10 +212,6 @@ class DriverViewModel @Inject constructor(
         _selectedPresetId.value = preset.id
         preset.contrast?.let { _brightness.value = it }
         preset.orientation?.let { _orientationLock.value = OrientationLock.from(it) }
-        preset.audioEnabled?.let {
-            _audioEnabled.value = it
-            speech.enabled = it
-        }
         // Stale presets (saved before newer cards existed) don't carry
         // their keys in cardOrder. `orderedVisibleCards` iterates
         // cardOrder so a missing entry would silently never render —
@@ -299,7 +249,6 @@ class DriverViewModel @Inject constructor(
         cardOrder: List<String>,
         contrast: Double,
         orientation: String,
-        audioEnabled: Boolean,
         onSuccess: () -> Unit = {},
         onError: (Throwable) -> Unit = {},
     ) {
@@ -311,22 +260,15 @@ class DriverViewModel @Inject constructor(
                     cardOrder = cardOrder,
                     contrast = contrast,
                     orientation = orientation,
-                    audioEnabled = audioEnabled,
                 )
             }.onSuccess { created ->
                 _presets.value = _presets.value + created
                 _selectedPresetId.value = created.id
-                // Also apply locally so the pilot view picks the new
-                // options up immediately. audioEnabled was missing from
-                // the previous implementation, which kept the saved
-                // "audio=on" flag from propagating to the speech service
-                // until the next preset reload.
+                // Also apply locally so the pilot view picks the new options up immediately.
                 _visibleCards.value = visibleCards
                 _cardOrder.value = cardOrder
                 _brightness.value = contrast
                 _orientationLock.value = OrientationLock.from(orientation)
-                _audioEnabled.value = audioEnabled
-                speech.enabled = audioEnabled
                 saveConfig()
                 onSuccess()
             }.onFailure(onError)
@@ -343,7 +285,6 @@ class DriverViewModel @Inject constructor(
         cardOrder: List<String>,
         contrast: Double,
         orientation: String,
-        audioEnabled: Boolean,
         onSuccess: () -> Unit = {},
         onError: (Throwable) -> Unit = {},
     ) {
@@ -356,7 +297,6 @@ class DriverViewModel @Inject constructor(
                     cardOrder = cardOrder,
                     contrast = contrast,
                     orientation = orientation,
-                    audioEnabled = audioEnabled,
                 )
             }.onSuccess { updated ->
                 _presets.value = _presets.value.map { if (it.id == updated.id) updated else it }

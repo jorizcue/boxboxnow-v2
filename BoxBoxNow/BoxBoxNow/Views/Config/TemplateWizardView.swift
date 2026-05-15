@@ -18,7 +18,6 @@ struct TemplateWizardView: View {
     @State private var cardOrder: [String] = []
     @State private var contrast: Double = 0.0
     @State private var orientation: OrientationLock = .free
-    @State private var audioEnabled = false
     @State private var isSaving = false
     @State private var draggingCard: DriverCard?
 
@@ -100,7 +99,6 @@ struct TemplateWizardView: View {
                     cardOrder = preset.cardOrder
                     contrast = preset.contrast ?? 0.0
                     orientation = OrientationLock(rawValue: preset.orientation ?? "free") ?? .free
-                    audioEnabled = preset.audioEnabled ?? false
                 } else {
                     // Create mode: initialize from current DriverViewModel config
                     visibleCards = driverVM.visibleCards
@@ -319,18 +317,6 @@ struct TemplateWizardView: View {
                     .pickerStyle(.segmented)
                 }
 
-                // Audio
-                Toggle(isOn: $audioEnabled) {
-                    HStack(spacing: 8) {
-                        Image(systemName: audioEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                            .foregroundColor(audioEnabled ? .accentColor : .gray)
-                        Text(t("wizard.audio"))
-                            .font(.subheadline)
-                            .foregroundColor(.white)
-                    }
-                }
-                .tint(.accentColor)
-
                 // Summary
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Resumen")
@@ -344,9 +330,6 @@ struct TemplateWizardView: View {
                         .font(.caption)
                         .foregroundColor(.gray)
                     Text("Orientacion: \(orientation.displayName)")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    Text("Audio: \(audioEnabled ? "Si" : "No")")
                         .font(.caption)
                         .foregroundColor(.gray)
                 }
@@ -432,8 +415,7 @@ struct TemplateWizardView: View {
                         visibleCards: visibleCards,
                         cardOrder: cardOrder,
                         contrast: contrast,
-                        orientation: orientation.rawValue,
-                        audioEnabled: audioEnabled
+                        orientation: orientation.rawValue
                     )
                     await MainActor.run {
                         toast.success("Plantilla \"\(presetName)\" actualizada")
@@ -447,8 +429,7 @@ struct TemplateWizardView: View {
                         visibleCards: visibleCards,
                         cardOrder: cardOrder,
                         contrast: contrast,
-                        orientation: orientation.rawValue,
-                        audioEnabled: audioEnabled
+                        orientation: orientation.rawValue
                     )
                     await MainActor.run {
                         toast.success("Plantilla \"\(presetName)\" guardada")

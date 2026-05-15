@@ -8,7 +8,6 @@ struct DriverView: View {
     @EnvironmentObject var auth: AuthViewModel
     @EnvironmentObject var langStore: LanguageStore
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var speech = DriverSpeechService()
     @State private var showMenu = false
     @State private var lapDelta: String? = nil // "faster" | "slower"
     @State private var prevLapMs: Double = 0
@@ -210,31 +209,11 @@ struct DriverView: View {
                     }
 
                     if showMenu {
-                        DriverMenuOverlay(speech: speech, isPresented: $showMenu, onDismiss: { dismiss() })
+                        DriverMenuOverlay(isPresented: $showMenu, onDismiss: { dismiss() })
                     }
 
-                    // Indicators (top-left audio, right-center menu handle)
+                    // Menu handle (right edge, vertically centered)
                     if !showMenu {
-                        VStack {
-                            HStack {
-                                // Audio indicator
-                                if driverVM.audioEnabled {
-                                    Image(systemName: "speaker.wave.2.fill")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(.accentColor)
-                                        .padding(6)
-                                        .background(Color.black.opacity(0.6))
-                                        .clipShape(Circle())
-                                        .padding(.leading, 12)
-                                        .padding(.top, 8)
-                                }
-                                Spacer()
-                            }
-                            Spacer()
-                        }
-                        .allowsHitTesting(false)
-
-                        // Menu handle (right edge, vertically centered)
                         HStack {
                             Spacer()
                             VStack(spacing: 3) {
@@ -331,11 +310,6 @@ struct DriverView: View {
             UIApplication.shared.isIdleTimerDisabled = true
             // Apply orientation lock chosen by the user
             OrientationManager.shared.apply(driverVM.orientationLock)
-            // Seed speech service from the viewModel's persisted audio choice
-            // so opening the driver view immediately reflects the preset/user
-            // preference (the toggle in DriverMenuOverlay writes back to
-            // driverVM.audioEnabled, which we mirror here).
-            speech.enabled = driverVM.audioEnabled
             // Preset fetch + auto-apply now lives in the parent body's
             // `.task` (runs before this branch renders), gating mainBody
             // behind a known preset count so the "no plantilla" state
@@ -365,12 +339,6 @@ struct DriverView: View {
         // re-fetches the circuits (e.g. coming back to the foreground).
         .onChange(of: configVM.circuits) { _, _ in
             applyCircuitFinishLine()
-        }
-        // Keep the speech service in sync with the viewModel's audio flag.
-        // This fires whenever applyPreset() sets audioEnabled from a preset,
-        // or when the menu toggle writes back to driverVM.audioEnabled.
-        .onChange(of: driverVM.audioEnabled) { _, newValue in
-            speech.enabled = newValue
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // Re-sync state when returning from background (may have missed
@@ -415,7 +383,6 @@ struct DriverView: View {
         .onChange(of: ourKartNumber) {
             prevLapMs = 0
             lapDelta = nil
-            speech.reset()
         }
         .onChange(of: raceVM.boxCallActive) {
             if raceVM.boxCallActive {
@@ -564,19 +531,6 @@ struct DriverView: View {
             lapDelta = lastMs < prevLapMs ? "faster" : "slower"
         }
         prevLapMs = lastMs
-
-        // Trigger audio narration (matching web useDriverSpeech)
-        let pos = raceVM.racePosition(ourKartNumber: ourKartNumber)
-        let stintCalc = raceVM.computeStintCalc(ourKartNumber: ourKartNumber, clockMs: 0)
-        speech.speakLapData(
-            lastLapMs: lastMs,
-            prevLapMs: prevLapMs,
-            lapDelta: lapDelta,
-            realPosition: pos?.pos,
-            totalKarts: pos?.total,
-            boxScore: raceVM.boxScore,
-            lapsToMaxStint: stintCalc.lapsToMax
-        )
     }
 }
 

@@ -25,8 +25,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Style
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -35,8 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -71,7 +67,6 @@ fun DriverMenuOverlay(
     val orientation by driverVM.orientationLock.collectAsState()
     val presets by driverVM.presets.collectAsState()
     val selectedPresetId by driverVM.selectedPresetId.collectAsState()
-    val audioEnabled by driverVM.audioEnabled.collectAsState()
 
     Row(modifier = Modifier.fillMaxSize()) {
         // Dim backdrop — tap outside to close
@@ -260,50 +255,6 @@ fun DriverMenuOverlay(
                                 )
                             }
                         }
-                    }
-                }
-
-                // Audio narration toggle
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        t("driver.menuAudio"),
-                        color = BoxBoxNowColors.SystemGray3,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.8.sp,
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(BoxBoxNowColors.SystemGray5)
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            if (audioEnabled) Icons.Filled.VolumeUp else Icons.Filled.VolumeOff,
-                            contentDescription = null,
-                            tint = if (audioEnabled) BoxBoxNowColors.Accent else BoxBoxNowColors.SystemGray,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            if (audioEnabled) t("driver.narrationOn") else t("driver.narrationOff"),
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Switch(
-                            checked = audioEnabled,
-                            onCheckedChange = { driverVM.setAudioEnabled(it) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = BoxBoxNowColors.Accent,
-                                uncheckedThumbColor = Color.White,
-                                uncheckedTrackColor = BoxBoxNowColors.SystemGray4,
-                                uncheckedBorderColor = BoxBoxNowColors.SystemGray4,
-                            ),
-                        )
                     }
                 }
 

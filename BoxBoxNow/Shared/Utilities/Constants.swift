@@ -26,7 +26,6 @@ enum Constants {
         static let sessionName  = "session_name"
         static let orientation  = "orientation_lock"
         static let brightness   = "driver_brightness"
-        static let audioEnabled = "driver_audio_enabled"
         // Refresh rate (in Hz) for the GPS delta cards on the driver
         // dashboard. Underlying `lapTracker.deltaBestMs/deltaPrevMs` are
         // recomputed at the RaceBox sample rate (~50Hz); this only
@@ -43,14 +42,13 @@ enum Constants {
     /// UserDefaults keys that hold per-user driver-view state. Wiped on
     /// `fullSignOut()` and when a different user logs in — without this,
     /// the cached visibleCards / cardOrder / brightness / orientation
-    /// / audioEnabled survive a logout, and the next user lands on the
-    /// previous user's plantilla even though they have zero presets of
-    /// their own (visible bug: Vista Piloto loads with stale layout).
+    /// survive a logout, and the next user lands on the previous user's
+    /// plantilla even though they have zero presets of their own (visible
+    /// bug: Vista Piloto loads with stale layout).
     static let driverConfigKeys: [String] = [
         Keys.visibleCards,
         Keys.cardOrder,
         Keys.orientation,
         Keys.brightness,
-        Keys.audioEnabled,
     ]
 }

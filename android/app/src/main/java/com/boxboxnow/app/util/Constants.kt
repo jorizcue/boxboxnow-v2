@@ -23,7 +23,6 @@ object Constants {
         const val SESSION_NAME = "session_name"
         const val ORIENTATION = "orientation_lock"
         const val BRIGHTNESS = "driver_brightness"
-        const val AUDIO_ENABLED = "driver_audio_enabled"
         const val FINISH_LINE = "bbn_finish_line"
         // Refresh rate (in Hz) for the GPS delta cards on the driver
         // dashboard. The underlying deltaBestMs flow on LapTracker is
@@ -40,15 +39,13 @@ object Constants {
 
     /// Driver-view SharedPreferences keys that hold per-user state. Wiped
     /// on `fullSignOut()` and on account switch — without this the cached
-    /// visibleCards / cardOrder / brightness / orientationLock /
-    /// audioEnabled survive a logout, and the next user lands on the
-    /// previous user's plantilla even though they have zero presets of
-    /// their own.
+    /// visibleCards / cardOrder / brightness / orientationLock survive a
+    /// logout, and the next user lands on the previous user's plantilla
+    /// even though they have zero presets of their own.
     val DRIVER_CONFIG_KEYS = listOf(
         Keys.VISIBLE_CARDS,
         Keys.CARD_ORDER,
         Keys.ORIENTATION,
         Keys.BRIGHTNESS,
-        Keys.AUDIO_ENABLED,
     )
 }

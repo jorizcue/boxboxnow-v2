@@ -147,8 +147,8 @@ final class AuthViewModel: NSObject, ObservableObject, ASWebAuthenticationPresen
     /// `fullSignOut()` and whenever a different username logs in on the
     /// same device — fixes the bug where the next user landed on the
     /// previous user's plantilla (visibleCards / cardOrder /
-    /// brightness / orientationLock / audioEnabled survived logout
-    /// because UserDefaults isn't scoped by account).
+    /// brightness / orientationLock survived logout because UserDefaults
+    /// isn't scoped by account).
     static func wipeDriverConfigDefaults() {
         let d = UserDefaults.standard
         for key in Constants.driverConfigKeys {

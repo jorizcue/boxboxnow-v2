@@ -3,7 +3,6 @@ import SwiftUI
 struct DriverMenuOverlay: View {
     @EnvironmentObject var driverVM: DriverViewModel
     @EnvironmentObject var langStore: LanguageStore
-    @ObservedObject var speech: DriverSpeechService
     @Binding var isPresented: Bool
     var onDismiss: () -> Void
 
@@ -90,28 +89,6 @@ struct DriverMenuOverlay: View {
                                 }
                             }
                             .pickerStyle(.segmented)
-                        }
-
-                        // Audio narration toggle
-                        // Binds to driverVM.audioEnabled (the single source of
-                        // truth) instead of speech.enabled. DriverView observes
-                        // driverVM.audioEnabled and propagates changes to the
-                        // speech service, so the toggle still controls playback
-                        // while also persisting the choice and surviving preset
-                        // reloads.
-                        Toggle(isOn: $driverVM.audioEnabled) {
-                            HStack(spacing: 8) {
-                                Image(systemName: driverVM.audioEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                                    .foregroundColor(driverVM.audioEnabled ? .accentColor : .gray)
-                                Text(driverVM.audioEnabled ? t("driver.narrationOn") : t("driver.narrationOff"))
-                                    .font(.subheadline)
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        .tint(.accentColor)
-                        .onChange(of: driverVM.audioEnabled) { _, _ in
-                            // Persist immediately so the choice survives restarts.
-                            driverVM.saveConfig()
                         }
 
                         // Exit button

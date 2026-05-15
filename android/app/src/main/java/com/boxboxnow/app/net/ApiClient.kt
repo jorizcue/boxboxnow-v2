@@ -175,7 +175,6 @@ class ApiClient @Inject constructor(
         isDefault: Boolean = false,
         contrast: Double? = null,
         orientation: String? = null,
-        audioEnabled: Boolean? = null,
     ): DriverConfigPreset {
         val body = buildJsonObject {
             put("name", name)
@@ -184,7 +183,6 @@ class ApiClient @Inject constructor(
             if (isDefault) put("is_default", true)
             contrast?.let { put("contrast", it) }
             orientation?.let { put("orientation", it) }
-            audioEnabled?.let { put("audio_enabled", it) }
         }
         return postJson("/config/presets", body)
     }
@@ -197,7 +195,6 @@ class ApiClient @Inject constructor(
         isDefault: Boolean? = null,
         contrast: Double? = null,
         orientation: String? = null,
-        audioEnabled: Boolean? = null,
     ): DriverConfigPreset {
         val body = buildJsonObject {
             name?.let { put("name", it) }
@@ -206,7 +203,6 @@ class ApiClient @Inject constructor(
             isDefault?.let { put("is_default", it) }
             contrast?.let { put("contrast", it) }
             orientation?.let { put("orientation", it) }
-            audioEnabled?.let { put("audio_enabled", it) }
         }
         return patchJson("/config/presets/$id", body)
     }

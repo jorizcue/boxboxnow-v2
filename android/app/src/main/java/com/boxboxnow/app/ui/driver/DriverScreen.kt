@@ -35,7 +35,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Style
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -231,7 +230,6 @@ private fun DriverScreenContent(onBack: () -> Unit) {
     val hasSectors by raceVM.hasSectors.collectAsState()
     val sectorMeta by raceVM.sectorMeta.collectAsState()
     val orientation by driverVM.orientationLock.collectAsState()
-    val audioEnabled by driverVM.audioEnabled.collectAsState()
     val brightness by driverVM.brightness.collectAsState()
     val user by authVM.user.collectAsState()
 
@@ -330,35 +328,6 @@ private fun DriverScreenContent(onBack: () -> Unit) {
             driverVM.lapTracker.resetStintBest()
         }
         prevPitStatus = ourKartPitStatus
-    }
-
-    // Audio narration on every new lap — mirrors iOS DriverView.detectLapDelta.
-    // Triggers when driverVM.lapTracker.lastLapMs changes; the VM dedupes
-    // repeat values internally so keyed LaunchedEffect is enough.
-    var lastSpokenLap by remember { mutableStateOf(0.0) }
-    var previousLapMs by remember { mutableStateOf(0.0) }
-    LaunchedEffect(lastLap) {
-        val ms = lastLap ?: return@LaunchedEffect
-        if (ms <= 0 || ms == lastSpokenLap) return@LaunchedEffect
-        val prev = previousLapMs
-        val lapDelta: String? = when {
-            prev <= 0 -> null
-            ms < prev -> "faster"
-            else -> "slower"
-        }
-        val pos = raceVM.racePosition()
-        val stintCalc = raceVM.computeStintCalc()
-        driverVM.speakLapData(
-            lastLapMs = ms,
-            prevLapMs = prev,
-            lapDelta = lapDelta,
-            realPosition = pos?.pos,
-            totalKarts = pos?.total,
-            boxScore = boxScore,
-            lapsToMaxStint = stintCalc.lapsToMax,
-        )
-        previousLapMs = ms
-        lastSpokenLap = ms
     }
 
     // Screen-on flag, max brightness, orientation lock, immersive mode
@@ -503,31 +472,6 @@ private fun DriverScreenContent(onBack: () -> Unit) {
                 CircularProgressIndicator(color = Color.White, strokeWidth = 1.5.dp, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(t("driver.reconnecting"), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-
-        // Audio indicator — small speaker icon top-left when narration is on.
-        // Matches iOS DriverView. Hidden while the menu/box-call overlays are
-        // visible to keep the screen clean.
-        AnimatedVisibility(
-            visible = audioEnabled && !showMenu && !boxCall,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopStart),
-        ) {
-            Box(
-                modifier = Modifier
-                    .padding(start = 12.dp, top = 8.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .padding(6.dp),
-            ) {
-                Icon(
-                    Icons.Filled.VolumeUp,
-                    contentDescription = t("driver.audioOn"),
-                    tint = BoxBoxNowColors.Accent,
-                    modifier = Modifier.size(14.dp),
-                )
             }
         }
 
