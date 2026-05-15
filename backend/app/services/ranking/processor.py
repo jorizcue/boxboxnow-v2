@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 import statistics
+from dataclasses import dataclass as _dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
@@ -60,10 +61,8 @@ MIN_DRIVERS_PER_SESSION = 3
 # their "average" was a 3-minute pit-through.
 MIN_LAPS_PER_DRIVER = 5
 
-from dataclasses import dataclass as _dataclass
 
-
-@_dataclass
+@_dataclass(frozen=True)
 class RatedDriver:
     name: str
     team_key: str
@@ -71,28 +70,32 @@ class RatedDriver:
     team_position: int | None  # real finishing position (team or individual)
 
 
-def _pace_pctile(field: list["RatedDriver"]) -> dict[str, float]:
+def _pace_pctile(field: list[RatedDriver]) -> dict[str, float]:
     order = sorted(field, key=lambda d: d.corrected_avg_ms)
     n = len(order)
-    if n == 1:
-        return {order[0].name: 0.0}
+    if n <= 1:
+        return {d.name: 0.0 for d in order}
     return {d.name: i / (n - 1) for i, d in enumerate(order)}
 
 
-def effective_scores(field: list["RatedDriver"], *, w: float = 0.7) -> dict[str, float]:
+def effective_scores(field: list[RatedDriver], *, w: float = 0.7) -> dict[str, float]:
     """Lower = better. Race ordering key (spec §6.A).
     effective = w*norm_team_pos + (1-w)*pace_pctile, both in [0,1].
     n_teams == 1 → pure pace."""
     pace = _pace_pctile(field)
-    teams = sorted({d.team_key for d in field if d.team_position is not None})
-    pos_by_team = {}
+    pos_by_team: dict[str, int] = {}
     for d in field:
         if d.team_position is not None:
-            pos_by_team.setdefault(d.team_key, d.team_position)
-    n_teams = len(teams)
+            existing = pos_by_team.setdefault(d.team_key, d.team_position)
+            if existing != d.team_position:
+                raise ValueError(
+                    f"team_key {d.team_key!r}: conflicting team_position "
+                    f"{existing} vs {d.team_position} (driver {d.name!r})"
+                )
+    n_teams = len(pos_by_team)
     if n_teams <= 1:
         return dict(pace)
-    ranked_teams = sorted(teams, key=lambda tk: pos_by_team[tk])
+    ranked_teams = sorted(pos_by_team, key=pos_by_team.__getitem__)
     norm_team = {tk: i / (n_teams - 1) for i, tk in enumerate(ranked_teams)}
     out: dict[str, float] = {}
     for d in field:

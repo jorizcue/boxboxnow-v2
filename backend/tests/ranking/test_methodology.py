@@ -21,3 +21,22 @@ def test_single_team_degrades_to_pace_order():
     field = [_rd("A", "t1", 61000.0, 1), _rd("B", "t1", 60000.0, 1)]
     scores = effective_scores(field, w=0.7)
     assert scores["B"] < scores["A"]  # pure pace when n_teams == 1
+
+
+def test_all_none_team_position_degrades_to_pace():
+    f = [RatedDriver("A", "t1", 61000.0, None),
+         RatedDriver("B", "t2", 60000.0, None)]
+    s = effective_scores(f, w=0.7)
+    assert s["B"] < s["A"]  # pure pace when no positions
+
+
+def test_empty_field_returns_empty_dict():
+    assert effective_scores([], w=0.7) == {}
+
+
+def test_conflicting_team_position_raises():
+    import pytest
+    f = [RatedDriver("A", "t1", 60000.0, 2),
+         RatedDriver("B", "t1", 61000.0, 1)]
+    with pytest.raises(ValueError):
+        effective_scores(f, w=0.7)
