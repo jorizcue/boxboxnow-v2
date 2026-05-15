@@ -367,6 +367,12 @@ async def init_db():
             await conn.execute(text("ALTER TABLE product_tab_config ADD COLUMN coming_soon BOOLEAN DEFAULT 0 NOT NULL"))
         except Exception:
             pass
+        # Diagnostic: raw Apex last position on session_results (rating
+        # uses reconstructed final_position; this is audit-only).
+        try:
+            await conn.execute(text("ALTER TABLE session_results ADD COLUMN apex_last_position INTEGER"))
+        except Exception:
+            pass
 
         # Drop UNIQUE constraint on product_tab_config.plan_type so the same
         # label can be reused across multiple products. stripe_price_id remains

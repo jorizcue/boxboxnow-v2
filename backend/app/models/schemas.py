@@ -832,6 +832,10 @@ class SessionResult(Base):
     team_mode = Column(String(12), default="individual", nullable=False)  # endurance|individual
     effective_score = Column(Float, nullable=True)
     duration_s = Column(Integer, default=0, nullable=False)
+    # Raw last Apex RANKING value seen for the row — DIAGNOSTIC ONLY.
+    # The rating uses `final_position` (reconstructed from lap data);
+    # this is kept to audit how wrong Apex's live position was.
+    apex_last_position = Column(Integer, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     __table_args__ = (
