@@ -412,10 +412,25 @@ async def apply_extracts(
         circuit_rows: dict[int, DriverCircuitRating] = {}
 
         for _, driver, _, _ in driver_objs:
-            # Global rating row is created with the Driver itself (in
-            # `_resolve_or_create_driver`), so it's always present.
+            # Global rating row: normally created with the Driver in
+            # `_resolve_or_create_driver`, BUT after a
+            # `reset_ratings(wipe_drivers=False)` the `drivers` rows
+            # survive while every `driver_ratings` row is deleted — so a
+            # pre-existing driver resolves with NO global rating row.
+            # Lazy-create it here with the Glicko-2 defaults, exactly
+            # like the per-circuit row below. (Using `scalar_one()` here
+            # raised NoResultFound and skipped the whole log on reprocess.)
             gres = await db.execute(select(DriverRating).where(DriverRating.driver_id == driver.id))
-            grow = gres.scalar_one()
+            grow = gres.scalar_one_or_none()
+            if grow is None:
+                grow = DriverRating(
+                    driver_id=driver.id,
+                    rating=DEFAULT_RATING,
+                    rd=DEFAULT_RD,
+                    volatility=DEFAULT_VOLATILITY,
+                )
+                db.add(grow)
+                await db.flush()
             pre_global[driver.id] = Glicko2State(rating=grow.rating, rd=grow.rd, volatility=grow.volatility)
 
             # Per-circuit row is lazy — created on first appearance of this

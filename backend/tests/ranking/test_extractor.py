@@ -343,3 +343,77 @@ async def test_multi_stint_same_driver_aggregated_not_dropped(db):
         f"expected 3 SessionResult rows total (1 aggregated + 2 others), "
         f"got {n_results}"
     )
+
+
+async def test_preexisting_driver_without_rating_does_not_crash(db):
+    """Regression for the prod reprocess crash: `reset_ratings(wipe_drivers=
+    False)` deletes every `driver_ratings` row but KEEPS the `drivers` rows.
+    On reprocess `_resolve_or_create_driver` returns the pre-existing Driver
+    WITHOUT creating a DriverRating, so the Glicko block's `scalar_one()`
+    raised `NoResultFound` and `process_pending` skipped the whole log →
+    near-empty ranking in production. The fix lazy-creates the global rating
+    (like the per-circuit row). This reproduces that exact state."""
+    from sqlalchemy import select, func, delete
+    from app.models.schemas import Driver
+
+    common = dict(
+        circuit_name="ResetCircuit",
+        log_date="2026-03-03",
+        session_seq=1,
+        session_type="race",
+        team_mode="individual",
+        kart_number=None,
+        drteam_names=[],
+        duration_s=1800,
+        title1="GP",
+        title2="FINAL",
+    )
+
+    def _se(canon, raw, team, pos, lap):
+        return SessionExtract(
+            driver_canonical=canon, driver_raw=raw,
+            team_key=team, final_position=pos,
+            laps_ms=[lap] * 6, total_laps=6,
+            avg_lap_ms=float(lap), best_lap_ms=lap, median_lap_ms=lap,
+            **common,
+        )
+
+    sessions = [
+        _se("alpha one", "Alpha One", "k1", 1, 60000),
+        _se("bravo two", "Bravo Two", "k2", 2, 61000),
+        _se("charlie three", "Charlie Three", "k3", 3, 62000),
+    ]
+
+    # First run: creates Driver + DriverRating rows normally.
+    await apply_extracts(sessions, db)
+    await db.commit()
+    drivers_before = (await db.execute(
+        select(func.count()).select_from(Driver))).scalar()
+    assert drivers_before == 3
+
+    # Simulate reset_ratings(wipe_drivers=False): drop ratings/results but
+    # KEEP drivers + aliases (and clear processed-state).
+    await db.execute(delete(DriverRating))
+    await db.execute(delete(DriverCircuitRating))
+    await db.execute(delete(SessionResult))
+    await db.commit()
+    assert (await db.execute(
+        select(func.count()).select_from(DriverRating))).scalar() == 0
+    assert (await db.execute(
+        select(func.count()).select_from(Driver))).scalar() == 3  # kept
+
+    # Reprocess the SAME sessions. With the old code this raised
+    # NoResultFound at the global scalar_one(); with the fix it must
+    # lazy-create the global ratings and succeed.
+    await apply_extracts(sessions, db)
+    await db.commit()
+
+    n_global = (await db.execute(
+        select(func.count()).select_from(DriverRating))).scalar()
+    n_circuit = (await db.execute(
+        select(func.count()).select_from(DriverCircuitRating))).scalar()
+    n_drivers = (await db.execute(
+        select(func.count()).select_from(Driver))).scalar()
+    assert n_drivers == 3, "must reuse the pre-existing drivers, not duplicate"
+    assert n_global == 3, "global DriverRating must be lazy-recreated for each"
+    assert n_circuit == 3, "per-circuit ratings repopulated too"
