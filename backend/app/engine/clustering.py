@@ -54,10 +54,21 @@ def compute_clustering(
     Uses valid_laps from each kart, grouped by pitNumber, taking the
     last pit's data. Then applies Jenks clustering with break padding.
 
-    `state.warmup_laps_to_skip` (per circuit): the first N laps of every
-    stint are excluded from `Tiempo_Promedio_Vuelta` because the tyres are
-    cold and the times don't reflect real pace. Best_time_avg is unaffected
-    because nsmallest(3) naturally ignores cold-tyre laps.
+    Lap filtering: `valid_laps` already excludes the first `laps_discard`
+    laps of every stint (in/out + the first warmup lap) — that's done
+    upstream in `_record_lap`. Both `Tiempo_Promedio_Vuelta` (MED.20)
+    and `Best_time_avg` (MEJ.3) operate on the same pool so they're
+    coherent: MEJ.3 ≤ MED.20 by definition.
+
+    Historical note: there used to be an additional
+    `warmup_laps_to_skip` parameter that excluded the first N entries
+    of valid_laps ON TOP of laps_discard, but only from MED.20 — not
+    from MEJ.3. The double exclusion plus the asymmetry made the two
+    metrics inconsistent (MEJ.3 could come out slower than MED.20)
+    and collapsed MED.20 to a single-lap value for the first 4-5 laps
+    of every stint. Now both metrics use the same pool. The column
+    still exists in `circuits` for backward compatibility but is no
+    longer consulted.
     """
     if driver_differentials is None:
         driver_differentials = {}
@@ -78,22 +89,14 @@ def compute_clustering(
     df.dropna(inplace=True)
     df = df.sort_values(['kartNumber', 'pitNumber', 'totalLap'])
 
-    # Cold-tyre filter for the rolling 20-lap mean. Drop the first N laps
-    # of each stint, then take the last 20 of what remains. For stints
-    # that haven't reached N+1 laps yet, fall back to the full set so the
-    # value isn't NaN — early in a stint we'd rather show a noisy mean
-    # than nothing at all.
-    skip = max(0, int(getattr(state, "warmup_laps_to_skip", 3)))
-
-    def _avg_excl_warmup(x: pd.Series) -> float:
-        if len(x) > skip:
-            return float(x.iloc[skip:].tail(20).mean())
-        return float(x.tail(20).mean())
-
-    # Group by kart + pitNumber, compute aggregates (exact port)
+    # Group by kart + pitNumber. Both aggregates work on the same
+    # `valid_laps` slice — MED.20 averages the last 20, MEJ.3 averages
+    # the 3 fastest. With the warmup skip removed, MEJ.3 ≤ MED.20
+    # always (the 3 best can never average slower than the rolling
+    # mean of the same set).
     df_grouped = df.groupby(['kartNumber', 'pitNumber']).agg({
         'lapTime': [
-            ('Tiempo_Promedio_Vuelta', _avg_excl_warmup),
+            ('Tiempo_Promedio_Vuelta', lambda x: float(x.tail(20).mean())),
             ('Best_time_avg', lambda x: x.nsmallest(3).mean()),
         ]
     }).reset_index()
