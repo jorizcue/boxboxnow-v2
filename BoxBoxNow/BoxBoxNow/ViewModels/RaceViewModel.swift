@@ -242,37 +242,46 @@ final class RaceViewModel: ObservableObject {
     }
 
     /// Live classification order. The Apex `position` column only
-    /// refreshes on RANKING events (lap-line crossings) so it lags —
-    /// ordering by gap-to-leader instead updates on every gap event,
-    /// which is why the "behind"/ApexPosition cards used to freeze
-    /// until a position change. Key: leader (no gap)=0, numeric gap=
-    /// seconds, laps-down=large sentinel; stable tiebreak by the
-    /// (lagging) position then kart number so early-race (no gaps yet)
-    /// still has a deterministic order.
+    /// refreshes on RANKING events (lap-line crossings) so it lags and
+    /// is 0 for the leader at race start ("Vuelta 1", no crossing yet)
+    /// — filtering/anchoring by it dropped the leader, made the total
+    /// off-by-one and picked an arbitrary kart as P1, corrupting the
+    /// "behind"/ApexPosition cards. Order purely by the CONTINUOUS
+    /// gap-to-leader instead: key = leader −1, numeric gap = seconds,
+    /// laps-down = large sentinel. A kart is classified when it carries
+    /// ANY signal (position, gap or interval); tiebreak by kartNumber.
     private func apexOrder() -> [KartState] {
-        let placed = karts.filter { $0.position > 0 }
-        // The LEADER's gap cell is NOT empty — Apex shows the leader's
-        // current lap there ("Vuelta 4" / "Tour 4"), which looks just
-        // like a laps-down marker. Anchor the leader by the minimum
-        // Apex position instead (P1 is the single most stable field —
-        // it barely changes and Apex fires RANKING immediately on a
-        // lead change). Everyone else is ordered by the CONTINUOUS
-        // numeric gap-to-leader; genuinely lapped karts ("N Tour") sink
-        // to the back. Without this anchor the leader was mis-sorted to
-        // the end and every position came out off-by-one.
-        let leaderPos = placed.map { $0.position }.min()
+        let hasInterval = sessionHasInterval()
+        let candidates = karts.filter {
+            $0.position > 0 ||
+                !($0.gap ?? "").trimmingCharacters(in: .whitespaces).isEmpty ||
+                !($0.interval ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        }
+        // Leader detection WITHOUT the lagging `position`:
+        //  · interval session → the leader is the only classified kart
+        //    with an empty interval (no kart ahead). Its gap cell shows
+        //    the lap count "Vuelta N" (apexSeconds == nil), so it must
+        //    NOT be read as a laps-down marker; a genuinely lapped kart
+        //    still carries a numeric interval and is excluded here.
+        //  · no interval column (e.g. qualifying) → the leader's gap is
+        //    empty and falls through to the gap==empty → 0 branch.
+        let leader: KartState? = hasInterval
+            ? candidates.first {
+                ($0.interval ?? "").trimmingCharacters(in: .whitespaces).isEmpty &&
+                    apexSeconds($0.gap) == nil
+            }
+            : nil
         func key(_ k: KartState) -> Double {
-            if let lp = leaderPos, k.position == lp { return -1 }  // leader
+            if let l = leader, k.kartNumber == l.kartNumber { return -1 }
             let g = (k.gap ?? "").trimmingCharacters(in: .whitespaces)
-            if g.isEmpty { return 0 }                         // safety (no gap yet)
-            if let s = apexSeconds(g) { return s }            // same-lap gap
-            let laps = Double(g.prefix { $0.isNumber }) ?? 1  // laps-down
+            if g.isEmpty { return 0 }                         // leader (no int. col) / no gap yet
+            if let s = apexSeconds(g) { return s }            // same-lap gap to leader
+            let laps = Double(g.prefix { $0.isNumber }) ?? 1  // genuinely lapped → back
             return 1_000_000 + laps * 1_000
         }
-        return placed.sorted {
+        return candidates.sorted {
             let ka = key($0), kb = key($1)
             if ka != kb { return ka < kb }
-            if $0.position != $1.position { return $0.position < $1.position }
             return $0.kartNumber < $1.kartNumber
         }
     }

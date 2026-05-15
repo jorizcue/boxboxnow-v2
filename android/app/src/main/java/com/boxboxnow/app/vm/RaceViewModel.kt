@@ -299,35 +299,46 @@ class RaceViewModel @Inject constructor(
         _karts.value.any { !(it.interval ?: "").trim().isEmpty() }
 
     /** Live classification order. The Apex `position` column only
-     *  refreshes on RANKING events (lap-line crossings) so it lags —
-     *  ordering by gap-to-leader instead updates on every gap event,
-     *  which is why the "behind"/ApexPosition cards used to freeze
-     *  until a position change. Key: leader (no gap)=0, numeric gap=
-     *  seconds, laps-down=large sentinel; stable tiebreak by the
-     *  (lagging) position then kart number so early-race (no gaps yet)
-     *  still has a deterministic order. */
+     *  refreshes on RANKING events (lap-line crossings) so it lags and
+     *  is 0 for the leader at race start ("Vuelta 1", no crossing yet)
+     *  — filtering/anchoring by it dropped the leader, made the total
+     *  off-by-one and picked an arbitrary kart as P1, corrupting the
+     *  "behind"/ApexPosition cards. Order purely by the CONTINUOUS
+     *  gap-to-leader instead: key = leader −1, numeric gap = seconds,
+     *  laps-down = large sentinel. A kart is classified when it carries
+     *  ANY signal (position, gap or interval); tiebreak by kartNumber. */
     private fun apexOrder(): List<KartState> {
-        val placed = _karts.value.filter { it.position > 0 }
-        // The LEADER's gap cell is NOT empty — Apex shows the leader's
-        // current lap there ("Vuelta 4" / "Tour 4"), which looks just
-        // like a laps-down marker. Anchor the leader by the minimum
-        // Apex position instead (P1 is the single most stable field —
-        // it barely changes and Apex fires RANKING immediately on a
-        // lead change). Everyone else is ordered by the CONTINUOUS
-        // numeric gap-to-leader; genuinely lapped karts ("N Tour") sink
-        // to the back. Without this anchor the leader was mis-sorted to
-        // the end and every position came out off-by-one.
-        val leaderPos = placed.minOfOrNull { it.position }
-        fun key(k: KartState): Double {
-            if (leaderPos != null && k.position == leaderPos) return -1.0  // leader
-            val g = (k.gap ?: "").trim()
-            if (g.isEmpty()) return 0.0                       // safety (no gap yet)
-            apexSeconds(g)?.let { return it }                 // same-lap gap
-            val laps = Regex("\\d+").find(g)?.value?.toDoubleOrNull() ?: 1.0
-            return 1_000_000.0 + laps * 1_000.0               // laps-down
+        val hasInterval = sessionHasInterval()
+        val candidates = _karts.value.filter {
+            it.position > 0 ||
+                !(it.gap ?: "").trim().isEmpty() ||
+                !(it.interval ?: "").trim().isEmpty()
         }
-        return placed.sortedWith(
-            compareBy({ key(it) }, { it.position }, { it.kartNumber }))
+        // Leader detection WITHOUT the lagging `position`:
+        //  · interval session → the leader is the only classified kart
+        //    with an empty interval (no kart ahead). Its gap cell shows
+        //    the lap count "Vuelta N" (apexSeconds == null), so it must
+        //    NOT be read as a laps-down marker; a genuinely lapped kart
+        //    still carries a numeric interval and is excluded here.
+        //  · no interval column (e.g. qualifying) → the leader's gap is
+        //    empty and falls through to the gap==empty → 0 branch.
+        val leader: KartState? =
+            if (hasInterval)
+                candidates.firstOrNull {
+                    (it.interval ?: "").trim().isEmpty() &&
+                        apexSeconds(it.gap) == null
+                }
+            else null
+        fun key(k: KartState): Double {
+            if (leader != null && k.kartNumber == leader.kartNumber) return -1.0
+            val g = (k.gap ?: "").trim()
+            if (g.isEmpty()) return 0.0                       // leader (no int. col) / no gap yet
+            apexSeconds(g)?.let { return it }                 // same-lap gap to leader
+            val laps = Regex("\\d+").find(g)?.value?.toDoubleOrNull() ?: 1.0
+            return 1_000_000.0 + laps * 1_000.0               // genuinely lapped → back
+        }
+        return candidates.sortedWith(
+            compareBy({ key(it) }, { it.kartNumber }))
     }
 
     /** Raw Apex live timing position, but ordered by the CONTINUOUS
