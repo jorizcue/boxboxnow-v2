@@ -4,6 +4,7 @@ struct PresetsView: View {
     @EnvironmentObject var driverVM: DriverViewModel
     @EnvironmentObject var toast: ToastManager
     @EnvironmentObject var auth: AuthViewModel
+    @EnvironmentObject var langStore: LanguageStore
     @State private var showWizard = false
     @State private var editingPreset: DriverConfigPreset?
     @State private var isLoading = true
@@ -24,10 +25,10 @@ struct PresetsView: View {
                         Image(systemName: "doc.on.doc")
                             .font(.system(size: 32))
                             .foregroundColor(Color(.systemGray3))
-                        Text("Sin plantillas")
+                        Text(t("preset.title"))
                             .font(.subheadline.bold())
                             .foregroundColor(.gray)
-                        Text("Guarda tu configuración actual para aplicarla después")
+                        Text(t("preset.empty"))
                             .font(.caption)
                             .foregroundColor(Color(.systemGray2))
                             .multilineTextAlignment(.center)
@@ -47,7 +48,7 @@ struct PresetsView: View {
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel(preset.isDefault ? "Quitar como predefinida" : "Marcar como predefinida")
+                            .accessibilityLabel(preset.isDefault ? t("preset.starOn") : t("preset.starOff"))
 
                             Button(action: {
                                 driverVM.applyPreset(preset)
@@ -58,14 +59,14 @@ struct PresetsView: View {
                                         HStack(spacing: 6) {
                                             Text(preset.name).foregroundColor(.white)
                                         }
-                                        Text("\(preset.visibleCards.filter { $0.value }.count) tarjetas")
+                                        Text(t("preset.cards", ["count": String(preset.visibleCards.filter { $0.value }.count)]))
                                             .font(.caption).foregroundColor(.gray)
                                     }
                                     Spacer()
                                 }
                                 .frame(minHeight: 44)
                             }
-                            .accessibilityLabel("Plantilla \(preset.name), \(preset.visibleCards.filter { $0.value }.count) tarjetas\(driverVM.selectedPresetId == preset.id ? ", seleccionada" : "")\(preset.isDefault ? ", predefinida" : "")")
+                            .accessibilityLabel("\(preset.name), \(t("preset.cards", ["count": String(preset.visibleCards.filter { $0.value }.count)]))")
 
                             // Edit button
                             Button(action: { editingPreset = preset }) {
@@ -76,25 +77,25 @@ struct PresetsView: View {
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("Editar plantilla \(preset.name)")
+                            .accessibilityLabel(t("common.edit"))
                         }
                     }
                     .onDelete(perform: confirmDelete)
                 }
             } header: {
-                Text("Plantillas (\(driverVM.presets.count)/\(Constants.maxPresets))")
+                Text(t("preset.header", ["count": String(driverVM.presets.count), "max": String(Constants.maxPresets)]))
             }
 
             Section {
                 Button(action: { showWizard = true }) {
-                    Label("Nueva plantilla", systemImage: "plus.circle.fill")
+                    Label(t("preset.createNew"), systemImage: "plus.circle.fill")
                         .frame(minHeight: 44)
                 }
                 .disabled(driverVM.presets.count >= Constants.maxPresets)
-                .accessibilityLabel("Crear nueva plantilla con asistente")
+                .accessibilityLabel(t("preset.createNew"))
             }
         }
-        .navigationTitle("Plantillas")
+        .navigationTitle(t("preset.title"))
         .task {
             await driverVM.loadPresets()
             isLoading = false
@@ -117,17 +118,17 @@ struct PresetsView: View {
                     Task { await driverVM.loadPresets() }
                 }
         }
-        .alert("Eliminar plantilla", isPresented: .init(
+        .alert(t("preset.deleteTitle"), isPresented: .init(
             get: { presetToDelete != nil },
             set: { if !$0 { presetToDelete = nil } }
         )) {
-            Button("Eliminar", role: .destructive) {
+            Button(t("common.delete"), role: .destructive) {
                 if let preset = presetToDelete { deletePreset(preset) }
             }
-            Button("Cancelar", role: .cancel) { presetToDelete = nil }
+            Button(t("common.cancel"), role: .cancel) { presetToDelete = nil }
         } message: {
             if let preset = presetToDelete {
-                Text("Se eliminará la plantilla \"\(preset.name)\". Esta acción no se puede deshacer.")
+                Text(t("preset.deleteConfirm", ["name": preset.name]))
             }
         }
     }

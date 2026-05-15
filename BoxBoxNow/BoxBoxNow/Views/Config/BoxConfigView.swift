@@ -9,6 +9,7 @@ import SwiftUI
 /// - Teams are read-only by default; edit button enables editing
 struct BoxConfigView: View {
     @EnvironmentObject var toast: ToastManager
+    @EnvironmentObject var langStore: LanguageStore
 
     @State private var teams: [Team] = []
     @State private var autoLoad: Bool = false
@@ -33,9 +34,9 @@ struct BoxConfigView: View {
                     }
                 )) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Auto-cargar al iniciar")
+                        Text(t("box.autoLoadTitle"))
                             .font(.system(size: 14, weight: .semibold))
-                        Text("Refresca equipos desde Live Timing al arrancar la carrera.")
+                        Text(t("box.autoLoadSubtitle"))
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }
@@ -53,7 +54,7 @@ struct BoxConfigView: View {
                         } else {
                             Image(systemName: "arrow.down.circle")
                         }
-                        Text("Cargar desde Live Timing")
+                        Text(t("box.liveTiming"))
                     }
                 }
                 .disabled(importing)
@@ -61,14 +62,14 @@ struct BoxConfigView: View {
                 Button {
                     showAddTeamSheet = true
                 } label: {
-                    Label("Anadir equipo", systemImage: "plus.circle")
+                    Label(t("box.addTeamTitle"), systemImage: "plus.circle")
                 }
             }
 
             // ── Team list ──
             if teams.isEmpty && !loading {
                 Section {
-                    Text("No hay equipos. Cargalos desde Live Timing o anadelos manualmente.")
+                    Text(t("box.empty"))
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity)
@@ -76,7 +77,7 @@ struct BoxConfigView: View {
                         .padding(.vertical, 12)
                 }
             } else {
-                Section("Equipos (\(teams.count))") {
+                Section(t("box.teamsHeader", ["count": String(teams.count)])) {
                     ForEach($teams) { $team in
                         TeamRowView(
                             team: $team,
@@ -99,7 +100,7 @@ struct BoxConfigView: View {
                         if saving {
                             ProgressView().tint(.black)
                         }
-                        Text("GUARDAR CAMBIOS")
+                        Text(t("box.saveChanges"))
                             .font(.headline)
                     }
                     .frame(maxWidth: .infinity, minHeight: 44)
@@ -119,9 +120,9 @@ struct BoxConfigView: View {
         // them snap back to the original order on save because no move
         // ever happened.
         .environment(\.editMode, .constant(isEditing ? .active : .inactive))
-        .navigationTitle("Configuracion Box")
+        .navigationTitle(t("box.title"))
         .navigationBarItems(trailing:
-            Button(isEditing ? "Listo" : "Editar") {
+            Button(isEditing ? t("common.done") : t("common.edit")) {
                 withAnimation { isEditing.toggle() }
             }
         )
@@ -133,17 +134,17 @@ struct BoxConfigView: View {
         .task {
             await loadAll()
         }
-        .alert("Anadir equipo", isPresented: $showAddTeamSheet) {
-            TextField("Nombre del equipo", text: $newTeamName)
-            TextField("Numero de kart", text: $newTeamKart)
+        .alert(t("box.addTeamTitle"), isPresented: $showAddTeamSheet) {
+            TextField(t("box.fieldName"), text: $newTeamName)
+            TextField(t("box.fieldKart"), text: $newTeamKart)
                 .keyboardType(.numberPad)
-            Button("Anadir") { addTeamFromPopup() }
-            Button("Cancelar", role: .cancel) {
+            Button(t("box.addConfirm")) { addTeamFromPopup() }
+            Button(t("common.cancel"), role: .cancel) {
                 newTeamName = ""
                 newTeamKart = ""
             }
         } message: {
-            Text("Introduce el nombre y numero de kart del nuevo equipo.")
+            Text(t("box.addTeamPrompt"))
         }
     }
 
@@ -279,6 +280,7 @@ private struct TeamRowView: View {
     let isEditing: Bool
     let onToggleExpanded: () -> Void
     let onRemove: () -> Void
+    @EnvironmentObject var langStore: LanguageStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -291,13 +293,13 @@ private struct TeamRowView: View {
 
                 if isEditing {
                     // Editable kart number
-                    TextField("Kart", value: $team.kart, format: .number)
+                    TextField(t("box.fieldKart"), value: $team.kart, format: .number)
                         .keyboardType(.numberPad)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 60)
 
                     // Editable team name
-                    TextField("Nombre equipo", text: $team.teamName)
+                    TextField(t("box.team"), text: $team.teamName)
                         .textFieldStyle(.roundedBorder)
                 } else {
                     // Read-only display
@@ -333,7 +335,9 @@ private struct TeamRowView: View {
 
             // Driver summary when collapsed
             if !isExpanded && !team.drivers.isEmpty {
-                Text("\(team.drivers.count) piloto\(team.drivers.count == 1 ? "" : "s")")
+                Text(team.drivers.count == 1
+                     ? t("box.pilotCount", ["count": String(team.drivers.count)])
+                     : t("box.pilotCountPlural", ["count": String(team.drivers.count)]))
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
                     .padding(.leading, 34)
@@ -351,7 +355,7 @@ private struct TeamRowView: View {
                         Button {
                             team.drivers.append(TeamDriver(driverName: "", differentialMs: 0))
                         } label: {
-                            Label("Anadir piloto", systemImage: "plus")
+                            Label(t("box.addPilot"), systemImage: "plus")
                                 .font(.system(size: 12))
                         }
                         .buttonStyle(.borderless)
@@ -370,6 +374,7 @@ private struct DriverRowView: View {
     @Binding var driver: TeamDriver
     let isEditing: Bool
     let onRemove: () -> Void
+    @EnvironmentObject var langStore: LanguageStore
 
     var body: some View {
         HStack(spacing: 6) {
@@ -379,7 +384,7 @@ private struct DriverRowView: View {
                 .frame(width: 20)
 
             if isEditing {
-                TextField("Nombre piloto", text: $driver.driverName)
+                TextField(t("box.driverPlaceholder"), text: $driver.driverName)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 13))
 
@@ -404,7 +409,7 @@ private struct DriverRowView: View {
                 }
                 .buttonStyle(.borderless)
             } else {
-                Text(driver.driverName.isEmpty ? "Sin nombre" : driver.driverName)
+                Text(driver.driverName.isEmpty ? t("box.driverNoName") : driver.driverName)
                     .font(.system(size: 13))
                     .foregroundColor(.white)
 

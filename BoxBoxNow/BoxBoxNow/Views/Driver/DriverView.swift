@@ -6,6 +6,7 @@ struct DriverView: View {
     @EnvironmentObject var configVM: ConfigViewModel
     @EnvironmentObject var gpsVM: GPSViewModel
     @EnvironmentObject var auth: AuthViewModel
+    @EnvironmentObject var langStore: LanguageStore
     @Environment(\.dismiss) private var dismiss
     @StateObject private var speech = DriverSpeechService()
     @State private var showMenu = false
@@ -73,16 +74,16 @@ struct DriverView: View {
                 Image(systemName: "doc.on.doc")
                     .font(.system(size: 48, weight: .light))
                     .foregroundColor(.accentColor)
-                Text("Necesitas una plantilla")
+                Text(t("driver.noPresetTitle"))
                     .font(.title3.bold())
                     .foregroundColor(.white)
-                Text("Crea al menos una plantilla en Configuración → Plantillas para usar la vista del piloto.")
+                Text(t("driver.noPresetBody"))
                     .font(.subheadline)
                     .foregroundColor(.gray)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
                 Button(action: { dismiss() }) {
-                    Text("Volver")
+                    Text(t("driver.back"))
                         .font(.headline)
                         .foregroundColor(.black)
                         .frame(maxWidth: .infinity)
@@ -134,7 +135,7 @@ struct DriverView: View {
                         VStack(spacing: 12) {
                             ProgressView()
                                 .tint(.accentColor)
-                            Text("Conectando...")
+                            Text(t("common.loading"))
                                 .foregroundColor(.gray)
                                 .font(.caption)
                         }
@@ -261,7 +262,7 @@ struct DriverView: View {
                                 ProgressView()
                                     .tint(.white)
                                     .scaleEffect(0.8)
-                                Text("Reconectando...")
+                                Text(t("driver.reconnecting"))
                                     .font(.caption.bold())
                                     .foregroundColor(.white)
                             }
@@ -275,7 +276,7 @@ struct DriverView: View {
                         .allowsHitTesting(false)
                         .transition(.move(edge: .top).combined(with: .opacity))
                         .animation(.easeInOut(duration: 0.3), value: raceVM.isConnected)
-                        .accessibilityLabel("Conexion perdida, reconectando")
+                        .accessibilityLabel(t("driver.reconnecting"))
                     }
 
                     // IMU calibration banner removed per product request —
@@ -589,6 +590,7 @@ private struct PitInProgressFullScreen: View {
     let kart: KartState?
     let clockMs: Double
     let pitTimeS: Double
+    @EnvironmentObject var langStore: LanguageStore
 
     var body: some View {
         GeometryReader { geo in
@@ -613,7 +615,7 @@ private struct PitInProgressFullScreen: View {
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
 
-                Text("PIT EN CURSO")
+                Text(t("driver.pitInProgress"))
                     .font(.system(size: headerSize, weight: .black, design: .rounded))
                     .foregroundColor(.cyan)
                     .kerning(headerSize * 0.12)

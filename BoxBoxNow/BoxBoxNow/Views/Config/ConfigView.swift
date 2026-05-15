@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ConfigView: View {
     @EnvironmentObject var auth: AuthViewModel
+    @EnvironmentObject var langStore: LanguageStore
 
     private func canAccess(_ tab: String) -> Bool {
         if auth.user?.isAdmin == true { return true }
@@ -13,12 +14,12 @@ struct ConfigView: View {
         if auth.user == nil {
             VStack(spacing: 12) {
                 ProgressView()
-                Text("Cargando permisos...")
+                Text(t("common.loading"))
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle("Configuracion")
+            .navigationTitle(t("config.title"))
             .task { await auth.refreshMe() }
         } else {
             configList
@@ -29,26 +30,26 @@ struct ConfigView: View {
         List {
             if canAccess("app-config-carrera") {
                 NavigationLink(destination: SessionConfigView()) {
-                    Label("Carrera", systemImage: "flag.checkered")
+                    Label(t("config.session"), systemImage: "flag.checkered")
                 }
             }
             if canAccess("app-config-box") {
                 NavigationLink(destination: BoxConfigView()) {
-                    Label("Box", systemImage: "wrench.and.screwdriver")
+                    Label(t("config.box"), systemImage: "wrench.and.screwdriver")
                 }
             }
             if canAccess("app-config-plantillas") || canAccess("app-config-visualizacion") {
                 NavigationLink(destination: PresetsView()) {
-                    Label("Plantillas", systemImage: "doc.on.doc")
+                    Label(t("config.presets"), systemImage: "doc.on.doc")
                 }
             }
             if canAccess("app-config-gps-racebox") {
                 NavigationLink(destination: GPSConfigView()) {
-                    Label("GPS / RaceBox", systemImage: "location.fill")
+                    Label(t("config.gps"), systemImage: "location.fill")
                 }
             }
         }
-        .navigationTitle("Configuracion")
+        .navigationTitle(t("config.title"))
         .listStyle(.insetGrouped)
     }
 }

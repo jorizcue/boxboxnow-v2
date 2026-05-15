@@ -5,6 +5,7 @@ struct CardOrderPreviewView: View {
     @EnvironmentObject var driverVM: DriverViewModel
     @EnvironmentObject var toast: ToastManager
     @EnvironmentObject var auth: AuthViewModel
+    @EnvironmentObject var langStore: LanguageStore
     @State private var draggingCard: DriverCard?
 
     /// Mirrors DriverView.canShowBoxCards — users without the
@@ -74,7 +75,7 @@ struct CardOrderPreviewView: View {
             }
         }
         .background(Color.black)
-        .navigationTitle("Orden y vista previa")
+        .navigationTitle(t("cardOrder.title"))
         .onDisappear {
             driverVM.saveConfig()
             Task {

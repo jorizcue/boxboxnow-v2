@@ -5,6 +5,7 @@ struct TemplateWizardView: View {
     @EnvironmentObject var driverVM: DriverViewModel
     @EnvironmentObject var auth: AuthViewModel
     @EnvironmentObject var toast: ToastManager
+    @EnvironmentObject var langStore: LanguageStore
     @Environment(\.dismiss) private var dismiss
 
     /// When non-nil the wizard is in **edit** mode: fields are pre-populated
@@ -83,11 +84,11 @@ struct TemplateWizardView: View {
                 navigationButtons
             }
             .background(Color.black.ignoresSafeArea())
-            .navigationTitle(isEditMode ? "Editar plantilla" : "Nueva plantilla")
+            .navigationTitle(isEditMode ? t("wizard.titleEdit") : t("wizard.titleNew"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }
+                    Button(t("common.cancel")) { dismiss() }
                         .foregroundColor(.gray)
                 }
             }
@@ -154,10 +155,10 @@ struct TemplateWizardView: View {
 
     private func stepLabel(_ s: Int) -> String {
         switch s {
-        case 1: return "Nombre"
-        case 2: return "Tarjetas"
-        case 3: return "Orden"
-        case 4: return "Opciones"
+        case 1: return t("wizard.stepName")
+        case 2: return t("wizard.stepVisibility")
+        case 3: return t("wizard.stepOrder")
+        case 4: return t("wizard.stepOptions")
         default: return ""
         }
     }
@@ -171,18 +172,16 @@ struct TemplateWizardView: View {
                 .font(.system(size: 48))
                 .foregroundColor(.accentColor)
 
-            Text("Nombre de la plantilla")
+            Text(t("wizard.nameLabel"))
                 .font(.title3.bold())
                 .foregroundColor(.white)
 
-            Text(isEditMode
-                 ? "Modifica el nombre de la plantilla si lo deseas"
-                 : "Elige un nombre para identificar esta configuración")
+            Text(t("wizard.namePrompt"))
                 .font(.subheadline)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
 
-            TextField("Ej: Carrera nocturna", text: $presetName)
+            TextField(t("wizard.nameLabel"), text: $presetName)
                 .textFieldStyle(.roundedBorder)
                 .padding(.horizontal, 40)
 
@@ -295,11 +294,11 @@ struct TemplateWizardView: View {
                 // Contrast
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("Contraste")
+                        Text(t("wizard.contrast"))
                             .font(.subheadline.bold())
                             .foregroundColor(.white)
                         Spacer()
-                        Text(contrast == 0 ? "Normal" : "+\(Int(contrast * 100))%")
+                        Text(contrast == 0 ? t("driver.menuNormal") : "+\(Int(contrast * 100))%")
                             .font(.caption.monospacedDigit())
                             .foregroundColor(.gray)
                     }
@@ -309,7 +308,7 @@ struct TemplateWizardView: View {
 
                 // Orientation
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Orientacion")
+                    Text(t("wizard.orientation"))
                         .font(.subheadline.bold())
                         .foregroundColor(.white)
                     Picker("", selection: $orientation) {
@@ -325,7 +324,7 @@ struct TemplateWizardView: View {
                     HStack(spacing: 8) {
                         Image(systemName: audioEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                             .foregroundColor(audioEnabled ? .accentColor : .gray)
-                        Text("Audio")
+                        Text(t("wizard.audio"))
                             .font(.subheadline)
                             .foregroundColor(.white)
                     }
@@ -368,7 +367,7 @@ struct TemplateWizardView: View {
                 Button(action: { withAnimation { step -= 1 } }) {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
-                        Text("Anterior")
+                        Text(t("common.back"))
                     }
                     .frame(maxWidth: .infinity, minHeight: 48)
                     .background(Color(.systemGray5))
@@ -380,7 +379,7 @@ struct TemplateWizardView: View {
             if step < totalSteps {
                 Button(action: { withAnimation { step += 1 } }) {
                     HStack(spacing: 4) {
-                        Text("Siguiente")
+                        Text(t("common.next"))
                         Image(systemName: "chevron.right")
                     }
                     .frame(maxWidth: .infinity, minHeight: 48)
@@ -396,7 +395,7 @@ struct TemplateWizardView: View {
                             ProgressView()
                                 .tint(.black)
                         }
-                        Text(isEditMode ? "Actualizar plantilla" : "Guardar plantilla")
+                        Text(isEditMode ? t("wizard.updateTemplate") : t("wizard.saveTemplate"))
                             .fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity, minHeight: 48)

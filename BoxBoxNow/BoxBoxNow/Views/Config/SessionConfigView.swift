@@ -3,6 +3,7 @@ import SwiftUI
 struct SessionConfigView: View {
     @EnvironmentObject var configVM: ConfigViewModel
     @EnvironmentObject var toast: ToastManager
+    @EnvironmentObject var langStore: LanguageStore
     @State private var isSaving = false
     @State private var showSaved = false
 
@@ -13,16 +14,16 @@ struct SessionConfigView: View {
     var body: some View {
         ScrollView {
             if configVM.isLoading {
-                ProgressView("Cargando sesión...")
+                ProgressView(t("common.loading"))
                     .padding(.top, 60)
             } else {
                 VStack(spacing: 20) {
                     // ── Circuit picker ──
                     if !configVM.circuits.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("CIRCUITO").font(.caption).foregroundColor(.gray)
-                            Picker("Circuito", selection: $configVM.session.circuitId) {
-                                Text("Seleccionar").tag(nil as Int?)
+                            Text(t("session.circuit")).font(.caption).foregroundColor(.gray)
+                            Picker(t("session.circuit"), selection: $configVM.session.circuitId) {
+                                Text(t("session.selectCircuit")).tag(nil as Int?)
                                 ForEach(configVM.circuits) { c in
                                     Text(c.name).tag(c.id as Int?)
                                 }
@@ -35,85 +36,85 @@ struct SessionConfigView: View {
                     }
 
                     // ── Section: Carrera ──
-                    ConfigSection(title: "CARRERA", icon: "flag.checkered") {
+                    ConfigSection(title: t("session.sectionRace"), icon: "flag.checkered") {
                         LazyVGrid(columns: columns, spacing: 10) {
                             NumberCard(
-                                title: "NUESTRO KART",
+                                title: t("session.kartTitle"),
                                 value: $configVM.session.ourKartNumber,
                                 accent: true, range: 1...999,
-                                tooltip: "Numero del kart de tu equipo"
+                                tooltip: t("session.kartTooltip")
                             )
                             NumberCard(
-                                title: "DURACION (MIN)",
+                                title: t("session.durationTitle"),
                                 value: $configVM.session.durationMin,
                                 range: 1...1440,
-                                tooltip: "Duracion total de la carrera en minutos"
+                                tooltip: t("session.durationTooltip")
                             )
                             NumberCard(
-                                title: "PITS MINIMOS",
+                                title: t("session.minPitsTitle"),
                                 value: $configVM.session.minPits,
                                 range: 0...50,
-                                tooltip: "Paradas obligatorias minimas segun reglamento"
+                                tooltip: t("session.minPitsTooltip")
                             )
                         }
                     }
 
                     // ── Section: Pit Stops ──
-                    ConfigSection(title: "PIT STOPS", icon: "wrench.and.screwdriver") {
+                    ConfigSection(title: t("session.sectionPit"), icon: "wrench.and.screwdriver") {
                         LazyVGrid(columns: columns, spacing: 10) {
                             NumberCard(
-                                title: "TIEMPO PIT (S)",
+                                title: t("session.pitTimeTitle"),
                                 value: $configVM.session.pitTimeS,
                                 range: 0...600,
-                                tooltip: "Segundos que tardas en hacer una parada en boxes"
+                                tooltip: t("session.pitTimeTooltip")
                             )
                             NumberCard(
-                                title: "PIT CERRADO\nINICIO (MIN)",
+                                title: t("session.pitClosedStartTitle"),
                                 value: $configVM.session.pitClosedStartMin,
                                 range: 0...1440,
-                                tooltip: "Minuto en el que se cierra la ventana de pit (desde el inicio)"
+                                tooltip: t("session.pitClosedStartTooltip")
                             )
                             NumberCard(
-                                title: "PIT CERRADO\nFINAL (MIN)",
+                                title: t("session.pitClosedEndTitle"),
                                 value: $configVM.session.pitClosedEndMin,
                                 range: 0...1440,
-                                tooltip: "Minuto en el que se reabre la ventana de pit"
+                                tooltip: t("session.pitClosedEndTooltip")
                             )
                         }
                     }
 
                     // ── Section: Stints ──
-                    ConfigSection(title: "STINTS Y PILOTOS", icon: "person.2.fill") {
+                    ConfigSection(title: t("session.sectionStints"), icon: "person.2.fill") {
                         LazyVGrid(columns: columns, spacing: 10) {
                             NumberCard(
-                                title: "STINT MIN (MIN)",
+                                title: t("session.minStintTitle"),
                                 value: $configVM.session.minStintMin,
                                 range: 0...300,
-                                tooltip: "Tiempo mínimo que un piloto debe estar en pista antes de poder entrar a boxes"
+                                tooltip: t("session.minStintTooltip")
                             )
                             NumberCard(
-                                title: "STINT MAX (MIN)",
+                                title: t("session.maxStintTitle"),
                                 value: $configVM.session.maxStintMin,
                                 range: 0...300,
-                                tooltip: "Tiempo máximo que un piloto puede estar en pista antes de ser obligado a parar"
+                                tooltip: t("session.maxStintTooltip")
                             )
                             NumberCard(
-                                title: "TIEMPO MIN\nPILOTO (MIN)",
+                                title: t("session.minDriverTimeTitle"),
                                 value: $configVM.session.minDriverTimeMin,
                                 range: 0...300,
-                                tooltip: "Tiempo mínimo total que cada piloto debe conducir durante la carrera"
+                                tooltip: t("session.minDriverTimeTooltip")
                             )
                             // Pilot count used by the pit-gate feasibility
                             // check (see backend/app/engine/pit_gate.py).
                             // 0 = fallback to Apex-observed drivers.
                             NumberCard(
-                                title: "PILOTOS\nDEL EQUIPO",
+                                title: t("session.teamDriversTitle"),
                                 value: Binding(
                                     get: { configVM.session.teamDriversCount ?? 0 },
                                     set: { configVM.session.teamDriversCount = $0 }
                                 ),
                                 range: 0...20,
-                                tooltip: "Numero de pilotos del equipo. 0 = se cuentan automaticamente segun aparecen en Apex."
+                                tooltip: t("session.teamDriversTooltip")
                             )
                         }
                     }
@@ -124,7 +125,7 @@ struct SessionConfigView: View {
                     // it immediately so the strategist can switch
                     // between dry/wet pace assumptions in one tap,
                     // without scrolling down to "ACTUALIZAR SESION".
-                    ConfigSection(title: "MODO LLUVIA", icon: "cloud.rain.fill") {
+                    ConfigSection(title: t("session.sectionRain"), icon: "cloud.rain.fill") {
                         RainToggleRow(
                             rain: configVM.session.rain,
                             onChange: { newVal in
@@ -160,7 +161,7 @@ struct SessionConfigView: View {
                             if isSaving {
                                 ProgressView().tint(.black)
                             }
-                            Text(showSaved ? "GUARDADO ✓" : "ACTUALIZAR SESION")
+                            Text(showSaved ? t("session.saved") : t("session.updateSession"))
                                 .font(.headline)
                         }
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -170,7 +171,7 @@ struct SessionConfigView: View {
                         .cornerRadius(12)
                     }
                     .disabled(isSaving)
-                    .accessibilityLabel(showSaved ? "Guardado" : "Actualizar sesión")
+                    .accessibilityLabel(showSaved ? t("session.saved") : t("session.updateSession"))
                     .padding(.top, 4)
                 }
                 .padding(16)
@@ -180,7 +181,7 @@ struct SessionConfigView: View {
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("OK") {
+                Button(t("common.ok")) {
                     UIApplication.shared.sendAction(
                         #selector(UIResponder.resignFirstResponder),
                         to: nil, from: nil, for: nil
@@ -188,7 +189,7 @@ struct SessionConfigView: View {
                 }
             }
         }
-        .navigationTitle("Sesion de carrera")
+        .navigationTitle(t("session.title"))
         .task {
             await configVM.loadSession()
             await configVM.loadCircuits()
@@ -229,6 +230,7 @@ struct SessionConfigView: View {
 private struct RainToggleRow: View {
     let rain: Bool
     let onChange: (Bool) -> Void
+    @EnvironmentObject var langStore: LanguageStore
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -243,10 +245,10 @@ private struct RainToggleRow: View {
                     .foregroundColor(rain ? Color.blue : .gray)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(rain ? "Activado" : "Desactivado")
+                Text(rain ? t("session.rainOn") : t("session.rainOff"))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white)
-                Text("Desactiva el filtro de outliers en las medias para que la lluvia no falsee el ritmo.")
+                Text(t("session.rainHint"))
                     .font(.system(size: 11))
                     .foregroundColor(Color(.systemGray))
             }
@@ -306,6 +308,7 @@ struct NumberCard: View {
     var accent: Bool = false
     var range: ClosedRange<Int> = 0...9999
     var tooltip: String? = nil
+    @EnvironmentObject var langStore: LanguageStore
     @State private var text: String = ""
     @State private var isInvalid = false
     @State private var showTooltip = false
@@ -381,7 +384,7 @@ struct NumberCard: View {
         .onAppear { text = "\(value)" }
         .onChange(of: value) { text = "\(value)" }
         .alert(title, isPresented: $showTooltip) {
-            Button("OK", role: .cancel) {}
+            Button(t("common.ok"), role: .cancel) {}
         } message: {
             Text(tooltip ?? "")
         }

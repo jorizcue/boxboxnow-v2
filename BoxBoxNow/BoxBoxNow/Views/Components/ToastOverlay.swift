@@ -82,6 +82,7 @@ struct ToastOverlay: ViewModifier {
 struct ToastBanner: View {
     let item: ToastItem
     let onDismiss: () -> Void
+    @EnvironmentObject var langStore: LanguageStore
 
     var body: some View {
         HStack(spacing: 10) {
@@ -103,7 +104,7 @@ struct ToastBanner: View {
                     .foregroundColor(.gray)
                     .frame(minWidth: 44, minHeight: 44)
             }
-            .accessibilityLabel("Cerrar notificacion")
+            .accessibilityLabel(t("common.close"))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

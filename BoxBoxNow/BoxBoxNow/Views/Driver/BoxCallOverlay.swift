@@ -5,6 +5,7 @@ import SwiftUI
 /// Tap anywhere to dismiss.
 struct BoxCallOverlay: View {
     var onDismiss: () -> Void
+    @EnvironmentObject var langStore: LanguageStore
     @State private var flash = false
 
     var body: some View {
@@ -24,7 +25,7 @@ struct BoxCallOverlay: View {
                     .foregroundColor(.white)
                     .shadow(color: .red, radius: 40)
 
-                Text("Toca para cerrar")
+                Text(t("boxCall.tapToClose"))
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.7))
             }

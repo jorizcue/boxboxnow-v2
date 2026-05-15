@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LoginView: View {
     @EnvironmentObject var authVM: AuthViewModel
+    @EnvironmentObject var langStore: LanguageStore
     @State private var email = ""
     @State private var password = ""
     @State private var showPassword = false
@@ -67,7 +68,7 @@ struct LoginView: View {
                                     .foregroundColor(.accentColor)
                             }
 
-                            Text("VISTA PILOTO")
+                            Text(t("home.brandingSubtitle"))
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundColor(Color(.systemGray2))
                                 .tracking(3)
@@ -95,7 +96,7 @@ struct LoginView: View {
                 Image(systemName: "envelope")
                     .foregroundColor(Color(.systemGray3))
                     .frame(width: 20)
-                TextField("Email", text: $email)
+                TextField(t("login.email"), text: $email)
                     .textContentType(.emailAddress)
                     .autocapitalization(.none)
                     .keyboardType(.emailAddress)
@@ -111,7 +112,7 @@ struct LoginView: View {
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(focusedField == .email ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
             )
-            .accessibilityLabel("Email")
+            .accessibilityLabel(t("login.email"))
 
             // Custom styled password field with show/hide toggle
             HStack(spacing: 12) {
@@ -124,12 +125,12 @@ struct LoginView: View {
                     // on showPassword. Both share the same $password binding
                     // + keyboard behaviour.
                     if showPassword {
-                        TextField("Contrasena", text: $password)
+                        TextField(t("login.password"), text: $password)
                             .textContentType(.password)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                     } else {
-                        SecureField("Contrasena", text: $password)
+                        SecureField(t("login.password"), text: $password)
                             .textContentType(.password)
                     }
                 }
@@ -157,7 +158,7 @@ struct LoginView: View {
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(focusedField == .password ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
             )
-            .accessibilityLabel("Contrasena")
+            .accessibilityLabel(t("login.password"))
 
             if let error = authVM.errorMessage {
                 HStack(spacing: 6) {
@@ -173,7 +174,7 @@ struct LoginView: View {
             Button(action: { authVM.login(email: email, password: password) }) {
                 HStack {
                     if authVM.isLoading { ProgressView().tint(.black) }
-                    Text("Iniciar sesión")
+                    Text(t("login.signIn"))
                         .font(.headline)
                 }
                 .frame(maxWidth: .infinity, minHeight: 44)
@@ -182,13 +183,13 @@ struct LoginView: View {
                 .cornerRadius(10)
             }
             .disabled(authVM.isLoading || email.isEmpty || password.isEmpty)
-            .accessibilityLabel("Iniciar sesión")
+            .accessibilityLabel(t("login.signIn"))
             .padding(.top, 4)
 
             // Divider
             HStack {
                 Rectangle().fill(Color(.systemGray5)).frame(height: 0.5)
-                Text("o")
+                Text(t("login.or"))
                     .font(.caption)
                     .foregroundColor(Color(.systemGray3))
                     .padding(.horizontal, 8)
@@ -206,7 +207,7 @@ struct LoginView: View {
                     } else {
                         Image(systemName: "globe")
                     }
-                    Text("Continuar con Google")
+                    Text(authVM.isGoogleLoading ? t("login.openingGoogle") : t("login.continueGoogle"))
                 }
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background(Color(.systemGray6))
@@ -218,7 +219,7 @@ struct LoginView: View {
                 )
             }
             .disabled(authVM.isLoading || authVM.isGoogleLoading)
-            .accessibilityLabel("Continuar con Google")
+            .accessibilityLabel(t("login.continueGoogle"))
         }
     }
 

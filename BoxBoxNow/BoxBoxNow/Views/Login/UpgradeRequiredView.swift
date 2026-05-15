@@ -6,6 +6,7 @@ import SwiftUI
 /// bump the floor from the web Admin → Plataforma → "Apps móviles".
 struct UpgradeRequiredView: View {
     let info: UpgradeRequiredInfo
+    @EnvironmentObject var langStore: LanguageStore
 
     var body: some View {
         VStack(spacing: 24) {
@@ -17,7 +18,7 @@ struct UpgradeRequiredView: View {
                 .shadow(color: .accentColor.opacity(0.3), radius: 20)
 
             VStack(spacing: 8) {
-                Text("Actualización requerida")
+                Text(t("update.title"))
                     .font(.title2.bold())
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
@@ -31,13 +32,13 @@ struct UpgradeRequiredView: View {
 
             VStack(spacing: 4) {
                 if let installed = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
-                    metadataRow(label: "Versión instalada", value: installed)
+                    metadataRow(label: t("update.installed"), value: installed)
                 }
                 if let min = info.minVersion {
-                    metadataRow(label: "Versión mínima requerida", value: min)
+                    metadataRow(label: t("update.minRequired"), value: min)
                 }
                 if let latest = info.latestVersion, latest != info.minVersion {
-                    metadataRow(label: "Última versión disponible", value: latest)
+                    metadataRow(label: t("update.latest"), value: latest)
                 }
             }
             .padding(.vertical, 12)
@@ -50,7 +51,7 @@ struct UpgradeRequiredView: View {
             Button(action: openAppStore) {
                 HStack(spacing: 8) {
                     Image(systemName: "square.and.arrow.down")
-                    Text("Abrir App Store")
+                    Text(t("update.openStore"))
                         .font(.headline)
                 }
                 .frame(maxWidth: .infinity, minHeight: 48)
@@ -59,7 +60,7 @@ struct UpgradeRequiredView: View {
                 .cornerRadius(10)
             }
             .padding(.horizontal, 32)
-            .accessibilityLabel("Abrir la App Store para actualizar")
+            .accessibilityLabel(t("update.openStore"))
 
             Spacer()
         }

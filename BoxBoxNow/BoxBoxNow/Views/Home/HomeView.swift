@@ -53,7 +53,7 @@ struct HomeView: View {
                                     .foregroundColor(.accentColor)
                             }
 
-                            Text("ESTRATEGIA DE KARTING EN TIEMPO REAL")
+                            Text(t("home.brandingTagline"))
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(Color(.systemGray))
                                 .tracking(1.5)
@@ -118,7 +118,7 @@ struct HomeView: View {
                                 icon: "gauge.open.with.lines.needle.33percent.and.arrowtriangle",
                                 title: t("home.viewPilot"),
                                 subtitle: hasSession
-                                    ? "Kart #\(configVM.session.ourKartNumber) · \(configVM.session.durationMin) min"
+                                    ? t("home.viewPilotSubtitle", ["kart": String(configVM.session.ourKartNumber), "min": String(configVM.session.durationMin)])
                                     : t("home.fullScreen"),
                                 accentBorder: true
                             )
@@ -181,15 +181,16 @@ struct HomeView: View {
 struct SessionSummaryCard: View {
     let session: RaceSession
     let circuits: [Circuit]
+    @EnvironmentObject var langStore: LanguageStore
 
     private var circuitName: String {
-        circuits.first(where: { $0.id == session.circuitId })?.name ?? "Sin circuito"
+        circuits.first(where: { $0.id == session.circuitId })?.name ?? t("home.noCircuit")
     }
 
     var body: some View {
         VStack(spacing: 12) {
             HStack {
-                Text("SESION ACTIVA")
+                Text(t("home.activeSession"))
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(.accentColor)
                     .tracking(1)
@@ -200,14 +201,14 @@ struct SessionSummaryCard: View {
             }
 
             HStack(spacing: 16) {
-                SessionInfoPill(label: "KART", value: "#\(session.ourKartNumber)", accent: true)
-                SessionInfoPill(label: "DURACION", value: "\(session.durationMin) min")
-                SessionInfoPill(label: "PITS", value: "\(session.minPits)")
+                SessionInfoPill(label: t("home.pillKart"), value: "#\(session.ourKartNumber)", accent: true)
+                SessionInfoPill(label: t("home.pillDuration"), value: "\(session.durationMin) min")
+                SessionInfoPill(label: t("home.pillPits"), value: "\(session.minPits)")
             }
 
             HStack(spacing: 16) {
-                SessionInfoPill(label: "CIRCUITO", value: circuitName)
-                SessionInfoPill(label: "MAX STINT", value: "\(session.maxStintMin) min")
+                SessionInfoPill(label: t("home.pillCircuit"), value: circuitName)
+                SessionInfoPill(label: t("home.pillMaxStint"), value: "\(session.maxStintMin) min")
             }
         }
         .padding(16)

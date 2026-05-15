@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DriverMenuOverlay: View {
     @EnvironmentObject var driverVM: DriverViewModel
+    @EnvironmentObject var langStore: LanguageStore
     @ObservedObject var speech: DriverSpeechService
     @Binding var isPresented: Bool
     var onDismiss: () -> Void
@@ -16,7 +17,7 @@ struct DriverMenuOverlay: View {
             VStack(spacing: 0) {
                 // Header: title + close button (iOS standard X)
                 HStack {
-                    Text("Menu")
+                    Text(t("driver.menuTitle"))
                         .font(.title3.bold())
                         .foregroundColor(.white)
                     Spacer()
@@ -29,7 +30,7 @@ struct DriverMenuOverlay: View {
                             .foregroundColor(.gray)
                             .frame(minWidth: 44, minHeight: 44)
                     }
-                    .accessibilityLabel("Cerrar menu")
+                    .accessibilityLabel(t("common.close"))
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
@@ -42,12 +43,12 @@ struct DriverMenuOverlay: View {
                     VStack(alignment: .leading, spacing: 20) {
                         // Preset selector
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Plantilla")
+                            Text(t("driver.menuTemplate"))
                                 .font(.caption)
                                 .foregroundColor(.gray)
 
                             if !driverVM.presets.isEmpty {
-                                Picker("Plantilla", selection: $driverVM.selectedPresetId) {
+                                Picker(t("driver.menuTemplate"), selection: $driverVM.selectedPresetId) {
                                     ForEach(driverVM.presets) { p in
                                         Text(p.name).tag(p.id as Int?)
                                     }
@@ -64,23 +65,23 @@ struct DriverMenuOverlay: View {
                         // Contrast boost
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
-                                Text("Contraste")
+                                Text(t("driver.menuContrast"))
                                     .font(.caption)
                                     .foregroundColor(.gray)
                                 Spacer()
-                                Text(driverVM.brightness == 0 ? "Normal" : "+\(Int(driverVM.brightness * 100))%")
+                                Text(driverVM.brightness == 0 ? t("driver.menuNormal") : "+\(Int(driverVM.brightness * 100))%")
                                     .font(.caption.monospacedDigit())
                                     .foregroundColor(.white)
                             }
                             Slider(value: $driverVM.brightness, in: 0...1.0, step: 0.05)
                                 .accentColor(.accentColor)
-                                .accessibilityLabel("Contraste")
-                                .accessibilityValue(driverVM.brightness == 0 ? "Normal" : "+\(Int(driverVM.brightness * 100))%")
+                                .accessibilityLabel(t("driver.menuContrast"))
+                                .accessibilityValue(driverVM.brightness == 0 ? t("driver.menuNormal") : "+\(Int(driverVM.brightness * 100))%")
                         }
 
                         // Orientation
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Orientacion")
+                            Text(t("driver.menuOrientation"))
                                 .font(.caption)
                                 .foregroundColor(.gray)
                             Picker("", selection: $driverVM.orientationLock) {
@@ -102,7 +103,7 @@ struct DriverMenuOverlay: View {
                             HStack(spacing: 8) {
                                 Image(systemName: driverVM.audioEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                                     .foregroundColor(driverVM.audioEnabled ? .accentColor : .gray)
-                                Text("Audio")
+                                Text(driverVM.audioEnabled ? t("driver.narrationOn") : t("driver.narrationOff"))
                                     .font(.subheadline)
                                     .foregroundColor(.white)
                             }
@@ -121,14 +122,14 @@ struct DriverMenuOverlay: View {
                         }) {
                             HStack {
                                 Image(systemName: "rectangle.portrait.and.arrow.right")
-                                Text("Salir")
+                                Text(t("driver.menuExit"))
                             }
                             .frame(maxWidth: .infinity, minHeight: 44)
                             .background(Color.red.opacity(0.15))
                             .foregroundColor(.red)
                             .cornerRadius(10)
                         }
-                        .accessibilityLabel("Salir de la vista del piloto")
+                        .accessibilityLabel(t("driver.menuExit"))
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 16)

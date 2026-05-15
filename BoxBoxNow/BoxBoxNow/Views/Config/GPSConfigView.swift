@@ -5,6 +5,7 @@ import CoreLocation
 struct GPSConfigView: View {
     @EnvironmentObject var gpsVM: GPSViewModel
     @EnvironmentObject var toast: ToastManager
+    @EnvironmentObject var langStore: LanguageStore
     @State private var connectingDeviceId: UUID?
 
     /// Refresh rate (Hz) for the GPS delta cards on the driver dashboard.
@@ -14,10 +15,10 @@ struct GPSConfigView: View {
 
     var body: some View {
         Form {
-            Section("Fuente GPS") {
+            Section(t("gps.source")) {
                 // App is RaceBox-only. Hide the "Telefono" option from the
                 // picker — only "Ninguno" and "RaceBox BLE" are selectable.
-                Picker("Fuente", selection: $gpsVM.source) {
+                Picker(t("gps.source"), selection: $gpsVM.source) {
                     ForEach(GPSSource.selectable, id: \.self) { src in
                         Text(src.displayName).tag(src)
                     }
@@ -29,15 +30,15 @@ struct GPSConfigView: View {
             }
 
             if gpsVM.source == .racebox {
-                Section("RaceBox BLE") {
+                Section(t("gps.raceboxBle")) {
                     // Connected device — show disconnect button
                     if let device = gpsVM.bleManager.connectedDevice {
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
-                            Text(device.name ?? "RaceBox")
+                            Text(device.name ?? t("gps.raceboxName"))
                             Spacer()
-                            Button("Desconectar") {
+                            Button(t("gps.disconnect")) {
                                 gpsVM.bleManager.disconnect()
                                 gpsVM.isConnected = false
                                 gpsVM.signalQuality = .none
@@ -52,17 +53,17 @@ struct GPSConfigView: View {
                         if gpsVM.bleManager.isScanning {
                             HStack {
                                 ProgressView()
-                                Text("Buscando dispositivos...")
+                                Text(t("common.searching"))
                                     .foregroundColor(.gray)
                             }
                         }
 
                         if gpsVM.bleManager.discoveredDevices.isEmpty && !gpsVM.bleManager.isScanning {
                             VStack(spacing: 6) {
-                                Text("No se encontraron dispositivos")
+                                Text(t("gps.noDevices"))
                                     .font(.subheadline)
                                     .foregroundColor(.gray)
-                                Text("Asegurate de que tu RaceBox esta encendido y cerca")
+                                Text(t("gps.noDevicesHint"))
                                     .font(.caption)
                                     .foregroundColor(Color(.systemGray3))
                                     .multilineTextAlignment(.center)
@@ -74,7 +75,7 @@ struct GPSConfigView: View {
                         ForEach(gpsVM.bleManager.discoveredDevices, id: \.identifier) { device in
                             Button(action: { connectToDevice(device) }) {
                                 HStack {
-                                    Text(device.name ?? "Desconocido")
+                                    Text(device.name ?? t("gps.raceboxName"))
                                     Spacer()
                                     if connectingDeviceId == device.identifier {
                                         ProgressView()
@@ -83,11 +84,11 @@ struct GPSConfigView: View {
                                 .frame(minHeight: 44)
                             }
                             .disabled(connectingDeviceId != nil)
-                            .accessibilityLabel("Conectar a \(device.name ?? "dispositivo desconocido")")
+                            .accessibilityLabel(device.name ?? t("gps.raceboxName"))
                         }
 
                         if !gpsVM.bleManager.isScanning {
-                            Button("Buscar dispositivos") {
+                            Button(t("gps.searchDevices")) {
                                 gpsVM.bleManager.startScan()
                             }
                             .frame(minHeight: 44)
@@ -106,44 +107,44 @@ struct GPSConfigView: View {
             // only controls how often the visible number changes on screen.
             if gpsVM.source == .racebox {
                 Section {
-                    Picker("Frecuencia delta", selection: $deltaRefreshHz) {
+                    Picker(t("gps.deltaFrequency"), selection: $deltaRefreshHz) {
                         Text("1 Hz").tag(1)
                         Text("2 Hz").tag(2)
                         Text("4 Hz").tag(4)
                     }
                     .pickerStyle(.segmented)
                 } header: {
-                    Text("Pantalla")
+                    Text(t("gps.displaySection"))
                 } footer: {
-                    Text("Cuantas veces por segundo se actualiza el delta en pantalla. Mas Hz = mas reactivo, pero el ultimo decimal puede bailar mas. 2 Hz es el equilibrio recomendado.")
+                    Text(t("gps.deltaHint"))
                         .font(.caption)
                         .foregroundColor(.gray)
                 }
             }
 
             if gpsVM.source != .none {
-                Section("Estado") {
-                    HStack { Text("Conectado"); Spacer()
+                Section(t("gps.status")) {
+                    HStack { Text(t("gps.connected")); Spacer()
                         Image(systemName: gpsVM.isConnected ? "checkmark.circle.fill" : "xmark.circle")
                             .foregroundColor(gpsVM.isConnected ? .green : .red)
                     }
-                    HStack { Text("Senal"); Spacer(); Text(gpsVM.signalQuality.displayName).foregroundColor(.gray) }
+                    HStack { Text(t("gps.signal")); Spacer(); Text(gpsVM.signalQuality.displayName).foregroundColor(.gray) }
                     HStack {
-                        Text("Satelites")
+                        Text(t("gps.satellites"))
                         Spacer()
                         Text("\(gpsVM.lastSample?.numSatellites ?? 0)")
                             .foregroundColor(.gray)
                             .monospacedDigit()
                     }
-                    HStack { Text("Frecuencia"); Spacer(); Text("\(Int(gpsVM.sampleRate)) Hz").foregroundColor(.gray) }
+                    HStack { Text(t("gps.frequency")); Spacer(); Text("\(Int(gpsVM.sampleRate)) Hz").foregroundColor(.gray) }
                 }
             }
 
             // IMU Calibration — only for RaceBox (phone GPS doesn't have an external IMU)
             if gpsVM.source == .racebox {
-                Section("Calibracion IMU") {
+                Section(t("gps.imuTitle")) {
                     HStack {
-                        Text("Fase")
+                        Text(t("gps.phase"))
                         Spacer()
                         HStack(spacing: 6) {
                             Circle()
@@ -156,7 +157,7 @@ struct GPSConfigView: View {
 
                     if gpsVM.calibrator.phase == .sampling {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Muestras: \(Int(gpsVM.calibrator.progress * 100))%")
+                            Text(t("gps.samples", ["pct": String(Int(gpsVM.calibrator.progress * 100))]))
                                 .font(.caption)
                                 .foregroundColor(.gray)
                             ProgressView(value: gpsVM.calibrator.progress)
@@ -165,7 +166,7 @@ struct GPSConfigView: View {
                     }
 
                     if gpsVM.calibrator.phase == .ready {
-                        Text("Conduce a mas de 15 km/h para alinear los ejes del dispositivo")
+                        Text(t("gps.driveHint"))
                             .font(.caption)
                             .foregroundColor(.cyan)
                     }
@@ -174,7 +175,7 @@ struct GPSConfigView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
-                            Text("Calibracion completa")
+                            Text(t("gps.calibrationComplete"))
                                 .foregroundColor(.green)
                         }
                         .font(.subheadline)
@@ -182,7 +183,7 @@ struct GPSConfigView: View {
 
                     // Action buttons
                     if gpsVM.calibrator.phase == .idle {
-                        Button("Iniciar calibracion") {
+                        Button(t("gps.startCalibration")) {
                             gpsVM.calibrator.startCalibration()
                             toast.info("Manten el kart quieto durante la calibracion")
                         }
@@ -190,22 +191,22 @@ struct GPSConfigView: View {
                         .disabled(gpsVM.bleManager.connectedDevice == nil)
 
                         if gpsVM.bleManager.connectedDevice == nil {
-                            Text("Conecta un RaceBox para calibrar")
+                            Text(t("gps.connectFirst"))
                                 .font(.caption)
                                 .foregroundColor(Color(.systemGray3))
                         }
                     } else if gpsVM.calibrator.phase == .sampling {
-                        Text("Manten el kart quieto...")
+                        Text(t("gps.holdStill"))
                             .font(.caption)
                             .foregroundColor(.blue)
                     } else if gpsVM.calibrator.phase == .ready {
-                        Button("Omitir alineacion") {
+                        Button(t("gps.skipAlign")) {
                             gpsVM.calibrator.skipAlignment()
                             toast.success("Calibracion completada (sin alineacion)")
                         }
                         .frame(minHeight: 44)
                     } else if gpsVM.calibrator.phase == .aligned {
-                        Button("Recalibrar") {
+                        Button(t("gps.recalibrate")) {
                             gpsVM.calibrator.reset()
                             gpsVM.calibrator.startCalibration()
                             toast.info("Recalibrando — manten el kart quieto")
@@ -213,7 +214,7 @@ struct GPSConfigView: View {
                         .frame(minHeight: 44)
                     }
 
-                    Button("Resetear calibracion", role: .destructive) {
+                    Button(t("gps.resetCalibration"), role: .destructive) {
                         gpsVM.calibrator.reset()
                         toast.warning("Calibracion reseteada")
                     }
@@ -222,15 +223,15 @@ struct GPSConfigView: View {
                 }
             }
         }
-        .navigationTitle("GPS / RaceBox")
+        .navigationTitle(t("gps.title"))
     }
 
     private var calibPhaseText: String {
         switch gpsVM.calibrator.phase {
-        case .idle: return "Sin calibrar"
-        case .sampling: return "Capturando gravedad..."
-        case .ready: return "Gravedad OK — alineando"
-        case .aligned: return "Calibrado"
+        case .idle: return t("gps.phaseIdle")
+        case .sampling: return t("gps.phaseSampling")
+        case .ready: return t("gps.phaseReady")
+        case .aligned: return t("gps.phaseAligned")
         }
     }
 
