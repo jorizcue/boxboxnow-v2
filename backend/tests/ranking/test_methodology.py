@@ -47,3 +47,15 @@ def test_candidates_sorted_globally_by_date_then_circuit():
             ("Gensk", "2026-05-02"), ("Ariza", "2026-03-28")]
     assert _ordered_candidates(cand) == [
         ("Ariza", "2026-03-28"), ("Gensk", "2026-05-02"), ("RKC_Paris", "2026-05-09")]
+
+
+import inspect
+from app.services.ranking import processor as P
+import app.api.ranking_routes as R
+
+
+def test_no_hard_100_cap():
+    sig = inspect.signature(P.get_top_drivers)
+    assert sig.parameters["limit"].default is None
+    src = inspect.getsource(R.admin_top)
+    assert "limit: int = 100" not in src

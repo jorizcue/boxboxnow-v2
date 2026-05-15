@@ -650,7 +650,7 @@ async def lookup_ratings_by_names(
 
 async def get_top_drivers(
     db: AsyncSession,
-    limit: int = 100,
+    limit: int | None = None,
     min_sessions: int = 2,
     circuit: str | None = None,
 ) -> list[dict]:
@@ -661,14 +661,16 @@ async def get_top_drivers(
     ranking from `driver_circuit_ratings` — the same Glicko-2 math
     but only counting sessions at that track."""
     if circuit:
-        res = await db.execute(
+        q = (
             select(Driver, DriverCircuitRating)
             .join(DriverCircuitRating, DriverCircuitRating.driver_id == Driver.id)
             .where(DriverCircuitRating.circuit_name == circuit)
             .where(DriverCircuitRating.sessions_count >= min_sessions)
             .order_by(DriverCircuitRating.rating.desc())
-            .limit(limit)
         )
+        if limit is not None:
+            q = q.limit(limit)
+        res = await db.execute(q)
         out: list[dict] = []
         for rank, (driver, rating) in enumerate(res.all(), start=1):
             out.append({
@@ -685,13 +687,15 @@ async def get_top_drivers(
             })
         return out
 
-    res = await db.execute(
+    q2 = (
         select(Driver, DriverRating)
         .join(DriverRating, DriverRating.driver_id == Driver.id)
         .where(DriverRating.sessions_count >= min_sessions)
         .order_by(DriverRating.rating.desc())
-        .limit(limit)
     )
+    if limit is not None:
+        q2 = q2.limit(limit)
+    res = await db.execute(q2)
     out2: list[dict] = []
     for rank, (driver, rating) in enumerate(res.all(), start=1):
         out2.append({
@@ -820,6 +824,8 @@ async def get_driver_detail(driver_id: int, db: AsyncSession) -> dict | None:
             "best_lap_ms": s.best_lap_ms,
             "avg_lap_ms": round(s.avg_lap_ms, 0),
             "final_position": s.final_position,
+            "session_type": s.session_type,
+            "effective_score": round(s.effective_score, 4) if s.effective_score is not None else None,
         }
         for s in sres.scalars().all()
     ]

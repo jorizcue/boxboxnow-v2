@@ -69,7 +69,7 @@ async def lookup_ratings(
 
 @admin_router.get("/top")
 async def admin_top(
-    limit: int = 100,
+    limit: int | None = None,
     min_sessions: int = 2,
     circuit: str | None = None,
     _admin: User = Depends(require_admin),
