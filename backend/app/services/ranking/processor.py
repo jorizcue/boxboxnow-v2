@@ -557,7 +557,7 @@ async def process_log_file(
     return {"skipped": False, "sessions": sessions_count, "laps": laps_count}
 
 
-def _ordered_candidates(candidates: list[tuple[str, str]]) -> list[tuple[str, str]]:
+def _ordered_candidates(candidates: Iterable[tuple[str, str]]) -> list[tuple[str, str]]:
     """Global chronological order: oldest log_date first, deduped,
     circuit name as deterministic tiebreak. Required so the global
     Glicko rating evolves in true time order across circuits (spec §8)."""
@@ -595,7 +595,7 @@ async def process_pending(db: AsyncSession, recordings_dir: Path) -> dict:
 
     processed = 0
     skipped = 0
-    for circuit, log_date in _ordered_candidates(list(path_by_key.keys())):
+    for circuit, log_date in _ordered_candidates(path_by_key.keys()):
         path = path_by_key[(circuit, log_date)]
         try:
             result = await process_log_file(path, circuit, log_date, db)

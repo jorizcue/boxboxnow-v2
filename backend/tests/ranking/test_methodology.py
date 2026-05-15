@@ -1,4 +1,4 @@
-from app.services.ranking.processor import effective_scores, RatedDriver
+from app.services.ranking.processor import effective_scores, RatedDriver, _ordered_candidates
 
 
 def _rd(name, team_key, corrected_ms, team_pos):
@@ -40,9 +40,6 @@ def test_conflicting_team_position_raises():
          RatedDriver("B", "t1", 61000.0, 1)]
     with pytest.raises(ValueError):
         effective_scores(f, w=0.7)
-
-
-from app.services.ranking.processor import _ordered_candidates
 
 
 def test_candidates_sorted_globally_by_date_then_circuit():
