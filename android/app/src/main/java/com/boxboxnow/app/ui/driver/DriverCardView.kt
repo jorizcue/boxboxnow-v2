@@ -91,6 +91,10 @@ fun DriverCardView(
     val accent = cardAccent(
         card, lastLapMs, bestLapMs, deltaBestMs, ourKart, raceClockMs,
         pitOpen = pitStatusForAccent?.isOpen,
+        // Only the LapsToMaxStint card needs this; skip the (cheap but
+        // pointless) stint calc for every other card.
+        lapsToMax = if (card == DriverCard.LapsToMaxStint)
+            raceVM.computeStintCalc(raceClockMs).lapsToMax else null,
     )
     val prominent = card == DriverCard.Position || card == DriverCard.RealPos || card == DriverCard.PitWindow
     val bgAlpha = if (prominent) 0.18f else 0.12f
@@ -209,6 +213,34 @@ private fun cardLabel(
     else -> label
 }
 
+/**
+ * Color for the "Vueltas hasta stint máximo" card. Shared by the card
+ * accent (background / border / icon) and the big number text so the
+ * two can never disagree — a faithful port of iOS
+ * `cardAccentColor` + `lapsToMaxTextColor`:
+ *
+ *   pit window closed   → red
+ *   laps ≤ 2            → red
+ *   laps ≤ 5            → orange
+ *   pit window open     → green
+ *   otherwise           → `fallback`
+ *
+ * iOS uses the same conditions for both, differing only in the final
+ * fallback (teal for the accent, white for the number text); we pass
+ * that fallback in so the split stays identical. Android previously
+ * hard-coded the teal `card.accent` for every state, which is why the
+ * card stayed teal/white while iOS turned red on a closed pit.
+ */
+private fun lapsToMaxStintColor(pitOpen: Boolean?, laps: Double?, fallback: Color): Color {
+    if (pitOpen == false) return Color(0xFFFF453A)   // red — pit closed
+    if (laps != null) {
+        if (laps <= 2.0) return Color(0xFFFF453A)    // red
+        if (laps <= 5.0) return Color(0xFFFF9F0A)    // orange
+    }
+    if (pitOpen == true) return Color(0xFF30D158)    // green — pit open
+    return fallback
+}
+
 private fun cardAccent(
     card: DriverCard,
     lastLapMs: Double?,
@@ -217,6 +249,7 @@ private fun cardAccent(
     ourKart: KartState?,
     raceClockMs: Double,
     pitOpen: Boolean? = null,
+    lapsToMax: Double? = null,
 ): Color {
     val gray = BoxBoxNowColors.SystemGray
     return when (card) {
@@ -253,6 +286,10 @@ private fun cardAccent(
             false -> BoxBoxNowColors.ErrorRed
             null  -> gray
         }
+        // Dynamic, matching iOS: red on a closed pit / very few laps
+        // left, orange when getting tight, green when the window is
+        // open, teal otherwise. `card.accent` is the teal fallback.
+        DriverCard.LapsToMaxStint -> lapsToMaxStintColor(pitOpen, lapsToMax, card.accent)
         else -> card.accent
     }
 }
@@ -473,9 +510,17 @@ private fun CardContent(
             // looked frozen on Android while the adjacent
             // `BoxScore`/timer cards refreshed normally.
             val laps = raceVM.computeStintCalc(raceClockMs).lapsToMax
+            // Text follows the same state as the card accent (which is
+            // already the dynamic red/orange/green/teal computed in
+            // `cardAccent`). iOS keeps the number WHITE only in the
+            // neutral fallback state (where the accent is teal) and
+            // colors it red/orange/green otherwise — replicate that by
+            // deriving from `accent` so the two never disagree.
+            val lapsTextColor =
+                if (accent == DriverCard.LapsToMaxStint.accent) Color.White else accent
             Text(
                 laps?.let { "%.1f".format(it) } ?: "0",
-                color = Color.White,
+                color = lapsTextColor,
                 fontSize = bigFont,
                 fontWeight = FontWeight.Black,
                 fontFamily = FontFamily.Monospace,
