@@ -11,7 +11,7 @@ ALLOWED_APEX = {"app.apex.replay", "app.apex.parser"}
 
 def test_ranking_only_imports_allowed_apex_modules():
     bad = []
-    for py in RANKING.glob("*.py"):
+    for py in RANKING.glob("**/*.py"):
         tree = ast.parse(py.read_text())
         for node in ast.walk(tree):
             mod = None
