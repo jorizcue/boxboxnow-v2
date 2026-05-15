@@ -307,15 +307,27 @@ class RaceViewModel @Inject constructor(
      *  (lagging) position then kart number so early-race (no gaps yet)
      *  still has a deterministic order. */
     private fun apexOrder(): List<KartState> {
+        val placed = _karts.value.filter { it.position > 0 }
+        // The LEADER's gap cell is NOT empty — Apex shows the leader's
+        // current lap there ("Vuelta 4" / "Tour 4"), which looks just
+        // like a laps-down marker. Anchor the leader by the minimum
+        // Apex position instead (P1 is the single most stable field —
+        // it barely changes and Apex fires RANKING immediately on a
+        // lead change). Everyone else is ordered by the CONTINUOUS
+        // numeric gap-to-leader; genuinely lapped karts ("N Tour") sink
+        // to the back. Without this anchor the leader was mis-sorted to
+        // the end and every position came out off-by-one.
+        val leaderPos = placed.minOfOrNull { it.position }
         fun key(k: KartState): Double {
+            if (leaderPos != null && k.position == leaderPos) return -1.0  // leader
             val g = (k.gap ?: "").trim()
-            if (g.isEmpty()) return 0.0                       // leader
+            if (g.isEmpty()) return 0.0                       // safety (no gap yet)
             apexSeconds(g)?.let { return it }                 // same-lap gap
             val laps = Regex("\\d+").find(g)?.value?.toDoubleOrNull() ?: 1.0
             return 1_000_000.0 + laps * 1_000.0               // laps-down
         }
-        return _karts.value.filter { it.position > 0 }
-            .sortedWith(compareBy({ key(it) }, { it.position }, { it.kartNumber }))
+        return placed.sortedWith(
+            compareBy({ key(it) }, { it.position }, { it.kartNumber }))
     }
 
     /** Raw Apex live timing position, but ordered by the CONTINUOUS

@@ -250,14 +250,26 @@ final class RaceViewModel: ObservableObject {
     /// (lagging) position then kart number so early-race (no gaps yet)
     /// still has a deterministic order.
     private func apexOrder() -> [KartState] {
+        let placed = karts.filter { $0.position > 0 }
+        // The LEADER's gap cell is NOT empty — Apex shows the leader's
+        // current lap there ("Vuelta 4" / "Tour 4"), which looks just
+        // like a laps-down marker. Anchor the leader by the minimum
+        // Apex position instead (P1 is the single most stable field —
+        // it barely changes and Apex fires RANKING immediately on a
+        // lead change). Everyone else is ordered by the CONTINUOUS
+        // numeric gap-to-leader; genuinely lapped karts ("N Tour") sink
+        // to the back. Without this anchor the leader was mis-sorted to
+        // the end and every position came out off-by-one.
+        let leaderPos = placed.map { $0.position }.min()
         func key(_ k: KartState) -> Double {
+            if let lp = leaderPos, k.position == lp { return -1 }  // leader
             let g = (k.gap ?? "").trimmingCharacters(in: .whitespaces)
-            if g.isEmpty { return 0 }                         // leader
+            if g.isEmpty { return 0 }                         // safety (no gap yet)
             if let s = apexSeconds(g) { return s }            // same-lap gap
             let laps = Double(g.prefix { $0.isNumber }) ?? 1  // laps-down
             return 1_000_000 + laps * 1_000
         }
-        return karts.filter { $0.position > 0 }.sorted {
+        return placed.sorted {
             let ka = key($0), kb = key($1)
             if ka != kb { return ka < kb }
             if $0.position != $1.position { return $0.position < $1.position }
