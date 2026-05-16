@@ -16,15 +16,16 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import func, select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_routes import require_admin, get_current_user
 from app.models.database import get_db
-from app.models.schemas import User
+from app.models.schemas import User, SessionResult, RankingSessionOverride
 from app.services.ranking.processor import (
     get_top_drivers, search_drivers, lookup_ratings_by_names,
     merge_drivers, process_pending,
@@ -195,6 +196,174 @@ async def admin_reset(
         rerun = await process_pending(db, recordings_dir)
         result["reprocess"] = rerun
     return result
+
+
+# ─── Admin: session-type override ──────────────────────────────────────
+
+
+@admin_router.get("/sessions")
+async def admin_sessions(
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all distinct recorded sessions with their stored session_type
+    and any admin override (forced_type). Ordered by log_date DESC,
+    circuit_name, session_seq.
+
+    Each item: {circuit_name, log_date, session_seq, title1, title2,
+                session_type, team_mode, driver_count, forced_type|null}.
+    """
+    # Aggregate session results grouped by the 5 session-identity columns.
+    agg = (
+        await db.execute(
+            select(
+                SessionResult.circuit_name,
+                SessionResult.log_date,
+                SessionResult.session_seq,
+                SessionResult.title1,
+                SessionResult.title2,
+                SessionResult.session_type,
+                SessionResult.team_mode,
+                func.count(SessionResult.driver_id).label("driver_count"),
+            )
+            .group_by(
+                SessionResult.circuit_name,
+                SessionResult.log_date,
+                SessionResult.session_seq,
+                SessionResult.title1,
+                SessionResult.title2,
+                SessionResult.session_type,
+                SessionResult.team_mode,
+            )
+            .order_by(
+                SessionResult.log_date.desc(),
+                SessionResult.circuit_name,
+                SessionResult.session_seq,
+            )
+        )
+    ).all()
+
+    # Fetch all overrides so we can do the left-join in Python (avoids
+    # SQLite dialect issues with JOIN over aggregate queries).
+    override_rows = (await db.execute(select(RankingSessionOverride))).scalars().all()
+    override_map: dict[tuple[str, str, int], str] = {
+        (ov.circuit_name, ov.log_date, ov.session_seq): ov.forced_type
+        for ov in override_rows
+    }
+
+    result = []
+    for row in agg:
+        key = (row.circuit_name, row.log_date, row.session_seq)
+        result.append(
+            {
+                "circuit_name": row.circuit_name,
+                "log_date": row.log_date,
+                "session_seq": row.session_seq,
+                "title1": row.title1,
+                "title2": row.title2,
+                "session_type": row.session_type,
+                "team_mode": row.team_mode,
+                "driver_count": row.driver_count,
+                "forced_type": override_map.get(key),
+            }
+        )
+    return result
+
+
+class SessionTypeRequest(BaseModel):
+    circuit_name: str
+    log_date: str
+    session_seq: int
+    forced_type: Literal["race", "pace"]
+
+
+@admin_router.post("/session-type")
+async def admin_set_session_type(
+    payload: SessionTypeRequest,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upsert a RankingSessionOverride for the given session.
+
+    Snapshots title1/title2 from an existing SessionResult if one is
+    found for the (circuit_name, log_date, session_seq) triple.
+    Returns the saved override row as a dict.
+    """
+    # Snapshot titles from SessionResult if available.
+    sr = (
+        await db.execute(
+            select(SessionResult)
+            .where(
+                SessionResult.circuit_name == payload.circuit_name,
+                SessionResult.log_date == payload.log_date,
+                SessionResult.session_seq == payload.session_seq,
+            )
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    title1 = sr.title1 if sr else ""
+    title2 = sr.title2 if sr else ""
+
+    # Upsert: find existing row or create new.
+    existing = (
+        await db.execute(
+            select(RankingSessionOverride).where(
+                RankingSessionOverride.circuit_name == payload.circuit_name,
+                RankingSessionOverride.log_date == payload.log_date,
+                RankingSessionOverride.session_seq == payload.session_seq,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if existing:
+        existing.forced_type = payload.forced_type
+        existing.title1 = title1
+        existing.title2 = title2
+        await db.flush()
+        ov = existing
+    else:
+        ov = RankingSessionOverride(
+            circuit_name=payload.circuit_name,
+            log_date=payload.log_date,
+            session_seq=payload.session_seq,
+            forced_type=payload.forced_type,
+            title1=title1,
+            title2=title2,
+        )
+        db.add(ov)
+        await db.flush()
+
+    return {
+        "id": ov.id,
+        "circuit_name": ov.circuit_name,
+        "log_date": ov.log_date,
+        "session_seq": ov.session_seq,
+        "forced_type": ov.forced_type,
+        "title1": ov.title1,
+        "title2": ov.title2,
+    }
+
+
+@admin_router.delete("/session-type")
+async def admin_delete_session_type(
+    circuit_name: str,
+    log_date: str,
+    session_seq: int,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete the RankingSessionOverride for the given session.
+
+    Idempotent: returns 200 even if no row existed.
+    """
+    await db.execute(
+        delete(RankingSessionOverride).where(
+            RankingSessionOverride.circuit_name == circuit_name,
+            RankingSessionOverride.log_date == log_date,
+            RankingSessionOverride.session_seq == session_seq,
+        )
+    )
+    return {"ok": True}
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────
