@@ -53,97 +53,65 @@ def test_retired_driver_ranked_behind_classified():
     classified runner (worst positions), and retired drivers are ordered
     among THEMSELVES by laps completed DESC (more laps = better DNF).
 
-    Tests the `_finalize_session` seam directly — the most targeted level
-    — by constructing `_RowState`s on a `_SessionAccumulator`.  Driver C
-    classifies P3 (last classified) with 8 laps; driver L retires holding
-    a nominal P2 but only 3 laps; driver M retires with 6 laps.  Expected
-    final positions: C=3 (real), then retired ordered by laps desc → M (6
-    laps) BEFORE L (3 laps): M=4, L=5 — both strictly worse than C's 3.
+    Ported from the old `_finalize_session` unit test (which exercised the
+    now-removed private `_SessionAccumulator`/_finalize_session` seam) to
+    the current public API: `reconstruct_race` via `Segment`/`_RowState`.
+
+    Driver C classifies P3 (last classified) with 8 laps; driver L retires
+    holding a nominal P2 but only 3 laps; driver M retires with 6 laps.
+    Expected final positions: C=1 (first classified among these 3 rows),
+    then retired ordered by laps desc → M (6 laps) BEFORE L (3 laps):
+    M=2, L=3 — both strictly worse than C's position.
+
+    The multi-retired lap-ordering behaviour is NOT covered by
+    test_results.py::test_retired_sorts_strictly_behind_classified (which
+    tests only 1 retired vs 1 classified).
     """
-    from app.services.ranking.extractor import (
-        _SessionAccumulator, _finalize_session,
-    )
+    from app.services.ranking.segmenter import Segment, _RowState
+    from app.services.ranking.assembler import Race
+    from app.services.ranking.results import reconstruct_race
 
-    acc = _SessionAccumulator("ENDURANCE RACE", "6H")
+    seg = Segment("", "RACE")
 
-    # Classified runner C — finishes P3, completed 8 laps.
-    c = acc.row("rC")
-    c.lap_ms.extend([60000] * 8)
-    c.note_name("Driver C", is_drteam=True)
-    c.last_position = 3
-    c.retired = False
+    # Classified runner C — 8 laps.
+    c = _RowState(); c.lap_ms = [60000] * 8; c.last_live_name = "Driver C"; c.retired = False
+    seg.rows["rC"] = c; seg.row_to_kart["rC"] = 11
 
-    # Retired runner L — last seen holding P2, but only 3 laps (engine
-    # blew early).  Must NOT keep P2.
-    l = acc.row("rL")
-    l.lap_ms.extend([61000] * 3)
-    l.note_name("Driver L", is_drteam=True)
-    l.last_position = 2
-    l.retired = True
+    # Retired runner L — last seen P2 but only 3 laps. Must NOT keep P2.
+    l = _RowState(); l.lap_ms = [61000] * 3; l.last_live_name = "Driver L"; l.retired = True
+    seg.rows["rL"] = l; seg.row_to_kart["rL"] = 22
 
-    # Retired runner M — 6 laps before retiring.  More laps than L ⇒ must
-    # rank ahead of L among the DNFs (but still behind classified C).
-    m = acc.row("rM")
-    m.lap_ms.extend([62000] * 6)
-    m.note_name("Driver M", is_drteam=True)
-    m.last_position = 1
-    m.retired = True
+    # Retired runner M — 6 laps before retiring. More laps than L → ranks
+    # ahead of L among the DNFs (but still behind classified C).
+    m = _RowState(); m.lap_ms = [62000] * 6; m.last_live_name = "Driver M"; m.retired = True
+    seg.rows["rM"] = m; seg.row_to_kart["rM"] = 33
 
-    acc.first_lap_ts = acc.last_lap_ts = None
+    out = reconstruct_race(Race([seg]), circuit_name="TestCircuit",
+                           log_date="2026-01-01", session_seq=1)
 
-    out = _finalize_session(
-        acc,
-        circuit_name="TestCircuit",
-        log_date="2026-01-01",
-        session_seq=1,
-        row_to_kart={"rC": 11, "rL": 22, "rM": 33},
-        init_team_name={},
-    )
+    pos = {s.driver_raw: s.final_position for s in out}
+    assert set(pos) == {"Driver C", "Driver L", "Driver M"}
 
-    pos = {s.driver_canonical: s.final_position for s in out}
-    assert set(pos) == {
-        normalize_name("Driver C"),
-        normalize_name("Driver L"),
-        normalize_name("Driver M"),
-    }
-    p_c = pos[normalize_name("Driver C")]
-    p_l = pos[normalize_name("Driver L")]
-    p_m = pos[normalize_name("Driver M")]
+    p_c = pos["Driver C"]
+    p_l = pos["Driver L"]
+    p_m = pos["Driver M"]
 
-    # Classified C keeps its real position.
-    assert p_c == 3
-    # BOTH retired drivers sort strictly behind the worst classified (3).
-    assert p_l > p_c and p_m > p_c
+    # BOTH retired drivers sort strictly behind the only classified runner.
+    assert p_l > p_c and p_m > p_c, (
+        f"retired L={p_l}, M={p_m} must both be > classified C={p_c}")
     # Retired ordered among themselves by laps DESC: M (6 laps) better
-    # (smaller position) than L (3 laps).
-    assert p_m < p_l
-    # Concretely: contiguous worst positions after the classified max.
-    assert p_m == 4 and p_l == 5
-
-
-def test_retired_classified_none_position_pace_fallback_preserved():
-    """A classified row with NO position event keeps final_position=None
-    (the processor pace-fallback path).  Only retired rows get a derived
-    numeric position; classified-without-position is left None as before.
-    """
-    from app.services.ranking.extractor import (
-        _SessionAccumulator, _finalize_session,
+    # (smaller position number) than L (3 laps).
+    assert p_m < p_l, (
+        f"M (6 laps, pos {p_m}) must rank ahead of L (3 laps, pos {p_l})"
     )
+    # Concretely: contiguous positions with no gaps.
+    assert sorted([p_c, p_m, p_l]) == [1, 2, 3]
 
-    acc = _SessionAccumulator("ESSAIS", "")  # pace title, position-less
-    a = acc.row("rA")
-    a.lap_ms.extend([60000] * 5)
-    a.note_name("Pacer A", is_drteam=True)
-    a.last_position = None
-    a.retired = False
-    acc.first_lap_ts = acc.last_lap_ts = None
-
-    out = _finalize_session(
-        acc, circuit_name="C", log_date="2026-01-02", session_seq=1,
-        row_to_kart={"rA": 7}, init_team_name={},
-    )
-    assert len(out) == 1
-    assert out[0].final_position is None
+# test_retired_classified_none_position_pace_fallback_preserved REMOVED:
+# The new pipeline (results.reconstruct_race) ALWAYS assigns a numeric
+# final_position — there is no None-position path for classified rows.
+# The new pace-session contract (positions always assigned) is covered by
+# test_results.py::test_pace_session_still_emitted_with_positions.
 
 
 import pytest
