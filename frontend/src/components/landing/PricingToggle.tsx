@@ -100,7 +100,7 @@ const FALLBACK_PLANS: PlanData[] = [
       "App móvil · 2 usuarios",
       "Acceso web · 1 usuario",
       "Módulo carrera + módulo box",
-      "Live Apex",
+      "LiveTiming",
     ],
     price_amount: 49,
     billing_interval: "month",

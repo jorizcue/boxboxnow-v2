@@ -144,9 +144,9 @@ const ROWS: Row[] = [
     values: {
       ind_m: text("Piloto"),
       ind_a: text("Piloto recurrente"),
-      end_b: text("Equipo / circuito pequeño"),
-      end_pro_m: text("Equipo / circuito avanzado"),
-      end_pro_a: text("Circuito / equipo profesional"),
+      end_b: text("Piloto / Equipo iniciación"),
+      end_pro_m: text("Equipo profesional"),
+      end_pro_a: text("Equipo profesional"),
     },
   },
   {
@@ -210,7 +210,7 @@ const ROWS: Row[] = [
     values: { ind_m: NO, ind_a: NO, end_b: YES, end_pro_m: YES, end_pro_a: YES },
   },
   {
-    label: "Live Apex",
+    label: "LiveTiming",
     values: { ind_m: NO, ind_a: NO, end_b: YES, end_pro_m: YES, end_pro_a: YES },
   },
   {
@@ -220,7 +220,7 @@ const ROWS: Row[] = [
       ind_a: NO,
       end_b: NO,
       end_pro_m: NO,
-      end_pro_a: NO,
+      end_pro_a: YES,
     },
   },
   {
@@ -234,7 +234,7 @@ const ROWS: Row[] = [
       ind_a: YES,
       end_b: NO,
       end_pro_m: NO,
-      end_pro_a: NO,
+      end_pro_a: YES,
     },
   },
   {
