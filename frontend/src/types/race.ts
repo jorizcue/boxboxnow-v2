@@ -262,6 +262,7 @@ export interface RaceSnapshot {
   // field-wide leader per sector + the runner-up's bestMs.
   hasSectors?: boolean;
   sectorMeta?: SectorMeta | null;
+  sectorMetaCurrent?: SectorMeta | null;
 }
 
 export interface WsUpdateEvent {

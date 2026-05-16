@@ -41,6 +41,10 @@ export type DriverCardId =
   | "deltaBestS3"
   | "theoreticalBestLap"
   | "deltaSectors"  // S1/S2/S3 deltas combined into one card, 3 lines
+  | "deltaCurrentS1"
+  | "deltaCurrentS2"
+  | "deltaCurrentS3"
+  | "deltaSectorsCurrent"
   // Raw Apex live timing — distinct from gapAhead/gapBehind (which
   // derive from the adjusted classification) and from position
   // (avg-pace) / realPos (adjusted). These surface the values
@@ -96,6 +100,10 @@ export const ALL_DRIVER_CARDS: {
   { id: "deltaBestS2", labelKey: "card.deltaBestS2", label: "Δ Mejor S2", requiresGps: false, group: "raceBbn" },
   { id: "deltaBestS3", labelKey: "card.deltaBestS3", label: "Δ Mejor S3", requiresGps: false, group: "raceBbn" },
   { id: "deltaSectors", labelKey: "card.deltaSectors", label: "Δ Sectores", requiresGps: false, group: "raceBbn" },
+  { id: "deltaCurrentS1", labelKey: "card.deltaCurrentS1", label: "Δ Actual S1", requiresGps: false, group: "raceBbn" },
+  { id: "deltaCurrentS2", labelKey: "card.deltaCurrentS2", label: "Δ Actual S2", requiresGps: false, group: "raceBbn" },
+  { id: "deltaCurrentS3", labelKey: "card.deltaCurrentS3", label: "Δ Actual S3", requiresGps: false, group: "raceBbn" },
+  { id: "deltaSectorsCurrent", labelKey: "card.deltaSectorsCurrent", label: "Δ Sectores Actual", requiresGps: false, group: "raceBbn" },
 
   // --- BOX group (alphabetical by label) ---
   { id: "currentPit", labelKey: "card.currentPit", label: "Pit en curso", requiresGps: false, group: "box" },

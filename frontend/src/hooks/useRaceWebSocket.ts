@@ -138,13 +138,14 @@ export function useRaceWebSocket(options?: WsOptions) {
             // present, refresh the field-best leaders so the sector
             // cards re-render with the new state.
             const anyMsg = msg as any;
-            if (anyMsg.sectorMeta !== undefined || anyMsg.hasSectors !== undefined) {
+            if (anyMsg.sectorMeta !== undefined || anyMsg.hasSectors !== undefined || anyMsg.sectorMetaCurrent !== undefined) {
               applySectorMetaUpdate(
                 !!anyMsg.hasSectors,
                 anyMsg.sectorMeta ?? null,
+                anyMsg.sectorMetaCurrent ?? null,
               );
             }
-            ch?.postMessage({ type: "update", events: msg.events, sectorMeta: anyMsg.sectorMeta, hasSectors: anyMsg.hasSectors });
+            ch?.postMessage({ type: "update", events: msg.events, sectorMeta: anyMsg.sectorMeta, hasSectors: anyMsg.hasSectors, sectorMetaCurrent: anyMsg.sectorMetaCurrent });
           } else if (msg.type === "fifo_update" && msg.data) {
             applyFifoUpdate(msg.data);
             ch?.postMessage({ type: "fifo_update", data: msg.data });

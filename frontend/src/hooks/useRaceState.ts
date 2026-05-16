@@ -32,6 +32,7 @@ interface RaceStore {
   // cards check this to decide whether to render data or a "--" stub.
   hasSectors: boolean;
   sectorMeta: SectorMeta | null;
+  sectorMetaCurrent: SectorMeta | null;
 
   /** Backend-computed pit-gate state. null while the snapshot hasn't
    *  arrived yet (initial mount). StatusBar reads this to decide
@@ -87,7 +88,7 @@ interface RaceStore {
    * (only sent by the backend when a sector event was in the batch).
    * Called from the WS hook after `applyUpdates` so per-kart sector
    * mutations and field-best refresh land in the same render. */
-  applySectorMetaUpdate: (hasSectors: boolean, meta: SectorMeta | null) => void;
+  applySectorMetaUpdate: (hasSectors: boolean, meta: SectorMeta | null, metaCurrent: SectorMeta | null) => void;
 }
 
 const defaultFifo: FifoState = { queue: [], score: 0, history: [] };
@@ -147,6 +148,7 @@ export const useRaceStore = create<RaceStore>((set) => ({
   config: defaultConfig,
   hasSectors: false,
   sectorMeta: null,
+  sectorMetaCurrent: null,
   pitStatus: null,
 
   apexConnected: false,
@@ -216,6 +218,9 @@ export const useRaceStore = create<RaceStore>((set) => ({
       }
       if (Object.prototype.hasOwnProperty.call(snapshot, "sectorMeta")) {
         out.sectorMeta = snapshot.sectorMeta ?? null;
+      }
+      if (Object.prototype.hasOwnProperty.call(snapshot, "sectorMetaCurrent")) {
+        out.sectorMetaCurrent = snapshot.sectorMetaCurrent ?? null;
       }
       // Pit-gate decision: when present, replace; when absent, keep
       // whatever we already had so transient frames without pitStatus
@@ -394,6 +399,9 @@ export const useRaceStore = create<RaceStore>((set) => ({
       if (Object.prototype.hasOwnProperty.call(data, "sectorMeta")) {
         out.sectorMeta = data.sectorMeta ?? null;
       }
+      if (Object.prototype.hasOwnProperty.call(data, "sectorMetaCurrent")) {
+        out.sectorMetaCurrent = data.sectorMetaCurrent ?? null;
+      }
       if (Object.prototype.hasOwnProperty.call(data, "pitStatus")) {
         out.pitStatus = normalizePitStatus(data.pitStatus);
       }
@@ -409,6 +417,6 @@ export const useRaceStore = create<RaceStore>((set) => ({
       classificationMeta: data.classificationMeta ?? state.classificationMeta,
     })),
 
-  applySectorMetaUpdate: (hasSectors, meta) =>
-    set({ hasSectors, sectorMeta: meta }),
+  applySectorMetaUpdate: (hasSectors, meta, metaCurrent) =>
+    set({ hasSectors, sectorMeta: meta, sectorMetaCurrent: metaCurrent ?? null }),
 }));

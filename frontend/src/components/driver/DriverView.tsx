@@ -222,6 +222,7 @@ function computeSectorDelta(
   hasSectors: boolean,
   sectorMeta: SectorMeta | null,
   myKart: KartState | null,
+  current: boolean = false,
 ): SectorDeltaResult {
   if (!hasSectors || !sectorMeta || !myKart) return null;
   const leader = sectorIdx === 1 ? sectorMeta.s1
@@ -238,8 +239,11 @@ function computeSectorDelta(
   const isMine = leader.kartNumber === myKart.kartNumber;
 
   if (isMine) {
-    if (myBest && myBest > 0 && leader.secondBestMs && leader.secondBestMs > 0) {
-      return { deltaMs: myBest - leader.secondBestMs, isMine: true };  // negative
+    // For the current variant, holder margin = myCurrent − secondBestMs
+    // (mirrors iOS/Android). For the best variant, holder margin = myBest − secondBestMs.
+    const holderVal = current ? myCurrent : myBest;
+    if (holderVal && holderVal > 0 && leader.secondBestMs && leader.secondBestMs > 0) {
+      return { deltaMs: holderVal - leader.secondBestMs, isMine: true };  // negative
     }
     return { deltaMs: 0, isMine: true };  // only kart with sectors → no margin yet
   }
@@ -254,14 +258,15 @@ function renderSectorDeltaCard(
   hasSectors: boolean,
   sectorMeta: SectorMeta | null,
   myKart: KartState | null,
+  label: string,
+  current: boolean = false,
 ): { label: string; content: React.ReactNode; accent: string } {
-  const label = `Δ Mejor S${sectorIdx}`;
   const stubAccent = "from-neutral-500/15 to-neutral-500/5 border-neutral-500/30";
 
   const leader = sectorMeta
     ? (sectorIdx === 1 ? sectorMeta.s1 : sectorIdx === 2 ? sectorMeta.s2 : sectorMeta.s3)
     : null;
-  const result = computeSectorDelta(sectorIdx, hasSectors, sectorMeta, myKart);
+  const result = computeSectorDelta(sectorIdx, hasSectors, sectorMeta, myKart, current);
 
   if (!hasSectors || !leader || !myKart || !result) {
     return {
@@ -377,8 +382,9 @@ function renderDeltaSectorsCard(
   hasSectors: boolean,
   sectorMeta: SectorMeta | null,
   myKart: KartState | null,
+  label: string,
+  current: boolean = false,
 ): { label: string; content: React.ReactNode; accent: string } {
-  const label = "Δ Sectores";
   const stubAccent = "from-neutral-500/15 to-neutral-500/5 border-neutral-500/30";
   if (!hasSectors) {
     return {
@@ -395,7 +401,7 @@ function renderDeltaSectorsCard(
     content: (
       <div className="flex flex-col items-stretch h-full w-full justify-center gap-1 sm:gap-1.5 px-2">
         {([1, 2, 3] as const).map((n) => {
-          const r = computeSectorDelta(n, hasSectors, sectorMeta, myKart);
+          const r = computeSectorDelta(n, hasSectors, sectorMeta, myKart, current);
           return (
             <div key={n} className="flex items-center justify-between">
               <span className="text-xs sm:text-sm font-semibold text-neutral-400 tracking-wide w-7">
@@ -550,7 +556,7 @@ function renderApexPositionCard(
 
 export function DriverView() {
   const t = useT();
-  const { karts, config, fifo, connected, countdownMs, durationMs, raceFinished, hasSectors, sectorMeta } = useRaceStore();
+  const { karts, config, fifo, connected, countdownMs, durationMs, raceFinished, hasSectors, sectorMeta, sectorMetaCurrent } = useRaceStore();
   const { now, speed } = useSimNow();
   const raceClock = useRaceClock();
   const driverCfg = useDriverConfig();
@@ -1337,11 +1343,15 @@ export function DriverView() {
     // and the kart's own `currentSNMs` / `bestSNMs`. On circuits that
     // don't expose sectors (`hasSectors === false`), the cards render
     // a "--" stub instead of empty content — same as iOS.
-    deltaBestS1: renderSectorDeltaCard(1, hasSectors, sectorMeta, ourKartObj),
-    deltaBestS2: renderSectorDeltaCard(2, hasSectors, sectorMeta, ourKartObj),
-    deltaBestS3: renderSectorDeltaCard(3, hasSectors, sectorMeta, ourKartObj),
+    deltaBestS1: renderSectorDeltaCard(1, hasSectors, sectorMeta, ourKartObj, "Δ Mejor S1"),
+    deltaBestS2: renderSectorDeltaCard(2, hasSectors, sectorMeta, ourKartObj, "Δ Mejor S2"),
+    deltaBestS3: renderSectorDeltaCard(3, hasSectors, sectorMeta, ourKartObj, "Δ Mejor S3"),
     theoreticalBestLap: renderTheoreticalBestLapCard(hasSectors, ourKartObj),
-    deltaSectors: renderDeltaSectorsCard(hasSectors, sectorMeta, ourKartObj),
+    deltaSectors: renderDeltaSectorsCard(hasSectors, sectorMeta, ourKartObj, "Δ Sectores"),
+    deltaCurrentS1: renderSectorDeltaCard(1, hasSectors, sectorMetaCurrent, ourKartObj, t("card.deltaCurrentS1"), true),
+    deltaCurrentS2: renderSectorDeltaCard(2, hasSectors, sectorMetaCurrent, ourKartObj, t("card.deltaCurrentS2"), true),
+    deltaCurrentS3: renderSectorDeltaCard(3, hasSectors, sectorMetaCurrent, ourKartObj, t("card.deltaCurrentS3"), true),
+    deltaSectorsCurrent: renderDeltaSectorsCard(hasSectors, sectorMetaCurrent, ourKartObj, t("card.deltaSectorsCurrent"), true),
     // ── Raw Apex live timing cards ──
     // intervalAhead = myKart.interval (gap to kart in front per Apex)
     // intervalBehind = interval reported by kart at apexPos+1 (their gap to me)
