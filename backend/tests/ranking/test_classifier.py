@@ -37,3 +37,21 @@ def test_endurance_by_duration():
 def test_spanish_practice():
     c = classify_session("FP3", "", duration_s=700, had_driver_swap=False)
     assert c.session_type == "pace"
+
+
+def test_spanish_clasificacion_is_pace_even_with_duration_in_title():
+    c = classify_session("12H LOS SANTOS", "Clasificación", duration_s=1195, had_driver_swap=False)
+    assert c.session_type == "pace"
+
+def test_accentless_and_italian_quali_is_pace():
+    assert classify_session("GP", "CLASIFICACION", duration_s=1200, had_driver_swap=False).session_type == "pace"
+    assert classify_session("Gara", "Classifica", duration_s=1200, had_driver_swap=False).session_type == "pace"
+    assert classify_session("X", "Qualifying", duration_s=1200, had_driver_swap=False).session_type == "pace"
+
+def test_real_race_still_race():
+    assert classify_session("12H LOS SANTOS", "CARRERA", duration_s=38803, had_driver_swap=True).session_type == "race"
+    assert classify_session("Club", "FINAL", duration_s=900, had_driver_swap=False).session_type == "race"
+
+def test_existing_nonrace_unchanged():
+    assert classify_session("X", "ESSAIS LIBRES", duration_s=900, had_driver_swap=False).session_type == "pace"
+    assert classify_session("X", "Q1", duration_s=900, had_driver_swap=False).session_type == "pace"
