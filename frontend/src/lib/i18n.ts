@@ -814,6 +814,34 @@ const translations: Record<string, Record<Language, string>> = {
   "admin.tracking.clear": { es: "Borrar", en: "Clear", it: "Cancella", de: "Löschen", fr: "Effacer" },
   "admin.tracking.minPolylinePoints": { es: "Necesitas al menos 4 puntos para guardar el trazado.", en: "Need at least 4 points to save the track.", it: "Servono almeno 4 punti per salvare il tracciato.", de: "Mindestens 4 Punkte zum Speichern.", fr: "Au moins 4 points sont nécessaires." },
   "admin.tracking.editTrackBtn": { es: "Editar trazado", en: "Edit track", it: "Modifica tracciato", de: "Strecke bearbeiten", fr: "Modifier le tracé" },
+
+  // === Email verification ===
+  "verify.loading": { es: "Verificando tu cuenta...", en: "Verifying your account...", it: "Verifica del tuo account...", de: "Konto wird verifiziert...", fr: "Vérification de votre compte..." },
+  "verify.successTitle": { es: "¡Cuenta verificada!", en: "Account verified!", it: "Account verificato!", de: "Konto verifiziert!", fr: "Compte vérifié !" },
+  "verify.successText": { es: "Tu prueba gratuita ha comenzado. Ya puedes empezar a usar BoxBoxNow.", en: "Your free trial has started. You can now start using BoxBoxNow.", it: "La tua prova gratuita è iniziata. Ora puoi iniziare a usare BoxBoxNow.", de: "Deine kostenlose Testphase hat begonnen. Du kannst BoxBoxNow jetzt nutzen.", fr: "Votre essai gratuit a commencé. Vous pouvez maintenant utiliser BoxBoxNow." },
+  "verify.alreadyTitle": { es: "Cuenta ya verificada", en: "Account already verified", it: "Account già verificato", de: "Konto bereits verifiziert", fr: "Compte déjà vérifié" },
+  "verify.alreadyText": { es: "Tu cuenta ya estaba verificada. Puedes iniciar sesión.", en: "Your account was already verified. You can log in.", it: "Il tuo account era già verificato. Puoi accedere.", de: "Dein Konto war bereits verifiziert. Du kannst dich anmelden.", fr: "Votre compte était déjà vérifié. Vous pouvez vous connecter." },
+  "verify.goToLogin": { es: "Ir al login", en: "Go to login", it: "Vai al login", de: "Zum Login", fr: "Aller à la connexion" },
+  "verify.errorTitle": { es: "Enlace inválido o expirado", en: "Invalid or expired link", it: "Link non valido o scaduto", de: "Ungültiger oder abgelaufener Link", fr: "Lien invalide ou expiré" },
+  "verify.errorText": { es: "El enlace de verificación no es válido o ha caducado. Solicita uno nuevo.", en: "The verification link is invalid or has expired. Request a new one.", it: "Il link di verifica non è valido o è scaduto. Richiedine uno nuovo.", de: "Der Bestätigungslink ist ungültig oder abgelaufen. Fordere einen neuen an.", fr: "Le lien de vérification est invalide ou a expiré. Demandez-en un nouveau." },
+  "verify.emailPlaceholder": { es: "tu@email.com", en: "you@email.com", it: "tu@email.com", de: "du@email.com", fr: "vous@email.com" },
+  "verify.resendLink": { es: "Reenviar enlace", en: "Resend link", it: "Reinvia link", de: "Link erneut senden", fr: "Renvoyer le lien" },
+  "verify.resending": { es: "Enviando...", en: "Sending...", it: "Invio...", de: "Senden...", fr: "Envoi..." },
+  "verify.resentText": { es: "Si el correo existe, te hemos enviado un nuevo enlace.", en: "If the email exists, we've sent you a new link.", it: "Se l'email esiste, ti abbiamo inviato un nuovo link.", de: "Falls die E-Mail existiert, haben wir dir einen neuen Link gesendet.", fr: "Si l'e-mail existe, nous vous avons envoyé un nouveau lien." },
+  "verify.missingToken": { es: "Enlace inválido. Falta el token de verificación.", en: "Invalid link. The verification token is missing.", it: "Link non valido. Manca il token di verifica.", de: "Ungültiger Link. Der Bestätigungstoken fehlt.", fr: "Lien invalide. Le jeton de vérification est manquant." },
+  "verify.backToLogin": { es: "Volver al login", en: "Back to login", it: "Torna al login", de: "Zurück zum Login", fr: "Retour à la connexion" },
+
+  // Post-register "check your email" screen
+  "register.verifyTitle": { es: "Verifica tu correo", en: "Verify your email", it: "Verifica la tua email", de: "Bestätige deine E-Mail", fr: "Vérifiez votre e-mail" },
+  "register.verifyText": { es: "Te hemos enviado un correo a {email}. Verifícalo para empezar tu prueba gratuita.", en: "We've sent an email to {email}. Verify it to start your free trial.", it: "Ti abbiamo inviato un'email a {email}. Verificala per iniziare la tua prova gratuita.", de: "Wir haben eine E-Mail an {email} gesendet. Bestätige sie, um deine kostenlose Testphase zu starten.", fr: "Nous avons envoyé un e-mail à {email}. Vérifiez-le pour démarrer votre essai gratuit." },
+  "register.resendEmail": { es: "Reenviar correo", en: "Resend email", it: "Reinvia email", de: "E-Mail erneut senden", fr: "Renvoyer l'e-mail" },
+  "register.resentText": { es: "Si el correo existe, te hemos enviado un nuevo enlace.", en: "If the email exists, we've sent you a new link.", it: "Se l'email esiste, ti abbiamo inviato un nuovo link.", de: "Falls die E-Mail existiert, haben wir dir einen neuen Link gesendet.", fr: "Si l'e-mail existe, nous vous avons envoyé un nouveau lien." },
+
+  // Checkout: email_not_verified gate
+  "checkout.emailNotVerified": { es: "Verifica tu correo para poder comprar.", en: "Verify your email to be able to purchase.", it: "Verifica la tua email per poter acquistare.", de: "Bestätige deine E-Mail, um kaufen zu können.", fr: "Vérifiez votre e-mail pour pouvoir acheter." },
+  "checkout.resendVerification": { es: "Reenviar correo de verificación", en: "Resend verification email", it: "Reinvia email di verifica", de: "Bestätigungs-E-Mail erneut senden", fr: "Renvoyer l'e-mail de vérification" },
+  "checkout.verificationSent": { es: "Si el correo existe, te hemos enviado un nuevo enlace.", en: "If the email exists, we've sent you a new link.", it: "Se l'email esiste, ti abbiamo inviato un nuovo link.", de: "Falls die E-Mail existiert, haben wir dir einen neuen Link gesendet.", fr: "Si l'e-mail existe, nous vous avons envoyé un nouveau lien." },
+  "checkout.checkoutError": { es: "No se pudo iniciar el pago. Inténtalo de nuevo.", en: "Could not start the payment. Please try again.", it: "Impossibile avviare il pagamento. Riprova.", de: "Zahlung konnte nicht gestartet werden. Bitte erneut versuchen.", fr: "Impossible de démarrer le paiement. Veuillez réessayer." },
 };
 
 /**

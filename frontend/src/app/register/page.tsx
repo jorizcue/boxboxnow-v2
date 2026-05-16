@@ -8,6 +8,7 @@ import { MaintenancePage } from "@/components/landing/MaintenancePage";
 import Link from "next/link";
 import { useTracker, useTrackerInit } from "@/hooks/useTracker";
 import { ensureVisitorId, getFirstTouch } from "@/lib/visitor";
+import { api } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -25,10 +26,17 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const { token, user, _hydrated, setAuth } = useAuth();
+  const { token, user, _hydrated } = useAuth();
   const { maintenance, loading: siteLoading } = useSiteStatus();
   const router = useRouter();
   const [pendingPlan] = useState(getPlanFromUrl);
+  // Post-register: the new account is UNVERIFIED and has NO trial yet.
+  // Instead of auto-logging-in + routing into the (paid) app, we show a
+  // "verify your email" screen with a resend. We deliberately do NOT call
+  // setAuth here — a token would trip the redirect-to-dashboard effect.
+  const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
 
   // Tracker init for users that landed directly on /register (e.g. from
   // a paid ad with utm_*=...) without ever hitting the homepage. Without
@@ -171,13 +179,27 @@ export default function RegisterPage() {
         return;
       }
 
-      const data = await res.json();
-      setAuth(data.access_token, data.session_token, data.user);
-      router.push("/dashboard");
+      // Account created but UNVERIFIED + no trial. Do NOT setAuth /
+      // route into the app — show the verify-your-email screen so the
+      // user verifies before the trial starts.
+      await res.json().catch(() => null);
+      setRegisteredEmail(email);
     } catch {
       setError("Error de conexion. Intentalo de nuevo.");
     }
     setLoading(false);
+  };
+
+  const handleResend = async () => {
+    if (!registeredEmail) return;
+    setResending(true);
+    try {
+      await api.resendVerification(registeredEmail);
+    } catch {
+      // resend-verification is generic-success by contract.
+    }
+    setResent(true);
+    setResending(false);
   };
 
   if (!_hydrated) {
@@ -198,6 +220,63 @@ export default function RegisterPage() {
           <span className="text-white">BOXBOX</span>
           <span className="text-accent">NOW</span>
         </span>
+      </div>
+    );
+  }
+
+  // Post-register confirmation: account created but UNVERIFIED with no
+  // trial. Show "verify your email" + resend instead of dropping the
+  // user into the paid app.
+  if (registeredEmail) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-sm">
+          {/* Brand header */}
+          <div className="text-center mb-8 sm:mb-10">
+            <div className="inline-flex items-center gap-0 mb-2">
+              <span className="text-4xl font-bold text-white">BB</span>
+              <span className="text-4xl font-bold text-accent">N</span>
+            </div>
+            <h1 className="text-2xl font-bold tracking-wider text-white">
+              BOXBOX<span className="text-accent">NOW</span>
+            </h1>
+          </div>
+
+          <div className="bg-surface rounded-2xl p-5 sm:p-8 border border-border text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-accent/10 flex items-center justify-center">
+              <svg className="w-8 h-8 text-accent" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2">Verifica tu correo</h2>
+            <p className="text-neutral-400 text-sm mb-6">
+              Te hemos enviado un correo a{" "}
+              <span className="text-white font-medium">{registeredEmail}</span>.
+              Verifícalo para empezar tu prueba gratuita.
+            </p>
+
+            {resent ? (
+              <p className="text-accent text-sm mb-2">
+                Si el correo existe, te hemos enviado un nuevo enlace.
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={resending}
+                className="w-full bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed text-black font-semibold py-3 rounded-lg transition-colors tracking-wide"
+              >
+                {resending ? "Enviando..." : "Reenviar correo"}
+              </button>
+            )}
+          </div>
+
+          <div className="mt-6 text-center">
+            <Link href="/login" className="inline-block text-sm text-neutral-500 hover:text-neutral-300 transition-colors">
+              Ir al login
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }

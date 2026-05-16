@@ -624,6 +624,22 @@ export const api = {
       body: JSON.stringify({ password }),
     }),
 
+  // Email verification (gates trial start + purchase). Mirrors the
+  // password-reset helpers: unauthenticated, raw fetch, backend surfaces
+  // its Spanish `detail` on non-2xx (e.g. "Enlace inválido o expirado").
+  verifyEmail: (token: string) =>
+    fetchRaw<{ ok: boolean; alreadyVerified?: boolean }>("/api/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
+  // Always 200 {ok:true} (anti-enumeration) regardless of whether the
+  // email exists / is already verified.
+  resendVerification: (email: string) =>
+    fetchRaw<{ ok: boolean }>("/api/auth/resend-verification", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
   // GPS Telemetry
   saveGpsLaps: (laps: any[]) =>
     fetchApi("/api/gps/laps", { method: "POST", body: JSON.stringify({ laps }) }),
