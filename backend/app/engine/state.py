@@ -483,6 +483,7 @@ class RaceStateManager:
                 )
                 if has_sector_event and self.has_sectors:
                     msg["sectorMeta"] = self._compute_sector_meta()
+                    msg["sectorMetaCurrent"] = self._compute_sector_meta(source="current")
                     msg["hasSectors"] = True
                 await self._broadcast(msg)
 
@@ -1275,27 +1276,32 @@ class RaceStateManager:
         self.race_finished = True
         self._needs_snapshot = True
 
-    def _compute_sector_meta(self) -> dict:
-        """Compute field-wide sector leaders (best + 2nd best per sector).
+    def _compute_sector_meta(self, source: str = "best") -> dict:
+        """Field-wide sector leaders (best + 2nd best per sector).
 
-        Returns a dict shaped like:
-            {
-              "s1": {"bestMs": 30428, "kartNumber": 14,
-                     "driverName": "...", "teamName": "...",
-                     "secondBestMs": 30521 or None},
-              "s2": {...} or None,
-              "s3": {...} or None,
-            }
+        source="best"  → rank by each kart's session-long PB
+                          (`best_sN_ms`) over ALL karts. Unchanged
+                          legacy behaviour; default arg keeps every
+                          existing call site byte-identical.
+        source="current" → rank by each kart's latest live pass
+                          (`current_sN_ms`) over ON-TRACK karts only
+                          (`pit_status != "in_pit"`). A kart parked in
+                          the pits retains a stale-fast current value;
+                          excluding it keeps the live-pace reference
+                          meaningful.
 
-        Per-sector entries are None when no kart has registered a best
-        for that sector yet. Computed on demand each snapshot — O(n_karts)
-        per sector, negligible for a typical 30-kart field.
+        Returns {"s1": {...}|None, "s2": ..., "s3": ...}.
         """
         result: dict = {}
         for s in (1, 2, 3):
-            attr = f"best_s{s}_ms"
+            attr = f"{source}_s{s}_ms"
+            if source == "current":
+                pool = [k for k in self.karts.values()
+                        if k.pit_status != "in_pit"]
+            else:
+                pool = list(self.karts.values())
             ranked = sorted(
-                ((getattr(k, attr), k) for k in self.karts.values()
+                ((getattr(k, attr), k) for k in pool
                  if getattr(k, attr) > 0),
                 key=lambda pair: pair[0],
             )
@@ -1333,6 +1339,7 @@ class RaceStateManager:
                 "classificationMeta": self.classification_meta,
                 "hasSectors": self.has_sectors,
                 "sectorMeta": self._compute_sector_meta() if self.has_sectors else None,
+                "sectorMetaCurrent": self._compute_sector_meta(source="current") if self.has_sectors else None,
                 "config": {
                     "circuitLengthM": self.circuit_length_m,
                     "pitTimeS": self.pit_time_s,

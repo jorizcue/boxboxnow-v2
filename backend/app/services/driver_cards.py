@@ -44,6 +44,10 @@ ALL_DRIVER_CARD_IDS: list[str] = [
     "deltaBestS2",
     "deltaBestS3",
     "deltaSectors",
+    "deltaCurrentS1",
+    "deltaCurrentS2",
+    "deltaCurrentS3",
+    "deltaSectorsCurrent",
     # Box
     "currentPit",
     "pitCount",

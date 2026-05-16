@@ -654,6 +654,10 @@ class UserSession:
                                     self.state._compute_sector_meta()
                                     if self.state.has_sectors else None
                                 ),
+                                "sectorMetaCurrent": (
+                                    self.state._compute_sector_meta(source="current")
+                                    if self.state.has_sectors else None
+                                ),
                                 # Pit-gate decision — recomputed every
                                 # analytics tick so the badge / next-open
                                 # countdown stay current even between pit
@@ -1068,6 +1072,10 @@ class ReplaySession:
                                 "hasSectors": self.state.has_sectors,
                                 "sectorMeta": (
                                     self.state._compute_sector_meta()
+                                    if self.state.has_sectors else None
+                                ),
+                                "sectorMetaCurrent": (
+                                    self.state._compute_sector_meta(source="current")
                                     if self.state.has_sectors else None
                                 ),
                                 "pitStatus": self.state._compute_pit_status_dict(),
