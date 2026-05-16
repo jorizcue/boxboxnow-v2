@@ -7,8 +7,14 @@ Asserts the two headline fixes on real data (mirrors
 tests/ranking/test_race_classification_integration.py, which runs the
 same logic on committed .log.gz fixtures). Exit 0 = OK, 1 = FAIL.
 """
+import os
 import sys
 from collections import defaultdict
+
+# Run-from-anywhere: `python scripts/ranking_dryrun.py` puts scripts/ on
+# sys.path, not the backend app root, so `import app...` fails. Prepend
+# the backend root (parent of scripts/) so the documented command works.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.services.ranking.extractor import extract_sessions
 
