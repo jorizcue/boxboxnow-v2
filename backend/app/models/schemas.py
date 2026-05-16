@@ -845,6 +845,29 @@ class SessionResult(Base):
     )
 
 
+class RankingSessionOverride(Base):
+    """Admin-forced session type for a recorded session. Consulted by
+    apply_extracts (effective type = override ?? classifier). Lives in
+    its own table so reset_ratings (which truncates session_results /
+    rating_history / processed_logs) does NOT wipe manual fixes."""
+    __tablename__ = "ranking_session_overrides"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    circuit_name = Column(String(64), nullable=False, index=True)
+    log_date = Column(String(10), nullable=False, index=True)
+    session_seq = Column(Integer, nullable=False)
+    forced_type = Column(String(8), nullable=False)  # "race" | "pace"
+    title1 = Column(String(120), default="", nullable=False)
+    title2 = Column(String(120), default="", nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(),
+                        onupdate=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("circuit_name", "log_date", "session_seq",
+                         name="uq_ranking_session_override"),
+    )
+
+
 class RatingHistory(Base):
     """Append-only log of every Glicko-2 update applied to a driver.
     One row per (session_result, driver). Useful for audit / undo and for
