@@ -442,7 +442,7 @@ export const api = {
 
   // Stripe
   getCheckoutCircuits: () =>
-    fetchApi<{ id: number; name: string }[]>("/api/stripe/circuits"),
+    fetchApi<{ id: number; name: string; is_beta: boolean }[]>("/api/stripe/circuits"),
   // `circuits` accepts:
   //   * null  → cross-circuit plan, no selection (backend grants all)
   //   * []    → same as null (cross-circuit)

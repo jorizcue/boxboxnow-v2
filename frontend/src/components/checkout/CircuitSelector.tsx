@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 interface Circuit {
   id: number;
   name: string;
+  is_beta: boolean;
 }
 
 const PLAN_LABELS: Record<string, string> = {
@@ -400,6 +401,11 @@ export function CircuitSelector({
                             </div>
                           )}
                           <span className="font-medium">{circuit.name}</span>
+                          {circuit.is_beta && (
+                            <span className="text-[10px] uppercase rounded px-1.5 py-0.5 bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                              Sin verificar
+                            </span>
+                          )}
                         </div>
                       </button>
                     );
