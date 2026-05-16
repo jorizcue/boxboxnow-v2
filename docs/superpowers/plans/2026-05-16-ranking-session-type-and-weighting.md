@@ -23,11 +23,19 @@
 
 ---
 
+> **Testing-infra note (verified pre-execution):** `backend/tests/ranking/`
+> has NO `conftest.py` and NO DB fixture. `test_classifier.py` already exists
+> (pure-function). `test_race_classification_integration.py` is DB-free (it
+> only calls `extract_sessions` and asserts on `SessionExtract`). Therefore:
+> classifier tests EXTEND `test_classifier.py`; pure logic is unit-tested via
+> extracted pure helpers; DB-backed tests use a NEW shared
+> `backend/tests/ranking/conftest.py` async-sqlite fixture created in Task 2.
+
 ## Task 1: Classifier — recognise qualifying
 
-**Files:** `backend/app/services/ranking/classifier.py`; test `backend/tests/ranking/test_classifier_quali.py`
+**Files:** `backend/app/services/ranking/classifier.py`; **extend** existing `backend/tests/ranking/test_classifier.py`
 
-- [ ] **Step 1: failing test** `backend/tests/ranking/test_classifier_quali.py`:
+- [ ] **Step 1: add failing tests to the END of `backend/tests/ranking/test_classifier.py`** (do not create a new file; keep its existing import `from app.services.ranking.classifier import classify_session, SessionClass`):
 
 ```python
 from app.services.ranking.classifier import classify_session
@@ -58,14 +66,34 @@ def test_existing_nonrace_unchanged():
 
 - [ ] **Step 5: commit**
 ```bash
-cd /Users/jizcue/boxboxnow-v2 && git add backend/app/services/ranking/classifier.py backend/tests/ranking/test_classifier_quali.py && git commit -m "fix(ranking): classify Spanish/Italian qualifying as pace (Clasificación no longer race)"
+cd /Users/jizcue/boxboxnow-v2 && git add backend/app/services/ranking/classifier.py backend/tests/ranking/test_classifier.py && git commit -m "fix(ranking): classify Spanish/Italian qualifying as pace (Clasificación no longer race)"
 ```
 
 ---
 
 ## Task 2: `RankingSessionOverride` model (survives Reset)
 
-**Files:** `backend/app/models/schemas.py`; test `backend/tests/ranking/test_session_override_model.py`
+**Files:** `backend/app/models/schemas.py`; NEW `backend/tests/ranking/conftest.py`; test `backend/tests/ranking/test_session_override_model.py`
+
+- [ ] **Step 0: create the shared async DB fixture** `backend/tests/ranking/conftest.py` (none exists; this is reused by Tasks 2/5/7). In-memory SQLite via the project's async stack:
+
+```python
+import pytest_asyncio
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from app.models.schemas import Base
+
+@pytest_asyncio.fixture
+async def db_session():
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+    async with Session() as s:
+        yield s
+    await engine.dispose()
+```
+
+Confirm `pytest_asyncio` + `aiosqlite` are available in `backend/.venv` (the app already uses async SQLAlchemy; if `pytest.ini`/`pyproject` lacks `asyncio_mode=auto`, mark async tests with `@pytest.mark.asyncio`). Verify imports by running one trivial async test.
 
 - [ ] **Step 1: failing test**:
 
@@ -137,7 +165,9 @@ Context: in `apply_extracts`, each `agg_group` is one session. Currently
 path sorts `field` by `corrected_avg_ms`; `SessionResult.final_position` =
 `s.final_position if is_race else None`; `session_type=agg_group[0].session_type`.
 
-- [ ] **Step 1: failing test** `test_pace_ordering.py` — build a synthetic pace `agg_group` (3 individual competitors, distinct `best_lap_ms`, similar avg) through `apply_extracts` with a fresh `db_session`; assert the persisted `SessionResult.final_position` equals the **best-lap** rank (fastest best_lap → position 1), and that a race group still ranks by finish. Also: insert a `RankingSessionOverride(forced_type="pace")` for a group the classifier calls "race" and assert that group is treated as pace (final_position by best lap, session_type stored "pace"). (Mirror the construction style of the existing `tests/ranking/test_race_classification_integration.py`; reuse its `SessionExtract` builders/helpers if present.)
+- [ ] **Step 1: failing tests** `test_pace_ordering.py`. Two layers:
+  - **Pure unit (no DB)** on a new pure helper `_pace_positions(rated_se) -> dict[str, int]` (added in Step 3): given SessionExtract-like rows with `team_key`/`best_lap_ms`, fastest team-best → position 1, ties stable, no-best-lap excluded. This is the core ordering logic, DB-free.
+  - **DB (uses `db_session` from conftest)**: a synthetic pace `agg_group` through `apply_extracts`; assert persisted `SessionResult.final_position` == best-lap rank and race group still finish-order; insert `RankingSessionOverride(forced_type="pace")` for a classifier-"race" group and assert it is treated as pace (positions by best lap, `session_type` stored "pace"). Mirror SessionExtract construction from `tests/ranking/test_results.py` / `test_race_classification_integration.py`.
 
 - [ ] **Step 2:** Run → FAIL (pace currently stores `final_position=None` / orders by avg).
 
@@ -157,23 +187,33 @@ path sorts `field` by `corrected_avg_ms`; `SessionResult.final_position` =
   ```
   2. Replace every `agg_group[0].session_type` used for rating/persist with `effective_type`, and `agg_group[0].team_mode` with `effective_mode` (the `is_race` line, the `SessionResult(session_type=..., team_mode=...)` kwargs).
   3. `is_race = effective_type == "race" and any(s.final_position is not None for s in rated_se)`.
-  4. Pace branch: rank competitors by best lap. Add, in the `else:` (pace) branch that currently sorts by `corrected_avg_ms`:
+  4. Add a **pure module-level helper** to `processor.py` (unit-tested DB-free in Task 3 Step 1):
   ```python
-  comp_best: dict[str, int] = {}
-  for s in rated_se:
-      if s.best_lap_ms and s.best_lap_ms > 0:
-          comp_best[s.team_key] = min(
-              comp_best.get(s.team_key, s.best_lap_ms), s.best_lap_ms)
-  ranked_comps = sorted(comp_best, key=comp_best.__getitem__)
-  pace_pos = {tk: i + 1 for i, tk in enumerate(ranked_comps)}
-  n = len(ranked_comps)
-  # ordering key: normalised best-lap rank (lower = better)
+  def _pace_positions(rated_se: list) -> dict[str, int]:
+      """team_key -> 1-based rank by the competitor's best lap
+      (min best_lap_ms over its rows). Competitors with no valid
+      best lap are omitted (caller pushes them last)."""
+      comp_best: dict[str, int] = {}
+      for s in rated_se:
+          if s.best_lap_ms and s.best_lap_ms > 0:
+              prev = comp_best.get(s.team_key)
+              comp_best[s.team_key] = (s.best_lap_ms if prev is None
+                                       else min(prev, s.best_lap_ms))
+      ranked = sorted(comp_best, key=comp_best.__getitem__)
+      return {tk: i + 1 for i, tk in enumerate(ranked)}
+  ```
+  Pace branch (the `else:` that currently sorts `field` by `corrected_avg_ms`) becomes:
+  ```python
+  pace_pos = _pace_positions(rated_se)
+  n = len(pace_pos)
   key = {}
   for d in field:
       p = pace_pos.get(d.team_key)
-      key[d.name] = 0.0 if (p is None or n <= 1) else (p - 1) / (n - 1)
+      if p is None:                       # no valid best lap → last
+          key[d.name] = 1.0 if n > 1 else 0.0
+      else:
+          key[d.name] = 0.0 if n <= 1 else (p - 1) / (n - 1)
   ```
-  (Competitors with no valid best lap → not in `pace_pos`; they keep key 0.0 only if alone, otherwise they were already filtered by the `laps_floor`/`MIN_LAPS` gate; if any remain with no best lap, push them last: set their key to `1.0`. Add: `if p is None and n > 1: key[d.name] = 1.0`.)
   5. Persist position for pace too — change the `SessionResult(... final_position=(s.final_position if is_race else None) ...)` to:
   ```python
   final_position=(s.final_position if is_race
@@ -194,7 +234,12 @@ git add backend/app/services/ranking/processor.py backend/tests/ranking/test_pac
 
 **Files:** `backend/app/services/ranking/processor.py`; test `backend/tests/ranking/test_session_type_weight.py`
 
-- [ ] **Step 1: failing test**: two identical synthetic sessions (same drivers, same pairwise outcomes) processed from the same fresh ratings — one effective `race`, one effective `pace`. Assert: race produces the pre-change baseline delta; pace produces ≈ `0.30 ×` the race delta on `DriverRating.rating` (tolerance 1e-6 on the linear-blend identity), and `RatingHistory.delta` matches the blended value. Assert race path rating equals what it was before this task (regression: capture via a `race` run).
+- [ ] **Step 1: failing tests (pure, DB-free)** `test_session_type_weight.py` on the pure helper `_blend` + the constants:
+  - `SESSION_TYPE_WEIGHT == {"race": 1.0, "pace": 0.3}` and `INTRA_RACE_POS_WEIGHT == 0.7`.
+  - `_blend(pre, new, 1.0) == new` (race is byte-identical).
+  - `_blend(pre, new, 0.0) == pre`.
+  - Linear identity: for arbitrary `pre`/`new` `Glicko2State`s, `_blend(pre,new,0.3).rating - pre.rating == 0.3*(new.rating - pre.rating)` (and same for `rd`, `volatility`), tol 1e-9.
+  End-to-end weighting (a real session moving 30%) is covered by the Task 7 integration test — keep Task 4 DB-free.
 
 - [ ] **Step 2:** Run → FAIL.
 
@@ -275,20 +320,10 @@ git add frontend/src/components/admin/AdminRankingPanel.tsx && git commit -m "fe
 
 **Files:** `backend/tests/ranking/test_session_type_integration.py`
 
-- [ ] **Step 1:** New test using the committed fixture
-`backend/tests/ranking/fixtures/santos_2026-04-25.log.gz` (mirror
-`test_race_classification_integration.py`): run `extract_sessions` →
-`apply_extracts` end-to-end against a fresh `db_session`. Assert, on
-`seq=1 "12H LOS SANTOS / Clasificación"`:
-  - effective `session_type == "pace"` (classifier fix);
-  - the `SessionResult` for **Jon del Valle, kart 8** has `final_position == 3`
-    (verified from real data: team-best 1:04.532 = 3rd-fastest, behind kart 3
-    @64510 and kart 10 @64523);
-  - `seq=2` and `seq=3` ("12H LOS SANTOS / CARRERA") remain `session_type ==
-    "race"` with finish-order positions.
-  Then with a `RankingSessionOverride(seq=1, forced_type="race")` inserted,
-  re-run and assert seq=1 is treated as race (positions revert to finish
-  order) — proving the override path end-to-end.
+- [ ] **Step 1:** New `test_session_type_integration.py` on the committed fixture
+`backend/tests/ranking/fixtures/santos_2026-04-25.log.gz`, two parts:
+  - **Part A — extractor (DB-free, mirror `test_race_classification_integration.py`'s `@pytest.mark.skipif(not os.path.exists(SANTOS))` + `extract_sessions` style):** `extract_sessions(SANTOS, circuit_name="Santos", log_date="2026-04-25")`, group by `session_seq`; assert seq=1 (`title2` ~ "Clasificación") → `session_type == "pace"` (classifier fix proven end-to-end on real data); seq=2 & seq=3 ("CARRERA") → `"race"`.
+  - **Part B — apply_extracts (uses `db_session` from conftest):** run `apply_extracts(extract_sessions(...), db)`; query `SessionResult` for circuit Santos / 2026-04-25 / seq=1 / the **kart 8** row(s) (Jon del Valle); assert `final_position == 3` (real data: team-best 1:04.532 = 3rd-fastest, behind kart 3 @64510 and kart 10 @64523) and stored `session_type == "pace"`; assert a seq=2 row keeps a finish-order `final_position` with `session_type == "race"`. Then insert `RankingSessionOverride(circuit_name="Santos", log_date="2026-04-25", session_seq=1, forced_type="race")`, `reset_ratings(db)` (must NOT delete the override), re-run `apply_extracts`, and assert seq=1 rows now have `session_type == "race"` with finish-order positions (kart 8 back near last) — proving override + survives-reset end-to-end.
 - [ ] **Step 2:** Run it → pass.
 - [ ] **Step 3:** Full suite: `cd /Users/jizcue/boxboxnow-v2/backend && .venv/bin/python -m pytest tests -q` → all pass. Also re-run `npx tsc --noEmit && npm run build` in `frontend` → green.
 - [ ] **Step 4: commit**
