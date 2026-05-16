@@ -249,6 +249,8 @@ class CircuitOut(BaseModel):
     # that case and the admin editor shows the empty-track state).
     has_track_config: bool = False
     default_direction: str = "forward"
+    for_sale: bool = True
+    is_beta: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -331,6 +333,8 @@ class CircuitCreate(BaseModel):
     finish_lat2: float | None = None
     finish_lon2: float | None = None
     warmup_laps_to_skip: int = 3
+    for_sale: bool = True
+    is_beta: bool = False
 
 
 class CircuitUpdate(BaseModel):
@@ -350,6 +354,8 @@ class CircuitUpdate(BaseModel):
     finish_lat2: float | None = None
     finish_lon2: float | None = None
     warmup_laps_to_skip: int | None = None
+    for_sale: bool | None = None
+    is_beta: bool | None = None
 
 
 # --- User Circuit Access ---

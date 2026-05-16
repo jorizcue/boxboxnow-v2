@@ -134,6 +134,15 @@ async def init_db():
         except Exception:
             pass
 
+        try:
+            await conn.execute(text("ALTER TABLE circuits ADD COLUMN for_sale BOOLEAN NOT NULL DEFAULT 1"))
+        except Exception:
+            pass  # Column already exists
+        try:
+            await conn.execute(text("ALTER TABLE circuits ADD COLUMN is_beta BOOLEAN NOT NULL DEFAULT 0"))
+        except Exception:
+            pass  # Column already exists
+
         # Add kart_number to gps_telemetry_laps (used to sync with replay)
         try:
             await conn.execute(text("ALTER TABLE gps_telemetry_laps ADD COLUMN kart_number INTEGER"))

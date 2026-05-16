@@ -71,6 +71,8 @@ class Circuit(Base):
     # aren't representative of the driver's real pace. Configurable per
     # circuit because shorter tracks reach temperature in fewer laps.
     warmup_laps_to_skip = Column(Integer, default=3, nullable=False)
+    for_sale = Column(Boolean, nullable=False, default=True, server_default="1")
+    is_beta = Column(Boolean, nullable=False, default=False, server_default="0")
 
     # ── Tracking module (vista de pista en vivo) ──
     # `track_polyline` es un JSON con un array de [lat, lon] que define

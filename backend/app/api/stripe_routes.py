@@ -174,9 +174,9 @@ async def list_circuits_for_checkout(
     )
     active_circuit_ids = {row[0] for row in active_result.fetchall()}
 
-    result = await db.execute(select(Circuit).order_by(Circuit.name))
+    result = await db.execute(select(Circuit).where(Circuit.for_sale == True).order_by(Circuit.name))
     return [
-        {"id": c.id, "name": c.name}
+        {"id": c.id, "name": c.name, "is_beta": c.is_beta}
         for c in result.scalars().all()
         if c.id not in active_circuit_ids
     ]
