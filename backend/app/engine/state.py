@@ -850,7 +850,14 @@ class RaceStateManager:
             # Calculate stint duration (time on track) and race elapsed time
             duration_total_ms = self.duration_min * 60 * 1000
             on_track_ms = kart.stint_start_countdown_ms - self.countdown_ms
-            race_time_ms = duration_total_ms - self.countdown_ms if self.countdown_ms > 0 else abs(self.countdown_ms) + duration_total_ms
+            # Interpolated, NOT raw self.countdown_ms (≤30s stale): the Box
+            # "Pit en curso" card computes elapsed = raceElapsed(live
+            # interpolated clock) − pitRecord.race_time_ms, so a stale raw
+            # anchor makes that card start at the staleness offset (e.g.
+            # 0:09) instead of 0:00. Same rationale as pit_in_countdown_ms
+            # above / lines 558,966.
+            icd = self._interpolated_countdown_ms()
+            race_time_ms = duration_total_ms - icd if icd > 0 else abs(icd) + duration_total_ms
             stint_laps = sum(1 for lap in kart.all_laps if lap.get("pitNumber") == kart.pit_count - 1)
 
             # Update per-driver cumulative time
