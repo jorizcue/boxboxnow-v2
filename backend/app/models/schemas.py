@@ -35,6 +35,9 @@ class User(Base):
     stripe_customer_id = Column(String(255), unique=True, nullable=True, index=True)
     password_reset_token = Column(String(255), nullable=True)
     password_reset_expires = Column(DateTime, nullable=True)
+    email_verified = Column(Boolean, nullable=False, default=False, server_default="0")
+    email_verification_token = Column(String(255), nullable=True)
+    email_verification_expires = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
     circuit_access = relationship("UserCircuitAccess", back_populates="user", cascade="all, delete-orphan")

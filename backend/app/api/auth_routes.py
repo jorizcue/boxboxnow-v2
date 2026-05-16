@@ -50,6 +50,43 @@ PLATFORM_DEFAULTS = {
     "trial_email_days": "3",
 }
 
+EMAIL_VERIFICATION_TTL = timedelta(days=7)
+
+
+async def start_trial(user: User, db: AsyncSession, *, trial_days: int) -> None:
+    """Create a trial Subscription + UserCircuitAccess for every for_sale=True circuit.
+
+    Idempotent: if the user already has ANY Subscription row, returns immediately
+    (no-op). Does NOT commit — the caller is responsible for committing.
+    """
+    existing_sub = (
+        await db.execute(select(Subscription).where(Subscription.user_id == user.id))
+    ).scalar_one_or_none()
+    if existing_sub is not None:
+        return
+
+    now = datetime.now(timezone.utc)
+    trial_end = now + timedelta(days=trial_days)
+
+    db.add(Subscription(
+        user_id=user.id,
+        plan_type="trial",
+        status="trialing",
+        current_period_start=now,
+        current_period_end=trial_end,
+    ))
+
+    circuits_result = await db.execute(
+        select(Circuit).where(Circuit.for_sale == True)  # noqa: E712
+    )
+    for circuit in circuits_result.scalars().all():
+        db.add(UserCircuitAccess(
+            user_id=user.id,
+            circuit_id=circuit.id,
+            valid_from=now,
+            valid_until=trial_end,
+        ))
+
 
 # ---- Mobile app version gating ----------------------------------------------
 #
@@ -794,6 +831,9 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
         password_hash=hash_password(data.password),
         is_admin=False,
         max_devices=2,
+        email_verified=False,
+        email_verification_token=secrets.token_urlsafe(48),
+        email_verification_expires=datetime.now(timezone.utc) + EMAIL_VERIFICATION_TTL,
     )
     db.add(user)
     await db.flush()
@@ -818,27 +858,8 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
     for tab in reg_config["tabs"]:
         db.add(UserTabAccess(user_id=user.id, tab=tab))
 
-    if trial_days > 0:
-        # Create trial subscription with configurable duration
-        trial_end = datetime.now(timezone.utc) + timedelta(days=trial_days)
-        trial_sub = Subscription(
-            user_id=user.id,
-            plan_type="trial",
-            status="trialing",
-            current_period_start=datetime.now(timezone.utc),
-            current_period_end=trial_end,
-        )
-        db.add(trial_sub)
-
-        # Grant circuit access to all circuits for trial period
-        circuits_result = await db.execute(select(Circuit))
-        for circuit in circuits_result.scalars().all():
-            db.add(UserCircuitAccess(
-                user_id=user.id,
-                circuit_id=circuit.id,
-                valid_from=datetime.now(timezone.utc),
-                valid_until=trial_end,
-            ))
+    # Trial does NOT start at registration — it starts when the user verifies their email.
+    # Task 3: send_verification_email(email, username, token) fire-and-forget here
 
     await db.commit()
 
@@ -891,10 +912,9 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
     )
     user = result.scalar_one()
 
-    # Send welcome email (fire and forget)
-    from app.services.email_service import send_welcome_email
-    import asyncio
-    asyncio.create_task(send_welcome_email(data.email, data.username, trial_days))
+    # Welcome email removed from register(): it fires when the user verifies their
+    # email address and the trial actually begins. See Task 3 (send_welcome_email
+    # moves to the verify-email endpoint).
 
     access_token = create_token(user.id, user.username, user.is_admin, session_token)
     return LoginResponse(
@@ -1251,6 +1271,7 @@ async def google_callback(code: str, request: Request, state: str | None = None,
             has_custom_password=False,
             is_admin=False,
             max_devices=2,
+            email_verified=True,  # Google already verified the address
         )
         db.add(user)
         await db.flush()
@@ -1266,25 +1287,9 @@ async def google_callback(code: str, request: Request, state: str | None = None,
         for tab in reg_config["tabs"]:
             db.add(UserTabAccess(user_id=user.id, tab=tab))
 
+        # Google verified the email → start trial immediately (no verification step needed)
         if trial_days > 0:
-            trial_end = datetime.now(timezone.utc) + timedelta(days=trial_days)
-            trial_sub = Subscription(
-                user_id=user.id,
-                plan_type="trial",
-                status="trialing",
-                current_period_start=datetime.now(timezone.utc),
-                current_period_end=trial_end,
-            )
-            db.add(trial_sub)
-
-            circuits_result = await db.execute(select(Circuit))
-            for circuit in circuits_result.scalars().all():
-                db.add(UserCircuitAccess(
-                    user_id=user.id,
-                    circuit_id=circuit.id,
-                    valid_from=datetime.now(timezone.utc),
-                    valid_until=trial_end,
-                ))
+            await start_trial(user, db, trial_days=trial_days)
 
         await db.commit()
 
@@ -1294,7 +1299,7 @@ async def google_callback(code: str, request: Request, state: str | None = None,
         )
         user = result.scalar_one()
 
-        # Send welcome email
+        # Send welcome email (trial started immediately for OAuth users)
         if email:
             from app.services.email_service import send_welcome_email
             import asyncio as _asyncio

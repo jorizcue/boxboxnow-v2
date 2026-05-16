@@ -218,6 +218,25 @@ async def init_db():
         except Exception:
             pass
 
+        # Add email verification columns to users
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT 0"))
+        except Exception:
+            pass  # Column already exists
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN email_verification_token VARCHAR(255)"))
+        except Exception:
+            pass  # Column already exists
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN email_verification_expires DATETIME"))
+        except Exception:
+            pass  # Column already exists
+        # Grandfather: every pre-existing user is marked as verified so nobody is locked out.
+        # Safe to re-run — UPDATE is idempotent (already-verified rows are unchanged).
+        await conn.execute(text(
+            "UPDATE users SET email_verified = 1 WHERE email_verified = 0 OR email_verified IS NULL"
+        ))
+
         # Seed default tab access for all users (basic tabs)
         # This ensures existing users get access to all standard tabs
         basic_tabs = ["race", "pit", "live", "adjusted", "driver", "config", "replay", "analytics"]
