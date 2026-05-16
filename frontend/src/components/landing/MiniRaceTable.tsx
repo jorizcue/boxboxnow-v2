@@ -34,15 +34,15 @@ interface Row {
 }
 
 const INITIAL: Row[] = [
-  { pos: 1, kart: 53, team: "NEO LEVELDOWN", driver: "GUILLE CHAPATE", med20: "56.298", mej3: "55.751", ult: "55.606", mejor: "55.734", vlt: 20, pitDone: 0, pitMin: 3, tier: 100, stint: "19:02.02", stintLaps: 19 },
-  { pos: 2, kart: 47, team: "NEO DEL HACENDADO", driver: "ALEJANDRO FLORIDO", med20: "56.508", mej3: "55.850", ult: "55.160", mejor: "55.554", vlt: 20, pitDone: 0, pitMin: 3, tier: 75, stint: "19:02.02", stintLaps: 19 },
-  { pos: 3, kart: 54, team: "NEO LEVELAP", driver: "JON DEL VALLE", med20: "56.965", mej3: "55.960", ult: "55.489", mejor: "55.746", vlt: 20, pitDone: 0, pitMin: 3, tier: 75, stint: "19:02.02", stintLaps: 19 },
-  { pos: 4, kart: 31, team: "JARAMAFAN RACING", driver: "GERARD SOTO", med20: "57.283", mej3: "56.439", ult: "58.996", mejor: "—", vlt: 17, pitDone: 1, pitMin: 3, tier: 50, stint: "2:30.37", stintLaps: 2 },
-  { pos: 5, kart: 45, team: "KARTINGNOW RACING TEAM", driver: "PABLO PIMIENTA", med20: "58.071", mej3: "56.363", ult: "56.442", mejor: "56.325", vlt: 19, pitDone: 0, pitMin: 3, tier: 50, stint: "19:02.02", stintLaps: 19 },
-  { pos: 6, kart: 26, team: "CKM FARMACIA ZENITH", driver: "GUILLERMO PANIAGUA", med20: "58.312", mej3: "57.700", ult: "57.203", mejor: "57.633", vlt: 18, pitDone: 0, pitMin: 3, tier: 25, stint: "19:02.02", stintLaps: 17 },
-  { pos: 7, kart: 46, team: "1899 CALL RACING", driver: "JORGE GARCIA", med20: "58.798", mej3: "58.576", ult: "59.062", mejor: "58.136", vlt: 17, pitDone: 1, pitMin: 3, tier: 1, stint: "6:00.74", stintLaps: 6 },
-  { pos: 8, kart: 28, team: "DOUBLE TROUBLE", driver: "MARIO BRICEÑO GONZALEZ", med20: "58.827", mej3: "57.846", ult: "59.004", mejor: "57.312", vlt: 19, pitDone: 0, pitMin: 3, tier: 25, stint: "19:02.02", stintLaps: 18 },
-  { pos: 9, kart: 51, team: "KARTINGNOW ENDURANCE TEAM", driver: "MATIAS GARCIA", med20: "59.952", mej3: "59.952", ult: "1:02.867", mejor: "59.606", vlt: 16, pitDone: 1, pitMin: 3, tier: 1, stint: "6:00.74", stintLaps: 6, mine: true },
+  { pos: 1, kart: 53, team: "ESCUDERÍA RELÁMPAGO", driver: "LUCAS MARTÍN", med20: "56.298", mej3: "55.751", ult: "55.606", mejor: "55.734", vlt: 20, pitDone: 0, pitMin: 3, tier: 100, stint: "19:02.02", stintLaps: 19 },
+  { pos: 2, kart: 47, team: "TEAM NEBULOSA", driver: "DANIEL SERRANO", med20: "56.508", mej3: "55.850", ult: "55.160", mejor: "55.554", vlt: 20, pitDone: 0, pitMin: 3, tier: 75, stint: "19:02.02", stintLaps: 19 },
+  { pos: 3, kart: 54, team: "VÉRTICE RACING", driver: "PABLO REYES", med20: "56.965", mej3: "55.960", ult: "55.489", mejor: "55.746", vlt: 20, pitDone: 0, pitMin: 3, tier: 75, stint: "19:02.02", stintLaps: 19 },
+  { pos: 4, kart: 31, team: "KART GALAXIA", driver: "IVÁN CASTRO", med20: "57.283", mej3: "56.439", ult: "58.996", mejor: "—", vlt: 17, pitDone: 1, pitMin: 3, tier: 50, stint: "2:30.37", stintLaps: 2 },
+  { pos: 5, kart: 45, team: "TRAZADA PERFECTA", driver: "SERGIO LARA", med20: "58.071", mej3: "56.363", ult: "56.442", mejor: "56.325", vlt: 19, pitDone: 0, pitMin: 3, tier: 50, stint: "19:02.02", stintLaps: 19 },
+  { pos: 6, kart: 26, team: "NITRO LEGENDS", driver: "ADRIÁN NIETO", med20: "58.312", mej3: "57.700", ult: "57.203", mejor: "57.633", vlt: 18, pitDone: 0, pitMin: 3, tier: 25, stint: "19:02.02", stintLaps: 17 },
+  { pos: 7, kart: 46, team: "CURVA CERO", driver: "RUBÉN SOLÍS", med20: "58.798", mej3: "58.576", ult: "59.062", mejor: "58.136", vlt: 17, pitDone: 1, pitMin: 3, tier: 1, stint: "6:00.74", stintLaps: 6 },
+  { pos: 8, kart: 28, team: "PISTA FANTASMA", driver: "ÓSCAR PEÑA", med20: "58.827", mej3: "57.846", ult: "59.004", mejor: "57.312", vlt: 19, pitDone: 0, pitMin: 3, tier: 25, stint: "19:02.02", stintLaps: 18 },
+  { pos: 9, kart: 51, team: "HORIZONTE KART", driver: "MARCO LEÓN", med20: "59.952", mej3: "59.952", ult: "1:02.867", mejor: "59.606", vlt: 16, pitDone: 1, pitMin: 3, tier: 1, stint: "6:00.74", stintLaps: 6, mine: true },
 ];
 
 /** Tier badge palette — mirrors the real box-score gradient. */
@@ -118,7 +118,7 @@ export function MiniRaceTable() {
   }, [tick]);
 
   const headerCards: HeaderCard[] = [
-    { label: "PILOTO / ÚLT. VUELTA", value: "MATIAS GAR.", tone: "plain" },
+    { label: "PILOTO / ÚLT. VUELTA", value: "MARCO L.", tone: "plain" },
     { label: "MEDIA 20V", value: "59.952", tone: "plain" },
     { label: "POSICIÓN POR MEDIA", value: "9/9", tone: "accent" },
     { label: "STINT EN CURSO", value: "00:06:00", tone: "plain" },
@@ -163,7 +163,7 @@ export function MiniRaceTable() {
           </div>
           <div className="hidden lg:flex items-center gap-1 rounded bg-red-500/15 border border-red-500/30 px-2 py-1 text-[10px] text-red-300 shrink-0">
             <span className="font-bold">PIT CERRADO</span>
-            <span className="text-red-400/70">· MATIAS GARCIA necesita 29 min más</span>
+            <span className="text-red-400/70">· MARCO LEÓN necesita 29 min más</span>
           </div>
         </div>
 

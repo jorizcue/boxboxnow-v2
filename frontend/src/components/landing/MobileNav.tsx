@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLangStore, LANGUAGES } from "@/lib/i18n";
 
 const navLinks = [
   { label: "Funcionalidades", href: "#funcionalidades" },
@@ -10,6 +11,7 @@ const navLinks = [
 
 export function MobileNav() {
   const [open, setOpen] = useState(false);
+  const { lang, setLang } = useLangStore();
 
   return (
     <div className="md:hidden">
@@ -63,6 +65,13 @@ export function MobileNav() {
             </a>
           ))}
           <hr className="border-border" />
+          <div className="bbn-lang-switcher">
+            {LANGUAGES.map((l) => (
+              <button key={l.code} className={`bbn-lang-btn${lang === l.code ? " active" : ""}`} onClick={() => setLang(l.code)} title={l.label}>
+                {l.flag}
+              </button>
+            ))}
+          </div>
           <a
             href="/login"
             onClick={() => setOpen(false)}

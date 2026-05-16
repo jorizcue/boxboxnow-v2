@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { MobileNav } from "./MobileNav";
+import { useLangStore, LANGUAGES } from "@/lib/i18n";
 
 const navLinks = [
   { label: "Funcionalidades", href: "#funcionalidades" },
@@ -11,6 +12,7 @@ const navLinks = [
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
+  const { lang, setLang } = useLangStore();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -47,6 +49,13 @@ export function Navbar() {
 
         {/* Desktop CTAs */}
         <div className="hidden md:flex items-center gap-3">
+          <div className="bbn-lang-switcher">
+            {LANGUAGES.map((l) => (
+              <button key={l.code} className={`bbn-lang-btn${lang === l.code ? " active" : ""}`} onClick={() => setLang(l.code)} title={l.label}>
+                {l.flag}
+              </button>
+            ))}
+          </div>
           <a
             href="/login"
             className="rounded-lg px-4 py-2 text-sm font-medium text-muted/50 hover:text-white transition-colors"
