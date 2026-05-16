@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useT } from "@/lib/i18n";
 
 interface Row {
   pos: number;
@@ -85,6 +86,7 @@ interface HeaderCard {
 }
 
 export function MiniRaceTable() {
+  const t = useT();
   const [data, setData] = useState<Row[]>(INITIAL);
   const [flash, setFlash] = useState<Set<number>>(new Set());
   const [raceLeft, setRaceLeft] = useState(6057); // 1:40:57
@@ -118,14 +120,14 @@ export function MiniRaceTable() {
   }, [tick]);
 
   const headerCards: HeaderCard[] = [
-    { label: "PILOTO / ÚLT. VUELTA", value: "MARCO L.", tone: "plain" },
-    { label: "MEDIA 20V", value: "59.952", tone: "plain" },
-    { label: "POSICIÓN POR MEDIA", value: "9/9", tone: "accent" },
-    { label: "STINT EN CURSO", value: "00:06:00", tone: "plain" },
-    { label: "TIEMPO HASTA STINT MÁX.", value: "00:33:59", tone: "danger" },
-    { label: "VUELTAS HASTA STINT MÁX.", value: "34.0", tone: "warn" },
-    { label: "MEDIA STINT FUTURO", value: "00:47:59", tone: "warn" },
-    { label: "KARTS CERCA DE PIT", value: "0", tone: "plain" },
+    { label: t("landing.race.card.pilotoUltVuelta"), value: "MARCO L.", tone: "plain" },
+    { label: t("landing.race.card.media20v"), value: "59.952", tone: "plain" },
+    { label: t("landing.race.card.posicionPorMedia"), value: "9/9", tone: "accent" },
+    { label: t("landing.race.card.stintEnCurso"), value: "00:06:00", tone: "plain" },
+    { label: t("landing.race.card.tiempoHastaStintMax"), value: "00:33:59", tone: "danger" },
+    { label: t("landing.race.card.vueltasHastaStintMax"), value: "34.0", tone: "warn" },
+    { label: t("landing.race.card.mediaStintFuturo"), value: "00:47:59", tone: "warn" },
+    { label: t("landing.race.card.kartsCercaPit"), value: "0", tone: "plain" },
   ];
 
   const toneText: Record<NonNullable<HeaderCard["tone"]>, string> = {
@@ -158,11 +160,11 @@ export function MiniRaceTable() {
             </span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className="hidden sm:inline text-neutral-500">CARRERA</span>
+            <span className="hidden sm:inline text-neutral-500">{t("landing.race.bar.carrera")}</span>
             <span className="text-base font-bold tracking-wider text-white">{hhmmss(raceLeft)}</span>
           </div>
           <div className="hidden lg:flex items-center gap-1 rounded bg-red-500/15 border border-red-500/30 px-2 py-1 text-[10px] text-red-300 shrink-0">
-            <span className="font-bold">PIT CERRADO</span>
+            <span className="font-bold">{t("landing.race.bar.pitCerrado")}</span>
             <span className="text-red-400/70">· MARCO LEÓN necesita 29 min más</span>
           </div>
         </div>
@@ -184,8 +186,8 @@ export function MiniRaceTable() {
           ))}
           {/* LLAMAR A BOX */}
           <div className="min-w-[104px] shrink-0 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 flex flex-col items-center justify-center">
-            <div className="text-[8px] uppercase tracking-wider text-red-400/70">LLAMAR A BOX</div>
-            <div className="mt-1 text-lg font-extrabold text-red-400 tracking-widest">BOX</div>
+            <div className="text-[8px] uppercase tracking-wider text-red-400/70">{t("landing.race.bar.llamarBox")}</div>
+            <div className="mt-1 text-lg font-extrabold text-red-400 tracking-widest">{t("landing.race.bar.box")}</div>
           </div>
         </div>
 
@@ -196,8 +198,8 @@ export function MiniRaceTable() {
               <tr className="border-b border-border/40 text-[9px] uppercase tracking-wider text-neutral-500">
                 <th className="py-2 pl-3 pr-2 w-8">#</th>
                 <th className="py-2 px-2 w-10">Kart</th>
-                <th className="py-2 px-2">Equipo</th>
-                <th className="py-2 px-2 hidden md:table-cell">Piloto</th>
+                <th className="py-2 px-2">{t("landing.race.col.equipo")}</th>
+                <th className="py-2 px-2 hidden md:table-cell">{t("landing.race.col.piloto")}</th>
                 <th className="py-2 px-2 text-right text-[#9fe556]">Med.20 ▲</th>
                 <th className="py-2 px-2 text-right hidden sm:table-cell">Mej.3</th>
                 <th className="py-2 px-2 text-right">Últ.</th>

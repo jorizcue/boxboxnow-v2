@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 interface TrialConfig {
   trial_enabled: boolean;
@@ -15,6 +16,7 @@ interface TrialConfig {
  */
 export function TrialCTA({ className = "", variant = "hero" }: { className?: string; variant?: "hero" | "bottom" }) {
   const [config, setConfig] = useState<TrialConfig | null>(null);
+  const t = useT();
 
   useEffect(() => {
     api.getTrialConfig()
@@ -26,21 +28,21 @@ export function TrialCTA({ className = "", variant = "hero" }: { className?: str
   if (!config) {
     return (
       <span className={`inline-block rounded-xl bg-accent/50 px-10 py-4 text-base font-bold text-transparent ${className}`}>
-        Cargando...
+        {t("landing.trial.loading")}
       </span>
     );
   }
 
   const text = config.trial_enabled
     ? variant === "bottom"
-      ? "Crear cuenta gratis"
-      : `Empieza gratis — ${config.trial_days} dias`
-    : "Pruebalo";
+      ? t("landing.trial.createAccount")
+      : t("landing.trial.startFreeDays", { days: config.trial_days })
+    : t("landing.trial.tryIt");
 
   const href = config.trial_enabled ? "/register" : "#precios";
 
   const subtitle = config.trial_enabled
-    ? `Sin tarjeta de credito \u00B7 Cancela cuando quieras`
+    ? t("landing.trial.noCard")
     : null;
 
   return (
@@ -60,6 +62,7 @@ export function TrialCTA({ className = "", variant = "hero" }: { className?: str
  */
 export function TrialSubtitle() {
   const [config, setConfig] = useState<TrialConfig | null>(null);
+  const t = useT();
 
   useEffect(() => {
     api.getTrialConfig()
@@ -71,7 +74,7 @@ export function TrialSubtitle() {
 
   return (
     <p className="mt-4 text-xs text-neutral-600">
-      Sin tarjeta de credito &middot; Cancela cuando quieras
+      {t("landing.trial.noCard")}
     </p>
   );
 }

@@ -2,17 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { MobileNav } from "./MobileNav";
-import { useLangStore, LANGUAGES } from "@/lib/i18n";
-
-const navLinks = [
-  { label: "Funcionalidades", href: "#funcionalidades" },
-  { label: "Precios", href: "#precios" },
-  { label: "Demo", href: "#demo" },
-];
+import { useLangStore, LANGUAGES, useT } from "@/lib/i18n";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const { lang, setLang } = useLangStore();
+  const t = useT();
+
+  const navLinks = [
+    { label: t("landing.nav.features"), href: "#funcionalidades" },
+    { label: t("landing.nav.pricing"), href: "#precios" },
+    { label: t("landing.nav.demo"), href: "#demo" },
+  ];
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -60,13 +61,13 @@ export function Navbar() {
             href="/login"
             className="rounded-lg px-4 py-2 text-sm font-medium text-muted/50 hover:text-white transition-colors"
           >
-            Iniciar sesion
+            {t("landing.nav.login")}
           </a>
           <a
             href="/register"
             className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-black hover:bg-accent-hover transition-all duration-200"
           >
-            Empezar
+            {t("landing.nav.start")}
           </a>
         </div>
 

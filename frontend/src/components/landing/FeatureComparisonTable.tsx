@@ -31,6 +31,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { api } from "@/lib/api";
 import { useTracker } from "@/hooks/useTracker";
+import { useT } from "@/lib/i18n";
+
+type T = ReturnType<typeof useT>;
 
 // Columns of the table — order is left → right.
 type Column = {
@@ -40,13 +43,15 @@ type Column = {
   popular?: boolean;
 };
 
-const COLUMNS: readonly Column[] = [
-  { key: "ind_m", label: "Individual", sub: "mensual" },
-  { key: "ind_a", label: "Individual", sub: "anual" },
-  { key: "end_b", label: "Endurance Básico", sub: "mensual" },
-  { key: "end_pro_m", label: "Endurance Pro", sub: "mensual", popular: true },
-  { key: "end_pro_a", label: "Endurance Pro", sub: "anual", popular: true },
-] as const;
+// Product names (label) are catalog data and stay literal; only the
+// billing cadence (sub) is translated.
+const buildColumns = (t: T): readonly Column[] => [
+  { key: "ind_m", label: "Individual", sub: t("landing.compare.sub.monthly") },
+  { key: "ind_a", label: "Individual", sub: t("landing.compare.sub.annual") },
+  { key: "end_b", label: "Endurance Básico", sub: t("landing.compare.sub.monthly") },
+  { key: "end_pro_m", label: "Endurance Pro", sub: t("landing.compare.sub.monthly"), popular: true },
+  { key: "end_pro_a", label: "Endurance Pro", sub: t("landing.compare.sub.annual"), popular: true },
+];
 
 type ColumnKey = Column["key"];
 
@@ -104,10 +109,16 @@ const limited = (s: string): Cell => ({ kind: "limited", value: s });
 // to change what shows in the landing. The order of keys inside each
 // `values` block matches COLUMNS above — TypeScript will complain if
 // any column is missing or a stray one is added.
-const ROWS: Row[] = [
-  { section: "Precios" },
+// Numeric price cells ("8,99 €/mes" …) and the numeric "1"/"3"
+// circuit counts are catalog data and stay literal. Everything else
+// (section headers, row labels, descriptive cells) is translated.
+const buildRows = (t: T): Row[] => {
+  const users = (n: number): Cell =>
+    text(n === 1 ? t("landing.compare.cell.usuarios", { n }) : t("landing.compare.cell.usuariosPlural", { n }));
+  return [
+  { section: t("landing.compare.section.precios") },
   {
-    label: "Precio",
+    label: t("landing.compare.row.precio"),
     emphasis: true,
     values: {
       ind_m: text("8,99 €/mes"),
@@ -118,7 +129,7 @@ const ROWS: Row[] = [
     },
   },
   {
-    label: "Equivalente mensual",
+    label: t("landing.compare.row.equivMensual"),
     values: {
       ind_m: text("8,99 €"),
       ind_a: text("7,49 €"),
@@ -128,93 +139,93 @@ const ROWS: Row[] = [
     },
   },
   {
-    label: "Ahorro anual",
+    label: t("landing.compare.row.ahorroAnual"),
     values: {
       ind_m: NO,
-      ind_a: text("2 meses gratis"),
+      ind_a: text(t("landing.compare.cell.dosMesesGratis")),
       end_b: NO,
       end_pro_m: NO,
-      end_pro_a: text("2 meses gratis"),
+      end_pro_a: text(t("landing.compare.cell.dosMesesGratis")),
     },
   },
 
-  { section: "Diseñado para" },
+  { section: t("landing.compare.section.disenadoPara") },
   {
-    label: "Tipo de usuario",
+    label: t("landing.compare.row.tipoUsuario"),
     values: {
-      ind_m: text("Piloto"),
-      ind_a: text("Piloto recurrente"),
-      end_b: text("Piloto / Equipo iniciación"),
-      end_pro_m: text("Equipo profesional"),
-      end_pro_a: text("Equipo profesional"),
+      ind_m: text(t("landing.compare.cell.piloto")),
+      ind_a: text(t("landing.compare.cell.pilotoRecurrente")),
+      end_b: text(t("landing.compare.cell.pilotoEquipoIniciacion")),
+      end_pro_m: text(t("landing.compare.cell.equipoProfesional")),
+      end_pro_a: text(t("landing.compare.cell.equipoProfesional")),
     },
   },
   {
-    label: "Mejor para",
+    label: t("landing.compare.row.mejorPara"),
     values: {
-      ind_m: text("Uso personal"),
-      ind_a: text("Piloto frecuente"),
-      end_b: text("Empezar sin compromiso"),
-      end_pro_m: text("Uso habitual"),
-      end_pro_a: text("Uso intensivo"),
+      ind_m: text(t("landing.compare.cell.usoPersonal")),
+      ind_a: text(t("landing.compare.cell.pilotoFrecuente")),
+      end_b: text(t("landing.compare.cell.empezarSinCompromiso")),
+      end_pro_m: text(t("landing.compare.cell.usoHabitual")),
+      end_pro_a: text(t("landing.compare.cell.usoIntensivo")),
     },
   },
 
-  { section: "Capacidad" },
+  { section: t("landing.compare.section.capacidad") },
   {
-    label: "Circuitos incluidos",
+    label: t("landing.compare.row.circuitosIncluidos"),
     values: {
       ind_m: text("1"),
-      ind_a: text("Todos"),
+      ind_a: text(t("landing.compare.cell.todos")),
       end_b: text("1"),
       end_pro_m: text("3"),
-      end_pro_a: text("Todos"),
+      end_pro_a: text(t("landing.compare.cell.todos")),
     },
   },
   {
-    label: "App móvil",
+    label: t("landing.compare.row.appMovil"),
     values: {
-      ind_m: text("1 usuario"),
-      ind_a: text("1 usuario"),
-      end_b: text("2 usuarios"),
-      end_pro_m: text("6 usuarios"),
-      end_pro_a: text("6 usuarios"),
+      ind_m: users(1),
+      ind_a: users(1),
+      end_b: users(2),
+      end_pro_m: users(6),
+      end_pro_a: users(6),
     },
   },
   {
-    label: "Acceso web",
+    label: t("landing.compare.row.accesoWeb"),
     values: {
       ind_m: NO,
       ind_a: NO,
-      end_b: text("1 usuario"),
-      end_pro_m: text("2 usuarios"),
-      end_pro_a: text("2 usuarios"),
+      end_b: users(1),
+      end_pro_m: users(2),
+      end_pro_a: users(2),
     },
   },
 
-  { section: "Funcionalidades" },
+  { section: t("landing.compare.section.funcionalidades") },
   {
-    label: "Vista piloto",
+    label: t("landing.compare.row.vistaPiloto"),
     values: { ind_m: YES, ind_a: YES, end_b: YES, end_pro_m: YES, end_pro_a: YES },
   },
   {
-    label: "Configuración de carrera",
+    label: t("landing.compare.row.configCarrera"),
     values: { ind_m: YES, ind_a: YES, end_b: YES, end_pro_m: YES, end_pro_a: YES },
   },
   {
-    label: "Módulo carrera",
+    label: t("landing.compare.row.moduloCarrera"),
     values: { ind_m: NO, ind_a: NO, end_b: YES, end_pro_m: YES, end_pro_a: YES },
   },
   {
-    label: "Módulo box",
+    label: t("landing.compare.row.moduloBox"),
     values: { ind_m: NO, ind_a: NO, end_b: YES, end_pro_m: YES, end_pro_a: YES },
   },
   {
-    label: "LiveTiming",
+    label: t("landing.compare.row.liveTiming"),
     values: { ind_m: NO, ind_a: NO, end_b: YES, end_pro_m: YES, end_pro_a: YES },
   },
   {
-    label: "Replay",
+    label: t("landing.compare.row.replay"),
     values: {
       ind_m: NO,
       ind_a: NO,
@@ -224,11 +235,11 @@ const ROWS: Row[] = [
     },
   },
   {
-    label: "Análisis de karts",
+    label: t("landing.compare.row.analisisKarts"),
     values: { ind_m: NO, ind_a: NO, end_b: NO, end_pro_m: YES, end_pro_a: YES },
   },
   {
-    label: "GPS Insights",
+    label: t("landing.compare.row.gpsInsights"),
     values: {
       ind_m: NO,
       ind_a: YES,
@@ -238,14 +249,15 @@ const ROWS: Row[] = [
     },
   },
   {
-    label: "Clasificación real",
+    label: t("landing.compare.row.clasificacionReal"),
     values: { ind_m: NO, ind_a: NO, end_b: NO, end_pro_m: SOON, end_pro_a: SOON },
   },
   {
-    label: "Soporte prioritario",
+    label: t("landing.compare.row.soportePrioritario"),
     values: { ind_m: NO, ind_a: NO, end_b: NO, end_pro_m: YES, end_pro_a: YES },
   },
-];
+  ];
+};
 
 export function FeatureComparisonTable() {
   // Fire "pricing.compare_view" once when the table scrolls into view
@@ -254,6 +266,9 @@ export function FeatureComparisonTable() {
   const ref = useRef<HTMLDivElement | null>(null);
   const firedRef = useRef(false);
   const { trackFunnel } = useTracker();
+  const t = useT();
+  const COLUMNS = buildColumns(t);
+  const ROWS = buildRows(t);
 
   // Columns flagged "venta próximamente" from the admin product config.
   const [comingSoon, setComingSoon] = useState<Partial<Record<ColumnKey, boolean>>>({});
@@ -300,13 +315,13 @@ export function FeatureComparisonTable() {
     <div ref={ref} className="mt-24">
       <div className="text-center mb-10">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent mb-3">
-          Comparativa
+          {t("landing.compare.eyebrow")}
         </p>
         <h3 className="text-2xl sm:text-3xl font-bold text-white">
-          Todo lo que incluye cada plan
+          {t("landing.compare.title")}
         </h3>
         <p className="mt-3 text-sm text-neutral-500">
-          Una mirada al detalle. Lo que ves en las tarjetas, ampliado.
+          {t("landing.compare.subtitle")}
         </p>
       </div>
 
@@ -318,7 +333,7 @@ export function FeatureComparisonTable() {
                 scope="col"
                 className="sticky left-0 z-10 bg-black/80 backdrop-blur text-left py-4 pl-5 pr-4 text-xs font-semibold uppercase tracking-wider text-neutral-500"
               >
-                Funcionalidad
+                {t("landing.compare.featureCol")}
               </th>
               {COLUMNS.map((col) => (
                 <th
@@ -339,12 +354,12 @@ export function FeatureComparisonTable() {
                     <span className="text-[11px] text-neutral-500">{col.sub}</span>
                     {col.popular && !comingSoon[col.key] && (
                       <span className="mt-1 rounded-full bg-accent px-2 py-0.5 text-[9px] font-bold text-black uppercase tracking-wider">
-                        Popular
+                        {t("landing.compare.popular")}
                       </span>
                     )}
                     {comingSoon[col.key] && (
                       <span className="mt-1 rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[9px] font-bold text-amber-300 uppercase tracking-wider">
-                        Pr&oacute;ximamente
+                        {t("landing.compare.soon")}
                       </span>
                     )}
                   </div>
@@ -391,7 +406,11 @@ export function FeatureComparisonTable() {
                           col.popular ? "bg-accent/[0.03]" : ""
                         } ${row.emphasis ? "text-white font-semibold" : "text-neutral-400"}`}
                       >
-                        <CellRenderer value={value} />
+                        <CellRenderer
+                          value={value}
+                          includedLabel={t("landing.compare.included")}
+                          soonLabel={t("landing.compare.soon")}
+                        />
                       </td>
                     );
                   })}
@@ -403,13 +422,21 @@ export function FeatureComparisonTable() {
       </div>
 
       <p className="mt-4 text-center text-xs text-neutral-500">
-        Desplaza horizontalmente en móvil para ver todos los planes.
+        {t("landing.compare.scrollHint")}
       </p>
     </div>
   );
 }
 
-function CellRenderer({ value }: { value: Cell | undefined }) {
+function CellRenderer({
+  value,
+  includedLabel,
+  soonLabel,
+}: {
+  value: Cell | undefined;
+  includedLabel: string;
+  soonLabel: string;
+}) {
   if (!value) return <span className="text-muted/30">—</span>;
   switch (value.kind) {
     case "yes":
@@ -420,7 +447,7 @@ function CellRenderer({ value }: { value: Cell | undefined }) {
           viewBox="0 0 24 24"
           stroke="currentColor"
           strokeWidth={2.5}
-          aria-label="Incluido"
+          aria-label={includedLabel}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
@@ -430,7 +457,7 @@ function CellRenderer({ value }: { value: Cell | undefined }) {
     case "soon":
       return (
         <span className="inline-block rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
-          Próximamente
+          {soonLabel}
         </span>
       );
     case "limited":

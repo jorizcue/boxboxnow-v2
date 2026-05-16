@@ -6,13 +6,16 @@ import { FeatureComparisonTable } from "@/components/landing/FeatureComparisonTa
 import { LiveTicker } from "@/components/landing/LiveTicker";
 import { MiniRaceTable } from "@/components/landing/MiniRaceTable";
 import { TrialCTA, TrialSubtitle } from "@/components/landing/TrialCTA";
+import { useT } from "@/lib/i18n";
 
-const features = [
+type T = ReturnType<typeof useT>;
+
+const buildFeatures = (t: T) => [
   {
-    title: "Posiciones en tiempo real",
-    desc: "Sigue cada kart en pista con actualizaciones al instante. Posición, vueltas, gaps e intervalos.",
+    title: t("landing.features.posiciones.title"),
+    desc: t("landing.features.posiciones.desc"),
     stat: "LIVE",
-    statLabel: "tiempo real",
+    statLabel: t("landing.features.posiciones.statLabel"),
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
@@ -20,10 +23,10 @@ const features = [
     ),
   },
   {
-    title: "Gestión de boxes",
-    desc: "Cola inteligente, mapa de calor del box y análisis de tiempos de pit para clavar cada parada.",
+    title: t("landing.features.boxes.title"),
+    desc: t("landing.features.boxes.desc"),
     stat: "BOX",
-    statLabel: "estrategia de paradas",
+    statLabel: t("landing.features.boxes.statLabel"),
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
@@ -31,10 +34,10 @@ const features = [
     ),
   },
   {
-    title: "Clasificación ajustada",
-    desc: "Algoritmo propio que calcula posiciones reales considerando paradas y bonificaciones.",
+    title: t("landing.features.clasificacion.title"),
+    desc: t("landing.features.clasificacion.desc"),
     stat: "PRO",
-    statLabel: "precisión",
+    statLabel: t("landing.features.clasificacion.statLabel"),
     soon: true,
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -43,10 +46,10 @@ const features = [
     ),
   },
   {
-    title: "App móvil nativa",
-    desc: "Apps nativas iOS y Android para el piloto: siguiente stint, tiempos objetivo y estado del equipo.",
+    title: t("landing.features.app.title"),
+    desc: t("landing.features.app.desc"),
     stat: "APP",
-    statLabel: "iOS y Android",
+    statLabel: t("landing.features.app.statLabel"),
     soon: true,
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -55,10 +58,10 @@ const features = [
     ),
   },
   {
-    title: "Análisis de karts",
-    desc: "Historial de rendimiento por kart, rankings de velocidad y detección de outliers.",
+    title: t("landing.features.karts.title"),
+    desc: t("landing.features.karts.desc"),
     stat: "+200",
-    statLabel: "métricas",
+    statLabel: t("landing.features.karts.statLabel"),
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
@@ -67,10 +70,10 @@ const features = [
     ),
   },
   {
-    title: "GPS Insights",
-    desc: "Telemetría GPS con comparativa de vueltas, velocidad en curva y fuerzas G.",
+    title: t("landing.features.gps.title"),
+    desc: t("landing.features.gps.desc"),
     stat: "50 Hz",
-    statLabel: "RaceBox",
+    statLabel: t("landing.features.gps.statLabel"),
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -79,10 +82,10 @@ const features = [
     ),
   },
   {
-    title: "Replay de carreras",
-    desc: "Revive cualquier carrera con todos los datos en vivo para estudiar y afinar tu estrategia.",
+    title: t("landing.features.replay.title"),
+    desc: t("landing.features.replay.desc"),
     stat: "REPLAY",
-    statLabel: "estudio de estrategia",
+    statLabel: t("landing.features.replay.statLabel"),
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
@@ -90,10 +93,10 @@ const features = [
     ),
   },
   {
-    title: "Compatible con tu circuito",
-    desc: "Compatible con el cronometraje en vivo (live timing) de más de 30 circuitos.",
+    title: t("landing.features.circuito.title"),
+    desc: t("landing.features.circuito.desc"),
     stat: "30+",
-    statLabel: "circuitos",
+    statLabel: t("landing.features.circuito.statLabel"),
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
@@ -105,14 +108,14 @@ const features = [
 // The pains a karting endurance team has to answer on the wall, in
 // seconds (source: marketing brief §2). Replaces the old generic
 // "listo en 3 pasos" — leading with the real problem converts better.
-const problems = [
-  "¿Cuánto lleva mi piloto en pista?",
-  "¿Cuándo abre mi ventana de pit?",
-  "¿Cuántas vueltas quedan antes del stint máximo?",
-  "¿Qué karts entran a box en los próximos 2 minutos?",
-  "¿Estamos cumpliendo el tiempo mínimo de piloto?",
-  "¿Qué tiempo hace mi piloto frente a la media del campo?",
-  "¿Cuál es el kart más rápido hoy?",
+const buildProblems = (t: T) => [
+  t("landing.problem.q1"),
+  t("landing.problem.q2"),
+  t("landing.problem.q3"),
+  t("landing.problem.q4"),
+  t("landing.problem.q5"),
+  t("landing.problem.q6"),
+  t("landing.problem.q7"),
 ];
 
 const circuits = [
@@ -123,14 +126,14 @@ const circuits = [
   "Campillos Kart",
 ];
 
-const demoHighlights = [
+const buildDemoHighlights = (t: T) => [
   {
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
       </svg>
     ),
-    text: "Actualización en tiempo real",
+    text: t("landing.demo.h1"),
   },
   {
     icon: (
@@ -138,7 +141,7 @@ const demoHighlights = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
       </svg>
     ),
-    text: "Más de 30 métricas calculadas en tiempo real",
+    text: t("landing.demo.h2"),
   },
   {
     icon: (
@@ -146,11 +149,17 @@ const demoHighlights = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
       </svg>
     ),
-    text: "Detección automática de pit stops",
+    text: t("landing.demo.h3"),
   },
 ];
 
 export function MarketingHome() {
+  const t = useT();
+  const features = buildFeatures(t);
+  const problems = buildProblems(t);
+  const demoHighlights = buildDemoHighlights(t);
+  const year = new Date().getFullYear();
+
   return (
     <div className="noise-bg min-h-screen bg-black text-white overflow-clip">
       <Navbar />
@@ -181,14 +190,14 @@ export function MarketingHome() {
           <div className="animate-fade-in-up mb-3">
             <span className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/5 px-4 py-1.5 text-xs font-medium text-accent tracking-wide">
               <span className="led-dot" />
-              Usado por equipos en circuitos de España y Europa
+              {t("landing.hero.badge")}
             </span>
           </div>
 
           <h1 className="animate-fade-in-up text-3xl font-bold leading-[1.1] tracking-tight sm:text-5xl lg:text-6xl" style={{ animationDelay: "0.08s" }}>
-            Estrategia de karting{" "}
+            {t("landing.hero.title1")}{" "}
             <span className="block text-4xl font-black sm:text-7xl lg:text-[5.5rem] mt-1 bg-gradient-to-r from-accent via-accent-hover to-accent bg-clip-text text-transparent">
-              en tiempo real
+              {t("landing.hero.title2")}
             </span>
           </h1>
 
@@ -196,9 +205,7 @@ export function MarketingHome() {
             className="animate-fade-in-up mx-auto mt-8 max-w-xl text-sm text-neutral-400 sm:text-lg sm:max-w-2xl leading-relaxed"
             style={{ animationDelay: "0.25s" }}
           >
-            Monitoriza posiciones, optimiza paradas en boxes y toma decisiones
-            estratégicas con datos en vivo. La herramienta que usan los equipos
-            profesionales de endurance.
+            {t("landing.hero.subtitle")}
           </p>
 
           {/* Live ticker */}
@@ -218,7 +225,7 @@ export function MarketingHome() {
               href="#demo"
               className="group rounded-xl border border-border/60 px-8 py-4 text-base font-medium text-neutral-400 hover:border-accent/40 hover:text-white transition-all duration-300"
             >
-              Ver en acción
+              {t("landing.hero.ctaSecondary")}
               <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">&rarr;</span>
             </a>
           </div>
@@ -248,12 +255,12 @@ export function MarketingHome() {
         <div className="mx-auto max-w-6xl px-6">
           <div className="mx-auto max-w-2xl text-center mb-12">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent mb-4">
-              Funcionalidades
+              {t("landing.features.eyebrow")}
             </p>
             <h2 className="text-3xl font-bold sm:text-4xl lg:text-5xl leading-tight">
-              Todo lo que necesitas{" "}
+              {t("landing.features.title1")}{" "}
               <span className="bg-gradient-to-r from-accent to-accent-hover bg-clip-text text-transparent">
-                para ganar
+                {t("landing.features.title2")}
               </span>
             </h2>
           </div>
@@ -266,7 +273,7 @@ export function MarketingHome() {
               >
                 {f.soon && (
                   <span className="absolute top-4 right-4 rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[9px] font-bold text-amber-300 uppercase tracking-wider">
-                    Próximamente
+                    {t("landing.features.soon")}
                   </span>
                 )}
                 {/* Icon + Stat row */}
@@ -306,18 +313,16 @@ export function MarketingHome() {
         <div className="relative mx-auto max-w-5xl px-6">
           <div className="text-center mb-12">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent mb-4">
-              El problema
+              {t("landing.problem.eyebrow")}
             </p>
             <h2 className="text-3xl font-bold sm:text-4xl leading-tight">
-              Lo que tu equipo necesita saber{" "}
+              {t("landing.problem.title1")}{" "}
               <span className="bg-gradient-to-r from-accent to-accent-hover bg-clip-text text-transparent">
-                en segundos
+                {t("landing.problem.title2")}
               </span>
             </h2>
             <p className="mt-4 text-neutral-500 max-w-2xl mx-auto">
-              El karting de resistencia se decide en el muro. Hoy se resuelve con
-              cronómetro de pulsera, hojas de Excel, walkie-talkies y pizarras.
-              BoxBoxNow te lo responde en tiempo real.
+              {t("landing.problem.paragraph")}
             </p>
           </div>
 
@@ -348,16 +353,16 @@ export function MarketingHome() {
         <div className="mx-auto max-w-5xl px-6">
           <div className="text-center mb-10">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent mb-4">
-              Demo en vivo
+              {t("landing.demo.eyebrow")}
             </p>
             <h2 className="text-3xl font-bold sm:text-4xl">
-              Míralo en{" "}
+              {t("landing.demo.title1")}{" "}
               <span className="bg-gradient-to-r from-accent to-accent-hover bg-clip-text text-transparent">
-                acción
+                {t("landing.demo.title2")}
               </span>
             </h2>
             <p className="mt-4 text-neutral-500 max-w-lg mx-auto">
-              Datos actualizándose en tiempo real, como en una carrera de verdad.
+              {t("landing.demo.subtitle")}
             </p>
           </div>
 
@@ -398,13 +403,13 @@ export function MarketingHome() {
         <div className="relative mx-auto max-w-6xl px-6">
           <div className="mx-auto max-w-2xl text-center mb-4">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent mb-4">
-              Precios
+              {t("landing.pricing.eyebrow")}
             </p>
             <h2 className="text-3xl font-bold sm:text-4xl">
-              Planes simples, sin sorpresas
+              {t("landing.pricing.title")}
             </h2>
             <p className="mt-4 text-neutral-500">
-              Elige el plan que mejor se adapte a tu equipo. Sin permanencia.
+              {t("landing.pricing.subtitle")}
             </p>
           </div>
           <PricingToggle />
@@ -422,14 +427,14 @@ export function MarketingHome() {
 
         <div className="relative mx-auto max-w-3xl px-6 text-center">
           <h2 className="text-3xl font-bold sm:text-4xl lg:text-5xl leading-tight">
-            ¿Listo para llevar tu estrategia al{" "}
+            {t("landing.cta.title1")}{" "}
             <span className="bg-gradient-to-r from-accent to-accent-hover bg-clip-text text-transparent">
-              siguiente nivel
+              {t("landing.cta.title2")}
             </span>
-            ?
+            {t("landing.cta.title3")}
           </h2>
           <p className="mx-auto mt-6 max-w-lg text-lg text-neutral-500">
-            Descubre cómo BoxBoxNow puede transformar tu estrategia de carrera.
+            {t("landing.cta.subtitle")}
           </p>
           <TrialCTA
             className="glow-pulse mt-10 inline-block rounded-xl bg-accent px-12 py-4 text-base font-bold text-black hover:bg-accent-hover transition-all duration-300 hover:scale-[1.03]"
@@ -448,33 +453,33 @@ export function MarketingHome() {
                 BOXBOX<span className="text-accent">NOW</span>
               </a>
               <p className="mt-3 text-sm text-neutral-500 leading-relaxed">
-                Estrategia de karting en tiempo real para equipos de endurance.
+                {t("landing.footer.tagline")}
               </p>
               <p className="mt-2 text-xs text-neutral-600">
-                Hecho en España
+                {t("landing.footer.madeIn")}
               </p>
             </div>
 
             {/* Links */}
             <div className="flex gap-16 text-sm">
               <div>
-                <h4 className="font-semibold text-neutral-400 mb-3">Producto</h4>
+                <h4 className="font-semibold text-neutral-400 mb-3">{t("landing.footer.product")}</h4>
                 <ul className="space-y-2">
-                  <li><a href="#funcionalidades" className="text-neutral-500 hover:text-accent transition-colors">Funcionalidades</a></li>
-                  <li><a href="#precios" className="text-neutral-500 hover:text-accent transition-colors">Precios</a></li>
-                  <li><a href="#demo" className="text-neutral-500 hover:text-accent transition-colors">Demo</a></li>
+                  <li><a href="#funcionalidades" className="text-neutral-500 hover:text-accent transition-colors">{t("landing.nav.features")}</a></li>
+                  <li><a href="#precios" className="text-neutral-500 hover:text-accent transition-colors">{t("landing.nav.pricing")}</a></li>
+                  <li><a href="#demo" className="text-neutral-500 hover:text-accent transition-colors">{t("landing.nav.demo")}</a></li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-semibold text-neutral-400 mb-3">Legal</h4>
+                <h4 className="font-semibold text-neutral-400 mb-3">{t("landing.footer.legal")}</h4>
                 <ul className="space-y-2">
-                  <li><a href="/terminos" className="text-neutral-500 hover:text-accent transition-colors">Términos</a></li>
-                  <li><a href="/privacidad" className="text-neutral-500 hover:text-accent transition-colors">Privacidad</a></li>
-                  <li><a href="/cookies" className="text-neutral-500 hover:text-accent transition-colors">Cookies</a></li>
+                  <li><a href="/terminos" className="text-neutral-500 hover:text-accent transition-colors">{t("landing.footer.terms")}</a></li>
+                  <li><a href="/privacidad" className="text-neutral-500 hover:text-accent transition-colors">{t("landing.footer.privacy")}</a></li>
+                  <li><a href="/cookies" className="text-neutral-500 hover:text-accent transition-colors">{t("landing.footer.cookies")}</a></li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-semibold text-neutral-400 mb-3">Contacto</h4>
+                <h4 className="font-semibold text-neutral-400 mb-3">{t("landing.footer.contact")}</h4>
                 <ul className="space-y-2">
                   <li><a href="mailto:info@kartingnow.com" className="text-neutral-500 hover:text-accent transition-colors">info@kartingnow.com</a></li>
                 </ul>
@@ -484,7 +489,7 @@ export function MarketingHome() {
 
           <div className="mt-12 pt-6 border-t border-border/30 flex flex-col sm:flex-row justify-between items-center gap-4">
             <p className="text-xs text-neutral-600">
-              &copy; 2026 BoxBoxNow. Todos los derechos reservados.
+              {t("landing.footer.copyright", { year })}
             </p>
             <p className="font-mono text-[10px] text-neutral-700 tracking-wider">
               BUILT FOR SPEED

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT } from "@/lib/i18n";
 
 interface TickerEntry {
   kart: string;
@@ -29,6 +30,7 @@ function varyLap(base: string): string {
 
 export function LiveTicker() {
   const [data, setData] = useState(BASE_DATA);
+  const t = useT();
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -65,7 +67,7 @@ export function LiveTicker() {
                 {entry.kart}
               </span>
               <span className="font-mono text-[11px] text-muted/30">
-                {entry.gap}
+                {entry.gap === "LIDER" ? t("landing.ticker.leader") : entry.gap}
               </span>
               <span className="font-mono text-[11px] text-muted/20">
                 {entry.lap}

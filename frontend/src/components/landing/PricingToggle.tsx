@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 import { useTracker } from "@/hooks/useTracker";
+import { useT } from "@/lib/i18n";
 
 interface PlanData {
   plan_type: string;
@@ -232,6 +233,7 @@ export function PricingToggle() {
   const [trialDays, setTrialDays] = useState(0);
   const { trackFunnel } = useTracker();
   const sectionRef = useRef<HTMLDivElement | null>(null);
+  const t = useT();
 
   useEffect(() => {
     Promise.all([
@@ -299,9 +301,11 @@ export function PricingToggle() {
   };
 
   const planButtonText = (p: GroupedPlan) => {
-    if (p.is_event) return "Comprar evento";
-    if (p.is_popular) return "Empezar ahora";
-    return trialDays > 0 ? `Probar gratis ${trialDays} días` : "Suscribirse";
+    if (p.is_event) return t("landing.pricing.buyEvent");
+    if (p.is_popular) return t("landing.pricing.startNow");
+    return trialDays > 0
+      ? t("landing.pricing.tryFreeDays", { days: trialDays })
+      : t("landing.pricing.subscribe");
   };
 
   const planButtonHref = (p: GroupedPlan) => planLink(p);
@@ -317,6 +321,7 @@ export function PricingToggle() {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+        <span className="sr-only">{t("landing.pricing.loading")}</span>
       </div>
     );
   }
@@ -330,7 +335,7 @@ export function PricingToggle() {
             !annual ? "text-white" : "text-muted/30"
           }`}
         >
-          Mensual
+          {t("landing.pricing.monthly")}
         </span>
         <button
           onClick={() => setAnnual(!annual)}
@@ -339,7 +344,7 @@ export function PricingToggle() {
               ? "bg-accent shadow-[0_0_20px_rgba(159,229,86,0.2)]"
               : "bg-border/60"
           }`}
-          aria-label="Cambiar entre mensual y anual"
+          aria-label={t("landing.pricing.toggleAria")}
         >
           <span
             className={`absolute top-1 left-1 h-6 w-6 rounded-full bg-white shadow-md transition-all duration-300 ${
@@ -352,11 +357,11 @@ export function PricingToggle() {
             annual ? "text-white" : "text-muted/30"
           }`}
         >
-          Anual
+          {t("landing.pricing.annual")}
         </span>
         {annual && (
           <span className="rounded-full bg-accent/15 border border-accent/20 px-3 py-1 text-xs font-bold text-accent font-mono">
-            2 meses gratis
+            {t("landing.pricing.twoMonthsFree")}
           </span>
         )}
       </div>
@@ -384,7 +389,7 @@ export function PricingToggle() {
             {plan.is_popular && (
               <div className="absolute top-4 right-4">
                 <span className="rounded-full bg-accent px-3 py-1 text-[10px] font-bold text-black uppercase tracking-wider">
-                  Popular
+                  {t("landing.pricing.popular")}
                 </span>
               </div>
             )}
@@ -408,7 +413,11 @@ export function PricingToggle() {
                   </span>
                   <span className="text-lg text-muted/40">&euro;</span>
                   <span className="text-sm text-muted/30 ml-1">
-                    {plan.is_event ? "/evento" : effectivelyAnnual(plan) ? "/a\u00F1o" : "/mes"}
+                    {plan.is_event
+                      ? t("landing.pricing.perEvent")
+                      : effectivelyAnnual(plan)
+                        ? t("landing.pricing.perYear")
+                        : t("landing.pricing.perMonth")}
                   </span>
                 </div>
 
@@ -417,7 +426,7 @@ export function PricingToggle() {
                     7,49 \u20AC/mes (rounding to 7 would mislead). */}
                 {effectivelyAnnual(plan) && plan.price_annual && (
                   <p className="font-mono text-xs text-muted/25 mt-1">
-                    equiv. {formatPrice((plan.price_annual ?? 0) / 12)}&euro;/mes
+                    {t("landing.pricing.equivPerMonth", { price: formatPrice((plan.price_annual ?? 0) / 12) })}
                   </p>
                 )}
 
@@ -431,7 +440,7 @@ export function PricingToggle() {
                     if (savePct <= 0) return null;
                     return (
                       <span className="inline-block mt-2 rounded-full bg-accent/15 border border-accent/30 px-2.5 py-0.5 text-[10px] font-semibold text-accent">
-                        2 meses gratis &mdash; ahorras {savePct}%
+                        {t("landing.pricing.savingsBadge", { pct: savePct })}
                       </span>
                     );
                   })()
@@ -442,7 +451,7 @@ export function PricingToggle() {
                     explain why instead of vanishing from the grid. */}
                 {annual && !plan.is_event && plan.price_annual == null && (
                   <p className="mt-2 text-[11px] text-muted/40">
-                    Solo disponible en mensual.
+                    {t("landing.pricing.monthlyOnly")}
                   </p>
                 )}
               </div>
@@ -471,10 +480,10 @@ export function PricingToggle() {
               {plan.coming_soon ? (
                 <div
                   aria-disabled="true"
-                  title="Este plan estará disponible próximamente"
+                  title={t("landing.pricing.comingSoonTitle")}
                   className="block w-full rounded-xl py-3.5 text-center text-sm font-bold uppercase tracking-wide bg-white/[0.04] border-2 border-border/60 text-muted/40 cursor-not-allowed select-none"
                 >
-                  Pr&oacute;ximamente
+                  {t("landing.pricing.comingSoon")}
                 </div>
               ) : (
                 <a
@@ -515,14 +524,14 @@ export function PricingToggle() {
       {/* Extra notes */}
       <div className="mt-14 text-center">
         <p className="text-sm text-muted/30">
-          &iquest;Tu circuito no est&aacute; disponible en la app? Escr&iacute;benos a{" "}
+          {t("landing.pricing.contactPrefix")}{" "}
           <a
             href="mailto:info@kartingnow.com"
             className="text-accent/70 hover:text-accent hover:underline transition-colors"
           >
             info@kartingnow.com
           </a>{" "}
-          y lo a&ntilde;adimos.
+          {t("landing.pricing.contactSuffix")}
         </p>
       </div>
     </div>

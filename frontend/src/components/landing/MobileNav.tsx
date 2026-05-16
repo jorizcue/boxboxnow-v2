@@ -1,24 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { useLangStore, LANGUAGES } from "@/lib/i18n";
-
-const navLinks = [
-  { label: "Funcionalidades", href: "#funcionalidades" },
-  { label: "Precios", href: "#precios" },
-  { label: "Demo", href: "#demo" },
-];
+import { useLangStore, LANGUAGES, useT } from "@/lib/i18n";
 
 export function MobileNav() {
   const [open, setOpen] = useState(false);
   const { lang, setLang } = useLangStore();
+  const t = useT();
+
+  const navLinks = [
+    { label: t("landing.nav.features"), href: "#funcionalidades" },
+    { label: t("landing.nav.pricing"), href: "#precios" },
+    { label: t("landing.nav.demo"), href: "#demo" },
+  ];
 
   return (
     <div className="md:hidden">
       <button
         onClick={() => setOpen(!open)}
         className="relative z-50 flex h-10 w-10 items-center justify-center"
-        aria-label="Menú"
+        aria-label={t("landing.nav.menu")}
       >
         <div className="flex flex-col gap-1.5">
           <span
@@ -77,14 +78,14 @@ export function MobileNav() {
             onClick={() => setOpen(false)}
             className="text-lg text-muted hover:text-white transition-colors"
           >
-            Iniciar sesion
+            {t("landing.nav.login")}
           </a>
           <a
             href="/register"
             onClick={() => setOpen(false)}
             className="inline-flex items-center justify-center rounded-lg bg-accent px-6 py-3 text-base font-semibold text-black hover:bg-accent-hover transition-colors"
           >
-            Empezar
+            {t("landing.nav.start")}
           </a>
         </nav>
       </div>
