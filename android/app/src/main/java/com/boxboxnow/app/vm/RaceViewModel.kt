@@ -146,6 +146,13 @@ class RaceViewModel @Inject constructor(
     private val _sectorMeta = MutableStateFlow<SectorMeta?>(null)
     val sectorMeta = _sectorMeta.asStateFlow()
 
+    /** Field-wide leader per sector ranked by each kart's *current live
+     *  pass* (`current_sN_ms`), restricted to on-track karts only.
+     *  Mirrors `sectorMeta` shape exactly; decoded from the backend's
+     *  `sectorMetaCurrent` payload. Null when sectors are unavailable. */
+    private val _sectorMetaCurrent = MutableStateFlow<SectorMeta?>(null)
+    val sectorMetaCurrent = _sectorMetaCurrent.asStateFlow()
+
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
     // Server clock reference: the last value + wallclock when it arrived.
@@ -430,11 +437,11 @@ class RaceViewModel @Inject constructor(
      *  cuando no hay datos suficientes (sectores no expuestos en el
      *  circuito, kart no localizado, sin field-best aún o sin valor
      *  del piloto local para ese sector). */
-    fun sectorDelta(sectorIdx: Int): SectorDelta? {
+    fun sectorDelta(sectorIdx: Int, current: Boolean = false): SectorDelta? {
         if (!_hasSectors.value) return null
         val ourKart = _ourKartNumber.value
         if (ourKart <= 0) return null
-        val leader = _sectorMeta.value?.bestFor(sectorIdx) ?: return null
+        val leader = (if (current) _sectorMetaCurrent.value else _sectorMeta.value)?.bestFor(sectorIdx) ?: return null
         val kart = _karts.value.firstOrNull { it.kartNumber == ourKart } ?: return null
 
         val (myCurrent, myBest) = when (sectorIdx) {
@@ -446,10 +453,11 @@ class RaceViewModel @Inject constructor(
 
         val isMine = kart.kartNumber == leader.kartNumber
         return if (isMine) {
-            val mb = myBest
+            // current mode: margin off MY current vs 2nd-fastest current.
+            // best mode: margin off MY best (stable). Without runner-up, render 0.
+            val mine = if (current) myCurrent else myBest
             val sb = leader.secondBestMs
-            // Margin off MY best (stable). Without runner-up, render 0.
-            val d = if (mb != null && mb > 0 && sb != null && sb > 0) mb - sb else 0.0
+            val d = if (mine != null && mine > 0 && sb != null && sb > 0) mine - sb else 0.0
             SectorDelta(d, isMine = true)
         } else {
             // Deficit uses CURRENT (latest pass) so the value reacts to
@@ -556,6 +564,9 @@ class RaceViewModel @Inject constructor(
                 if (data.containsKey("sectorMeta")) {
                     _sectorMeta.value = parseSectorMeta(data["sectorMeta"])
                 }
+                if (data.containsKey("sectorMetaCurrent")) {
+                    _sectorMetaCurrent.value = parseSectorMeta(data["sectorMetaCurrent"])
+                }
                 // Pit-gate decision pushed by backend. Same defensive
                 // containsKey check as sectors — analytics frames from
                 // older backends omit the field, and we must not reset
@@ -580,6 +591,9 @@ class RaceViewModel @Inject constructor(
                 }
                 if (el.containsKey("sectorMeta")) {
                     _sectorMeta.value = parseSectorMeta(el["sectorMeta"])
+                }
+                if (el.containsKey("sectorMetaCurrent")) {
+                    _sectorMetaCurrent.value = parseSectorMeta(el["sectorMetaCurrent"])
                 }
             }
 

@@ -705,6 +705,28 @@ private fun CardContent(
             mainFont = mainFont, cardHeight = cardHeight, scale = scale,
         )
 
+        // ── Δ Actual S1/S2/S3: per-sector cards vs current-pass leader ──
+        DriverCard.DeltaCurrentS1 -> SectorDeltaContent(
+            sectorIdx = 1, hasSectors = hasSectors, sectorMeta = sectorMeta,
+            ourKart = ourKart, raceVM = raceVM, mainFont = mainFont, bigFont = bigFont,
+            smallFont = smallFont, scale = scale, current = true,
+        )
+        DriverCard.DeltaCurrentS2 -> SectorDeltaContent(
+            sectorIdx = 2, hasSectors = hasSectors, sectorMeta = sectorMeta,
+            ourKart = ourKart, raceVM = raceVM, mainFont = mainFont, bigFont = bigFont,
+            smallFont = smallFont, scale = scale, current = true,
+        )
+        DriverCard.DeltaCurrentS3 -> SectorDeltaContent(
+            sectorIdx = 3, hasSectors = hasSectors, sectorMeta = sectorMeta,
+            ourKart = ourKart, raceVM = raceVM, mainFont = mainFont, bigFont = bigFont,
+            smallFont = smallFont, scale = scale, current = true,
+        )
+        // ── Δ Sectores Actual: combined current-pass S1/S2/S3 in 3 lines ──
+        DriverCard.DeltaSectorsCurrent -> DeltaSectorsContent(
+            hasSectors = hasSectors, raceVM = raceVM,
+            mainFont = mainFont, cardHeight = cardHeight, scale = scale, current = true,
+        )
+
         // ── Apex live timing: interval to kart in front ──
         // myKart.interval IS the gap to the kart in front. Empty when
         // we lead the apex order — show "LIDER" sentinel in that case
@@ -787,8 +809,12 @@ private fun SectorDeltaContent(
     bigFont: TextUnit,
     smallFont: TextUnit,
     scale: Float,
+    current: Boolean = false,
 ) {
-    val leader = sectorMeta?.bestFor(sectorIdx)
+    // When rendering current-pass cards, use sectorMetaCurrent for the
+    // leader block (stub guard + kart/#/name display).
+    val effectiveMeta = if (current) raceVM.sectorMetaCurrent.collectAsState().value else sectorMeta
+    val leader = effectiveMeta?.bestFor(sectorIdx)
     if (!hasSectors || leader == null || ourKart == null) {
         MonoValue("--", BoxBoxNowColors.SystemGray3, mainFont)
         return
@@ -800,7 +826,7 @@ private fun SectorDeltaContent(
     // prefix. When I'm trailing, `myCurrent - fieldBest` is positive
     // and renders red with "+". Sign + color pair makes leader vs.
     // trailer state unambiguous without a star icon.
-    val result = raceVM.sectorDelta(sectorIdx)
+    val result = raceVM.sectorDelta(sectorIdx, current = current)
     if (result == null) {
         MonoValue("--", BoxBoxNowColors.SystemGray3, mainFont)
         return
@@ -941,6 +967,7 @@ private fun DeltaSectorsContent(
     mainFont: TextUnit,
     cardHeight: Dp,
     scale: Float,
+    current: Boolean = false,
 ) {
     if (!hasSectors) {
         MonoValue("--", BoxBoxNowColors.SystemGray3, mainFont)
@@ -980,6 +1007,7 @@ private fun DeltaSectorsContent(
                     DeltaSectorsLine(
                         sectorIdx = n, raceVM = raceVM,
                         labelFontSp = labelFontSp, valueFontSp = valueFontSp,
+                        current = current,
                     )
                 }
             }
@@ -997,8 +1025,9 @@ private fun DeltaSectorsLine(
     raceVM: RaceViewModel,
     labelFontSp: TextUnit,
     valueFontSp: TextUnit,
+    current: Boolean = false,
 ) {
-    val r = raceVM.sectorDelta(sectorIdx)
+    val r = raceVM.sectorDelta(sectorIdx, current = current)
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,

@@ -85,6 +85,14 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
      *  sector cards; auto-hides on circuits without sector telemetry
      *  via `requiresGPS` is irrelevant — gated by hasSectors instead. */
     DeltaSectors("deltaSectors", "Δ Sectores", "S1 -0.04s"),
+    // Current-pass sector deltas: compare pilot's live sector against the
+    // fastest live pass among on-track karts (sectorMetaCurrent payload).
+    // Mirror of DeltaBestS1/2/3 + DeltaSectors but using the current-pass
+    // reference instead of session-long PBs.
+    DeltaCurrentS1("deltaCurrentS1", "Δ Actual S1", "+0.18s"),
+    DeltaCurrentS2("deltaCurrentS2", "Δ Actual S2", "-0.09s"),
+    DeltaCurrentS3("deltaCurrentS3", "Δ Actual S3", "+0.31s"),
+    DeltaSectorsCurrent("deltaSectorsCurrent", "Δ Sectores Actual", "S1 +0.12s"),
     // Raw Apex live timing values — distinct from gapAhead/gapBehind
     // (which derive from the adjusted classification) and from Position
     // (avg-pace) / RealPos (adjusted). These surface the values straight
@@ -140,6 +148,8 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
         CurrentPit -> Color(0xFF00BCD4)       // cyan
         DeltaBestS1, DeltaBestS2, DeltaBestS3 -> Color(0xFFFFCC00)  // yellow
         DeltaSectors -> Color(0xFFFFCC00)     // yellow, same family as DeltaBestS1/2/3
+        DeltaCurrentS1, DeltaCurrentS2, DeltaCurrentS3 -> Color(0xFFFFCC00)  // yellow, mirrors DeltaBest family
+        DeltaSectorsCurrent -> Color(0xFFFFCC00)  // yellow, mirrors DeltaSectors
         TheoreticalBestLap -> Color(0xFFFF4081)                     // pink
         IntervalAhead -> Color(0xFFFF453A)    // red, mirrors GapAhead
         IntervalBehind -> Color(0xFF30D158)   // green, mirrors GapBehind
@@ -176,6 +186,10 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
         IntervalBehind -> Icons.Filled.KeyboardDoubleArrowDown
         ApexPosition -> Icons.Filled.FormatListNumbered
         DeltaSectors -> Icons.Filled.ViewAgenda  // 3 stacked rows, matches the layout
+        DeltaCurrentS1 -> Icons.Filled.LooksOne
+        DeltaCurrentS2 -> Icons.Filled.LooksTwo
+        DeltaCurrentS3 -> Icons.Filled.Looks3
+        DeltaSectorsCurrent -> Icons.Filled.ViewAgenda
     }
 
     /** i18n catalog key for the card's user-visible label. Matches the
