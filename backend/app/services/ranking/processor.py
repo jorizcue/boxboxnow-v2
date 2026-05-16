@@ -38,7 +38,7 @@ from sqlalchemy import delete
 
 from app.models.schemas import (
     Driver, DriverAlias, DriverRating, DriverCircuitRating,
-    SessionResult, RatingHistory, ProcessedLog,
+    SessionResult, RatingHistory, ProcessedLog, RankingSessionOverride,
 )
 from .glicko2 import (
     Glicko2State, update, DEFAULT_RATING, DEFAULT_RD, DEFAULT_VOLATILITY,
@@ -104,6 +104,20 @@ def effective_scores(field: list[RatedDriver], *, w: float = 0.7) -> dict[str, f
         else:
             out[d.name] = w * norm_team[d.team_key] + (1 - w) * pace[d.name]
     return out
+
+
+def _pace_positions(rated_se: list) -> dict[str, int]:
+    """team_key -> 1-based rank by the competitor's best lap
+    (min best_lap_ms over its rows). Competitors with no valid
+    best lap are omitted (caller pushes them last)."""
+    comp_best: dict[str, int] = {}
+    for s in rated_se:
+        if s.best_lap_ms and s.best_lap_ms > 0:
+            prev = comp_best.get(s.team_key)
+            comp_best[s.team_key] = (s.best_lap_ms if prev is None
+                                     else min(prev, s.best_lap_ms))
+    ranked = sorted(comp_best, key=comp_best.__getitem__)
+    return {tk: i + 1 for i, tk in enumerate(ranked)}
 
 
 # ─── Driver canonicalisation helpers ─────────────────────────────────────
@@ -293,6 +307,20 @@ async def apply_extracts(
         if len(rated_se) < MIN_DRIVERS_PER_SESSION:
             continue
 
+        # ── Override lookup → effective session type ──
+        # Consult ranking_session_overrides for this (circuit, date, seq).
+        # If an admin override exists, it wins over the classifier.
+        ov = (await db.execute(
+            select(RankingSessionOverride).where(
+                RankingSessionOverride.circuit_name == circuit_name,
+                RankingSessionOverride.log_date == log_date,
+                RankingSessionOverride.session_seq == session_seq,
+            )
+        )).scalar_one_or_none()
+        effective_type = ov.forced_type if ov else agg_group[0].session_type
+        effective_mode = ("individual" if effective_type == "pace"
+                          else agg_group[0].team_mode)
+
         # ── Kart bias correction ──
         # Mechanical kart differences (setup, wear) skew the avg lap by up
         # to ±1 s. Per `team_key` mean across drivers that ran it, minus
@@ -306,7 +334,7 @@ async def apply_extracts(
         bias = {k: m - field_mean for k, m in team_mean.items()}
 
         is_race = (
-            agg_group[0].session_type == "race"
+            effective_type == "race"
             and any(s.final_position is not None for s in rated_se)
         )
 
@@ -342,15 +370,25 @@ async def apply_extracts(
                     circuit_name, log_date, session_seq,
                 )
                 is_race = False
-                order = sorted(field, key=lambda d: d.corrected_avg_ms)
-                n = len(order)
-                key = {d.name: (0.0 if n == 1 else i / (n - 1))
-                       for i, d in enumerate(order)}
+                pace_pos = _pace_positions(rated_se)
+                n = len(pace_pos)
+                key = {}
+                for d in field:
+                    p = pace_pos.get(d.team_key)
+                    if p is None:                       # no valid best lap → last
+                        key[d.name] = 1.0 if n > 1 else 0.0
+                    else:
+                        key[d.name] = 0.0 if n <= 1 else (p - 1) / (n - 1)
         else:
-            order = sorted(field, key=lambda d: d.corrected_avg_ms)
-            n = len(order)
-            key = {d.name: (0.0 if n == 1 else i / (n - 1))
-                   for i, d in enumerate(order)}
+            pace_pos = _pace_positions(rated_se)
+            n = len(pace_pos)
+            key = {}
+            for d in field:
+                p = pace_pos.get(d.team_key)
+                if p is None:                       # no valid best lap → last
+                    key[d.name] = 1.0 if n > 1 else 0.0
+                else:
+                    key[d.name] = 0.0 if n <= 1 else (p - 1) / (n - 1)
 
         # Resolve or create drivers and persist SessionResult rows. The
         # SessionResult-exists check (new unique key: circuit, date,
@@ -390,10 +428,11 @@ async def apply_extracts(
                 median_lap_ms=s.median_lap_ms,
                 kart_bias_ms=b,
                 corrected_avg_ms=corrected,
-                final_position=(s.final_position if is_race else None),
+                final_position=(s.final_position if is_race
+                                else pace_pos.get(s.team_key)),
                 apex_last_position=s.apex_last_position,
-                session_type=agg_group[0].session_type,
-                team_mode=agg_group[0].team_mode,
+                session_type=effective_type,
+                team_mode=effective_mode,
                 effective_score=key[canon],
                 duration_s=agg_group[0].duration_s,
             )
