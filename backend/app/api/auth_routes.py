@@ -60,8 +60,10 @@ async def start_trial(user: User, db: AsyncSession, *, trial_days: int) -> None:
     (no-op). Does NOT commit — the caller is responsible for committing.
     """
     existing_sub = (
-        await db.execute(select(Subscription).where(Subscription.user_id == user.id))
-    ).scalar_one_or_none()
+        await db.execute(
+            select(Subscription).where(Subscription.user_id == user.id).limit(1)
+        )
+    ).scalars().first()
     if existing_sub is not None:
         return
 
@@ -859,9 +861,17 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
         db.add(UserTabAccess(user_id=user.id, tab=tab))
 
     # Trial does NOT start at registration — it starts when the user verifies their email.
-    # Task 3: send_verification_email(email, username, token) fire-and-forget here
+    # Capture token before commit (after commit the attribute may be expired on the ORM obj).
+    _verification_token = user.email_verification_token
 
     await db.commit()
+
+    # Fire-and-forget: send verification email so the user can activate their trial.
+    from app.services.email_service import send_verification_email as _send_verification_email
+    import asyncio as _asyncio_reg
+    _asyncio_reg.create_task(
+        _send_verification_email(data.email, data.username, _verification_token)
+    )
 
     # Auto-login: create device session
     device_name, ip_address = _extract_device_info(request)
@@ -1873,6 +1883,100 @@ async def reset_password(request: Request, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     return {"ok": True, "message": "Contrasena actualizada correctamente"}
+
+
+# --- Email Verification ---
+
+@router.post("/verify-email")
+async def verify_email(request: Request, db: AsyncSession = Depends(get_db)):
+    """Verify the user's email address using the token from the verification link.
+
+    On success: marks email_verified=True, starts the free trial (via start_trial),
+    clears the token, and fires the welcome email. Idempotent: re-verifying an
+    already-verified account returns {ok, alreadyVerified} without creating a
+    second trial.
+    """
+    body = await request.json()
+    token = body.get("token", "").strip()
+
+    # Look up user by verification token
+    result = await db.execute(
+        select(User).where(User.email_verification_token == token)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user or not token:
+        raise HTTPException(400, "Enlace inválido o expirado")
+
+    # Check expiry — normalize naive datetimes (SQLite) to UTC before compare
+    exp = user.email_verification_expires
+    if exp is not None:
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp < datetime.now(timezone.utc):
+            raise HTTPException(400, "Enlace inválido o expirado")
+
+    # Idempotent: already verified → no second trial
+    if user.email_verified:
+        return {"ok": True, "alreadyVerified": True}
+
+    # Mark verified and clear token
+    user.email_verified = True
+    user.email_verification_token = None
+    user.email_verification_expires = None
+
+    # Resolve the same trial_days that register() uses, then start the trial
+    reg_config = await _get_registration_config(db)
+    trial_days = reg_config["trial_days"]
+
+    if trial_days > 0:
+        await start_trial(user, db, trial_days=trial_days)
+
+    await db.commit()
+
+    # Fire-and-forget welcome email: trial has now actually begun
+    import asyncio as _asyncio_verify
+    from app.services.email_service import send_welcome_email as _send_welcome_email
+    _asyncio_verify.create_task(_send_welcome_email(user.email, user.username, trial_days))
+
+    return {"ok": True}
+
+
+@router.post("/resend-verification")
+async def resend_verification(request: Request, db: AsyncSession = Depends(get_db)):
+    """Re-send the email-verification link.
+
+    Rate-limited per IP using the same forgot_password_limiter (5 per 15 min).
+    Anti-enumeration: always returns generic {ok: True} regardless of whether
+    the email exists or the user is already verified. Only fires the email when
+    an unverified user is found.
+    """
+    ip = request.client.host if request.client else "unknown"
+    forgot_password_limiter.check(ip)
+
+    body = await request.json()
+    email = body.get("email", "").strip().lower()
+
+    forgot_password_limiter.record_failure(ip)
+
+    # Look up user by email — anti-enumeration: same response either way
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if user and not user.email_verified:
+        # Regenerate token + reset expiry
+        user.email_verification_token = secrets.token_urlsafe(48)
+        user.email_verification_expires = datetime.now(timezone.utc) + EMAIL_VERIFICATION_TTL
+        await db.commit()
+
+        # Fire-and-forget
+        import asyncio as _asyncio_resend
+        from app.services.email_service import send_verification_email as _send_ver_email
+        _asyncio_resend.create_task(
+            _send_ver_email(user.email, user.username, user.email_verification_token)
+        )
+
+    return {"ok": True}
 
 
 @router.post("/set-password")

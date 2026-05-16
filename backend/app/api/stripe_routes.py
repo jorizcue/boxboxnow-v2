@@ -188,6 +188,11 @@ async def create_checkout_session(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Email-verification gate: block unverified users from purchasing.
+    # Admins and internal accounts are exempt (grandfathered verified + operational bypass).
+    if not user.email_verified and not (user.is_admin or getattr(user, "is_internal", False)):
+        raise HTTPException(status_code=403, detail="email_not_verified")
+
     body = await request.json()
     price_id = body.get("price_id")
     plan = body.get("plan")  # Legacy: accept plan label like "pro_monthly" (resolved via DB)

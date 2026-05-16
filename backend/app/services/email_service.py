@@ -215,6 +215,52 @@ async def send_subscription_confirmation_email(
         logger.error(f"Failed to send subscription confirmation to {email}: {e}")
 
 
+async def send_verification_email(to_email: str, username: str, token: str):
+    """Send email-verification link so the user can activate their account and start the trial."""
+    settings = get_settings()
+    if not settings.resend_api_key:
+        logger.warning("Resend API key not configured, skipping verification email")
+        return
+
+    verify_url = f"{settings.frontend_url}/verify-email?token={token}"
+    r = _get_resend()
+    try:
+        r.Emails.send({
+            "from": _from_email(),
+            "to": [to_email],
+            "subject": "Verifica tu cuenta - BoxBoxNow",
+            "html": f"""
+            <div style="font-family: 'Space Grotesk', -apple-system, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #fff; padding: 40px 30px; border-radius: 16px; border: 1px solid #222;">
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <h1 style="margin: 0; font-size: 28px;">
+                        <span style="color: #fff;">BOXBOX</span><span style="color: #9fe556;">NOW</span>
+                    </h1>
+                </div>
+                <h2 style="color: #fff; font-size: 22px; margin-bottom: 10px;">Verifica tu cuenta</h2>
+                <p style="color: #e5e5e5; font-size: 15px; line-height: 1.6;">
+                    Hola {username}, para completar tu registro y comenzar tu prueba gratuita
+                    necesitas verificar tu dirección de correo electrónico.
+                    Haz clic en el botón para verificar tu cuenta.
+                </p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{verify_url}" style="background: #9fe556; color: #000; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
+                        Verificar mi cuenta
+                    </a>
+                </div>
+                <p style="color: #b5b5b5; font-size: 13px; line-height: 1.5;">
+                    Este enlace caduca en 7 días. Si no creaste esta cuenta, puedes ignorar este correo.
+                </p>
+                <p style="color: #888; font-size: 12px; text-align: center; margin-top: 30px;">
+                    BoxBoxNow - Estrategia de Karting en Tiempo Real
+                </p>
+            </div>
+            """,
+        })
+        logger.info(f"Verification email sent to {to_email}")
+    except Exception as e:
+        logger.error(f"Failed to send verification email to {to_email}: {e}")
+
+
 async def send_password_reset_email(email: str, username: str, reset_token: str):
     """Send password reset email with link."""
     settings = get_settings()
