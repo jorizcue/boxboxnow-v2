@@ -40,6 +40,9 @@ Thumbs.db
 *.log.gz
 backend/data/logs/
 backend/data/recordings/
+# Allow test fixture gzip logs
+!backend/tests/ranking/fixtures/ariza_2026-05-02.log.gz
+!backend/tests/ranking/fixtures/santos_2026-04-25.log.gz
 
 # Docker
 docker-compose.override.yml

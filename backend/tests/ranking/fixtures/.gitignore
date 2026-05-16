@@ -1,2 +1,4 @@
 # Allow test fixture log files despite the root *.log exclusion
 !*.log
+!ariza_2026-05-02.log.gz
+!santos_2026-04-25.log.gz
