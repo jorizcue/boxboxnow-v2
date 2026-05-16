@@ -57,6 +57,16 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
     /// real estate when the pilot wants the three-sector summary at
     /// a glance.
     case deltaSectors
+    // Current-pass sector cards — compare the pilot's latest sector
+    // against the fastest *live pass* among on-track karts
+    // (sectorMetaCurrent). Purely additive; existing "Δ Mejor" cards
+    // are unchanged.
+    case deltaCurrentS1
+    case deltaCurrentS2
+    case deltaCurrentS3
+    /// Combined view of S1/S2/S3 current-pass deltas in three lines,
+    /// mirroring `deltaSectors` but reading `sectorMetaCurrent`.
+    case deltaSectorsCurrent
     // Raw Apex live timing — these surface the values straight from
     // the live timing grid (column `data-type="int"` / `data-type="rk"`),
     // distinct from the existing `gapAhead`/`gapBehind`/`position` cards
@@ -130,6 +140,10 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .intervalBehind: return "chevron.down.2"
         case .apexPosition:   return "list.number"
         case .deltaSectors:   return "square.stack.3d.up.fill"
+        case .deltaCurrentS1: return "1.circle.fill"
+        case .deltaCurrentS2: return "2.circle.fill"
+        case .deltaCurrentS3: return "3.circle.fill"
+        case .deltaSectorsCurrent: return "square.stack.3d.up.fill"
         }
     }
 
@@ -151,7 +165,8 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
     /// the config picker but show "--" in place of values.
     var requiresSectors: Bool {
         switch self {
-        case .deltaBestS1, .deltaBestS2, .deltaBestS3, .theoreticalBestLap, .deltaSectors:
+        case .deltaBestS1, .deltaBestS2, .deltaBestS3, .theoreticalBestLap, .deltaSectors,
+             .deltaCurrentS1, .deltaCurrentS2, .deltaCurrentS3, .deltaSectorsCurrent:
             return true
         default:
             return false
@@ -190,6 +205,10 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .intervalBehind: return "0.973s"
         case .apexPosition:   return "P4/12"
         case .deltaSectors:   return "S1 -0.04s"
+        case .deltaCurrentS1: return "+0.18s"
+        case .deltaCurrentS2: return "-0.09s"
+        case .deltaCurrentS3: return "+0.31s"
+        case .deltaSectorsCurrent: return "S1 +0.12s"
         }
     }
 
@@ -223,6 +242,8 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .intervalBehind:  return .green  // matches gapBehind semantics
         case .apexPosition:    return .purple // distinct from "position" (.purple) and "realPos" (.accentColor)
         case .deltaSectors:    return .yellow // same family as deltaBestS1/2/3
+        case .deltaCurrentS1, .deltaCurrentS2, .deltaCurrentS3: return .yellow
+        case .deltaSectorsCurrent: return .yellow
         }
     }
 

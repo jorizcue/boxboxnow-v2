@@ -561,7 +561,15 @@ struct DriverCardView: View {
 
         // ── Δ Sectores: combined S1/S2/S3 deltas in 3 lines ──
         case .deltaSectors:
-            deltaSectorsContent
+            deltaSectorsContent()
+
+        // ── Δ Actual S1 / S2 / S3 — vs fastest *live pass* on-track ──
+        case .deltaCurrentS1, .deltaCurrentS2, .deltaCurrentS3:
+            sectorDeltaContent(for: sectorIdx(for: card), current: true)
+
+        // ── Δ Sectores Actual: combined current-pass S1/S2/S3 ──
+        case .deltaSectorsCurrent:
+            deltaSectorsContent(current: true)
 
         // ── Apex live timing: interval to kart in front ──
         // myKart.interval IS the gap to the kart in front. Empty when
@@ -616,26 +624,27 @@ struct DriverCardView: View {
     /// Map a sector card to its sector index (1/2/3).
     private func sectorIdx(for card: DriverCard) -> Int {
         switch card {
-        case .deltaBestS1: return 1
-        case .deltaBestS2: return 2
-        case .deltaBestS3: return 3
+        case .deltaBestS1, .deltaCurrentS1: return 1
+        case .deltaBestS2, .deltaCurrentS2: return 2
+        case .deltaBestS3, .deltaCurrentS3: return 3
         default: return 0
         }
     }
 
-    /// Render the "Δ Best Sn" body. Reads `kart.currentSNMs` and
-    /// `raceVM.sectorMeta.sN` (which carries the field-best holder +
-    /// the runner-up's bestMs). Three states:
+    /// Render the "Δ Best/Current Sn" body. Reads `kart.currentSNMs` and
+    /// `raceVM.sectorMeta.sN` (or `raceVM.sectorMetaCurrent.sN` when
+    /// `current` is true). Three states:
     ///   1. Session has no sectors / no kart yet / no field-best → "--"
     ///   2. I'm the field-best holder → star + "-X.XXs" green
     ///   3. I'm not the holder → "+X.XXs" red + "#K Team / Driver"
     @ViewBuilder
-    private func sectorDeltaContent(for sectorIdx: Int) -> some View {
+    private func sectorDeltaContent(for sectorIdx: Int, current: Bool = false) -> some View {
         // Cálculo del delta centralizado en RaceViewModel.sectorDelta —
-        // reutilizado por la card combinada `deltaSectors` (3 líneas
-        // S1/S2/S3 sin nombres de líder).
-        let leader = raceVM.sectorMeta?.best(for: sectorIdx)
-        let result = raceVM.sectorDelta(ourKartNumber: ourKartNumber, sectorIdx: sectorIdx)
+        // reutilizado por la card combinada `deltaSectors`/`deltaSectorsCurrent`
+        // (3 líneas S1/S2/S3 sin nombres de líder).
+        let activeMeta = current ? raceVM.sectorMetaCurrent : raceVM.sectorMeta
+        let leader = activeMeta?.best(for: sectorIdx)
+        let result = raceVM.sectorDelta(ourKartNumber: ourKartNumber, sectorIdx: sectorIdx, current: current)
 
         if !raceVM.hasSectors || leader == nil || result == nil {
             Text("--")
@@ -683,12 +692,13 @@ struct DriverCardView: View {
         }
     }
 
-    /// Render del cuerpo de la card combinada `Δ Sectores` — 3 líneas
-    /// `S1/S2/S3` con etiqueta a la izquierda y delta a la derecha.
+    /// Render del cuerpo de la card combinada `Δ Sectores`/`Δ Sectores Actual`
+    /// — 3 líneas `S1/S2/S3` con etiqueta a la izquierda y delta a la derecha.
     /// Reusa `RaceViewModel.sectorDelta(...)` así que la matemática
     /// vive en un solo sitio (compartida con las cards individuales).
+    /// Pasa `current: true` para leer de `sectorMetaCurrent` en lugar de `sectorMeta`.
     @ViewBuilder
-    private var deltaSectorsContent: some View {
+    private func deltaSectorsContent(current: Bool = false) -> some View {
         if !raceVM.hasSectors {
             Text("--")
                 .font(.system(size: mainFont, weight: .black, design: .monospaced))
@@ -717,7 +727,7 @@ struct DriverCardView: View {
                 let labelFont: CGFloat = max(14, min(28, valueFont * 0.4))
                 VStack(spacing: 0) {
                     ForEach([1, 2, 3], id: \.self) { n in
-                        deltaSectorsLine(sectorIdx: n, valueFont: valueFont, labelFont: labelFont)
+                        deltaSectorsLine(sectorIdx: n, valueFont: valueFont, labelFont: labelFont, current: current)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
@@ -730,10 +740,11 @@ struct DriverCardView: View {
     /// One row of the combined sector-delta card: "S{n}" left, value
     /// right (or `—` when there's no data yet for that sector). Fonts
     /// arrive pre-sized from the parent so the three lines stay
-    /// aligned + scale together with the card.
+    /// aligned + scale together with the card. Pass `current: true`
+    /// to read from `sectorMetaCurrent` instead of `sectorMeta`.
     @ViewBuilder
-    private func deltaSectorsLine(sectorIdx n: Int, valueFont: CGFloat, labelFont: CGFloat) -> some View {
-        let r = raceVM.sectorDelta(ourKartNumber: ourKartNumber, sectorIdx: n)
+    private func deltaSectorsLine(sectorIdx n: Int, valueFont: CGFloat, labelFont: CGFloat, current: Bool = false) -> some View {
+        let r = raceVM.sectorDelta(ourKartNumber: ourKartNumber, sectorIdx: n, current: current)
         HStack(spacing: 6 * scale) {
             Text("S\(n)")
                 .font(.system(size: labelFont, weight: .semibold))
@@ -948,6 +959,36 @@ struct DriverCardView: View {
                 }
             }
             return "Delta sectores: \(parts.joined(separator: ", "))"
+        case .deltaCurrentS1, .deltaCurrentS2, .deltaCurrentS3:
+            let n = sectorIdx(for: card)
+            guard raceVM.hasSectors,
+                  let leader = raceVM.sectorMetaCurrent?.best(for: n) else {
+                return "Delta actual sector \(n): sin datos"
+            }
+            let isMine = (kart?.kartNumber == leader.kartNumber)
+            if isMine {
+                if let myC = (n == 1 ? kart?.currentS1Ms : n == 2 ? kart?.currentS2Ms : kart?.currentS3Ms),
+                   myC > 0, let s = leader.secondBestMs, s > 0 {
+                    return "Sector actual \(n) lider, ventaja \(String(format: "%.2f", (s - myC) / 1000)) segundos"
+                }
+                return "Sector actual \(n) lider"
+            }
+            let cur = (n == 1 ? kart?.currentS1Ms : n == 2 ? kart?.currentS2Ms : kart?.currentS3Ms) ?? 0
+            if cur <= 0 { return "Delta actual sector \(n): sin datos" }
+            let d = (cur - leader.bestMs) / 1000
+            return "Sector actual \(n): +\(String(format: "%.2f", d)) segundos del lider kart \(leader.kartNumber)"
+        case .deltaSectorsCurrent:
+            if !raceVM.hasSectors { return "Delta sectores actual: sin datos" }
+            var parts: [String] = []
+            for n in 1...3 {
+                if let r = raceVM.sectorDelta(ourKartNumber: ourKartNumber, sectorIdx: n, current: true) {
+                    let sign = r.deltaMs < 0 ? "menos" : "más"
+                    parts.append("S\(n) \(sign) \(String(format: "%.2f", abs(r.deltaMs) / 1000)) segundos")
+                } else {
+                    parts.append("S\(n) sin datos")
+                }
+            }
+            return "Delta sectores actual: \(parts.joined(separator: ", "))"
         }
     }
 

@@ -63,6 +63,7 @@ final class RaceViewModel: ObservableObject {
     // best ms + 2nd best ms).
     @Published var hasSectors: Bool = false
     @Published var sectorMeta: SectorMeta? = nil
+    @Published var sectorMetaCurrent: SectorMeta? = nil
 
     private let wsClient = WebSocketClient()
     private var cancellables = Set<AnyCancellable>()
@@ -382,9 +383,10 @@ final class RaceViewModel: ObservableObject {
     /// `nil` when sectors aren't available for the active session, the
     /// kart isn't on track yet, the field-best for the sector is empty,
     /// or the local pilot doesn't have data for the sector yet.
-    func sectorDelta(ourKartNumber: Int, sectorIdx: Int) -> SectorDelta? {
+    func sectorDelta(ourKartNumber: Int, sectorIdx: Int, current: Bool = false) -> SectorDelta? {
+        let meta = current ? sectorMetaCurrent : sectorMeta
         guard hasSectors,
-              let leader = sectorMeta?.best(for: sectorIdx),
+              let leader = meta?.best(for: sectorIdx),
               let kart = karts.first(where: { $0.kartNumber == ourKartNumber })
         else { return nil }
 
@@ -399,15 +401,16 @@ final class RaceViewModel: ObservableObject {
 
         let isMine = (kart.kartNumber == leader.kartNumber)
         if isMine {
-            // Margin off MY best (stable across the session). When the
-            // runner-up hasn't logged a sector yet, render 0 — still
-            // green, conveys "leader without anyone close enough to
+            // Margin off MY best (best mode) or MY current (current mode).
+            // When the runner-up hasn't logged a sector yet, render 0 —
+            // still green, conveys "leader without anyone close enough to
             // measure".
-            guard let myB = myBest, myB > 0 else { return SectorDelta(deltaMs: 0, isMine: true) }
+            let mine = current ? myCurrent : myBest
+            guard let myVal = mine, myVal > 0 else { return SectorDelta(deltaMs: 0, isMine: true) }
             guard let second = leader.secondBestMs, second > 0 else {
                 return SectorDelta(deltaMs: 0, isMine: true)
             }
-            return SectorDelta(deltaMs: myB - second, isMine: true)
+            return SectorDelta(deltaMs: myVal - second, isMine: true)
         } else {
             // Deficit uses CURRENT (latest pass) so the value reacts
             // to each sector crossing.
@@ -570,6 +573,9 @@ final class RaceViewModel: ObservableObject {
                 if snapshotData.keys.contains("sectorMeta") {
                     sectorMeta = decodeSectorMeta(snapshotData["sectorMeta"])
                 }
+                if snapshotData.keys.contains("sectorMetaCurrent") {
+                    sectorMetaCurrent = decodeSectorMeta(snapshotData["sectorMetaCurrent"])
+                }
                 // Pit-gate decision (server-side authoritative). Only
                 // overwrite when the key is present, same logic as
                 // sectors — guards against analytics frames that omit
@@ -599,6 +605,9 @@ final class RaceViewModel: ObservableObject {
             }
             if json["sectorMeta"] != nil {
                 sectorMeta = decodeSectorMeta(json["sectorMeta"])
+            }
+            if json["sectorMetaCurrent"] != nil {
+                sectorMetaCurrent = decodeSectorMeta(json["sectorMetaCurrent"])
             }
 
         case "fifo_update":
