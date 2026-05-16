@@ -27,35 +27,35 @@ async def send_welcome_email(email: str, username: str, trial_days: int = 0):
 
     if trial_days > 0:
         body_html = f"""
-                <h2 style="color: #fff; font-size: 22px; margin-bottom: 10px;">Bienvenido, {username}!</h2>
+                <h2 style="color: #fff; font-size: 22px; margin-bottom: 10px;">¡Bienvenido, {username}!</h2>
                 <p style="color: #e5e5e5; font-size: 15px; line-height: 1.6;">
-                    Tu cuenta ha sido creada correctamente. Tienes <strong style="color: #9fe556;">{trial_days} dias de prueba gratuita</strong>
+                    Tu cuenta ha sido creada correctamente. Tienes <strong style="color: #9fe556;">{trial_days} días de prueba gratuita</strong>
                     con acceso completo a todas las funcionalidades.
                 </p>
                 <div style="background: #111; border: 1px solid #333; border-radius: 12px; padding: 20px; margin: 24px 0;">
                     <p style="color: #9fe556; font-weight: 600; margin: 0 0 8px;">Tu prueba incluye:</p>
                     <ul style="color: #d4d4d4; font-size: 14px; padding-left: 20px; margin: 0;">
                         <li>Estrategia de carrera en tiempo real</li>
-                        <li>Analisis de tiempos y telemetria</li>
-                        <li>Gestion de pilotos y stints</li>
+                        <li>Análisis de tiempos y telemetría</li>
+                        <li>Gestión de pilotos y stints</li>
                         <li>Replay de sesiones anteriores</li>
                     </ul>
                 </div>
         """
     else:
         body_html = f"""
-                <h2 style="color: #fff; font-size: 22px; margin-bottom: 10px;">Bienvenido, {username}!</h2>
+                <h2 style="color: #fff; font-size: 22px; margin-bottom: 10px;">¡Bienvenido, {username}!</h2>
                 <p style="color: #e5e5e5; font-size: 15px; line-height: 1.6;">
                     Tu cuenta en <strong style="color: #9fe556;">BoxBoxNow</strong> ha sido creada correctamente.
-                    Completa tu suscripcion para acceder a todas las funcionalidades de la plataforma.
+                    Completa tu suscripción para acceder a todas las funcionalidades de la plataforma.
                 </p>
                 <div style="background: #111; border: 1px solid #333; border-radius: 12px; padding: 20px; margin: 24px 0;">
-                    <p style="color: #9fe556; font-weight: 600; margin: 0 0 8px;">Que puedes hacer con BoxBoxNow:</p>
+                    <p style="color: #9fe556; font-weight: 600; margin: 0 0 8px;">¿Qué puedes hacer con BoxBoxNow?</p>
                     <ul style="color: #d4d4d4; font-size: 14px; padding-left: 20px; margin: 0;">
                         <li>Estrategia de carrera en tiempo real</li>
-                        <li>Gestion de pit stops y cola FIFO</li>
-                        <li>Clasificacion ajustada por ritmo</li>
-                        <li>Analisis historico y telemetria GPS</li>
+                        <li>Gestión de pit stops y cola FIFO</li>
+                        <li>Clasificación ajustada por ritmo</li>
+                        <li>Análisis histórico y telemetría GPS</li>
                     </ul>
                 </div>
         """
@@ -101,7 +101,7 @@ async def send_trial_ending_email(email: str, username: str, days_remaining: int
         r.Emails.send({
             "from": _from_email(),
             "to": [email],
-            "subject": f"Tu prueba gratuita termina en {days_remaining} dias",
+            "subject": f"Tu prueba gratuita termina en {days_remaining} días",
             "html": f"""
             <div style="font-family: 'Space Grotesk', -apple-system, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #fff; padding: 40px 30px; border-radius: 16px; border: 1px solid #222;">
                 <div style="text-align: center; margin-bottom: 30px;">
@@ -111,7 +111,7 @@ async def send_trial_ending_email(email: str, username: str, days_remaining: int
                 </div>
                 <h2 style="color: #fff; font-size: 22px; margin-bottom: 10px;">Hola, {username}</h2>
                 <p style="color: #e5e5e5; font-size: 15px; line-height: 1.6;">
-                    Tu prueba gratuita termina en <strong style="color: #9fe556;">{days_remaining} dia{"s" if days_remaining != 1 else ""}</strong>.
+                    Tu prueba gratuita termina en <strong style="color: #9fe556;">{days_remaining} día{"s" if days_remaining != 1 else ""}</strong>.
                     Para seguir usando BoxBoxNow, elige un plan que se adapte a tus necesidades.
                 </p>
                 <div style="text-align: center; margin: 30px 0;">
@@ -148,7 +148,7 @@ async def send_subscription_confirmation_email(
         return
 
     is_event = "evento" in plan_name.lower()
-    subject = f"Acceso Evento activado — {circuit_name}" if is_event else f"Suscripcion {plan_name} activada"
+    subject = f"Acceso Evento activado — {circuit_name}" if is_event else f"Suscripción {plan_name} activada"
 
     # Build the body HTML: custom template if provided, otherwise default.
     if email_template and email_template.strip():
@@ -173,12 +173,12 @@ async def send_subscription_confirmation_email(
                     </div>
             """
         access_text = (
-            f"Tu acceso de evento a <strong style='color: #9fe556;'>{circuit_name}</strong> esta activo durante las proximas 48 horas."
+            f"Tu acceso de evento a <strong style='color: #9fe556;'>{circuit_name}</strong> está activo durante las próximas 48 horas."
             if is_event
             else f"Tu plan <strong style='color: #9fe556;'>{plan_name}</strong> ha sido activado correctamente."
         )
         body_html = f"""
-                <h2 style="color: #fff; font-size: 22px; margin-bottom: 10px;">Gracias, {username}!</h2>
+                <h2 style="color: #fff; font-size: 22px; margin-bottom: 10px;">¡Gracias, {username}!</h2>
                 <p style="color: #e5e5e5; font-size: 15px; line-height: 1.6;">
                     {access_text}
                 </p>
@@ -228,7 +228,7 @@ async def send_password_reset_email(email: str, username: str, reset_token: str)
         r.Emails.send({
             "from": _from_email(),
             "to": [email],
-            "subject": "Restablecer contrasena - BoxBoxNow",
+            "subject": "Restablecer contraseña - BoxBoxNow",
             "html": f"""
             <div style="font-family: 'Space Grotesk', -apple-system, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #fff; padding: 40px 30px; border-radius: 16px; border: 1px solid #222;">
                 <div style="text-align: center; margin-bottom: 30px;">
@@ -236,14 +236,14 @@ async def send_password_reset_email(email: str, username: str, reset_token: str)
                         <span style="color: #fff;">BOXBOX</span><span style="color: #9fe556;">NOW</span>
                     </h1>
                 </div>
-                <h2 style="color: #fff; font-size: 22px; margin-bottom: 10px;">Restablecer contrasena</h2>
+                <h2 style="color: #fff; font-size: 22px; margin-bottom: 10px;">Restablecer contraseña</h2>
                 <p style="color: #e5e5e5; font-size: 15px; line-height: 1.6;">
-                    Hola {username}, hemos recibido una solicitud para restablecer tu contrasena.
-                    Haz clic en el boton para crear una nueva.
+                    Hola {username}, hemos recibido una solicitud para restablecer tu contraseña.
+                    Haz clic en el botón para crear una nueva.
                 </p>
                 <div style="text-align: center; margin: 30px 0;">
                     <a href="{reset_url}" style="background: #9fe556; color: #000; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
-                        Restablecer contrasena
+                        Restablecer contraseña
                     </a>
                 </div>
                 <p style="color: #b5b5b5; font-size: 13px; line-height: 1.5;">

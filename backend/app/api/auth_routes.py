@@ -17,6 +17,7 @@ User can list and kill their own sessions (like Netflix device management).
 Admin can set max_devices per user.
 """
 
+import json
 import re
 import time
 import secrets
@@ -31,7 +32,8 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from app.config import get_settings
 from app.models.database import get_db
-from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess, Subscription, Circuit, AppSetting, ProductTabConfig, WaitlistEntry
+from app.services.driver_cards import ALL_DRIVER_CARD_IDS
+from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess, Subscription, Circuit, AppSetting, ProductTabConfig, WaitlistEntry, UserPreferences
 from sqlalchemy.orm import selectinload
 from app.models.pydantic_models import (
     LoginRequest, LoginResponse, UserOut, DeviceSessionOut,
@@ -795,6 +797,15 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
     )
     db.add(user)
     await db.flush()
+
+    # Seed explicit UserPreferences with all cards unchecked so new users
+    # start with a blank driver view (existing users without a row continue
+    # to fall through to the frontend default of all-visible).
+    db.add(UserPreferences(
+        user_id=user.id,
+        visible_cards=json.dumps({card_id: False for card_id in ALL_DRIVER_CARD_IDS}),
+        card_order=json.dumps([]),
+    ))
 
     # Read registration config from AppSettings
     reg_config = await _get_registration_config(db)
@@ -1843,8 +1854,13 @@ async def reset_password(request: Request, db: AsyncSession = Depends(get_db)):
     if not user:
         raise HTTPException(400, "Token invalido o expirado")
 
-    if user.password_reset_expires and user.password_reset_expires < datetime.now(timezone.utc):
-        raise HTTPException(400, "Token invalido o expirado")
+    if user.password_reset_expires:
+        expires = user.password_reset_expires
+        # SQLite stores naive datetimes; normalize to UTC before compare.
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        if expires < datetime.now(timezone.utc):
+            raise HTTPException(400, "Token invalido o expirado")
 
     user.password_hash = hash_password(new_password)
     user.password_reset_token = None
