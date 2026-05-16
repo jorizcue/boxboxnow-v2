@@ -735,6 +735,35 @@ export const api = {
       "/api/admin/ranking/reset",
       { method: "POST", body: JSON.stringify({ wipe_drivers: wipeDrivers, reprocess }) },
     ),
+
+  // Session-type overrides
+  rankingAdminSessions: () =>
+    fetchApi<RankingSessionRow[]>("/api/admin/ranking/sessions"),
+  rankingAdminSetSessionType: (
+    circuit_name: string,
+    log_date: string,
+    session_seq: number,
+    forced_type: "race" | "pace",
+  ) =>
+    fetchApi<{ ok: boolean }>(
+      "/api/admin/ranking/session-type",
+      { method: "POST", body: JSON.stringify({ circuit_name, log_date, session_seq, forced_type }) },
+    ),
+  rankingAdminClearSessionType: (
+    circuit_name: string,
+    log_date: string,
+    session_seq: number,
+  ) => {
+    const qs = new URLSearchParams({
+      circuit_name,
+      log_date,
+      session_seq: String(session_seq),
+    });
+    return fetchApi<{ ok: boolean }>(
+      `/api/admin/ranking/session-type?${qs.toString()}`,
+      { method: "DELETE" },
+    );
+  },
 };
 
 // ── Ranking response types ───────────────────────────────────────────
@@ -824,6 +853,18 @@ export interface RankingDriverDetail {
     elo_delta: number | null;
     field_size: number | null;
   }>;
+}
+
+export interface RankingSessionRow {
+  circuit_name: string;
+  log_date: string;
+  session_seq: number;
+  title1: string;
+  title2: string;
+  session_type: string;
+  team_mode: boolean;
+  driver_count: number;
+  forced_type: "race" | "pace" | null;
 }
 
 /**

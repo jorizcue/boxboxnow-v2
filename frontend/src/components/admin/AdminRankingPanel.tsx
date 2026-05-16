@@ -24,6 +24,7 @@ import {
   type RankingSearchRow,
   type RankingCircuitRow,
   type RankingDriverDetail,
+  type RankingSessionRow,
 } from "@/lib/api";
 
 function ratingBadge(rating: number): string {
@@ -82,6 +83,13 @@ export function AdminRankingPanel() {
   const [reprocessing, setReprocessing] = useState(false);
   const [detailOpen, setDetailOpen] = useState<RankingDriverDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  // ── Session-type override state ───────────────────────────────────
+  const [sessions, setSessions] = useState<RankingSessionRow[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
+  // Key: `${circuit_name}|${log_date}|${session_seq}` → true while in-flight
+  const [sessionRowBusy, setSessionRowBusy] = useState<Record<string, boolean>>({});
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -204,6 +212,57 @@ export function AdminRankingPanel() {
     }
   };
 
+  // ── Session-type handlers ─────────────────────────────────────────
+  const loadSessions = async () => {
+    setSessionsLoading(true);
+    setSessionsError(null);
+    try {
+      const data = await api.rankingAdminSessions();
+      setSessions(data);
+    } catch (e: any) {
+      setSessionsError(e.message || "Error cargando sesiones");
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const sessionKey = (s: RankingSessionRow) =>
+    `${s.circuit_name}|${s.log_date}|${s.session_seq}`;
+
+  const handleSetSessionType = async (s: RankingSessionRow, forced_type: "race" | "pace") => {
+    const key = sessionKey(s);
+    setSessionRowBusy((prev) => ({ ...prev, [key]: true }));
+    try {
+      await api.rankingAdminSetSessionType(s.circuit_name, s.log_date, s.session_seq, forced_type);
+      setSessions((prev) =>
+        prev.map((row) =>
+          sessionKey(row) === key ? { ...row, forced_type } : row,
+        ),
+      );
+    } catch (e: any) {
+      alert("Error: " + (e.message || "set_type_failed"));
+    } finally {
+      setSessionRowBusy((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleClearSessionType = async (s: RankingSessionRow) => {
+    const key = sessionKey(s);
+    setSessionRowBusy((prev) => ({ ...prev, [key]: true }));
+    try {
+      await api.rankingAdminClearSessionType(s.circuit_name, s.log_date, s.session_seq);
+      setSessions((prev) =>
+        prev.map((row) =>
+          sessionKey(row) === key ? { ...row, forced_type: null } : row,
+        ),
+      );
+    } catch (e: any) {
+      alert("Error: " + (e.message || "clear_type_failed"));
+    } finally {
+      setSessionRowBusy((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
   const openDetail = async (driverId: number) => {
     setDetailLoading(true);
     setDetailOpen(null);
@@ -285,6 +344,10 @@ export function AdminRankingPanel() {
           </button>
         </div>
       </div>
+
+      <p className="text-xs text-neutral-500 -mt-4 mb-4">
+        Los cambios de tipo de sesión se aplican al recalcular. Los overrides se conservan al resetear.
+      </p>
 
       {reprocessStatus && (
         <div className="mb-4 text-xs text-neutral-400 bg-surface border border-border rounded-lg px-3 py-2">
@@ -416,6 +479,107 @@ export function AdminRankingPanel() {
               </li>
             ))}
           </ul>
+        )}
+      </div>
+
+      {/* Tipo de sesión */}
+      <div className="bg-surface border border-border rounded-xl p-4 mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h3 className="text-sm font-semibold text-white">Tipo de sesión</h3>
+            <p className="text-xs text-neutral-500 mt-0.5">
+              Fuerza el clasificador automático para sesiones individuales. Afecta al peso en el ranking.
+            </p>
+          </div>
+          <button
+            onClick={loadSessions}
+            disabled={sessionsLoading}
+            className="border border-border rounded-lg px-3 py-1.5 text-sm text-neutral-300 hover:text-white hover:border-accent transition-colors disabled:opacity-50"
+          >
+            {sessionsLoading ? "Cargando…" : sessions.length > 0 ? "Recargar" : "Cargar sesiones"}
+          </button>
+        </div>
+
+        {sessionsError && (
+          <div className="mb-3 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2">
+            {sessionsError}
+          </div>
+        )}
+
+        {sessions.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-black/40 text-xs uppercase text-neutral-500">
+                <tr>
+                  <th className="text-left px-3 py-2">Circuito</th>
+                  <th className="text-left px-3 py-2">Fecha</th>
+                  <th className="text-center px-3 py-2">Seq</th>
+                  <th className="text-left px-3 py-2">Título</th>
+                  <th className="text-center px-3 py-2">Tipo (efectivo)</th>
+                  <th className="text-center px-3 py-2">Pilotos</th>
+                  <th className="text-center px-3 py-2">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {sessions.map((s) => {
+                  const key = sessionKey(s);
+                  const busy = !!sessionRowBusy[key];
+                  const effective = s.forced_type ?? s.session_type;
+                  const title = [s.title1, s.title2].filter(Boolean).join(" / ") || "—";
+                  return (
+                    <tr key={key} className={busy ? "opacity-50" : ""}>
+                      <td className="px-3 py-2 text-white text-xs whitespace-nowrap">{s.circuit_name}</td>
+                      <td className="px-3 py-2 text-neutral-400 font-mono text-xs whitespace-nowrap">{s.log_date}</td>
+                      <td className="px-3 py-2 text-center text-neutral-500 font-mono text-xs">{s.session_seq}</td>
+                      <td className="px-3 py-2 text-neutral-300 text-xs max-w-[200px] truncate" title={title}>
+                        {title}
+                      </td>
+                      <td className="px-3 py-2 text-center text-xs">
+                        <span className={`inline-flex items-center gap-1 border rounded px-2 py-0.5 font-mono ${
+                          effective === "race"
+                            ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+                            : "bg-amber-500/15 text-amber-300 border-amber-500/40"
+                        }`}>
+                          {effective === "race" ? "Carrera" : "Tanda"}
+                          {s.forced_type && (
+                            <span className="text-[10px] opacity-70">(manual)</span>
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-center text-neutral-400 font-mono text-xs">{s.driver_count}</td>
+                      <td className="px-3 py-2 text-center">
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            disabled={busy || s.forced_type === "race"}
+                            onClick={() => handleSetSessionType(s, "race")}
+                            className="border border-emerald-500/40 rounded px-2 py-0.5 text-xs text-emerald-300 hover:bg-emerald-500/10 transition-colors disabled:opacity-30 disabled:cursor-default"
+                          >
+                            Carrera
+                          </button>
+                          <button
+                            disabled={busy || s.forced_type === "pace"}
+                            onClick={() => handleSetSessionType(s, "pace")}
+                            className="border border-amber-500/40 rounded px-2 py-0.5 text-xs text-amber-300 hover:bg-amber-500/10 transition-colors disabled:opacity-30 disabled:cursor-default"
+                          >
+                            Tanda
+                          </button>
+                          {s.forced_type && (
+                            <button
+                              disabled={busy}
+                              onClick={() => handleClearSessionType(s)}
+                              className="border border-border rounded px-2 py-0.5 text-xs text-neutral-400 hover:text-white hover:border-accent transition-colors disabled:opacity-30 disabled:cursor-default"
+                            >
+                              Auto
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
