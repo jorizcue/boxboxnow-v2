@@ -55,6 +55,12 @@ logger = logging.getLogger(__name__)
 # SessionExtract per (session, ratable driver row).
 MIN_DRIVERS_PER_SESSION = 3
 
+# Intra-RACE blend (position vs kart-corrected pace) — UNCHANGED behaviour.
+INTRA_RACE_POS_WEIGHT = 0.7
+# Inter-session-type weight on the Glicko-2 move: a tanda moves the
+# rating 30% of what an equivalent race would. Tunable.
+SESSION_TYPE_WEIGHT = {"race": 1.0, "pace": 0.3}
+
 # Drivers with fewer than this many laps in a session are excluded
 # from the rating update. Filters out drivers who only did an out/in
 # lap (e.g. parade or DNS) and avoids tanking their rating because
@@ -118,6 +124,15 @@ def _pace_positions(rated_se: list) -> dict[str, int]:
                                      else min(prev, s.best_lap_ms))
     ranked = sorted(comp_best, key=comp_best.__getitem__)
     return {tk: i + 1 for i, tk in enumerate(ranked)}
+
+
+def _blend(pre: Glicko2State, new: Glicko2State, w: float) -> Glicko2State:
+    """Move only `w` of the way pre→new (w=1 → new; w=0 → pre)."""
+    return Glicko2State(
+        rating=pre.rating + w * (new.rating - pre.rating),
+        rd=pre.rd + w * (new.rd - pre.rd),
+        volatility=pre.volatility + w * (new.volatility - pre.volatility),
+    )
 
 
 # ─── Driver canonicalisation helpers ─────────────────────────────────────
@@ -359,7 +374,7 @@ async def apply_extracts(
 
         if is_race:
             try:
-                key = effective_scores(field, w=0.7)
+                key = effective_scores(field, w=INTRA_RACE_POS_WEIGHT)
             except ValueError:
                 # Dirty upstream data: same team_key with conflicting
                 # team_position. Don't abort the whole run — fall back to
@@ -523,8 +538,11 @@ async def apply_extracts(
                 global_opps.append((pre_global[drv_j.id], score))
                 circuit_opps.append((pre_circuit[drv_j.id], score))
 
+            # ── Session-type weight (pace = 30%, race = 100%) ──
+            w = SESSION_TYPE_WEIGHT.get(effective_type, 1.0)
+
             # ── Global update ──
-            new_global = update(pre_global[drv_i.id], global_opps)
+            new_global = _blend(pre_global[drv_i.id], update(pre_global[drv_i.id], global_opps), w)
             gres = await db.execute(select(DriverRating).where(DriverRating.driver_id == drv_i.id))
             grow = gres.scalar_one()
             prev_global_rating = grow.rating
@@ -552,7 +570,7 @@ async def apply_extracts(
             ))
 
             # ── Per-circuit update ──
-            new_circuit = update(pre_circuit[drv_i.id], circuit_opps)
+            new_circuit = _blend(pre_circuit[drv_i.id], update(pre_circuit[drv_i.id], circuit_opps), w)
             crow = circuit_rows[drv_i.id]
             crow.rating = new_circuit.rating
             crow.rd = new_circuit.rd
