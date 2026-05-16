@@ -119,7 +119,7 @@ const translations: Record<string, Record<Language, string>> = {
 
   // === Race Table ===
   "race.noData": { es: "Sin datos de carrera", en: "No race data", it: "Nessun dato di gara", de: "Keine Renndaten", fr: "Pas de données de course" },
-  "race.connectHint": { es: "Conecta al WebSocket de Apex o inicia un replay", en: "Connect to Apex WebSocket or start a replay", it: "Connettiti al WebSocket di Apex o avvia un replay", de: "Verbinde dich mit dem Apex WebSocket oder starte ein Replay", fr: "Connectez-vous au WebSocket d'Apex ou démarrez un replay" },
+  "race.connectHint": { es: "Configura tu carrera y espera a que arranque o inicia un replay", en: "Set up your race and wait for it to start, or start a replay", it: "Configura la tua gara e attendi che inizi o avvia un replay", de: "Richte dein Rennen ein und warte auf den Start oder starte ein Replay", fr: "Configure ta course et attends le départ ou démarre un replay" },
   "race.kart": { es: "Kart", en: "Kart", it: "Kart", de: "Kart", fr: "Kart" },
   "race.team": { es: "Equipo", en: "Team", it: "Squadra", de: "Team", fr: "Équipe" },
   "race.driver": { es: "Piloto", en: "Driver", it: "Pilota", de: "Fahrer", fr: "Pilote" },

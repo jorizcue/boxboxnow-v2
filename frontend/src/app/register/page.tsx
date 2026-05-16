@@ -340,13 +340,13 @@ export default function RegisterPage() {
               />
               <span className="text-xs text-neutral-400 group-hover:text-neutral-300 transition-colors leading-relaxed">
                 Acepto los{" "}
-                <Link href="/terms" className="text-accent hover:text-accent-hover underline">
-                  terminos de servicio
-                </Link>{" "}
+                <a href="https://boxboxnow.com/cookies" target="_blank" rel="noopener noreferrer" className="text-accent hover:text-accent-hover underline">
+                  términos de servicio
+                </a>{" "}
                 y la{" "}
-                <Link href="/privacy" className="text-accent hover:text-accent-hover underline">
-                  politica de privacidad
-                </Link>
+                <a href="https://boxboxnow.com/privacidad" target="_blank" rel="noopener noreferrer" className="text-accent hover:text-accent-hover underline">
+                  política de privacidad
+                </a>
               </span>
             </label>
 
