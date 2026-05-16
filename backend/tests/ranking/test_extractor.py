@@ -194,13 +194,15 @@ async def test_conflicting_team_position_falls_back_to_pace_no_abort(db):
     n_results = (await db.execute(select(func.count()).select_from(SessionResult))).scalar()
     assert n_results >= 3, f"expected >=3 SessionResult rows, got {n_results}"
 
-    # final_position must be NULL for all rows (is_race was set to False).
+    # is_race was set to False (fallback to pace ordering).
+    # Pace ordering now stores best-lap-based final_position (not None).
+    # session_type stays "race" (effective_type = classifier result, no override).
     from app.models.schemas import SessionResult as SR
     rows = (await db.execute(select(SR))).scalars().all()
     for row in rows:
-        assert row.final_position is None, (
-            f"driver {row.driver_id}: expected final_position=None in pace fallback, "
-            f"got {row.final_position}"
+        assert row.final_position is not None, (
+            f"driver {row.driver_id}: expected a best-lap final_position in pace fallback, "
+            f"got None"
         )
         assert row.session_type == "race"
 
