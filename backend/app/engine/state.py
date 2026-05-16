@@ -839,7 +839,13 @@ class RaceStateManager:
             kart.pit_status = "in_pit"
             kart.pit_count += 1
             kart.last_pit_lap = kart.total_laps
-            kart.pit_in_countdown_ms = self.countdown_ms  # Save race clock at pit-in
+            # Interpolated, NOT raw self.countdown_ms: Apex sends countdown
+            # only every ~30s so the raw value is up to 30s stale. The
+            # pilot-view pit overlay shows elapsed = pitInCountdownMs −
+            # (client interpolated clock); a stale raw anchor makes that
+            # timer start at the staleness offset (e.g. 0:09) instead of
+            # 0:00 and end equally late. Same fix as lines 558/966.
+            kart.pit_in_countdown_ms = self._interpolated_countdown_ms()  # Save race clock at pit-in
 
             # Calculate stint duration (time on track) and race elapsed time
             duration_total_ms = self.duration_min * 60 * 1000
@@ -879,7 +885,11 @@ class RaceStateManager:
                 return None  # Already racing, skip duplicate
             # Calculate pit time (time spent in the pit)
             if kart.pit_in_countdown_ms != 0:
-                pit_time_ms = kart.pit_in_countdown_ms - self.countdown_ms
+                # Interpolated on the out side too: pit_in_countdown_ms is
+                # now interpolated, so mixing it with the raw (≤30s stale)
+                # countdown here would re-introduce up to 30s of error into
+                # the recorded pit duration.
+                pit_time_ms = kart.pit_in_countdown_ms - self._interpolated_countdown_ms()
                 # Update the last pit record with pit_time
                 if kart.pit_history:
                     kart.pit_history[-1].pit_time_ms = pit_time_ms
