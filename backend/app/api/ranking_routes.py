@@ -319,7 +319,7 @@ async def admin_set_session_type(
         existing.forced_type = payload.forced_type
         existing.title1 = title1
         existing.title2 = title2
-        await db.flush()
+        await db.commit()
         ov = existing
     else:
         ov = RankingSessionOverride(
@@ -331,7 +331,7 @@ async def admin_set_session_type(
             title2=title2,
         )
         db.add(ov)
-        await db.flush()
+        await db.commit()
 
     return {
         "id": ov.id,
@@ -363,6 +363,7 @@ async def admin_delete_session_type(
             RankingSessionOverride.session_seq == session_seq,
         )
     )
+    await db.commit()
     return {"ok": True}
 
 

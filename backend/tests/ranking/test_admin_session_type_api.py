@@ -10,10 +10,11 @@ from __future__ import annotations
 import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from app.api.auth_routes import require_admin
 from app.models.database import get_db
-from app.models.schemas import Driver, SessionResult, RankingSessionOverride, User
+from app.models.schemas import Base, Driver, SessionResult, RankingSessionOverride, User
 
 
 # ---------------------------------------------------------------------------
@@ -294,3 +295,91 @@ async def test_delete_then_get_shows_no_forced_type(db_session):
         assert s["forced_type"] is None
     finally:
         app.dependency_overrides.clear()
+
+
+async def test_post_session_type_persists_across_separate_session():
+    """Cross-session persistence: proves commit() actually wrote to the DB.
+
+    Uses a fresh engine + per-call session approach (prod-like), then opens a
+    SECOND independent session on the SAME engine and asserts the row is
+    visible — something a shared-session test with only flush() cannot catch.
+    This test will FAIL if flush() is used instead of commit().
+    """
+    from app.main import app
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+
+    class _FakeAdmin2:
+        id = 1
+        username = "test_admin"
+        is_admin = True
+
+    async def _override_require_admin():
+        return _FakeAdmin2()
+
+    async def _override_get_db_fresh():
+        """Yield a brand-new session per call — mirrors production get_db."""
+        async with SessionLocal() as session:
+            yield session
+
+    app.dependency_overrides[require_admin] = _override_require_admin
+    app.dependency_overrides[get_db] = _override_get_db_fresh
+
+    try:
+        # Seed a driver + session result so the endpoint can snapshot titles.
+        async with SessionLocal() as seed_session:
+            driver = Driver(canonical_name="DRIVER_X", normalized_key="DRIVER_X")
+            seed_session.add(driver)
+            await seed_session.flush()
+            sr = SessionResult(
+                circuit_name="CrossTest",
+                log_date="2026-05-01",
+                session_seq=1,
+                title1="CROSS TITLE",
+                title2="Q1",
+                driver_id=driver.id,
+                total_laps=3,
+                best_lap_ms=60000,
+                avg_lap_ms=61000.0,
+                median_lap_ms=60500,
+                kart_bias_ms=0.0,
+                corrected_avg_ms=61000.0,
+                team_name="",
+                duration_s=300,
+                session_type="pace",
+                team_mode="individual",
+            )
+            seed_session.add(sr)
+            await seed_session.commit()
+
+        # Issue the POST using the prod-like per-call session override.
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post(
+                "/api/admin/ranking/session-type",
+                json={
+                    "circuit_name": "CrossTest",
+                    "log_date": "2026-05-01",
+                    "session_seq": 1,
+                    "forced_type": "race",
+                },
+            )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["forced_type"] == "race"
+
+        # Open a completely separate session on the same engine and assert
+        # the row is there.  A missing commit() makes this assertion fail.
+        async with SessionLocal() as verify_session:
+            rows = (
+                await verify_session.execute(select(RankingSessionOverride))
+            ).scalars().all()
+            assert len(rows) == 1, (
+                "RankingSessionOverride row not visible in a separate session — "
+                "endpoint used flush() instead of commit()"
+            )
+            assert rows[0].forced_type == "race"
+    finally:
+        app.dependency_overrides.clear()
+        await engine.dispose()
