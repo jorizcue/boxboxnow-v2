@@ -49,6 +49,8 @@ interface CircuitRow {
   finish_lat2: number | null;
   finish_lon2: number | null;
   warmup_laps_to_skip: number;
+  for_sale: boolean;
+  is_beta: boolean;
 }
 
 interface AccessRow {
@@ -1111,6 +1113,8 @@ interface CircuitForm {
   finish_lat2: string;
   finish_lon2: string;
   warmup_laps_to_skip: string;
+  for_sale: boolean;
+  is_beta: boolean;
 }
 
 const emptyForm: CircuitForm = {
@@ -1130,6 +1134,8 @@ const emptyForm: CircuitForm = {
   finish_lat2: "",
   finish_lon2: "",
   warmup_laps_to_skip: "3",
+  for_sale: true,
+  is_beta: false,
 };
 
 function circuitToForm(c: CircuitRow): CircuitForm {
@@ -1150,6 +1156,8 @@ function circuitToForm(c: CircuitRow): CircuitForm {
     finish_lat2: c.finish_lat2?.toString() ?? "",
     finish_lon2: c.finish_lon2?.toString() ?? "",
     warmup_laps_to_skip: (c.warmup_laps_to_skip ?? 3).toString(),
+    for_sale: c.for_sale ?? true,
+    is_beta: c.is_beta ?? false,
   };
 }
 
@@ -1171,6 +1179,8 @@ function formToPayload(f: CircuitForm) {
     finish_lat2: f.finish_lat2 ? Number(f.finish_lat2) : null,
     finish_lon2: f.finish_lon2 ? Number(f.finish_lon2) : null,
     warmup_laps_to_skip: Number(f.warmup_laps_to_skip ?? 3) || 3,
+    for_sale: f.for_sale,
+    is_beta: f.is_beta,
   };
 }
 
@@ -1234,10 +1244,12 @@ function CircuitsManager() {
     } catch (e: any) { alert(e.message); }
   };
 
-  const setField = (key: keyof CircuitForm, value: string) =>
+  type CircuitFormStringKey = { [K in keyof CircuitForm]: CircuitForm[K] extends string ? K : never }[keyof CircuitForm];
+
+  const setField = (key: CircuitFormStringKey, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const fieldInput = (label: string, key: keyof CircuitForm, type: string = "text", placeholder?: string) => (
+  const fieldInput = (label: string, key: CircuitFormStringKey, type: string = "text", placeholder?: string) => (
     <div className="flex flex-col gap-1">
       <label className="text-[10px] text-neutral-400 uppercase tracking-wider">{label}</label>
       <input
@@ -1359,6 +1371,27 @@ function CircuitsManager() {
 
             <div className="grid grid-cols-1 gap-3">
               {fieldInput(t("admin.warmupLapsToSkip"), "warmup_laps_to_skip", "number", "3")}
+            </div>
+
+            <div className="flex gap-6">
+              <label className="flex items-center gap-2 text-sm text-neutral-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.for_sale}
+                  onChange={(e) => setForm((p) => ({ ...p, for_sale: e.target.checked }))}
+                  className="accent-accent"
+                />
+                Disponible para venta
+              </label>
+              <label className="flex items-center gap-2 text-sm text-neutral-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.is_beta}
+                  onChange={(e) => setForm((p) => ({ ...p, is_beta: e.target.checked }))}
+                  className="accent-accent"
+                />
+                Beta
+              </label>
             </div>
 
             {fieldInput("PHP API URL", "php_api_url", "text", "http://...")}
