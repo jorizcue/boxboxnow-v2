@@ -835,51 +835,88 @@ private fun SectorDeltaContent(
     val deltaMs = result.deltaMs
 
     val signText = if (deltaMs < 0) "-" else "+"
-    val deltaFontSp = (bigFont.value * 1.15f).sp
-    val kartFontSp = (mainFont.value * 0.85f).sp
-    val nameFontSp = (mainFont.value * 0.62f).sp
 
-    // Three Spacer(weight=1) entries split the available height into
-    // roughly thirds: top empty, delta in upper third, mid empty,
-    // leader-block (kart # on line 1, team/driver on line 2) in
-    // lower third, bottom empty. Anchors the delta a bit below the
-    // title and keeps the leader info readable above the bottom edge.
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(vertical = (4f * scale).dp),
-    ) {
-        Spacer(Modifier.weight(1f))
-        MonoValue(
-            "$signText%.2fs".format(abs(deltaMs) / 1000),
-            if (isMine) Color(0xFF30D158) else Color(0xFFFF453A),
-            deltaFontSp,
-        )
-        Spacer(Modifier.weight(1f))
-        if (!isMine) {
-            Text(
-                "#${leader.kartNumber}",
-                color = BoxBoxNowColors.SystemGray,
-                fontSize = kartFontSp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-            )
-            val name = leaderName(leader)
-            if (name.isNotEmpty()) {
-                Text(
-                    name,
-                    color = BoxBoxNowColors.SystemGray,
-                    fontSize = nameFontSp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    softWrap = true,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = (4f * scale).dp),
+    // Mirror DeltaSectorsContent: read BOTH axes before sizing fonts so
+    // the delta value never overflows the card height and the leader
+    // block is always fully visible.
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val w = maxWidth.value
+        val h = maxHeight.value
+
+        // When the leader block is shown (!isMine) we need vertical room
+        // for "#NN" (1 line) + name (up to 2 lines), so the value gets a
+        // smaller height budget. When isMine the full height is available.
+        val hasLeader = !isMine
+        val valueBudget = if (hasLeader) h * 0.42f else h * 0.62f
+        val deltaFontSize = minOf(valueBudget, w * 0.19f).coerceIn(16f, 72f)
+
+        // Leader-block fonts scale off deltaFontSize so they stay
+        // proportional regardless of card size.
+        val kartFontSize = (deltaFontSize * 0.42f).coerceIn(9f, 22f)
+        val nameFontSize = (deltaFontSize * 0.30f).coerceIn(7f, 16f)
+
+        val deltaFontSp = deltaFontSize.sp
+        val kartFontSp = kartFontSize.sp
+        val nameFontSp = nameFontSize.sp
+
+        // Deterministic vertical layout: value gets a weighted Box so it
+        // cannot grow beyond its share, and the leader block (when shown)
+        // gets its own weighted Box with the remaining space. This
+        // replaces the collapsible Spacer(weight=1) triad that could push
+        // content past the card's clipped bottom edge.
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(vertical = (4f * scale).dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(if (hasLeader) 0.52f else 1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                MonoValue(
+                    "$signText%.2fs".format(abs(deltaMs) / 1000),
+                    if (isMine) Color(0xFF30D158) else Color(0xFFFF453A),
+                    deltaFontSp,
                 )
             }
-            Spacer(Modifier.weight(1f))
+            if (hasLeader) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.48f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            "#${leader.kartNumber}",
+                            color = BoxBoxNowColors.SystemGray,
+                            fontSize = kartFontSp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                        val name = leaderName(leader)
+                        if (name.isNotEmpty()) {
+                            Text(
+                                name,
+                                color = BoxBoxNowColors.SystemGray,
+                                fontSize = nameFontSp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 2,
+                                softWrap = true,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = (4f * scale).dp),
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
