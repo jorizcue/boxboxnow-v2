@@ -213,6 +213,16 @@ async def list_circuits_for_checkout(
     )
     active_circuit_ids = {row[0] for row in active_result.fetchall()}
 
+    has_all = (await db.execute(
+        select(UserAllCircuitAccess.id).where(
+            UserAllCircuitAccess.user_id == user.id,
+            UserAllCircuitAccess.valid_from <= now,
+            UserAllCircuitAccess.valid_until > now,
+        )
+    )).scalar_one_or_none() is not None
+    if has_all:
+        return []
+
     result = await db.execute(select(Circuit).where(Circuit.for_sale == True).order_by(Circuit.name))
     return [
         {"id": c.id, "name": c.name, "is_beta": c.is_beta}
@@ -323,6 +333,18 @@ async def create_checkout_session(
             )
         )
         already_owned = {row[0] for row in access_rows.all()}
+        has_all_grant = (await db.execute(
+            select(UserAllCircuitAccess.id).where(
+                UserAllCircuitAccess.user_id == user.id,
+                UserAllCircuitAccess.valid_from <= now,
+                UserAllCircuitAccess.valid_until > now,
+            )
+        )).scalar_one_or_none() is not None
+        if has_all_grant:
+            raise HTTPException(
+                400,
+                "Ya tienes acceso a todos los circuitos con tu suscripción actual",
+            )
         if already_owned:
             raise HTTPException(
                 400,

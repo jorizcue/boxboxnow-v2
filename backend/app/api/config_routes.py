@@ -35,6 +35,37 @@ async def list_my_circuits(user: User = Depends(get_current_user), db: AsyncSess
         result = await db.execute(select(Circuit).order_by(Circuit.name))
         return result.scalars().all()
 
+    from app.models.schemas import UserAllCircuitAccess
+    has_all = (await db.execute(
+        select(UserAllCircuitAccess.id).where(
+            UserAllCircuitAccess.user_id == user.id,
+            UserAllCircuitAccess.valid_from <= now,
+            UserAllCircuitAccess.valid_until > now,
+        )
+    )).scalar_one_or_none() is not None
+
+    if has_all:
+        result = await db.execute(
+            select(Circuit).where(
+                (Circuit.for_sale == True) | (Circuit.is_beta == True)  # noqa: E712
+            ).order_by(Circuit.name)
+        )
+        all_circuits = list(result.scalars().all())
+        direct = await db.execute(
+            select(Circuit).join(UserCircuitAccess).where(
+                UserCircuitAccess.user_id == user.id,
+                UserCircuitAccess.valid_from <= now,
+                UserCircuitAccess.valid_until >= now,
+            )
+        )
+        seen = {c.id for c in all_circuits}
+        for c in direct.scalars().all():
+            if c.id not in seen:
+                all_circuits.append(c)
+                seen.add(c.id)
+        all_circuits.sort(key=lambda c: c.name)
+        return all_circuits
+
     result = await db.execute(
         select(Circuit)
         .join(UserCircuitAccess)
@@ -380,17 +411,8 @@ async def _get_active_session(user: User, db: AsyncSession) -> RaceSession:
 async def _verify_circuit_access(user: User, circuit_id: int, db: AsyncSession):
     if user.is_admin:
         return
-
-    now = datetime.now(timezone.utc)
-    result = await db.execute(
-        select(UserCircuitAccess).where(
-            UserCircuitAccess.user_id == user.id,
-            UserCircuitAccess.circuit_id == circuit_id,
-            UserCircuitAccess.valid_from <= now,
-            UserCircuitAccess.valid_until >= now,
-        )
-    )
-    if not result.scalar_one_or_none():
+    from app.api.auth_routes import user_has_circuit_access
+    if not await user_has_circuit_access(db, user.id, circuit_id):
         raise HTTPException(403, "No access to this circuit")
 
 

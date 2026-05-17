@@ -202,6 +202,8 @@ async def list_recordings(
     # Filter by user access if not admin
     allowed_circuit_ids = None
     if not user.is_admin:
+        from app.models.schemas import UserAllCircuitAccess
+        from app.models.schemas import Circuit as _CM
         now = dt.now(tz.utc)
         result = await db.execute(
             select(UserCircuitAccess.circuit_id).where(
@@ -211,6 +213,20 @@ async def list_recordings(
             )
         )
         allowed_circuit_ids = {row[0] for row in result.all()}
+        has_all = (await db.execute(
+            select(UserAllCircuitAccess.id).where(
+                UserAllCircuitAccess.user_id == user.id,
+                UserAllCircuitAccess.valid_from <= now,
+                UserAllCircuitAccess.valid_until > now,
+            )
+        )).scalar_one_or_none() is not None
+        if has_all:
+            fs = await db.execute(
+                select(_CM.id).where(
+                    (_CM.for_sale == True) | (_CM.is_beta == True)  # noqa: E712
+                )
+            )
+            allowed_circuit_ids |= {row[0] for row in fs.all()}
 
     circuits_out = []
     for dir_name, dates in all_dirs.items():
