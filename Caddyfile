@@ -38,7 +38,14 @@ www.{$DOMAIN:localhost} {
     }
 
     handle /api/* {
-        reverse_proxy backend:8000
+        # Overwrite any client-supplied X-Forwarded-For with the real
+        # connecting peer. Caddy is the edge, so {remote_host} is the
+        # true client. Without this, Caddy APPENDS to a spoofed XFF and
+        # the backend rate limiters (_client_ip) would key on the
+        # attacker-controlled left-most entry.
+        reverse_proxy backend:8000 {
+            header_up X-Forwarded-For {remote_host}
+        }
     }
 
     handle /ws/* {

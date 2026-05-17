@@ -285,3 +285,45 @@ async def test_exhausting_resend_does_not_block_forgot_password(db_and_client):
                           json={"email": "y@example.com"},
                           headers={"X-Forwarded-For": "4.4.4.5"})
     assert r.status_code == 200, r.text
+
+
+async def test_login_invalid_mfa_counts_against_account_bucket(db_and_client):
+    """The invalid-MFA-code failure path must also record the account
+    bucket (mutation guard for login_limiter.record_failure(acct_key)
+    inside the bad-MFA branch)."""
+    import pyotp
+
+    Session, client = db_and_client
+    secret = pyotp.random_base32()
+    async with Session() as s:
+        s.add(User(username="mfauser", email="mfa@example.com",
+                    password_hash=hash_password("rightpw"),
+                    is_admin=False, email_verified=True,
+                    mfa_enabled=True, mfa_secret=secret))
+        await s.commit()
+
+    totp = pyotp.TOTP(secret)
+    wrong = "000000"
+    while totp.verify(wrong, valid_window=1):
+        wrong = f"{(int(wrong) + 1) % 1000000:06d}"
+
+    # Correct password, WRONG mfa code, 10x each from a DIFFERENT IP so
+    # the per-IP bucket never trips — only the account bucket should.
+    for i in range(10):
+        r = await client.post(
+            "/api/auth/login",
+            json={"username": "mfauser", "password": "rightpw",
+                  "mfa_code": wrong},
+            headers={"X-Forwarded-For": f"8.8.8.{i}"},
+        )
+        assert r.status_code == 403, (i, r.status_code, r.text)
+
+    # 11th from a fresh IP → blocked by the ACCOUNT bucket, proving the
+    # invalid-MFA path recorded acct_key.
+    r = await client.post(
+        "/api/auth/login",
+        json={"username": "mfauser", "password": "rightpw",
+              "mfa_code": wrong},
+        headers={"X-Forwarded-For": "8.8.8.250"},
+    )
+    assert r.status_code == 429, r.text
