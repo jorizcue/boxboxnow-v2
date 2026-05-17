@@ -40,7 +40,7 @@ async def test_creates_grant_with_period_grace(db):
     vu = rows[0].valid_until
     if vu.tzinfo is None:
         vu = vu.replace(tzinfo=timezone.utc)
-    assert vu >= pe + timedelta(days=2)
+    assert vu >= pe + timedelta(days=3)
     assert rows[0].stripe_subscription_id == "sub_A"
 
 
@@ -59,4 +59,47 @@ async def test_renewal_extends_same_grant(db):
     vu = rows[0].valid_until
     if vu.tzinfo is None:
         vu = vu.replace(tzinfo=timezone.utc)
-    assert vu >= pe2 + timedelta(days=2)
+    assert vu >= pe2 + timedelta(days=3)
+
+
+async def test_event_window_branch(db):
+    u = User(username="g3", password_hash="x", is_admin=False)
+    db.add(u); await db.flush()
+    es = datetime.now(timezone.utc) + timedelta(days=1)
+    ee = datetime.now(timezone.utc) + timedelta(days=3)
+    await _grant_all_circuits(db, u.id, stripe_subscription_id=None,
+                              event_start=es, event_end=ee)
+    await db.commit()
+    rows = (await db.execute(select(UserAllCircuitAccess).where(
+        UserAllCircuitAccess.user_id == u.id))).scalars().all()
+    assert len(rows) == 1
+    vf, vu = rows[0].valid_from, rows[0].valid_until
+    if vf.tzinfo is None: vf = vf.replace(tzinfo=timezone.utc)
+    if vu.tzinfo is None: vu = vu.replace(tzinfo=timezone.utc)
+    # event window used verbatim (no +3d grace on the event branch)
+    assert abs((vf - es).total_seconds()) < 5
+    assert abs((vu - ee).total_seconds()) < 5
+
+
+async def test_second_call_lowers_valid_from_when_earlier(db):
+    u = User(username="g4", password_hash="x", is_admin=False)
+    db.add(u); await db.flush()
+    base = datetime.now(timezone.utc)
+    # First grant: event window starting in 10 days
+    await _grant_all_circuits(db, u.id, stripe_subscription_id="sub_C",
+                              event_start=base + timedelta(days=10),
+                              event_end=base + timedelta(days=12))
+    await db.commit()
+    # Second grant SAME sub key, earlier start, later end → extend both ends
+    await _grant_all_circuits(db, u.id, stripe_subscription_id="sub_C",
+                              event_start=base + timedelta(days=1),
+                              event_end=base + timedelta(days=20))
+    await db.commit()
+    rows = (await db.execute(select(UserAllCircuitAccess).where(
+        UserAllCircuitAccess.user_id == u.id))).scalars().all()
+    assert len(rows) == 1  # same key → upserted, not duplicated
+    vf, vu = rows[0].valid_from, rows[0].valid_until
+    if vf.tzinfo is None: vf = vf.replace(tzinfo=timezone.utc)
+    if vu.tzinfo is None: vu = vu.replace(tzinfo=timezone.utc)
+    assert abs((vf - (base + timedelta(days=1))).total_seconds()) < 5   # lowered
+    assert abs((vu - (base + timedelta(days=20))).total_seconds()) < 5  # extended

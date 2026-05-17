@@ -174,6 +174,10 @@ class UserAllCircuitAccess(Base):
     renewals extend it and cancellation expires it.
     """
     __tablename__ = "user_all_circuit_access"
+    __table_args__ = (
+        UniqueConstraint("user_id", "stripe_subscription_id",
+                         name="uq_user_all_circuit_sub"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)

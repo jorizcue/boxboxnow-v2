@@ -146,6 +146,10 @@ async def _grant_all_circuits(
     new row is inserted. Resolution to concrete circuits (for_sale ∪
     beta, at access time) happens in user_has_circuit_access — this only
     manages the date window.
+    One-time payments pass stripe_subscription_id=None; multiple one-time
+    cross-circuit purchases for the same user therefore share a single
+    row and each extends the same window — this is intentional
+    (spec-accepted), not a bug.
     """
     now = datetime.now(timezone.utc)
     if event_start and event_end:
