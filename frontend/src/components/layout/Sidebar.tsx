@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import clsx from "clsx";
 import { useT } from "@/lib/i18n";
 import { useRaceStore } from "@/hooks/useRaceState";
+import { useTour } from "@/hooks/useTour";
 
 export type Tab = "race" | "pit" | "live" | "tracking" | "classification" | "adjusted" | "driver" | "driver-config" | "config" | "replay" | "analytics" | "insights" | "account" | "admin-users" | "admin-circuits" | "admin-hub" | "admin-platform" | "admin-marketing" | "admin-analytics" | "admin-ranking";
 
@@ -163,6 +164,7 @@ let _clasificacionExpanded = true;
 
 export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs, username }: SidebarProps) {
   const t = useT();
+  const startTour = useTour((s) => s.start);
   const raceStarted = useRaceStore((s) => s.raceStarted);
   const raceFinished = useRaceStore((s) => s.raceFinished);
   const replayActive = useRaceStore((s) => s.replayActive);
@@ -279,6 +281,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs, username }:
   const renderTabButton = (tab: { id: Tab; labelKey: string }, isSub = false) => (
     <button
       key={tab.id}
+      data-tour={`nav-${tab.id}`}
       onClick={() => handleTabClick(tab.id)}
       className={clsx(
         "w-full flex items-center gap-3 transition-colors relative group",
@@ -608,6 +611,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs, username }:
           tab. When the sidebar is collapsed we just show the avatar. */}
       <button
         type="button"
+        data-tour="nav-account"
         onClick={() => handleTabClick("account")}
         className={clsx(
           "shrink-0 flex items-center gap-2 border-t border-border transition-colors relative group",
@@ -630,6 +634,24 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, userTabs, username }:
           <span className="absolute left-full ml-2 px-2 py-1 bg-surface border border-border rounded text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
             {username || t("nav.account")}
           </span>
+        )}
+      </button>
+
+      {/* Relaunch the first-run onboarding tour on demand */}
+      <button
+        type="button"
+        onClick={() => { setMobileOpen(false); startTour(); }}
+        className={clsx(
+          "shrink-0 flex items-center gap-2 border-t border-border text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03] transition-colors",
+          collapsed ? "justify-center px-2 py-2" : "px-3 py-2"
+        )}
+        title={t("tour.relaunch")}
+      >
+        <svg className="shrink-0 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+        </svg>
+        {!collapsed && (
+          <span className="text-xs font-medium truncate flex-1 text-left">{t("tour.relaunch")}</span>
         )}
       </button>
     </div>

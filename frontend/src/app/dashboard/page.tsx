@@ -29,6 +29,7 @@ import { EmbeddedCheckout } from "@/components/checkout/EmbeddedCheckout";
 import { AccountPanel } from "@/components/account/AccountPanel";
 import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
 import { ChatWidget } from "@/components/chat/ChatWidget";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { useSiteStatus } from "@/hooks/useSiteStatus";
 import { MaintenancePage } from "@/components/landing/MaintenancePage";
 import { useTracker, useTrackerInit } from "@/hooks/useTracker";
@@ -427,6 +428,13 @@ function Dashboard({
       {/* Floating support chatbot — visible only when user has the `chat`
           permission (or is admin). Self-gated inside the component. */}
       <ChatWidget />
+      {/* First-run guided menu tour (auto-runs once per user on desktop;
+          relaunchable from the Sidebar). Self-gated inside the component. */}
+      <OnboardingTour
+        setActiveTab={setActiveTab}
+        userTabs={userTabs}
+        userId={user?.id}
+      />
     </div>
   );
 }
