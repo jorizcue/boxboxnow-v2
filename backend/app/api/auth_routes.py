@@ -292,6 +292,37 @@ login_limiter = RateLimiter(max_attempts=10, window_seconds=300)
 forgot_password_limiter = RateLimiter(max_attempts=5, window_seconds=900)
 
 
+# Token-confirm endpoints (/reset-password, /verify-email) were previously
+# unlimited. High token entropy (token_urlsafe(48)) mitigated brute force,
+# but nothing stopped scanning. 10 calls / 5 min per real client IP: ample
+# for a legit single link click, tight enough to kill scanning. Counts
+# every call (no success/failure distinction is meaningful here).
+token_limiter = RateLimiter(max_attempts=10, window_seconds=300)
+
+# /resend-verification gets its own bucket so it no longer shares
+# forgot_password_limiter with /forgot-password (one used to exhaust the
+# other, locking legitimate users out of the unrelated flow).
+resend_verification_limiter = RateLimiter(max_attempts=5, window_seconds=900)
+
+
+def _client_ip(request: Request) -> str:
+    """Best-effort real client IP, used as the rate-limit key.
+
+    Behind our Caddy reverse proxy (the only hop in front of
+    backend:8000, not publicly reachable) `request.client.host` is the
+    Caddy container IP — identical for every external user, which made
+    every limiter effectively global. Caddy sets `X-Forwarded-For`, so
+    the left-most entry is the real client. Falls back to the socket
+    peer when the header is absent/empty (direct/local calls, tests).
+    """
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        first = forwarded.split(",")[0].strip()
+        if first:
+            return first
+    return request.client.host if request.client else "unknown"
+
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
@@ -370,13 +401,7 @@ def _extract_device_info(request: Request) -> tuple[str, str]:
     elif "Edg" in ua:
         device += " / Edge"
 
-    ip = request.client.host if request.client else "unknown"
-    # Check for proxy headers
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        ip = forwarded.split(",")[0].strip()
-
-    return device, ip
+    return device, _client_ip(request)
 
 
 async def get_current_user(
@@ -850,7 +875,7 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
     a phantom session here would occupy the user's single device slot and
     make their first real /login hit the 409 device-limit wall.
     """
-    login_limiter.check(request.client.host if request.client else "unknown")
+    login_limiter.check(_client_ip(request))
 
     # Gate outdated mobile apps the same way `/login` does — otherwise a
     # stale client could create an account and then hit the upgrade wall
@@ -989,7 +1014,7 @@ async def login(
       2. Fall back to the legacy `user.max_devices` if no subscription
          config is found (preserves existing behavior for trial/free users).
     """
-    ip = request.client.host if request.client else "unknown"
+    ip = _client_ip(request)
     login_limiter.check(ip)
     client_kind = "mobile" if device == "mobile" else "web"
 
@@ -1856,7 +1881,7 @@ async def forgot_password(request: Request, db: AsyncSession = Depends(get_db)):
     to bound here is the outbound email volume, not just abuse. Legit
     users won't hit the cap at 5 attempts.
     """
-    ip = request.client.host if request.client else "unknown"
+    ip = _client_ip(request)
     forgot_password_limiter.check(ip)
 
     body = await request.json()
@@ -2016,7 +2041,7 @@ async def resend_verification(request: Request, db: AsyncSession = Depends(get_d
     the email exists or the user is already verified. Only fires the email when
     an unverified user is found.
     """
-    ip = request.client.host if request.client else "unknown"
+    ip = _client_ip(request)
     forgot_password_limiter.check(ip)
 
     body = await request.json()
