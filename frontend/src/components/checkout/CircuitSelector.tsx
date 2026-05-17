@@ -8,7 +8,7 @@ interface Circuit {
   id: number;
   name: string;
   is_beta: boolean;
-  for_sale?: boolean;
+  for_sale: boolean;
 }
 
 const LOCALE_TAG: Record<Language, string> = {
@@ -420,7 +420,7 @@ export function CircuitSelector({
                 <div className="text-center py-8">
                   <p className="text-neutral-400">{t("circuitSelector.empty")}</p>
                 </div>
-              ) : !informational && isMulti && purchasable.length < requiredCount ? (
+              ) : !informational && purchasable.length < requiredCount ? (
                 <div className="text-center py-8">
                   <p className="text-neutral-400">{t("circuitSelector.insufficient", { n: purchasable.length, req: requiredCount })}</p>
                 </div>
