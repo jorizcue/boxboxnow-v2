@@ -42,9 +42,15 @@ async def db():
 # ---------------------------------------------------------------------------
 
 class _FakeRequest:
-    """Minimal Request stand-in whose .json() returns a fixed body."""
+    """Minimal Request stand-in whose .json() returns a fixed body.
+
+    Also exposes `headers` and `client` so handlers that derive the
+    client IP (rate limiting via _client_ip) work when called directly.
+    """
     def __init__(self, body: dict):
         self._body = body
+        self.headers = {}
+        self.client = None
 
     async def json(self):
         return self._body
