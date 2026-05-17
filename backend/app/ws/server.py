@@ -225,21 +225,8 @@ async def race_websocket(
             # split makes the close-code reason actionable for the
             # client (the SPA already differentiates these on the HTTP
             # side via /auth/me's `has_active_circuit_access` flag).
-            ca_q = await db.execute(
-                select(UserCircuitAccess.valid_from, UserCircuitAccess.valid_until).where(
-                    UserCircuitAccess.user_id == user_id,
-                )
-            )
-            has_circuit = False
-            for vf, vu in ca_q.all():
-                if vf is not None and vf.tzinfo is None:
-                    vf = vf.replace(tzinfo=timezone.utc)
-                if vu is not None and vu.tzinfo is None:
-                    vu = vu.replace(tzinfo=timezone.utc)
-                if (vf is None or vf <= now) and (vu is None or vu > now):
-                    has_circuit = True
-                    break
-            if not has_circuit:
+            from app.api.auth_routes import user_has_any_active_circuit_access
+            if not await user_has_any_active_circuit_access(db, user_id):
                 logger.warning(f"WS rejected: no active circuit access (user={user_id})")
                 await websocket.close(code=4003, reason="No active circuit access")
                 return

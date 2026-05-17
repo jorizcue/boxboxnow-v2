@@ -164,18 +164,9 @@ async def _ws_authenticate(token: str | None) -> int | None:
 
         # At least one currently-valid circuit grant required (paying AND
         # internal users alike).
-        ca_q = await db.execute(
-            select(UserCircuitAccess.valid_from, UserCircuitAccess.valid_until).where(
-                UserCircuitAccess.user_id == user_id,
-            )
-        )
-        for vf, vu in ca_q.all():
-            if vf is not None and vf.tzinfo is None:
-                vf = vf.replace(tzinfo=timezone.utc)
-            if vu is not None and vu.tzinfo is None:
-                vu = vu.replace(tzinfo=timezone.utc)
-            if (vf is None or vf <= now) and (vu is None or vu > now):
-                return user_id
+        from app.api.auth_routes import user_has_any_active_circuit_access
+        if await user_has_any_active_circuit_access(db, user_id):
+            return user_id
         return None
 
 
