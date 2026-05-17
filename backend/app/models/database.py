@@ -1,8 +1,10 @@
+import json
 import logging
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from app.config import get_settings
+from app.services.plan_translations import PLAN_TRANSLATIONS
 
 logger = logging.getLogger(__name__)
 
@@ -629,6 +631,22 @@ async def init_db():
         except Exception:
             pass
 
+        # Per-locale plan copy (landing pricing cards i18n). Spanish stays
+        # in display_name/description/features = source + fallback; these
+        # nullable JSON-encoded TEXT columns hold the {en,it,de,fr}
+        # translations. NULL ⇒ /api/plans resolver returns the es value
+        # (regression-safe). Mirrors the for_sale/apex_last_position
+        # idempotent ALTER pattern.
+        for ddl in (
+            "ALTER TABLE product_tab_config ADD COLUMN display_name_i18n TEXT",
+            "ALTER TABLE product_tab_config ADD COLUMN description_i18n TEXT",
+            "ALTER TABLE product_tab_config ADD COLUMN features_i18n TEXT",
+        ):
+            try:
+                await conn.execute(text(ddl))
+            except Exception:
+                pass
+
         # Waitlist table for pre-launch lead capture
         await conn.execute(text("""
             CREATE TABLE IF NOT EXISTS waitlist_entry (
@@ -662,6 +680,94 @@ async def init_db():
             CREATE UNIQUE INDEX IF NOT EXISTS uq_usage_daily_user_day_event
             ON usage_daily (COALESCE(user_id, -1), day, event_key)
         """))
+
+        # Plan-card i18n backfill — MUST run after the *_i18n ALTERs
+        # above. Idempotent + admin-safe (only fills NULL/empty columns).
+        await backfill_plan_i18n(conn)
+
+
+async def backfill_plan_i18n(conn) -> None:
+    """Populate ``product_tab_config.*_i18n`` from ``PLAN_TRANSLATIONS``.
+
+    Idempotent + non-clobbering: a row's ``display_name_i18n`` /
+    ``description_i18n`` / ``features_i18n`` is written ONLY when it is
+    currently NULL/empty, so admin edits (and a previous run) are never
+    overwritten and re-running is a no-op. The JSON is built by
+    exact-matching the row's current Spanish text against the authored
+    dictionary:
+
+    * ``display_name_i18n`` = ``{lang: DICT[display_name][lang]}`` for the
+      langs present in the dict (omit a lang only when unknown → the API
+      falls back to es for that lang).
+    * ``description_i18n`` likewise; an empty/blank es description is
+      skipped (left NULL — the resolver returns the empty es value).
+    * ``features_i18n`` = ``{lang: [DICT.get(b,{}).get(lang, b) for b in
+      es_features]}`` for all four langs — same length/order as es with
+      per-bullet fallback to the es bullet.
+
+    Wrapped in try/except like the other ``init_db`` backfills; runs on
+    the caller's connection inside the existing init transaction (so it
+    commits with the rest).
+    """
+    langs = ("en", "it", "de", "fr")
+    try:
+        rows = (await conn.execute(text(
+            "SELECT id, display_name, description, features, "
+            "display_name_i18n, description_i18n, features_i18n "
+            "FROM product_tab_config"
+        ))).fetchall()
+    except Exception as e:  # table/columns missing — nothing to do
+        logger.warning("plan i18n backfill skipped: %s", e)
+        return
+
+    for r in rows:
+        (rid, dn, desc, feats_raw,
+         dn_i18n, desc_i18n, feats_i18n) = r
+        updates: dict[str, str] = {}
+
+        # display_name_i18n — only when empty
+        if not dn_i18n and dn in PLAN_TRANSLATIONS:
+            tr = PLAN_TRANSLATIONS[dn]
+            blob = {lang: tr[lang] for lang in langs if lang in tr}
+            if blob:
+                updates["display_name_i18n"] = json.dumps(blob, ensure_ascii=False)
+
+        # description_i18n — only when empty AND es description non-blank
+        if not desc_i18n and desc and desc.strip() and desc in PLAN_TRANSLATIONS:
+            tr = PLAN_TRANSLATIONS[desc]
+            blob = {lang: tr[lang] for lang in langs if lang in tr}
+            if blob:
+                updates["description_i18n"] = json.dumps(blob, ensure_ascii=False)
+
+        # features_i18n — only when empty; per-locale full list w/ es fallback
+        if not feats_i18n:
+            try:
+                es_features = json.loads(feats_raw) if feats_raw else []
+            except (ValueError, TypeError):
+                es_features = []
+            if es_features:
+                blob = {
+                    lang: [
+                        PLAN_TRANSLATIONS.get(b, {}).get(lang, b)
+                        for b in es_features
+                    ]
+                    for lang in langs
+                }
+                updates["features_i18n"] = json.dumps(blob, ensure_ascii=False)
+
+        if not updates:
+            continue
+        set_clause = ", ".join(f"{col} = :{col}" for col in updates)
+        try:
+            await conn.execute(
+                text(
+                    f"UPDATE product_tab_config SET {set_clause} WHERE id = :id"
+                ),
+                {**updates, "id": rid},
+            )
+        except Exception as e:
+            logger.warning("plan i18n backfill row %s failed: %s", rid, e)
+
 
 async def get_db():
     async with async_session() as session:

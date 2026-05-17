@@ -426,6 +426,17 @@ class ProductTabConfig(Base):
     display_name = Column(String(100), nullable=False, default="")
     description = Column(Text, nullable=True)
     features = Column(Text, nullable=True, default="[]")  # JSON array of feature strings
+    # Per-locale plan copy. Spanish stays the source/fallback in the
+    # columns above; these hold a JSON object keyed by locale. The
+    # display_name/description blobs are {"en","it","de","fr": "..."};
+    # features_i18n is {"en","it","de","fr": ["...", ...]} where each
+    # list mirrors the es `features` length/order (untranslated bullets
+    # fall back to the es bullet at request time). NULL/empty ⇒ the
+    # resolver returns the Spanish value (regression-safe). JSON-encoded
+    # Text, mirroring how `features` above is stored/decoded.
+    display_name_i18n = Column(Text, nullable=True)
+    description_i18n = Column(Text, nullable=True)
+    features_i18n = Column(Text, nullable=True)
     price_amount = Column(Float, nullable=True)  # Price in EUR for this specific interval
     billing_interval = Column(String(20), nullable=True)  # "month", "year", "one_time"
     is_popular = Column(Boolean, default=False, nullable=False)

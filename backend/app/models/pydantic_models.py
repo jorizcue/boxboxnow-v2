@@ -668,6 +668,14 @@ class ProductTabConfigOut(BaseModel):
     display_name: str = ""
     description: str | None = None
     features: list[str] = []
+    # Per-locale plan copy (landing pricing cards i18n). Decoded JSON
+    # objects keyed by locale: display_name_i18n/description_i18n are
+    # {"en|it|de|fr": "..."}, features_i18n is {"en|it|de|fr": [...]}.
+    # Spanish stays in display_name/description/features (source +
+    # fallback). None when unset → /api/plans falls back to es.
+    display_name_i18n: dict | None = None
+    description_i18n: dict | None = None
+    features_i18n: dict | None = None
     price_amount: float | None = None
     billing_interval: str | None = None
     is_popular: bool = False
@@ -693,6 +701,11 @@ class ProductTabConfigCreate(BaseModel):
     display_name: str = ""
     description: str | None = None
     features: list[str] = []
+    # Per-locale plan copy (see ProductTabConfigOut). Optional dict
+    # objects keyed by locale; omitted → not set on create.
+    display_name_i18n: dict | None = None
+    description_i18n: dict | None = None
+    features_i18n: dict | None = None
     price_amount: float | None = None
     billing_interval: str | None = None
     is_popular: bool = False
@@ -716,6 +729,11 @@ class ProductTabConfigUpdate(BaseModel):
     display_name: str | None = None
     description: str | None = None
     features: list[str] | None = None
+    # Per-locale plan copy (see ProductTabConfigOut). Optional dict
+    # objects keyed by locale; omitted → field left unchanged on update.
+    display_name_i18n: dict | None = None
+    description_i18n: dict | None = None
+    features_i18n: dict | None = None
     price_amount: float | None = None
     billing_interval: str | None = None
     is_popular: bool | None = None

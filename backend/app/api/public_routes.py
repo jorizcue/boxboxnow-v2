@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from app.models.database import get_db
 from app.models.schemas import AppSetting, ProductTabConfig
+from app.services.plan_translations import localize_plan
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["public"])
@@ -37,20 +38,38 @@ async def site_status(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/plans")
-async def list_plans(db: AsyncSession = Depends(get_db)):
-    """Return visible product configs for the pricing page. No auth required."""
+async def list_plans(lang: str = "es", db: AsyncSession = Depends(get_db)):
+    """Return visible product configs for the pricing page. No auth required.
+
+    Optional ``?lang=`` (``es|en|it|de|fr``, default ``es``) localizes
+    ``display_name`` / ``description`` / ``features`` via the per-row
+    ``*_i18n`` columns with per-field/per-bullet Spanish fallback. The
+    response SHAPE is unchanged; ``lang=es`` (or any unknown value) is
+    byte-identical to the previous Spanish-only output (regression-safe).
+    """
     result = await db.execute(
         select(ProductTabConfig)
         .where(ProductTabConfig.is_visible == True)
         .order_by(ProductTabConfig.sort_order)
     )
     configs = result.scalars().all()
-    return [
-        {
+    plans = []
+    for c in configs:
+        es_features = _json.loads(c.features) if c.features else []
+        display_name, description, features = localize_plan(
+            display_name=c.display_name,
+            description=c.description,
+            features=es_features,
+            dn_i18n=c.display_name_i18n,
+            desc_i18n=c.description_i18n,
+            feat_i18n=c.features_i18n,
+            lang=lang,
+        )
+        plans.append({
             "plan_type": c.plan_type,
-            "display_name": c.display_name,
-            "description": c.description,
-            "features": _json.loads(c.features) if c.features else [],
+            "display_name": display_name,
+            "description": description,
+            "features": features,
             "price_amount": c.price_amount,
             "billing_interval": c.billing_interval,
             "is_popular": c.is_popular,
@@ -58,6 +77,5 @@ async def list_plans(db: AsyncSession = Depends(get_db)):
             "sort_order": c.sort_order,
             "per_circuit": bool(c.per_circuit) if c.per_circuit is not None else True,
             "circuits_to_select": int(c.circuits_to_select) if c.circuits_to_select else 1,
-        }
-        for c in configs
-    ]
+        })
+    return plans
