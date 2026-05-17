@@ -41,6 +41,7 @@ class User(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     circuit_access = relationship("UserCircuitAccess", back_populates="user", cascade="all, delete-orphan")
+    all_circuit_access = relationship("UserAllCircuitAccess", back_populates="user", cascade="all, delete-orphan")
     tab_access = relationship("UserTabAccess", back_populates="user", cascade="all, delete-orphan")
     race_sessions = relationship("RaceSession", back_populates="user", cascade="all, delete-orphan")
     device_sessions = relationship("DeviceSession", back_populates="user", cascade="all, delete-orphan")
@@ -160,6 +161,27 @@ class UserCircuitAccess(Base):
 
     user = relationship("User", back_populates="circuit_access")
     circuit = relationship("Circuit", back_populates="user_access")
+
+
+class UserAllCircuitAccess(Base):
+    """A single date-windowed grant meaning "all circuits".
+
+    Created for subscriptions sold cross-circuit (ProductTabConfig
+    per_circuit=False) instead of one UserCircuitAccess row per circuit.
+    Resolves at access time to every circuit with for_sale OR is_beta —
+    so newly added circuits are covered automatically and removed ones
+    drop off, with no backfill scripts. Linked to its Stripe sub so
+    renewals extend it and cancellation expires it.
+    """
+    __tablename__ = "user_all_circuit_access"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    valid_from = Column(DateTime, nullable=False)
+    valid_until = Column(DateTime, nullable=False)
+    stripe_subscription_id = Column(String(255), nullable=True, index=True)
+
+    user = relationship("User", back_populates="all_circuit_access")
 
 
 class UserTabAccess(Base):
