@@ -213,3 +213,43 @@ async def test_successful_login_clears_account_bucket(db_and_client):
         headers={"X-Forwarded-For": "6.6.6.150"},
     )
     assert r.status_code == 401, r.text
+
+
+# ---- Task 3: token_limiter on /reset-password & /verify-email -----------
+
+async def test_reset_password_rate_limited(db_and_client):
+    _Session, client = db_and_client
+    last = None
+    for _ in range(11):
+        last = await client.post(
+            "/api/auth/reset-password",
+            json={"token": "bogus", "password": "longenough123"},
+            headers={"X-Forwarded-For": "5.5.5.5"},
+        )
+    assert last.status_code == 429, last.text
+
+
+async def test_verify_email_rate_limited(db_and_client):
+    _Session, client = db_and_client
+    last = None
+    for _ in range(11):
+        last = await client.post(
+            "/api/auth/verify-email",
+            json={"token": "bogus"},
+            headers={"X-Forwarded-For": "5.5.5.6"},
+        )
+    assert last.status_code == 429, last.text
+
+
+async def test_token_limiter_is_per_ip(db_and_client):
+    _Session, client = db_and_client
+    for _ in range(11):
+        await client.post("/api/auth/reset-password",
+                          json={"token": "x", "password": "longenough123"},
+                          headers={"X-Forwarded-For": "5.5.5.7"})
+    # A different client IP must still be allowed (gets 400 bad token,
+    # NOT 429).
+    r = await client.post("/api/auth/reset-password",
+                          json={"token": "x", "password": "longenough123"},
+                          headers={"X-Forwarded-For": "5.5.5.8"})
+    assert r.status_code == 400, r.text

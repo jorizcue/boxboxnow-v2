@@ -1921,6 +1921,9 @@ async def forgot_password(request: Request, db: AsyncSession = Depends(get_db)):
 @router.post("/reset-password")
 async def reset_password(request: Request, db: AsyncSession = Depends(get_db)):
     """Reset password with token from email."""
+    _ip = _client_ip(request)
+    token_limiter.check(_ip)
+    token_limiter.record_failure(_ip)
     body = await request.json()
     token = body.get("token", "")
     new_password = body.get("password", "")
@@ -1966,6 +1969,9 @@ async def verify_email(request: Request, db: AsyncSession = Depends(get_db)):
     already-verified account returns {ok, alreadyVerified} without creating a
     second trial.
     """
+    _ip = _client_ip(request)
+    token_limiter.check(_ip)
+    token_limiter.record_failure(_ip)
     body = await request.json()
     token = body.get("token", "").strip()
 
