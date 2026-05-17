@@ -81,7 +81,9 @@ This becomes `backend/app/services/plan_translations.py` as `PLAN_TRANSLATIONS: 
 
 ## Task 3 — Admin: per-language plan fields
 
-**Files:** `frontend/src/components/admin/AdminPanel.tsx` (+ `frontend/src/lib/api.ts` types if needed).
+> **Task 1 review follow-up (MUST do here):** the admin product CRUD does NOT use the pydantic ProductTabConfig models — `backend/app/api/admin_routes.py` `create_product_config` (~926-947), `update_product_config` (~981-1007) and `_serialize_config` (~875-897) hand-roll raw `request.json()` / dicts and currently IGNORE the new `*_i18n` columns. Task 3 MUST also wire `display_name_i18n`/`description_i18n`/`features_i18n` into those three backend functions (JSON-encode on write exactly like `features`; include in `_serialize_config` output) or the admin editor will silently no-op. Add a small backend test that POST/PATCH then GET round-trips the `*_i18n` JSON through `admin_routes`.
+
+**Files:** `backend/app/api/admin_routes.py`, `frontend/src/components/admin/AdminPanel.tsx` (+ `frontend/src/lib/api.ts` types if needed); test `backend/tests/test_admin_plan_i18n.py`.
 
 - [ ] **Step 1**: read the product/plan editor in `AdminPanel.tsx` (the form binding `display_name`/`description`/`features`). Add collapsible per-language sections **en/it/de/fr** with the same input shapes (display name = text, description = textarea, features = the existing list editor) bound to `display_name_i18n`/`description_i18n`/`features_i18n` (objects keyed by lang). Load existing values on edit; default empty. Mirror existing form/markup patterns; no new design system.
 - [ ] **Step 2 — verify**: `cd frontend && npx tsc --noEmit && npm run build` green.
