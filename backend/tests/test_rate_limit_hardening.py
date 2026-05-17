@@ -253,3 +253,35 @@ async def test_token_limiter_is_per_ip(db_and_client):
                           json={"token": "x", "password": "longenough123"},
                           headers={"X-Forwarded-For": "5.5.5.8"})
     assert r.status_code == 400, r.text
+
+
+# ---- Task 4: split forgot-password / resend-verification buckets --------
+
+async def test_exhausting_forgot_password_does_not_block_resend(db_and_client):
+    _Session, client = db_and_client
+    # forgot_password_limiter is 5/900s; exhaust it (6 calls → last 429).
+    last_fp = None
+    for _ in range(6):
+        last_fp = await client.post("/api/auth/forgot-password",
+                                    json={"email": "x@example.com"},
+                                    headers={"X-Forwarded-For": "4.4.4.4"})
+    assert last_fp.status_code == 429, last_fp.text
+    # Same IP, /resend-verification must still work (separate bucket).
+    r = await client.post("/api/auth/resend-verification",
+                          json={"email": "x@example.com"},
+                          headers={"X-Forwarded-For": "4.4.4.4"})
+    assert r.status_code == 200, r.text
+
+
+async def test_exhausting_resend_does_not_block_forgot_password(db_and_client):
+    _Session, client = db_and_client
+    last_rv = None
+    for _ in range(6):
+        last_rv = await client.post("/api/auth/resend-verification",
+                                    json={"email": "y@example.com"},
+                                    headers={"X-Forwarded-For": "4.4.4.5"})
+    assert last_rv.status_code == 429, last_rv.text
+    r = await client.post("/api/auth/forgot-password",
+                          json={"email": "y@example.com"},
+                          headers={"X-Forwarded-For": "4.4.4.5"})
+    assert r.status_code == 200, r.text

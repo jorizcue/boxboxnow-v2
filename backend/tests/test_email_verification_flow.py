@@ -42,6 +42,7 @@ if "resend" not in sys.modules:
 from app.api.auth_routes import (  # noqa: E402
     start_trial,
     forgot_password_limiter,
+    resend_verification_limiter,
 )
 from app.models.schemas import (  # noqa: E402
     Base,
@@ -409,15 +410,15 @@ async def test_resend_verification_unverified_regenerates_token_and_emails(db):
 
 
 async def test_resend_verification_rate_limiter_invoked(db):
-    """The forgot_password_limiter must be invoked (check + record_failure) on every call."""
+    """The resend_verification_limiter must be invoked (check + record_failure) on every call."""
     from app.api.auth_routes import resend_verification
 
-    forgot_password_limiter._failures.clear()
+    resend_verification_limiter._failures.clear()
 
     req = _FakeRequest({"email": "rate@x.com"})
     with (
-        patch.object(forgot_password_limiter, "check") as mock_check,
-        patch.object(forgot_password_limiter, "record_failure") as mock_record,
+        patch.object(resend_verification_limiter, "check") as mock_check,
+        patch.object(resend_verification_limiter, "record_failure") as mock_record,
         patch("asyncio.create_task", return_value=None),
     ):
         await resend_verification(request=req, db=db)
@@ -430,12 +431,12 @@ async def test_resend_verification_rate_limit_blocks_after_limit(db):
     """After exceeding the limit, resend-verification returns 429."""
     from app.api.auth_routes import resend_verification
 
-    forgot_password_limiter._failures.clear()
+    resend_verification_limiter._failures.clear()
     ip = "10.0.0.99"
 
-    # Exhaust the limit (5 attempts for forgot_password_limiter)
+    # Exhaust the limit (5 attempts for resend_verification_limiter)
     for _ in range(5):
-        forgot_password_limiter.record_failure(ip)
+        resend_verification_limiter.record_failure(ip)
 
     req = _FakeRequest({"email": "spam@x.com"})
     req.client = type("C", (), {"host": ip})()
@@ -446,7 +447,7 @@ async def test_resend_verification_rate_limit_blocks_after_limit(db):
     assert exc_info.value.status_code == 429
 
     # Clean up
-    forgot_password_limiter._failures.clear()
+    resend_verification_limiter._failures.clear()
 
 
 # ---------------------------------------------------------------------------

@@ -236,7 +236,9 @@ class RateLimiter:
 
     Two-step API:
         limiter.check(ip)   → raises 429 if over the limit
-        limiter.record_failure(ip) → call ONLY when credentials failed
+        limiter.record_failure(key) → call when an attempt should count
+            against the limit (login: only on credential failure; token /
+            email endpoints: every call)
         limiter.reset(ip)   → call on successful login
 
     This behavior replaces the old "count every request" approach that
@@ -2049,18 +2051,18 @@ async def verify_email(request: Request, db: AsyncSession = Depends(get_db)):
 async def resend_verification(request: Request, db: AsyncSession = Depends(get_db)):
     """Re-send the email-verification link.
 
-    Rate-limited per IP using the same forgot_password_limiter (5 per 15 min).
+    Rate-limited per IP using its own resend_verification_limiter (5 per 15 min).
     Anti-enumeration: always returns generic {ok: True} regardless of whether
     the email exists or the user is already verified. Only fires the email when
     an unverified user is found.
     """
     ip = _client_ip(request)
-    forgot_password_limiter.check(ip)
+    resend_verification_limiter.check(ip)
 
     body = await request.json()
     email = body.get("email", "").strip().lower()
 
-    forgot_password_limiter.record_failure(ip)
+    resend_verification_limiter.record_failure(ip)
 
     # Look up user by email — anti-enumeration: same response either way
     result = await db.execute(select(User).where(User.email == email))
