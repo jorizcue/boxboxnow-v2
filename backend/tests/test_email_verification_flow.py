@@ -41,7 +41,6 @@ if "resend" not in sys.modules:
 
 from app.api.auth_routes import (  # noqa: E402
     start_trial,
-    forgot_password_limiter,
     resend_verification_limiter,
 )
 from app.models.schemas import (  # noqa: E402
@@ -336,7 +335,7 @@ async def test_resend_verification_unknown_email_returns_ok_no_email(db):
     from app.api.auth_routes import resend_verification
 
     # Reset limiter state to avoid contamination across tests
-    forgot_password_limiter._failures.clear()
+    resend_verification_limiter._failures.clear()
 
     req = _FakeRequest({"email": "nobody@x.com"})
     with patch("asyncio.create_task", return_value=None) as ct_mock:
@@ -350,7 +349,7 @@ async def test_resend_verification_verified_user_returns_ok_no_email(db):
     """Verified user → generic {ok: True}, no email fired."""
     from app.api.auth_routes import resend_verification
 
-    forgot_password_limiter._failures.clear()
+    resend_verification_limiter._failures.clear()
 
     u = _make_user(
         db, username="ver2", email="ver2@x.com", email_verified=True,
@@ -370,7 +369,7 @@ async def test_resend_verification_unverified_regenerates_token_and_emails(db):
     """Unverified user → token regenerated, expires reset, email task fired."""
     from app.api.auth_routes import resend_verification
 
-    forgot_password_limiter._failures.clear()
+    resend_verification_limiter._failures.clear()
 
     old_token = "old-token-123"
     u = _make_user(
