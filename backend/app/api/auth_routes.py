@@ -33,7 +33,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from app.config import get_settings
 from app.models.database import get_db
 from app.services.driver_cards import ALL_DRIVER_CARD_IDS
-from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess, Subscription, Circuit, AppSetting, ProductTabConfig, WaitlistEntry, UserPreferences
+from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess, UserAllCircuitAccess, Subscription, Circuit, AppSetting, ProductTabConfig, WaitlistEntry, UserPreferences
 from sqlalchemy.orm import selectinload
 from app.models.pydantic_models import (
     LoginRequest, LoginResponse, UserOut, DeviceSessionOut,
@@ -461,10 +461,10 @@ async def get_current_user(
         select(User).where(User.id == user_id).options(
             selectinload(User.tab_access),
             selectinload(User.subscriptions),
-            # Eager-load circuit_access so user_has_active_circuit_access
-            # and the /me payload can both check it without an extra
-            # round-trip per request. Same shape as subscriptions —
-            # downstream helpers must tolerate naive datetimes (SQLite).
+            # Eager-load both circuit_access and all_circuit_access so
+            # user_has_active_circuit_access and the /me payload can check
+            # per-circuit rows AND all-grant rows without extra round-trips.
+            # Downstream helpers must tolerate naive datetimes (SQLite).
             selectinload(User.circuit_access),
             selectinload(User.all_circuit_access),
         )
@@ -739,13 +739,15 @@ async def require_active_subscription(
 
 
 def user_has_active_circuit_access(user: User) -> bool:
-    """Synchronous check: does this user have at least one UserCircuitAccess
-    row whose window covers "right now"?
+    """Synchronous check: does this user have at least one currently-valid
+    UserCircuitAccess row OR a currently-valid UserAllCircuitAccess
+    (all-circuits) grant?
 
-    Reads from `user.circuit_access` which `get_current_user` eager-loads
-    via `selectinload(User.circuit_access)` — no extra DB query. A row
-    counts as currently valid when `valid_from <= now < valid_until`,
-    treating naive datetimes (SQLite) as UTC-aware.
+    Both `user.circuit_access` and `user.all_circuit_access` must be
+    eager-loaded by the caller (`get_current_user` does this via
+    `selectinload`) — no extra DB query is issued here. A row counts as
+    currently valid when `valid_from <= now < valid_until`; naive
+    datetimes (SQLite) are treated as UTC-aware.
 
     Admins always pass even with no circuit-access rows so the platform
     stays manageable when an admin's own access lapses.
@@ -794,36 +796,31 @@ async def user_has_circuit_access(db, user_id: int, circuit_id: int) -> bool:
     goes off-sale (existing behaviour preserved). Naive SQLite datetimes
     are treated as UTC.
     """
-    from app.models.schemas import (
-        UserCircuitAccess as _UCA,
-        UserAllCircuitAccess as _UACA,
-        Circuit as _C,
-    )
     now = datetime.now(timezone.utc)
 
     direct = await db.execute(
-        select(_UCA.id).where(
-            _UCA.user_id == user_id,
-            _UCA.circuit_id == circuit_id,
-            _UCA.valid_from <= now,
-            _UCA.valid_until > now,
+        select(UserCircuitAccess.id).where(
+            UserCircuitAccess.user_id == user_id,
+            UserCircuitAccess.circuit_id == circuit_id,
+            UserCircuitAccess.valid_from <= now,
+            UserCircuitAccess.valid_until > now,
         )
     )
     if direct.scalar_one_or_none() is not None:
         return True
 
     all_grant = await db.execute(
-        select(_UACA.id).where(
-            _UACA.user_id == user_id,
-            _UACA.valid_from <= now,
-            _UACA.valid_until > now,
+        select(UserAllCircuitAccess.id).where(
+            UserAllCircuitAccess.user_id == user_id,
+            UserAllCircuitAccess.valid_from <= now,
+            UserAllCircuitAccess.valid_until > now,
         )
     )
     if all_grant.scalar_one_or_none() is None:
         return False
 
     cflags = await db.execute(
-        select(_C.for_sale, _C.is_beta).where(_C.id == circuit_id)
+        select(Circuit.for_sale, Circuit.is_beta).where(Circuit.id == circuit_id)
     )
     row = cflags.first()
     if row is None:
@@ -837,25 +834,21 @@ async def user_has_any_active_circuit_access(db, user_id: int) -> bool:
     True iff any currently-valid UserCircuitAccess OR UserAllCircuitAccess
     row exists for the user. Naive SQLite datetimes treated as UTC.
     """
-    from app.models.schemas import (
-        UserCircuitAccess as _UCA,
-        UserAllCircuitAccess as _UACA,
-    )
     now = datetime.now(timezone.utc)
     direct = await db.execute(
-        select(_UCA.id).where(
-            _UCA.user_id == user_id,
-            _UCA.valid_from <= now,
-            _UCA.valid_until > now,
+        select(UserCircuitAccess.id).where(
+            UserCircuitAccess.user_id == user_id,
+            UserCircuitAccess.valid_from <= now,
+            UserCircuitAccess.valid_until > now,
         )
     )
     if direct.scalar_one_or_none() is not None:
         return True
     allg = await db.execute(
-        select(_UACA.id).where(
-            _UACA.user_id == user_id,
-            _UACA.valid_from <= now,
-            _UACA.valid_until > now,
+        select(UserAllCircuitAccess.id).where(
+            UserAllCircuitAccess.user_id == user_id,
+            UserAllCircuitAccess.valid_from <= now,
+            UserAllCircuitAccess.valid_until > now,
         )
     )
     return allg.scalar_one_or_none() is not None
