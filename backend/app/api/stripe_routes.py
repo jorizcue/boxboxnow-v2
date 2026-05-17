@@ -223,12 +223,25 @@ async def list_circuits_for_checkout(
     if has_all:
         return []
 
-    result = await db.execute(select(Circuit).where(Circuit.for_sale == True).order_by(Circuit.name))
-    return [
-        {"id": c.id, "name": c.name, "is_beta": c.is_beta}
-        for c in result.scalars().all()
-        if c.id not in active_circuit_ids
-    ]
+    result = await db.execute(
+        select(Circuit)
+        .where((Circuit.for_sale == True) | (Circuit.is_beta == True))  # noqa: E712
+        .order_by(Circuit.name)
+    )
+    out = []
+    for c in result.scalars().all():
+        # Owned-exclusion only applies to purchasable (for_sale) circuits.
+        # "En estudio" rows (is_beta & ¬for_sale) are informational and
+        # always shown; a not-for-sale circuit isn't purchasable so an
+        # active per-circuit grant on it must not hide it from the
+        # informational list.
+        if c.for_sale and c.id in active_circuit_ids:
+            continue
+        out.append({
+            "id": c.id, "name": c.name,
+            "is_beta": c.is_beta, "for_sale": c.for_sale,
+        })
+    return out
 
 
 @router.post("/create-checkout-session")
