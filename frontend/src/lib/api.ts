@@ -629,7 +629,7 @@ export const api = {
   // password-reset helpers: unauthenticated, raw fetch, backend surfaces
   // its Spanish `detail` on non-2xx (e.g. "Enlace inválido o expirado").
   verifyEmail: (token: string) =>
-    fetchRaw<{ ok: boolean; alreadyVerified?: boolean }>("/api/auth/verify-email", {
+    fetchRaw<{ ok: boolean; alreadyVerified?: boolean; access_token?: string; session_token?: string; user?: any }>("/api/auth/verify-email", {
       method: "POST",
       body: JSON.stringify({ token }),
     }),

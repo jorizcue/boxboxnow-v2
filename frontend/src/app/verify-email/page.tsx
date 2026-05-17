@@ -2,9 +2,11 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useT } from "@/lib/i18n";
+import { useAuth } from "@/hooks/useAuth";
 
 type Status = "loading" | "success" | "already" | "error";
 
@@ -16,6 +18,8 @@ function VerifyEmailForm() {
   const [resendEmail, setResendEmail] = useState("");
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
+  const { setAuth } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     if (!token) {
@@ -27,6 +31,13 @@ function VerifyEmailForm() {
       try {
         const res = await api.verifyEmail(token);
         if (cancelled) return;
+        if (res.access_token) {
+          // Fresh verify with auto-login payload — log the user straight in.
+          setAuth(res.access_token, res.session_token ?? "", res.user);
+          router.push("/dashboard");
+          // Keep loading state until redirect takes over.
+          return;
+        }
         setStatus(res.alreadyVerified ? "already" : "success");
       } catch {
         // Backend returns 400 "Enlace inválido o expirado" for a bad or
