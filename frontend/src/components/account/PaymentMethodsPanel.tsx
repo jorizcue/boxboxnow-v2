@@ -163,8 +163,12 @@ export function PaymentMethodsPanel() {
     try {
       await api.deletePaymentMethod(pm.id);
       await loadMethods();
-    } catch {
-      alert(t("payment.errorDelete"));
+    } catch (err: any) {
+      if (typeof err?.message === "string" && err.message.includes("payment_method_required")) {
+        alert(t("payment.cannotDeleteLast"));
+      } else {
+        alert(t("payment.errorDelete"));
+      }
     } finally {
       setActionLoading(null);
     }
@@ -239,6 +243,11 @@ export function PaymentMethodsPanel() {
               </div>
             </div>
           ))}
+          {methods.length === 1 && (
+            <p className="text-neutral-500 text-xs mt-2">
+              {t("payment.lastMethodNote")}
+            </p>
+          )}
         </div>
       )}
 
