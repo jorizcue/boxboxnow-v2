@@ -178,7 +178,7 @@ const buildRows = (t: T): Row[] => {
       ind_m: text("1"),
       ind_a: text(t("landing.compare.cell.todos")),
       end_b: text("1"),
-      end_pro_m: text("3"),
+      end_pro_m: text(t("landing.compare.cell.todos")),
       end_pro_a: text(t("landing.compare.cell.todos")),
     },
   },
@@ -206,7 +206,7 @@ const buildRows = (t: T): Row[] => {
   { section: t("landing.compare.section.funcionalidades") },
   {
     label: t("landing.compare.row.vistaPiloto"),
-    values: { ind_m: YES, ind_a: YES, end_b: YES, end_pro_m: YES, end_pro_a: YES },
+    values: { ind_m: SOON, ind_a: SOON, end_b: SOON, end_pro_m: SOON, end_pro_a: SOON },
   },
   {
     label: t("landing.compare.row.configCarrera"),

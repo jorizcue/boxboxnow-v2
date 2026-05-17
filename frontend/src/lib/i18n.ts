@@ -978,7 +978,7 @@ const translations: Record<string, Record<Language, string>> = {
   "landing.compare.row.circuitosIncluidos": { es: "Circuitos incluidos", en: "Circuits included", it: "Circuiti inclusi", de: "Inkludierte Strecken", fr: "Circuits inclus" },
   "landing.compare.row.appMovil": { es: "App móvil", en: "Mobile app", it: "App mobile", de: "Mobile-App", fr: "App mobile" },
   "landing.compare.row.accesoWeb": { es: "Acceso web", en: "Web access", it: "Accesso web", de: "Web-Zugang", fr: "Accès web" },
-  "landing.compare.row.vistaPiloto": { es: "Vista piloto", en: "Driver view", it: "Vista pilota", de: "Fahreransicht", fr: "Vue pilote" },
+  "landing.compare.row.vistaPiloto": { es: "Vista Piloto App", en: "Driver View App", it: "Vista pilota App", de: "Fahreransicht App", fr: "Vue pilote App" },
   "landing.compare.row.configCarrera": { es: "Configuración de carrera", en: "Race configuration", it: "Configurazione gara", de: "Rennkonfiguration", fr: "Configuration de course" },
   "landing.compare.row.moduloCarrera": { es: "Módulo carrera", en: "Race module", it: "Modulo gara", de: "Rennmodul", fr: "Module course" },
   "landing.compare.row.moduloBox": { es: "Módulo box", en: "Pit module", it: "Modulo box", de: "Boxenmodul", fr: "Module stand" },
