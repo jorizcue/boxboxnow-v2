@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 import { useTracker } from "@/hooks/useTracker";
-import { useT } from "@/lib/i18n";
+import { useT, useLangStore } from "@/lib/i18n";
 
 interface PlanData {
   plan_type: string;
@@ -234,10 +234,11 @@ export function PricingToggle() {
   const { trackFunnel } = useTracker();
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const t = useT();
+  const lang = useLangStore((s) => s.lang);
 
   useEffect(() => {
     Promise.all([
-      api.getPlans().catch(() => null),
+      api.getPlans(lang).catch(() => null),
       api.getTrialConfig().catch(() => ({ trial_enabled: false, trial_days: 0 })),
     ]).then(([plansData, trialConfig]) => {
       if (plansData && plansData.length > 0) {
@@ -248,7 +249,7 @@ export function PricingToggle() {
       setTrialDays(trialConfig.trial_days ?? 0);
       setLoading(false);
     });
-  }, []);
+  }, [lang]);
 
   // Funnel: pricing.view fires once when the section actually becomes
   // visible in the viewport. Using IntersectionObserver instead of "on

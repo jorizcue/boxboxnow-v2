@@ -533,7 +533,7 @@ export const api = {
     fetchApi<any[]>("/api/admin/stripe-products"),
 
   // Public plans (no auth)
-  getPlans: () =>
+  getPlans: (lang?: string) =>
     fetchRaw<{
       plan_type: string;
       display_name: string;
@@ -546,7 +546,7 @@ export const api = {
       sort_order: number;
       per_circuit: boolean;
       circuits_to_select: number;
-    }[]>("/api/plans"),
+    }[]>(`/api/plans${lang ? "?lang=" + encodeURIComponent(lang) : ""}`),
 
   // Trial config (public)
   getTrialConfig: () =>
