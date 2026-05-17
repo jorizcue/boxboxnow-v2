@@ -216,7 +216,7 @@ async def send_subscription_confirmation_email(
 
 
 async def send_verification_email(to_email: str, username: str, token: str):
-    """Send email-verification link so the user can activate their account and start the trial."""
+    """Send email-verification link so the user can activate their account."""
     settings = get_settings()
     if not settings.resend_api_key:
         logger.warning("Resend API key not configured, skipping verification email")
@@ -238,8 +238,8 @@ async def send_verification_email(to_email: str, username: str, token: str):
                 </div>
                 <h2 style="color: #fff; font-size: 22px; margin-bottom: 10px;">Verifica tu cuenta</h2>
                 <p style="color: #e5e5e5; font-size: 15px; line-height: 1.6;">
-                    Hola {username}, para completar tu registro y comenzar tu prueba gratuita
-                    necesitas verificar tu dirección de correo electrónico.
+                    Hola {username}, para completar tu registro necesitas verificar
+                    tu dirección de correo electrónico.
                     Haz clic en el botón para verificar tu cuenta.
                 </p>
                 <div style="text-align: center; margin: 30px 0;">
