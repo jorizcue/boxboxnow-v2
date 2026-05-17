@@ -1294,8 +1294,16 @@ async def set_default_payment_method(
 async def delete_payment_method(
     pm_id: str,
     user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Detach a payment method from the customer."""
+    """Detach a payment method from the customer.
+
+    Guard (payment-critical): if this is the customer's last card AND a
+    renewing Stripe recurring subscription exists, refuse with 409 so the
+    next renewal isn't left without a payment method. On the allowed path,
+    if the card being removed is the invoice default and others remain,
+    promote remaining[0] to default BEFORE detaching.
+    """
     s = get_stripe()
     if not user.stripe_customer_id:
         raise HTTPException(400, "No Stripe customer found")
@@ -1304,6 +1312,39 @@ async def delete_payment_method(
     pm = s.PaymentMethod.retrieve(pm_id)
     if pm.customer != user.stripe_customer_id:
         raise HTTPException(403, "Payment method does not belong to this customer")
+
+    methods = s.PaymentMethod.list(customer=user.stripe_customer_id, type="card")
+    remaining = [m for m in methods.data if m.id != pm_id]
+
+    if len(remaining) == 0:
+        # Last card. Block if a renewing Stripe recurring subscription exists.
+        result = await db.execute(
+            select(Subscription).where(
+                Subscription.user_id == user.id,
+                Subscription.stripe_subscription_id.isnot(None),
+                Subscription.status.in_(["active", "trialing", "past_due"]),
+            )
+        )
+        # cancel_at_period_end NULL/False ⇒ will renew; True ⇒ won't.
+        # Filter in Python to avoid NULL-vs-False SQL ambiguity on legacy rows.
+        will_renew = any(
+            not bool(row.cancel_at_period_end)
+            for row in result.scalars().all()
+        )
+        if will_renew:
+            raise HTTPException(status_code=409, detail="payment_method_required")
+    else:
+        # Allowed to proceed — preserve a usable invoice default.
+        customer = s.Customer.retrieve(user.stripe_customer_id)
+        if (
+            customer.invoice_settings
+            and customer.invoice_settings.default_payment_method == pm_id
+            and remaining
+        ):
+            s.Customer.modify(
+                user.stripe_customer_id,
+                invoice_settings={"default_payment_method": remaining[0].id},
+            )
 
     s.PaymentMethod.detach(pm_id)
     return {"ok": True}
