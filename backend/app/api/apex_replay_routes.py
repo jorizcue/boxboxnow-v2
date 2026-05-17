@@ -15,7 +15,7 @@ from sqlalchemy import select
 from app.apex.replay import parse_log_file
 from app.api.auth_routes import decode_token
 from app.models.database import async_session
-from app.models.schemas import DeviceSession, Subscription, User, UserCircuitAccess
+from app.models.schemas import DeviceSession, Subscription, User
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/apex-replay", tags=["apex-replay"])

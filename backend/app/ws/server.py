@@ -16,7 +16,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy import select
 from app.api.auth_routes import decode_token
 from app.models.database import async_session
-from app.models.schemas import DeviceSession, ProductTabConfig, Subscription, User, UserCircuitAccess
+from app.models.schemas import DeviceSession, ProductTabConfig, Subscription, User
 
 logger = logging.getLogger(__name__)
 
