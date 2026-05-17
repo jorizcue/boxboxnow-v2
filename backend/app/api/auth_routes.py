@@ -1040,7 +1040,9 @@ async def login(
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(data.password, user.password_hash):
-        # Record the failure against the IP so repeated typos throttle.
+        # Record the failure against both the IP and the account so
+        # repeated failures throttle from either angle (per-IP: same
+        # client; per-account: distributed brute force across rotating IPs).
         login_limiter.record_failure(ip)
         login_limiter.record_failure(acct_key)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")

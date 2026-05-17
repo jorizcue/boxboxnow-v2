@@ -177,3 +177,39 @@ def test_account_bucket_reset_clears_it():
     lim.reset(key)
     # check() must not raise after reset
     lim.check(key)
+
+
+async def test_successful_login_clears_account_bucket(db_and_client):
+    Session, client = db_and_client
+    async with Session() as s:
+        s.add(User(username="carol", email="carol@example.com",
+                    password_hash=hash_password("right-pw"), is_admin=False,
+                    email_verified=True))
+        await s.commit()
+
+    # 9 bad attempts (under the 10 threshold) for carol's account.
+    for i in range(9):
+        r = await client.post(
+            "/api/auth/login",
+            json={"username": "carol", "password": "wrong"},
+            headers={"X-Forwarded-For": f"6.6.6.{i}"},
+        )
+        assert r.status_code == 401, (i, r.status_code, r.text)
+
+    # A successful login must clear BOTH the IP and the account bucket.
+    ok = await client.post(
+        "/api/auth/login",
+        json={"username": "carol", "password": "right-pw"},
+        headers={"X-Forwarded-For": "6.6.6.99"},
+    )
+    assert ok.status_code == 200, ok.text
+
+    # The account bucket is cleared: 10 fresh bad attempts from 10 new IPs
+    # must be needed again before the 11th is blocked (i.e. attempt #1
+    # right after success is NOT immediately 429).
+    r = await client.post(
+        "/api/auth/login",
+        json={"username": "carol", "password": "wrong"},
+        headers={"X-Forwarded-For": "6.6.6.150"},
+    )
+    assert r.status_code == 401, r.text
