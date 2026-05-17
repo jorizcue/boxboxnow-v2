@@ -239,34 +239,6 @@ async def init_db():
             "UPDATE users SET email_verified = 1 WHERE email_verified = 0 OR email_verified IS NULL"
         ))
 
-        # Seed default tab access for all users (basic tabs)
-        # This ensures existing users get access to all standard tabs
-        basic_tabs = ["race", "pit", "live", "adjusted", "driver", "config", "replay", "analytics"]
-        for tab in basic_tabs:
-            await conn.execute(text("""
-                INSERT OR IGNORE INTO user_tab_access (user_id, tab)
-                SELECT id, :tab FROM users WHERE id NOT IN (
-                    SELECT user_id FROM user_tab_access WHERE tab = :tab
-                )
-            """), {"tab": tab})
-
-        # Migrate granular tab permissions: users with parent tab get new sub-tabs
-        # driver → driver-config, analytics → insights
-        # (adjusted-beta retired — folded into adjusted with the time-domain
-        # algorithm, no longer a separate tab.)
-        tab_migrations = [
-            ("driver", "driver-config"),
-            ("analytics", "insights"),
-        ]
-        for parent_tab, new_tab in tab_migrations:
-            await conn.execute(text("""
-                INSERT OR IGNORE INTO user_tab_access (user_id, tab)
-                SELECT user_id, :new_tab FROM user_tab_access
-                WHERE tab = :parent_tab AND user_id NOT IN (
-                    SELECT user_id FROM user_tab_access WHERE tab = :new_tab
-                )
-            """), {"parent_tab": parent_tab, "new_tab": new_tab})
-
         # Migrate product_tab_config: add stripe_price_id, price_amount, billing_interval columns
         try:
             await conn.execute(text("ALTER TABLE product_tab_config ADD COLUMN stripe_price_id VARCHAR(255)"))
