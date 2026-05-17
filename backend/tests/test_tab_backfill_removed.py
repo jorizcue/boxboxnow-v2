@@ -10,7 +10,6 @@ from __future__ import annotations
 import sys
 import types
 
-import pytest
 import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -48,7 +47,6 @@ async def test_engine(monkeypatch):
     await engine.dispose()
 
 
-@pytest.mark.asyncio
 async def test_init_db_does_not_readd_tabs_excluded_by_paid_plan(test_engine):
     Session = async_sessionmaker(test_engine, expire_on_commit=False)
 
@@ -82,3 +80,40 @@ async def test_init_db_does_not_readd_tabs_excluded_by_paid_plan(test_engine):
     )
     for leaked in ("adjusted", "replay", "insights"):
         assert leaked not in tabs, f"{leaked!r} was re-added by the init_db backfill"
+
+
+async def test_init_db_does_not_lock_out_or_overgrant_legacy_user(test_engine):
+    """No-lockout guard: a user with a minimal curated tab set keeps
+    exactly that set after init_db() — nothing added, nothing removed.
+    Pre-fix, the basic_tabs backfill would have added race/pit/live's
+    siblings (adjusted, driver, config, replay, analytics) on top."""
+    minimal_tabs = ["race", "pit", "live"]
+    Session = async_sessionmaker(test_engine, expire_on_commit=False)
+
+    async with Session() as s:
+        user = User(
+            username="legacyfree",
+            email="legacy@example.com",
+            password_hash="x",
+            is_admin=False,
+            email_verified=True,
+        )
+        s.add(user)
+        await s.flush()
+        uid = user.id
+        for tab in minimal_tabs:
+            s.add(UserTabAccess(user_id=uid, tab=tab))
+        await s.commit()
+
+    await init_db()
+
+    async with Session() as s:
+        rows = await s.execute(
+            select(UserTabAccess.tab).where(UserTabAccess.user_id == uid)
+        )
+        tabs = sorted(t[0] for t in rows.all())
+
+    assert tabs == sorted(minimal_tabs), (
+        f"init_db() mutated a minimal-set user's tabs.\n"
+        f"expected={sorted(minimal_tabs)}\nactual={tabs}"
+    )
