@@ -83,3 +83,42 @@ async def test_cancel_per_circuit_unaffected_for_all_grant(db):
         vu = vu.replace(tzinfo=timezone.utc)
     assert vu <= datetime.now(timezone.utc) + timedelta(seconds=5)
     assert (await db.execute(select(UserAllCircuitAccess))).scalars().all() == []
+
+
+async def test_cancel_one_sub_does_not_revoke_other_all_grant(db):
+    """User with TWO active all-circuit subs: cancelling one must NOT
+    expire the other's all-grant (keyed by stripe_subscription_id)."""
+    now = datetime.now(timezone.utc)
+    u = User(username="two", password_hash="x", is_admin=False)
+    db.add(u); await db.flush()
+    db.add(Subscription(
+        user_id=u.id, stripe_subscription_id="sub_X", plan_type="endurance",
+        status="active", circuit_id=None,
+        current_period_start=now, current_period_end=now + timedelta(days=30),
+    ))
+    db.add(Subscription(
+        user_id=u.id, stripe_subscription_id="sub_Z", plan_type="endurance",
+        status="active", circuit_id=None,
+        current_period_start=now, current_period_end=now + timedelta(days=30),
+    ))
+    db.add(UserAllCircuitAccess(
+        user_id=u.id, stripe_subscription_id="sub_X",
+        valid_from=now - timedelta(days=1), valid_until=now + timedelta(days=30),
+    ))
+    db.add(UserAllCircuitAccess(
+        user_id=u.id, stripe_subscription_id="sub_Z",
+        valid_from=now - timedelta(days=1), valid_until=now + timedelta(days=30),
+    ))
+    await db.commit()
+
+    await _handle_subscription_deleted({"id": "sub_X", "metadata": {}}, db)
+
+    rows = {r.stripe_subscription_id: r for r in (await db.execute(
+        select(UserAllCircuitAccess).where(
+            UserAllCircuitAccess.user_id == u.id))).scalars().all()}
+    vx = rows["sub_X"].valid_until
+    vz = rows["sub_Z"].valid_until
+    if vx.tzinfo is None: vx = vx.replace(tzinfo=timezone.utc)
+    if vz.tzinfo is None: vz = vz.replace(tzinfo=timezone.utc)
+    assert vx <= datetime.now(timezone.utc) + timedelta(seconds=5)   # cancelled → expired
+    assert vz > datetime.now(timezone.utc) + timedelta(days=20)      # other → untouched

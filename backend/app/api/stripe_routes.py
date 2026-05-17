@@ -1013,8 +1013,8 @@ async def _handle_subscription_deleted(sub_data: dict, db: AsyncSession):
         if not revoked_circuit_ids and sub.circuit_id:
             revoked_circuit_ids = [sub.circuit_id]
 
+        now = datetime.now(timezone.utc)
         if revoked_circuit_ids:
-            now = datetime.now(timezone.utc)
             access_rows = await db.execute(
                 select(UserCircuitAccess).where(
                     UserCircuitAccess.user_id == sub.user_id,
@@ -1027,7 +1027,6 @@ async def _handle_subscription_deleted(sub_data: dict, db: AsyncSession):
         # Cross-circuit (all-circuits) subscriptions have no per-circuit
         # rows / metadata circuit_ids, so the block above revokes nothing.
         # Expire the all-grant tied to this Stripe sub instead.
-        now2 = datetime.now(timezone.utc)
         all_rows = await db.execute(
             select(UserAllCircuitAccess).where(
                 UserAllCircuitAccess.user_id == sub.user_id,
@@ -1035,7 +1034,7 @@ async def _handle_subscription_deleted(sub_data: dict, db: AsyncSession):
             )
         )
         for grant in all_rows.scalars().all():
-            grant.valid_until = now2
+            grant.valid_until = now
 
         await db.commit()
         logger.info(
