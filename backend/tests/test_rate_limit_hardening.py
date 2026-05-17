@@ -111,3 +111,69 @@ def test_extract_device_info_still_returns_first_xff_ip():
     req.headers["user-agent"] = "Mozilla/5.0"
     _device, ip = auth_routes._extract_device_info(req)
     assert ip == "8.8.8.8"
+
+
+# ---- Task 2: per-account login throttle ---------------------------------
+
+async def test_login_blocked_by_account_bucket_across_changing_ips(db_and_client):
+    Session, client = db_and_client
+    async with Session() as s:
+        s.add(User(username="victim", email="victim@example.com",
+                    password_hash=hash_password("correct horse"),
+                    is_admin=False, email_verified=True))
+        await s.commit()
+
+    # 10 failed logins for the same account, each from a DIFFERENT client
+    # IP (so the per-IP bucket never trips) — the account bucket should.
+    for i in range(10):
+        r = await client.post(
+            "/api/auth/login",
+            json={"username": "victim", "password": "wrong"},
+            headers={"X-Forwarded-For": f"9.9.9.{i}"},
+        )
+        assert r.status_code == 401, (i, r.status_code, r.text)
+
+    # 11th attempt, yet another fresh IP → blocked by the ACCOUNT bucket.
+    r = await client.post(
+        "/api/auth/login",
+        json={"username": "victim", "password": "wrong"},
+        headers={"X-Forwarded-For": "9.9.9.250"},
+    )
+    assert r.status_code == 429, r.text
+
+
+async def test_login_other_account_not_affected(db_and_client):
+    Session, client = db_and_client
+    async with Session() as s:
+        s.add(User(username="alice", email="a@example.com",
+                    password_hash=hash_password("pw"), is_admin=False,
+                    email_verified=True))
+        s.add(User(username="bob", email="b@example.com",
+                    password_hash=hash_password("pw"), is_admin=False,
+                    email_verified=True))
+        await s.commit()
+
+    for i in range(10):
+        await client.post(
+            "/api/auth/login",
+            json={"username": "alice", "password": "wrong"},
+            headers={"X-Forwarded-For": f"7.7.7.{i}"},
+        )
+    # alice's account bucket is full; bob (fresh IP) must still be allowed
+    # to attempt (gets 401 for wrong pw, NOT 429).
+    r = await client.post(
+        "/api/auth/login",
+        json={"username": "bob", "password": "wrong"},
+        headers={"X-Forwarded-For": "7.7.7.200"},
+    )
+    assert r.status_code == 401, r.text
+
+
+def test_account_bucket_reset_clears_it():
+    lim = auth_routes.login_limiter
+    key = "acct:victim@example.com"
+    for _ in range(lim.max_attempts):
+        lim.record_failure(key)
+    lim.reset(key)
+    # check() must not raise after reset
+    lim.check(key)

@@ -1027,6 +1027,8 @@ async def login(
 
     # Validate credentials — accept username OR email
     identifier = data.username.strip()
+    acct_key = f"acct:{identifier.lower()}"
+    login_limiter.check(acct_key)
     if "@" in identifier:
         result = await db.execute(
             select(User).where(User.email == identifier.lower()).options(selectinload(User.tab_access), selectinload(User.subscriptions))
@@ -1040,6 +1042,7 @@ async def login(
     if not user or not verify_password(data.password, user.password_hash):
         # Record the failure against the IP so repeated typos throttle.
         login_limiter.record_failure(ip)
+        login_limiter.record_failure(acct_key)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
 
     # MFA check
@@ -1055,12 +1058,14 @@ async def login(
         if not totp.verify(data.mfa_code, valid_window=1):
             # A wrong MFA code is also a credential-class failure.
             login_limiter.record_failure(ip)
+            login_limiter.record_failure(acct_key)
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid MFA code")
 
     # Credentials (and MFA if applicable) valid → clear any previous
     # failure streak for this IP so a future typo doesn't start already
     # halfway into the throttle window.
     login_limiter.reset(ip)
+    login_limiter.reset(acct_key)
     # Note: if mfa_required but not mfa_enabled, we let login succeed.
     # The frontend will show a mandatory MFA setup screen based on
     # user.mfa_required && !user.mfa_enabled in the response.
