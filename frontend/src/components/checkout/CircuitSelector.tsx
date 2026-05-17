@@ -215,6 +215,7 @@ function EventDatePicker({
 export function CircuitSelector({
   plan,
   circuitsToSelect = 1,
+  informational = false,
   onSelect,
   onCancel,
 }: {
@@ -223,6 +224,10 @@ export function CircuitSelector({
    *  (legacy default). >1 = checkbox grid; the "Continuar" button stays
    *  disabled until exactly `circuitsToSelect` items are ticked. */
   circuitsToSelect?: number;
+  /** When true, renders the circuit list read-only ("incluidos en tu plan")
+   *  and "Continuar" is always enabled → calls onSelect([]). For non-per-circuit
+   *  plans where the backend grants all circuits automatically. */
+  informational?: boolean;
   onSelect: (circuitIds: number[], eventDates?: string[]) => void;
   onCancel: () => void;
 }) {
@@ -264,6 +269,12 @@ export function CircuitSelector({
   };
 
   const handleContinue = () => {
+    if (informational) {
+      setSubmitting(true);
+      onSelect([]);
+      return;
+    }
+
     if (selectedIds.length === 0) return;
     if (isMulti && selectedIds.length !== requiredCount) return;
 
@@ -280,9 +291,11 @@ export function CircuitSelector({
     }
   };
 
-  const canContinue = step === "circuit"
-    ? (isMulti ? selectedIds.length === requiredCount : selectedIds.length >= 1)
-    : eventDates.length >= 1;
+  const canContinue = informational
+    ? true
+    : step === "circuit"
+      ? (isMulti ? selectedIds.length === requiredCount : selectedIds.length >= 1)
+      : eventDates.length >= 1;
 
   // In multi-pick mode the "selected circuit name" line in the dates step
   // doesn't make sense — fall back to "N circuitos seleccionados".
@@ -301,7 +314,11 @@ export function CircuitSelector({
             <span className="text-4xl font-bold text-accent">N</span>
           </div>
           <h1 className="text-xl font-bold text-white mt-2">
-            {step === "circuit" ? "Selecciona tu circuito" : "Selecciona los días del evento"}
+            {informational
+              ? "Circuitos incluidos en tu plan"
+              : step === "circuit"
+                ? "Selecciona tu circuito"
+                : "Selecciona los días del evento"}
           </h1>
           <p className="text-neutral-400 text-sm mt-2">
             Plan: <span className="text-accent font-medium">{PLAN_LABELS[plan] || plan}</span>
@@ -317,7 +334,7 @@ export function CircuitSelector({
         <div className="bg-surface rounded-2xl p-5 sm:p-8 border border-border">
           {step === "circuit" && (
             <>
-              {isMulti && (
+              {!informational && isMulti && (
                 <div className="mb-4 text-center">
                   <p className="text-sm text-neutral-300">
                     Selecciona{" "}
@@ -330,6 +347,11 @@ export function CircuitSelector({
                   </p>
                 </div>
               )}
+              {informational && (
+                <p className="text-sm text-neutral-400 mb-4 text-center">
+                  Estos son los circuitos incluidos en tu plan
+                </p>
+              )}
               {loading ? (
                 <div className="flex justify-center py-8">
                   <span className="text-neutral-400 animate-pulse">Cargando circuitos...</span>
@@ -338,12 +360,40 @@ export function CircuitSelector({
                 <div className="text-center py-8">
                   <p className="text-neutral-400">No hay circuitos disponibles</p>
                 </div>
-              ) : isMulti && circuits.length < requiredCount ? (
+              ) : !informational && isMulti && circuits.length < requiredCount ? (
                 <div className="text-center py-8">
                   <p className="text-neutral-400">
                     Solo hay {circuits.length} circuito{circuits.length !== 1 ? "s" : ""}{" "}
                     disponibles, este plan requiere {requiredCount}.
                   </p>
+                </div>
+              ) : informational ? (
+                <div className="space-y-2">
+                  {circuits.map((circuit) => (
+                    <div
+                      key={circuit.id}
+                      className="w-full px-4 py-3 rounded-lg border border-border bg-black text-neutral-300"
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* Subtle "incluido" check */}
+                        <svg
+                          className="w-4 h-4 text-neutral-500 flex-shrink-0"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span className="font-medium">{circuit.name}</span>
+                        {circuit.is_beta && (
+                          <span className="text-[10px] uppercase rounded px-1.5 py-0.5 bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                            Provisional
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -403,7 +453,7 @@ export function CircuitSelector({
                           <span className="font-medium">{circuit.name}</span>
                           {circuit.is_beta && (
                             <span className="text-[10px] uppercase rounded px-1.5 py-0.5 bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                              Sin verificar
+                              Provisional
                             </span>
                           )}
                         </div>
@@ -445,6 +495,24 @@ export function CircuitSelector({
             >
               {step === "dates" ? "Volver" : "Cancelar"}
             </button>
+          </div>
+
+          {/* Legends — shown in both selectable and informational modes */}
+          <div className="mt-5 space-y-2 border-t border-border pt-4">
+            <p className="text-[11px] text-neutral-500 leading-relaxed">
+              Los circuitos marcados como <span className="font-semibold text-neutral-400">Provisional</span> aún no se han probado en real. Si detectas algún problema, escríbenos a{" "}
+              <a href="mailto:info@kartingnow.com" className="text-neutral-400 underline hover:text-neutral-300 transition-colors">
+                info@kartingnow.com
+              </a>
+              .
+            </p>
+            <p className="text-[11px] text-neutral-500 leading-relaxed">
+              ¿No encuentras tu circuito? Escríbenos a{" "}
+              <a href="mailto:info@kartingnow.com" className="text-neutral-400 underline hover:text-neutral-300 transition-colors">
+                info@kartingnow.com
+              </a>
+              {" "}para pedir su inclusión.
+            </p>
           </div>
         </div>
       </div>

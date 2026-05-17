@@ -55,6 +55,10 @@ export default function DashboardPage() {
   const [checkoutCircuitIds, setCheckoutCircuitIds] = useState<number[] | null>(null);
   const [checkoutReady, setCheckoutReady] = useState(false);
   const [eventDates, setEventDates] = useState<string[] | undefined>(undefined);
+  // Set to true once the informational circuit window's "Continuar" is clicked
+  // for a non-per-circuit plan, so we can gate to EmbeddedCheckout even when
+  // checkoutCircuitIds is [] (empty selection = grant all on backend).
+  const [circuitStepDone, setCircuitStepDone] = useState(false);
   const router = useRouter();
 
   const { maintenance, loading: siteLoading } = useSiteStatus();
@@ -168,6 +172,7 @@ export default function DashboardPage() {
   const handleCircuitSelected = (circuitIds: number[], dates?: string[]) => {
     setCheckoutCircuitIds(circuitIds);
     setEventDates(dates);
+    setCircuitStepDone(true);
     trackFunnel("checkout.circuit_selected", {
       circuit_count: circuitIds.length,
       circuit_ids: circuitIds,
@@ -176,17 +181,21 @@ export default function DashboardPage() {
   };
 
   // Funnel stages: fire when the user first lands on each checkout
-  // surface. CircuitSelector shows for per-circuit plans; the
-  // EmbeddedCheckout shows once the plan info is ready. Both gates by
+  // surface. CircuitSelector shows for per-circuit plans (selectable) and
+  // for non-per-circuit plans (informational, before circuitStepDone). The
+  // EmbeddedCheckout shows once the circuit step is done. Both gates by
   // `checkoutReady` so we don't fire while we're still resolving the
   // pending plan's metadata.
   const showCircuitSelector =
-    !!pendingPlan && checkoutReady && pendingPlanPerCircuit &&
-    !(checkoutCircuitIds && checkoutCircuitIds.length > 0);
+    !!pendingPlan && checkoutReady &&
+    (pendingPlanPerCircuit
+      ? !(checkoutCircuitIds && checkoutCircuitIds.length > 0)
+      : !circuitStepDone);
   const showEmbeddedCheckout =
     !!pendingPlan && checkoutReady &&
-    (!pendingPlanPerCircuit ||
-      (checkoutCircuitIds !== null && checkoutCircuitIds.length > 0));
+    (!pendingPlanPerCircuit
+      ? circuitStepDone
+      : (checkoutCircuitIds !== null && checkoutCircuitIds.length > 0));
   useEffect(() => {
     if (showCircuitSelector) {
       trackFunnel("checkout.circuit_view", { plan: pendingPlan });
@@ -233,14 +242,26 @@ export default function DashboardPage() {
 
   // Checkout flow: circuit selection → embedded payment
   if (pendingPlan && checkoutReady) {
-    // Cross-circuit plans skip the circuit selector entirely.
+    // Non-per-circuit plans: show informational window first, then proceed.
     if (!pendingPlanPerCircuit) {
+      if (circuitStepDone) {
+        // User confirmed the informational window → go straight to checkout
+        // with an empty circuitIds list (backend grants all circuits).
+        return (
+          <EmbeddedCheckout
+            plan={pendingPlan}
+            circuitIds={[]}
+            eventDates={eventDates}
+            onCancel={() => { setCheckoutCircuitIds(null); setCircuitStepDone(false); setPendingPlan(null); setEventDates(undefined); }}
+          />
+        );
+      }
       return (
-        <EmbeddedCheckout
+        <CircuitSelector
           plan={pendingPlan}
-          circuitIds={[]}
-          eventDates={eventDates}
-          onCancel={() => { setCheckoutCircuitIds(null); setPendingPlan(null); setEventDates(undefined); }}
+          informational
+          onSelect={handleCircuitSelected}
+          onCancel={() => { setCircuitStepDone(false); setPendingPlan(null); }}
         />
       );
     }
@@ -250,7 +271,7 @@ export default function DashboardPage() {
           plan={pendingPlan}
           circuitIds={checkoutCircuitIds}
           eventDates={eventDates}
-          onCancel={() => { setCheckoutCircuitIds(null); setPendingPlan(null); setEventDates(undefined); }}
+          onCancel={() => { setCheckoutCircuitIds(null); setCircuitStepDone(false); setPendingPlan(null); setEventDates(undefined); }}
         />
       );
     }
