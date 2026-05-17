@@ -79,3 +79,34 @@ async def test_all_grant_returns_empty_preserved(db):
                                 valid_until=now + timedelta(days=30)))
     await db.commit()
     assert await list_circuits_for_checkout(user=u, db=db) == []
+
+
+async def test_owned_for_sale_beta_circuit_is_excluded(db):
+    """An owned for_sale&is_beta ("En pruebas") circuit must be excluded
+    too — owned-exclusion keys on for_sale, NOT on for_sale&¬beta."""
+    now = datetime.now(timezone.utc)
+    u = User(username="ob", password_hash="x", is_admin=False)
+    c_beta_owned = Circuit(name="AAA", ws_port=9131, for_sale=True, is_beta=True)
+    c_beta_free = Circuit(name="BBB", ws_port=9132, for_sale=True, is_beta=True)
+    db.add_all([u, c_beta_owned, c_beta_free]); await db.flush()
+    db.add(UserCircuitAccess(user_id=u.id, circuit_id=c_beta_owned.id,
+                             valid_from=now - timedelta(hours=1),
+                             valid_until=now + timedelta(days=10)))
+    await db.commit()
+
+    out = await list_circuits_for_checkout(user=u, db=db)
+    names = {r["name"] for r in out}
+    assert "AAA" not in names   # owned for_sale&beta → excluded
+    assert "BBB" in names       # unowned for_sale&beta → present
+
+
+async def test_response_dict_shape(db):
+    """Every returned item has exactly {id,name,is_beta,for_sale}."""
+    u = User(username="sh", password_hash="x", is_admin=False)
+    c_av = Circuit(name="AAA", ws_port=9141, for_sale=True, is_beta=False)
+    c_study = Circuit(name="CCC", ws_port=9142, for_sale=False, is_beta=True)
+    db.add_all([u, c_av, c_study]); await db.commit()
+    out = await list_circuits_for_checkout(user=u, db=db)
+    assert out, "expected non-empty result"
+    for r in out:
+        assert set(r.keys()) == {"id", "name", "is_beta", "for_sale"}
