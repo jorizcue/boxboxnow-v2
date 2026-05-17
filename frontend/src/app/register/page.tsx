@@ -27,7 +27,7 @@ export default function RegisterPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const { token, user, _hydrated } = useAuth();
-  const { maintenance, loading: siteLoading } = useSiteStatus();
+  const { maintenance, googleAuthEnabled, loading: siteLoading } = useSiteStatus();
   const router = useRouter();
   const [pendingPlan] = useState(getPlanFromUrl);
   // Post-register: the new account is UNVERIFIED and has NO trial yet.
@@ -57,9 +57,6 @@ export default function RegisterPage() {
     registerStartFiredRef.current = true;
     trackFunnel("register.start", pendingPlan ? { plan: pendingPlan } : undefined);
   };
-
-  // Google social login hidden site-wide on web. Set to true to restore.
-  const GOOGLE_AUTH_ENABLED = false;
 
   // Detect WebView/embedded browsers where Google OAuth is blocked
   const isWebView = typeof navigator !== "undefined" && (
@@ -302,8 +299,8 @@ export default function RegisterPage() {
         </div>
 
         <div className="bg-surface rounded-2xl p-5 sm:p-8 border border-border">
-          {/* Google signup — hidden site-wide (GOOGLE_AUTH_ENABLED) + in WebView */}
-          {GOOGLE_AUTH_ENABLED && !isWebView && (
+          {/* Google signup — controlled by googleAuthEnabled from site-status; hidden in WebView */}
+          {googleAuthEnabled && !isWebView && (
             <>
               <a
                 href={`/api/auth/google?mode=register${pendingPlan ? `&plan=${pendingPlan}` : ""}`}
@@ -326,7 +323,7 @@ export default function RegisterPage() {
               </div>
             </>
           )}
-          {GOOGLE_AUTH_ENABLED && isWebView && (
+          {googleAuthEnabled && isWebView && (
             <p className="mb-4 text-xs text-center text-amber-400/80 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
               Google login no disponible en este navegador. Registrate con email y contrasena.
             </p>

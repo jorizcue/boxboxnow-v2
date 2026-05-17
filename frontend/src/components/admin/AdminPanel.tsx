@@ -1917,6 +1917,24 @@ function PlatformSettingsManager() {
               )}
             </div>
 
+            {/* Google auth toggle */}
+            <div>
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={(settings.google_auth_enabled || "false") === "true"}
+                  onChange={(e) => handleChange("google_auth_enabled", e.target.checked ? "true" : "false")}
+                  className="mt-1 accent-accent w-4 h-4"
+                />
+                <div className="flex-1">
+                  <div className="text-sm text-white font-medium">Mostrar acceso con Google (web)</div>
+                  <div className="text-xs text-neutral-500 mt-0.5">
+                    Si está desactivado, el botón de Google se oculta en login/registro y la ruta OAuth web queda cerrada. No afecta a las apps móviles.
+                  </div>
+                </div>
+              </label>
+            </div>
+
             {/* Launch date */}
             <div>
               <label className="block text-xs text-neutral-400 mb-1.5 uppercase tracking-wider">

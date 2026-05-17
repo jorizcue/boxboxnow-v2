@@ -22,6 +22,7 @@ interface SiteStatusState {
   loading: boolean;
   loaded: boolean;
   maintenance: boolean;
+  googleAuthEnabled: boolean;
   launchAt: string | null;     // ISO 8601, null when site is already open
   serverNow: string | null;    // ISO 8601 from the server, used for countdown drift
   fetchedAtMs: number;         // wall clock when we received the snapshot
@@ -33,6 +34,7 @@ const useSiteStatusStore = create<SiteStatusState>((set, get) => ({
   loading: false,
   loaded: false,
   maintenance: false,
+  googleAuthEnabled: false,
   launchAt: null,
   serverNow: null,
   fetchedAtMs: 0,
@@ -46,6 +48,7 @@ const useSiteStatusStore = create<SiteStatusState>((set, get) => ({
         loading: false,
         loaded: true,
         maintenance: s.maintenance,
+        googleAuthEnabled: s.google_auth_enabled,
         launchAt: s.launch_at,
         serverNow: s.now,
         fetchedAtMs: Date.now(),
@@ -59,6 +62,7 @@ const useSiteStatusStore = create<SiteStatusState>((set, get) => ({
         loading: false,
         loaded: true,
         maintenance: false,
+        googleAuthEnabled: false,
         launchAt: null,
         serverNow: null,
         fetchedAtMs: Date.now(),
@@ -95,6 +99,7 @@ export function useSiteStatus() {
   return {
     loading: state.loading || !state.loaded,
     maintenance: state.maintenance,
+    googleAuthEnabled: state.googleAuthEnabled,
     launchAt: state.launchAt,
     serverNow: state.serverNow,
     fetchedAtMs: state.fetchedAtMs,

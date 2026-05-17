@@ -129,6 +129,7 @@ export const api = {
         launch_at: string | null;
         maintenance: boolean;
         now: string;
+        google_auth_enabled: boolean;
       }>;
     }),
 
