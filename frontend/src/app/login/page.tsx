@@ -31,6 +31,9 @@ export default function LoginPage() {
   const { token, _hydrated, setAuth } = useAuth();
   const router = useRouter();
 
+  // Google social login hidden site-wide on web. Set to true to restore.
+  const GOOGLE_AUTH_ENABLED = false;
+
   // Detect WebView/embedded browsers (Bluefy, WebBLE, etc.) where Google OAuth is blocked
   const isWebView = typeof navigator !== "undefined" && (
     /Bluefy|WebBLE/i.test(navigator.userAgent) ||
@@ -321,7 +324,7 @@ export default function LoginPage() {
             )}
           </form>
 
-          {!mfaRequired && !isWebView && (
+          {GOOGLE_AUTH_ENABLED && !mfaRequired && !isWebView && (
             <>
               {/* Divider */}
               <div className="flex items-center gap-3 my-5">
@@ -345,7 +348,7 @@ export default function LoginPage() {
               </a>
             </>
           )}
-          {!mfaRequired && isWebView && (
+          {GOOGLE_AUTH_ENABLED && !mfaRequired && isWebView && (
             <p className="mt-4 text-xs text-center text-amber-400/80 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
               Google login no disponible en este navegador. Usa tu email y contrasena.
             </p>
