@@ -9,7 +9,7 @@ from sqlalchemy import select, delete
 
 from app.config import get_settings
 from app.models.database import get_db
-from app.models.schemas import User, Subscription, UserCircuitAccess, Circuit, ProductTabConfig
+from app.models.schemas import User, Subscription, UserCircuitAccess, UserAllCircuitAccess, Circuit, ProductTabConfig
 from app.api.auth_routes import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -129,24 +129,59 @@ def _config_is_per_circuit(config: ProductTabConfig | None) -> bool:
     return bool(config.per_circuit) if config.per_circuit is not None else True
 
 
-async def _grant_all_circuits_access(
-    db: AsyncSession, user_id: int,
+async def _grant_all_circuits(
+    db: AsyncSession, user_id: int, *,
+    stripe_subscription_id: str | None,
     config: ProductTabConfig | None = None,
     period_end: datetime | None = None,
     event_start: datetime | None = None,
     event_end: datetime | None = None,
 ):
-    """Grant circuit access to every existing circuit (for products sold cross-circuit)."""
-    result = await db.execute(select(Circuit.id))
-    circuit_ids = [row[0] for row in result.all()]
-    for cid in circuit_ids:
-        await _grant_circuit_access(
-            db, user_id, cid,
-            config=config,
-            period_end=period_end,
-            event_start=event_start,
-            event_end=event_end,
+    """Upsert ONE "all circuits" grant for a cross-circuit subscription.
+
+    Date window mirrors _grant_circuit_access exactly (event window; or
+    period_end + 3d grace; or _calc_valid_until). Upsert key is
+    (user_id, stripe_subscription_id): an existing grant for that sub is
+    extended (valid_until = max, valid_from lowered if earlier); else a
+    new row is inserted. Resolution to concrete circuits (for_sale ∪
+    beta, at access time) happens in user_has_circuit_access — this only
+    manages the date window.
+    """
+    now = datetime.now(timezone.utc)
+    if event_start and event_end:
+        valid_from = event_start
+        valid_until = event_end
+    elif period_end:
+        valid_from = now
+        valid_until = period_end + timedelta(days=3)
+    else:
+        valid_from = now
+        valid_until = _calc_valid_until(config, now)
+
+    result = await db.execute(
+        select(UserAllCircuitAccess).where(
+            UserAllCircuitAccess.user_id == user_id,
+            UserAllCircuitAccess.stripe_subscription_id == stripe_subscription_id,
         )
+    )
+    existing = result.scalar_one_or_none()
+    if existing:
+        ex_until = existing.valid_until
+        if ex_until and ex_until.tzinfo is None:
+            ex_until = ex_until.replace(tzinfo=timezone.utc)
+        existing.valid_until = max(ex_until, valid_until) if ex_until else valid_until
+        ex_from = existing.valid_from
+        if ex_from and ex_from.tzinfo is None:
+            ex_from = ex_from.replace(tzinfo=timezone.utc)
+        if ex_from and ex_from > valid_from:
+            existing.valid_from = valid_from
+    else:
+        db.add(UserAllCircuitAccess(
+            user_id=user_id,
+            valid_from=valid_from,
+            valid_until=valid_until,
+            stripe_subscription_id=stripe_subscription_id,
+        ))
 
 
 @router.get("/circuits")
@@ -673,8 +708,9 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
                 for cid in circuit_ids:
                     await _grant_circuit_access(db, user_id, cid, config=config)
             elif not _config_is_per_circuit(config):
-                await _grant_all_circuits_access(
-                    db, user_id, config=config, period_end=period_end
+                await _grant_all_circuits(
+                    db, user_id, stripe_subscription_id=sub_id,
+                    config=config, period_end=period_end,
                 )
 
             if config:
@@ -765,9 +801,9 @@ async def _handle_checkout_completed(session_data: dict, db: AsyncSession, s):
                     event_start=event_start, event_end=event_end,
                 )
         elif not _config_is_per_circuit(config):
-            await _grant_all_circuits_access(
-                db, user_id, config=config,
-                event_start=event_start, event_end=event_end,
+            await _grant_all_circuits(
+                db, user_id, stripe_subscription_id=None,
+                config=config, event_start=event_start, event_end=event_end,
             )
 
         if config:
@@ -894,9 +930,9 @@ async def _handle_invoice_paid(invoice_data: dict, db: AsyncSession):
                 period_end=sub.current_period_end,
             )
     elif sub.current_period_end and not _config_is_per_circuit(config):
-        await _grant_all_circuits_access(
-            db, sub.user_id, config=config,
-            period_end=sub.current_period_end,
+        await _grant_all_circuits(
+            db, sub.user_id, stripe_subscription_id=sub.stripe_subscription_id,
+            config=config, period_end=sub.current_period_end,
         )
 
     await db.commit()
@@ -945,9 +981,9 @@ async def _handle_subscription_updated(sub_data: dict, db: AsyncSession):
                         period_end=sub.current_period_end,
                     )
             elif not _config_is_per_circuit(config):
-                await _grant_all_circuits_access(
-                    db, sub.user_id, config=config,
-                    period_end=sub.current_period_end,
+                await _grant_all_circuits(
+                    db, sub.user_id, stripe_subscription_id=sub.stripe_subscription_id,
+                    config=config, period_end=sub.current_period_end,
                 )
 
         await db.commit()
