@@ -466,6 +466,7 @@ async def get_current_user(
             # round-trip per request. Same shape as subscriptions —
             # downstream helpers must tolerate naive datetimes (SQLite).
             selectinload(User.circuit_access),
+            selectinload(User.all_circuit_access),
         )
     )
     user = result.scalar_one_or_none()
@@ -770,7 +771,94 @@ def user_has_active_circuit_access(user: User) -> bool:
             vu = vu.replace(tzinfo=timezone.utc)
         if (vf is None or vf <= now) and (vu is None or vu > now):
             return True
+    if 'all_circuit_access' in state.dict:
+        for row in (user.all_circuit_access or []):
+            vf = row.valid_from
+            vu = row.valid_until
+            if vf and vf.tzinfo is None:
+                vf = vf.replace(tzinfo=timezone.utc)
+            if vu and vu.tzinfo is None:
+                vu = vu.replace(tzinfo=timezone.utc)
+            if (vf is None or vf <= now) and (vu is None or vu > now):
+                return True
     return False
+
+
+async def user_has_circuit_access(db, user_id: int, circuit_id: int) -> bool:
+    """Async: does the user currently have access to THIS circuit?
+
+    True iff EITHER a UserCircuitAccess row for (user_id, circuit_id) is
+    currently valid, OR a UserAllCircuitAccess row for the user is
+    currently valid AND the circuit currently has for_sale OR is_beta.
+    An explicit per-circuit row always stands even if the circuit later
+    goes off-sale (existing behaviour preserved). Naive SQLite datetimes
+    are treated as UTC.
+    """
+    from app.models.schemas import (
+        UserCircuitAccess as _UCA,
+        UserAllCircuitAccess as _UACA,
+        Circuit as _C,
+    )
+    now = datetime.now(timezone.utc)
+
+    direct = await db.execute(
+        select(_UCA.id).where(
+            _UCA.user_id == user_id,
+            _UCA.circuit_id == circuit_id,
+            _UCA.valid_from <= now,
+            _UCA.valid_until > now,
+        )
+    )
+    if direct.scalar_one_or_none() is not None:
+        return True
+
+    all_grant = await db.execute(
+        select(_UACA.id).where(
+            _UACA.user_id == user_id,
+            _UACA.valid_from <= now,
+            _UACA.valid_until > now,
+        )
+    )
+    if all_grant.scalar_one_or_none() is None:
+        return False
+
+    cflags = await db.execute(
+        select(_C.for_sale, _C.is_beta).where(_C.id == circuit_id)
+    )
+    row = cflags.first()
+    if row is None:
+        return False
+    return bool(row[0]) or bool(row[1])
+
+
+async def user_has_any_active_circuit_access(db, user_id: int) -> bool:
+    """Async equivalent of user_has_active_circuit_access for code paths
+    that have a db session but not an eager-loaded User (WS handshakes):
+    True iff any currently-valid UserCircuitAccess OR UserAllCircuitAccess
+    row exists for the user. Naive SQLite datetimes treated as UTC.
+    """
+    from app.models.schemas import (
+        UserCircuitAccess as _UCA,
+        UserAllCircuitAccess as _UACA,
+    )
+    now = datetime.now(timezone.utc)
+    direct = await db.execute(
+        select(_UCA.id).where(
+            _UCA.user_id == user_id,
+            _UCA.valid_from <= now,
+            _UCA.valid_until > now,
+        )
+    )
+    if direct.scalar_one_or_none() is not None:
+        return True
+    allg = await db.execute(
+        select(_UACA.id).where(
+            _UACA.user_id == user_id,
+            _UACA.valid_from <= now,
+            _UACA.valid_until > now,
+        )
+    )
+    return allg.scalar_one_or_none() is not None
 
 
 async def require_active_circuit_access(
