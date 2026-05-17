@@ -1024,6 +1024,19 @@ async def _handle_subscription_deleted(sub_data: dict, db: AsyncSession):
             for access in access_rows.scalars().all():
                 access.valid_until = now
 
+        # Cross-circuit (all-circuits) subscriptions have no per-circuit
+        # rows / metadata circuit_ids, so the block above revokes nothing.
+        # Expire the all-grant tied to this Stripe sub instead.
+        now2 = datetime.now(timezone.utc)
+        all_rows = await db.execute(
+            select(UserAllCircuitAccess).where(
+                UserAllCircuitAccess.user_id == sub.user_id,
+                UserAllCircuitAccess.stripe_subscription_id == sub_id,
+            )
+        )
+        for grant in all_rows.scalars().all():
+            grant.valid_until = now2
+
         await db.commit()
         logger.info(
             f"Subscription deleted: sub={sub_id} user={sub.user_id} "
