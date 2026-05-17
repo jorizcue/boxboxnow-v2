@@ -1305,6 +1305,26 @@ function CircuitsManager() {
                   {c.pit_time_s && <span>Pit:{c.pit_time_s}s</span>}
                 </div>
               </div>
+              <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                <span
+                  className={`text-[9px] font-semibold uppercase rounded px-1.5 py-0.5 border ${
+                    (c.for_sale ?? true)
+                      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                      : "bg-red-500/15 text-red-300 border-red-500/30"
+                  }`}
+                  title={(c.for_sale ?? true) ? "Disponible para la venta" : "No disponible para la venta"}
+                >
+                  {(c.for_sale ?? true) ? "En venta" : "Sin venta"}
+                </span>
+                {(c.is_beta ?? false) && (
+                  <span
+                    className="text-[9px] font-semibold uppercase rounded px-1.5 py-0.5 border bg-amber-500/15 text-amber-300 border-amber-500/30"
+                    title="Circuito en Beta (se muestra como Provisional en la compra)"
+                  >
+                    Beta
+                  </span>
+                )}
+              </div>
             </div>
           ))}
           {circuits.length === 0 && (
