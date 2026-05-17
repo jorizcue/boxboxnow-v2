@@ -266,7 +266,15 @@ async def test_verify_email_valid_token_sets_verified_and_starts_trial(db):
         req = _FakeRequest({"token": "valid-token-xyz"})
         result = await verify_email(request=req, db=db)
 
-    assert result == {"ok": True}, f"Expected {{ok: True}}, got {result!r}"
+    # New contract (register-no-session / verify-auto-login): the fresh-verify
+    # path now auto-logs-in and returns the auth payload instead of a bare
+    # {ok: True}. ok must still be True; access_token / session_token / user
+    # must be present (the device-session creation itself is covered in
+    # test_register_verify_session.py).
+    assert result["ok"] is True, f"Expected ok=True, got {result!r}"
+    assert result.get("access_token"), f"fresh verify must return access_token, got {result!r}"
+    assert result.get("session_token"), f"fresh verify must return session_token, got {result!r}"
+    assert result.get("user") is not None, f"fresh verify must return user, got {result!r}"
 
     await db.refresh(u)
     assert u.email_verified is True, "email_verified must be True after verification"

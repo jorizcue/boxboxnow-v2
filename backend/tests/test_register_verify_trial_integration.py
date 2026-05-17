@@ -262,7 +262,22 @@ async def test_verify_email_full_flow(db, two_circuits):
 
     # Call verify_email
     result = await _call_verify_email(db, token)
-    assert result == {"ok": True}, f"verify_email must return {{ok: True}}, got {result!r}"
+    # New contract (register-no-session / verify-auto-login): a fresh verify
+    # now auto-logs-in and returns the auth payload (ok + access_token +
+    # session_token + user) instead of a bare {ok: True}. The single
+    # DeviceSession created here is asserted in test_register_verify_session.py;
+    # this integration test only re-checks the response shape + trial/circuit
+    # invariants below.
+    assert result["ok"] is True, f"verify_email must return ok=True, got {result!r}"
+    assert result.get("access_token"), (
+        f"fresh verify must return an access_token, got {result!r}"
+    )
+    assert result.get("session_token"), (
+        f"fresh verify must return a session_token, got {result!r}"
+    )
+    assert result.get("user") is not None, (
+        f"fresh verify must return a user object, got {result!r}"
+    )
 
     # Reload user state
     await db.refresh(user_row)

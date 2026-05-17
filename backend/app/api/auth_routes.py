@@ -616,6 +616,39 @@ async def _user_out(user: User, db: AsyncSession | None = None) -> UserOut:
     )
 
 
+async def _issue_device_session(
+    user: User, request: Request, db: AsyncSession
+) -> tuple[str, str]:
+    """Mint a DeviceSession + JWT for `user` and return (access_token, session_token).
+
+    Mirrors EXACTLY the session-creation mechanism `login()` uses
+    (`_extract_device_info` / `_extract_app_version_info` /
+    `secrets.token_hex(32)` / `DeviceSession(...)` / `create_token(...)`).
+    Adds the row to the session but does NOT commit — the caller owns the
+    transaction (same contract as start_trial()).
+
+    Used by verify_email() on the fresh-verify path. `login()` is
+    deliberately left untouched (it has extra per-kind concurrency /
+    409 logic that must not be perturbed); this helper only captures the
+    plain "create one session for this user" case where, by construction,
+    no device-limit check is needed.
+    """
+    device_name, ip_address = _extract_device_info(request)
+    app_platform, app_version = _extract_app_version_info(request)
+    session_token = secrets.token_hex(32)
+    device_session = DeviceSession(
+        session_token=session_token,
+        user_id=user.id,
+        device_name=device_name,
+        ip_address=ip_address,
+        app_platform=app_platform,
+        app_version=app_version,
+    )
+    db.add(device_session)
+    access_token = create_token(user.id, user.username, user.is_admin, session_token)
+    return access_token, session_token
+
+
 async def require_admin(
     request: Request,
     user: User = Depends(get_current_user),
@@ -806,9 +839,17 @@ async def _resolve_kind_limit(db: AsyncSession, user: User, client_kind: str) ->
 
 # --- Registration ---
 
-@router.post("/register", response_model=LoginResponse)
+@router.post("/register")
 async def register(data: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    """Public registration. Creates account + auto-login."""
+    """Public registration. Creates an UNVERIFIED account and does NOT
+    authenticate anyone.
+
+    Consistent with the verify-first model: the trial + the user's first
+    session are created when they verify their email (see verify_email),
+    not here. register() deliberately mints NO DeviceSession / token —
+    a phantom session here would occupy the user's single device slot and
+    make their first real /login hit the 409 device-limit wall.
+    """
     login_limiter.check(request.client.host if request.client else "unknown")
 
     # Gate outdated mobile apps the same way `/login` does — otherwise a
@@ -873,22 +914,17 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
         _send_verification_email(data.email, data.username, _verification_token)
     )
 
-    # Auto-login: create device session
-    device_name, ip_address = _extract_device_info(request)
+    # NO auto-login here: register() creates no DeviceSession / token.
+    # The user's first session is minted at email verification (verify_email).
+    # `_extract_app_version_info` is still needed below for the analytics
+    # `record_event` / client-kind attribution.
     app_platform, app_version = _extract_app_version_info(request)
-    session_token = secrets.token_hex(32)
-    device_session = DeviceSession(
-        session_token=session_token, user_id=user.id,
-        device_name=device_name, ip_address=ip_address,
-        app_platform=app_platform, app_version=app_version,
-    )
-    db.add(device_session)
 
     # Analytics — link anonymous visitor → fresh user_id + emit
     # register.completed funnel event. Server-side because the
     # frontend could lose the event to a network blip mid-redirect
-    # and we'd never recover the attribution. Same transaction as the
-    # DeviceSession so it commits atomically with the registration.
+    # and we'd never recover the attribution. Committed atomically with
+    # the registration in the db.commit() below.
     from app.services.usage_events import link_visitor_to_user, record_event
     await link_visitor_to_user(
         db,
@@ -916,22 +952,16 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
 
     await db.commit()
 
-    # Reload with tab_access
-    result = await db.execute(
-        select(User).where(User.id == user.id).options(selectinload(User.tab_access), selectinload(User.subscriptions))
-    )
-    user = result.scalar_one()
-
     # Welcome email removed from register(): it fires when the user verifies their
     # email address and the trial actually begins. See Task 3 (send_welcome_email
     # moves to the verify-email endpoint).
 
-    access_token = create_token(user.id, user.username, user.is_admin, session_token)
-    return LoginResponse(
-        access_token=access_token,
-        session_token=session_token,
-        user=await _user_out(user, db),
-    )
+    # Registration authenticates nobody — no token / session is issued here.
+    # The frontend register page is verify-first: it only checks res.ok and
+    # then shows the "check your email" screen, so a plain {ok:true} 200 is
+    # all it needs (and the decorator no longer has response_model so this
+    # dict isn't coerced into LoginResponse → 500).
+    return {"ok": True}
 
 
 # --- Login ---
@@ -1947,7 +1977,34 @@ async def verify_email(request: Request, db: AsyncSession = Depends(get_db)):
     from app.services.email_service import send_welcome_email as _send_welcome_email
     _asyncio_verify.create_task(_send_welcome_email(user.email, user.username, trial_days))
 
-    return {"ok": True}
+    # Auto-login in the verifying browser: mint this user's FIRST session +
+    # JWT and return the auth payload so /verify-email can setAuth + redirect
+    # to /dashboard. Created UNCONDITIONALLY — register() makes no session, so
+    # by construction the user has zero sessions here and no device-limit /
+    # 409 check is needed or wanted (that lives in login(), untouched).
+    #
+    # Re-fetch with the SAME eager-load options login() uses so _user_out can
+    # resolve tab_access + subscription without a MissingGreenlet.
+    result = await db.execute(
+        select(User)
+        .where(User.id == user.id)
+        .options(selectinload(User.tab_access), selectinload(User.subscriptions))
+    )
+    user = result.scalar_one()
+
+    access_token, session_token = await _issue_device_session(user, request, db)
+    await db.commit()
+
+    # Mirror login()'s LoginResponse shape (access_token / session_token /
+    # UserOut), wrapped as a plain dict with ok=True. The endpoint return
+    # type stays a plain dict (no response_model) so the alreadyVerified
+    # branch above can keep its {ok, alreadyVerified} shape.
+    return {
+        "ok": True,
+        "access_token": access_token,
+        "session_token": session_token,
+        "user": await _user_out(user, db),
+    }
 
 
 @router.post("/resend-verification")
