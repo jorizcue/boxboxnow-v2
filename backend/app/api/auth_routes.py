@@ -1132,7 +1132,7 @@ async def login(
 # --- Google OAuth ---
 
 @router.get("/google")
-async def google_login(request: Request, plan: str | None = None):
+async def google_login(request: Request, plan: str | None = None, db: AsyncSession = Depends(get_db)):
     """Redirect to Google OAuth.
 
     CSRF defense: we mint a random `state` nonce, store it in a short-lived
@@ -1143,6 +1143,10 @@ async def google_login(request: Request, plan: str | None = None):
     Plan selection used to ride on `state`; now it lives in its own
     short-lived cookie so the nonce stays purely random.
     """
+    google_enabled = await _get_platform_setting(db, "google_auth_enabled")
+    if not (google_enabled or "false").lower() == "true":
+        raise HTTPException(status_code=403, detail="Google login deshabilitado")
+
     settings = get_settings()
     if not settings.google_client_id:
         raise HTTPException(501, "Google login not configured")
@@ -1196,6 +1200,10 @@ async def google_callback(code: str, request: Request, state: str | None = None,
     are stamped to expire in this response regardless of outcome — the
     nonce is single-use.
     """
+    google_enabled = await _get_platform_setting(db, "google_auth_enabled")
+    if not (google_enabled or "false").lower() == "true":
+        raise HTTPException(status_code=403, detail="Google login deshabilitado")
+
     import httpx
     settings = get_settings()
 

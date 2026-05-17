@@ -815,6 +815,7 @@ PLATFORM_SETTINGS_KEYS = [
     # platform settings.
     "site_launch_at",       # ISO 8601 datetime; empty = already launched
     "site_maintenance",     # "true" / "false"; default "false"
+    "google_auth_enabled",  # "true" / "false"; default "false" — web Google OAuth toggle
 ]
 
 PLATFORM_DEFAULTS = {
@@ -831,6 +832,7 @@ PLATFORM_DEFAULTS = {
     "latest_android_version": "",
     "site_launch_at": "",
     "site_maintenance": "false",
+    "google_auth_enabled": "false",
 }
 
 

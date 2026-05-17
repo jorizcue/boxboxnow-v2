@@ -26,13 +26,14 @@ async def site_status(db: AsyncSession = Depends(get_db)):
 
     Empty `launch_at` means "already launched" — countdown disabled.
     """
-    keys = ("site_launch_at", "site_maintenance")
+    keys = ("site_launch_at", "site_maintenance", "google_auth_enabled")
     result = await db.execute(select(AppSetting).where(AppSetting.key.in_(keys)))
     rows = {s.key: s.value for s in result.scalars().all()}
     raw_launch = (rows.get("site_launch_at") or "").strip()
     return {
         "launch_at": raw_launch or None,
         "maintenance": (rows.get("site_maintenance") or "false").lower() == "true",
+        "google_auth_enabled": (rows.get("google_auth_enabled") or "false").lower() == "true",
         "now": datetime.now(timezone.utc).isoformat(),
     }
 
