@@ -887,6 +887,9 @@ def _serialize_config(c, _json) -> dict:
         "display_name": c.display_name,
         "description": c.description,
         "features": _json.loads(c.features) if c.features else [],
+        "display_name_i18n": _json.loads(c.display_name_i18n) if c.display_name_i18n else None,
+        "description_i18n": _json.loads(c.description_i18n) if c.description_i18n else None,
+        "features_i18n": _json.loads(c.features_i18n) if c.features_i18n else None,
         "price_amount": c.price_amount,
         "billing_interval": c.billing_interval,
         "is_popular": c.is_popular,
@@ -923,6 +926,12 @@ async def create_product_config(request: Request, admin: User = Depends(require_
 
     plan_type = body.get("plan_type", "")
 
+    # i18n columns are purely optional (nullable, no default): JSON-encode
+    # exactly like `features` when a value is supplied, else store NULL.
+    _dn_i18n = body.get("display_name_i18n")
+    _desc_i18n = body.get("description_i18n")
+    _feat_i18n = body.get("features_i18n")
+
     config = ProductTabConfig(
         stripe_product_id=body.get("stripe_product_id", ""),
         stripe_price_id=price_id,
@@ -937,6 +946,9 @@ async def create_product_config(request: Request, admin: User = Depends(require_
         display_name=body.get("display_name", ""),
         description=body.get("description"),
         features=_json.dumps(body.get("features", [])),
+        display_name_i18n=_json.dumps(_dn_i18n) if _dn_i18n is not None else None,
+        description_i18n=_json.dumps(_desc_i18n) if _desc_i18n is not None else None,
+        features_i18n=_json.dumps(_feat_i18n) if _feat_i18n is not None else None,
         price_amount=body.get("price_amount"),
         billing_interval=body.get("billing_interval"),
         is_popular=body.get("is_popular", False),
@@ -987,6 +999,27 @@ async def update_product_config(config_id: int, request: Request, admin: User = 
         config.allowed_cards = _json.dumps(body["allowed_cards"])
     if "features" in body:
         config.features = _json.dumps(body["features"])
+    # Partial-update i18n columns exactly like `features`: only rewrite when
+    # the key is present in the body (omitting it leaves the stored value
+    # untouched — no-clobber). An explicit null clears the column.
+    if "display_name_i18n" in body:
+        config.display_name_i18n = (
+            _json.dumps(body["display_name_i18n"])
+            if body["display_name_i18n"] is not None
+            else None
+        )
+    if "description_i18n" in body:
+        config.description_i18n = (
+            _json.dumps(body["description_i18n"])
+            if body["description_i18n"] is not None
+            else None
+        )
+    if "features_i18n" in body:
+        config.features_i18n = (
+            _json.dumps(body["features_i18n"])
+            if body["features_i18n"] is not None
+            else None
+        )
     for field in ("max_devices", "concurrency_web", "concurrency_mobile", "sort_order"):
         if field in body:
             setattr(config, field, body[field])

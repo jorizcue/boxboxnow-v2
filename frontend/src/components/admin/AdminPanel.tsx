@@ -1703,6 +1703,11 @@ function PlatformSettingsManager() {
     display_name: "",
     description: "",
     features: [] as string[],
+    // Per-language overrides for the auto-seeded translations. Keyed by
+    // locale; empty/absent locale ⇒ backend falls back to the es value.
+    display_name_i18n: {} as Record<string, string>,
+    description_i18n: {} as Record<string, string>,
+    features_i18n: {} as Record<string, string[]>,
     stripe_price_id: "",
     price_amount: null as number | null,
     billing_interval: "" as string,
@@ -1715,11 +1720,27 @@ function PlatformSettingsManager() {
 
   const [configForm, setConfigForm] = useState(emptyConfig);
   const [featuresText, setFeaturesText] = useState("");
+  // Supported translation locales for the per-language plan editor.
+  const PLAN_I18N_LANGS = ["en", "it", "de", "fr"] as const;
+  const PLAN_I18N_LANG_LABELS: Record<string, string> = {
+    en: "Inglés",
+    it: "Italiano",
+    de: "Alemán",
+    fr: "Francés",
+  };
+  // Per-language features mirror the es `featuresText` pattern: a plain
+  // string edited as one bullet per line, split on save.
+  const [featuresI18nText, setFeaturesI18nText] = useState<Record<string, string>>({});
+  const [openLangSections, setOpenLangSections] = useState<Record<string, boolean>>({});
+  const toggleLangSection = (lang: string) =>
+    setOpenLangSections((prev) => ({ ...prev, [lang]: !prev[lang] }));
 
   const openNewConfig = () => {
     setEditingConfig(null);
     setConfigForm(emptyConfig);
     setFeaturesText("");
+    setFeaturesI18nText({});
+    setOpenLangSections({});
     setSelectedProduct(null);
     setShowConfigForm(true);
     loadStripeProducts();
@@ -1742,6 +1763,9 @@ function PlatformSettingsManager() {
       display_name: c.display_name || "",
       description: c.description || "",
       features: c.features || [],
+      display_name_i18n: c.display_name_i18n || {},
+      description_i18n: c.description_i18n || {},
+      features_i18n: c.features_i18n || {},
       stripe_price_id: c.stripe_price_id || "",
       price_amount: c.price_amount ?? null,
       billing_interval: c.billing_interval || "",
@@ -1752,6 +1776,16 @@ function PlatformSettingsManager() {
       email_template: c.email_template || "",
     });
     setFeaturesText((c.features || []).join("\n"));
+    // Hydrate the per-language features textareas (one bullet per line),
+    // mirroring how the es `featuresText` is derived from the array.
+    const featI18n = (c.features_i18n || {}) as Record<string, string[]>;
+    setFeaturesI18nText(
+      PLAN_I18N_LANGS.reduce((acc, lang) => {
+        acc[lang] = (featI18n[lang] || []).join("\n");
+        return acc;
+      }, {} as Record<string, string>),
+    );
+    setOpenLangSections({});
     setSelectedProduct(null);
     setShowConfigForm(true);
     loadStripeProducts();
@@ -1781,9 +1815,29 @@ function PlatformSettingsManager() {
 
   const saveConfig = async () => {
     setConfigSaving(true);
+    // Per-language objects, built the same way the es `features` array is
+    // derived. Only locales with actual content are kept so an untouched
+    // locale stays out of the blob and the backend es-fallback applies.
+    const dnI18n: Record<string, string> = {};
+    const descI18n: Record<string, string> = {};
+    const featI18n: Record<string, string[]> = {};
+    for (const lang of PLAN_I18N_LANGS) {
+      const dn = (configForm.display_name_i18n[lang] || "").trim();
+      if (dn) dnI18n[lang] = dn;
+      const desc = (configForm.description_i18n[lang] || "").trim();
+      if (desc) descI18n[lang] = desc;
+      const feats = (featuresI18nText[lang] || "")
+        .split("\n")
+        .map((f) => f.trim())
+        .filter(Boolean);
+      if (feats.length) featI18n[lang] = feats;
+    }
     const data = {
       ...configForm,
       features: featuresText.split("\n").map((f) => f.trim()).filter(Boolean),
+      display_name_i18n: dnI18n,
+      description_i18n: descI18n,
+      features_i18n: featI18n,
     };
     try {
       if (editingConfig) {
@@ -2573,6 +2627,80 @@ function PlatformSettingsManager() {
                         placeholder={"1 circuito incluido\nHasta 2 dispositivos\nSoporte basico"}
                         className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white resize-none"
                       />
+                    </div>
+
+                    {/* Per-language overrides for name / description / features.
+                        Empty locale ⇒ backend falls back to the es value above. */}
+                    <div>
+                      <label className="block text-xs text-neutral-400 mb-1 uppercase tracking-wider">
+                        Traducciones por idioma
+                      </label>
+                      <p className="text-[11px] text-neutral-600 mb-2">
+                        Corrige o amplía las traducciones auto-generadas. Si un idioma se deja vacío se usa el texto en español.
+                      </p>
+                      <div className="space-y-2">
+                        {PLAN_I18N_LANGS.map((lang) => (
+                          <div key={lang} className="bg-surface rounded-lg border border-border">
+                            <button
+                              type="button"
+                              onClick={() => toggleLangSection(lang)}
+                              className="w-full flex items-center justify-between p-3 text-left"
+                            >
+                              <span className="text-xs font-semibold text-white uppercase tracking-wider">
+                                {PLAN_I18N_LANG_LABELS[lang]} ({lang})
+                              </span>
+                              <span className="text-neutral-500 text-xs">{openLangSections[lang] ? "▲" : "▼"}</span>
+                            </button>
+                            {openLangSections[lang] && (
+                              <div className="px-3 pb-3 space-y-3">
+                                <div>
+                                  <label className="block text-xs text-neutral-400 mb-1 uppercase">Nombre (pricing)</label>
+                                  <input
+                                    value={configForm.display_name_i18n[lang] || ""}
+                                    onChange={(e) =>
+                                      setConfigForm((p) => ({
+                                        ...p,
+                                        display_name_i18n: { ...p.display_name_i18n, [lang]: e.target.value },
+                                      }))
+                                    }
+                                    placeholder={configForm.display_name || "Plan Basico"}
+                                    className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-neutral-400 mb-1 uppercase">Descripcion</label>
+                                  <textarea
+                                    value={configForm.description_i18n[lang] || ""}
+                                    onChange={(e) =>
+                                      setConfigForm((p) => ({
+                                        ...p,
+                                        description_i18n: { ...p.description_i18n, [lang]: e.target.value },
+                                      }))
+                                    }
+                                    rows={2}
+                                    placeholder={configForm.description || "Para equipos pequenos"}
+                                    className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white resize-none"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-neutral-400 mb-1 uppercase">
+                                    Caracteristicas (una por linea)
+                                  </label>
+                                  <textarea
+                                    value={featuresI18nText[lang] || ""}
+                                    onChange={(e) =>
+                                      setFeaturesI18nText((p) => ({ ...p, [lang]: e.target.value }))
+                                    }
+                                    rows={4}
+                                    placeholder={featuresText || "1 circuito incluido\nHasta 2 dispositivos\nSoporte basico"}
+                                    className="w-full bg-black border border-border rounded-lg px-3 py-2 text-sm text-white resize-none"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
