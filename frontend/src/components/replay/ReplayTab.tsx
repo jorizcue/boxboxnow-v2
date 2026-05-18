@@ -297,7 +297,7 @@ export function ReplayTab() {
                       <span className="text-[11px] text-neutral-300 font-medium">{formatDateLabel(day.date)}</span>
                       <span className="text-[10px] text-neutral-500 animate-pulse">{t("replay.analyzing")}</span>
                     </div>
-                  ) : day.analysis && day.analysis.totalBlocks > 0 ? (
+                  ) : day.analysis && day.analysis.totalBlocks > 0 && day.analysis.raceStarts.length > 0 ? (
                     <>
                       <div className="flex justify-between text-[10px] text-neutral-500">
                         <span className="text-neutral-300 font-medium">{formatDateLabel(day.date)}</span>
@@ -349,6 +349,11 @@ export function ReplayTab() {
                         </div>
                       )}
                     </>
+                  ) : day.analysis && day.analysis.totalBlocks > 0 ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-neutral-300 font-medium">{formatDateLabel(day.date)}</span>
+                      <span className="text-[10px] text-neutral-600">{t("replay.noSessions")}</span>
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-neutral-300 font-medium">{formatDateLabel(day.date)}</span>

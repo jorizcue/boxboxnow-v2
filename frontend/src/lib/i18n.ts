@@ -353,6 +353,7 @@ const translations: Record<string, Record<Language, string>> = {
   "replay.noRecordings": { es: "No hay grabaciones disponibles", en: "No recordings available", it: "Nessuna registrazione disponibile", de: "Keine Aufnahmen verfugbar", fr: "Aucun enregistrement disponible" },
   "replay.noDaysInRange": { es: "No hay grabaciones en el rango seleccionado", en: "No recordings in the selected range", it: "Nessuna registrazione nell'intervallo selezionato", de: "Keine Aufnahmen im ausgewahlten Zeitraum", fr: "Aucun enregistrement dans la plage sélectionnée" },
   "replay.noData": { es: "Sin datos", en: "No data", it: "Nessun dato", de: "Keine Daten", fr: "Aucune donnée" },
+  "replay.noSessions": { es: "Sin sesiones", en: "No sessions", it: "Nessuna sessione", de: "Keine Sitzungen", fr: "Aucune session" },
   "replay.play": { es: "Reproducir", en: "Play", it: "Riproduci", de: "Abspielen", fr: "Lire" },
   "replay.download": { es: "Descargar", en: "Download", it: "Scarica", de: "Herunterladen", fr: "Télécharger" },
 
