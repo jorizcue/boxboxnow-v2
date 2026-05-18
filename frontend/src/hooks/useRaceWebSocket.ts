@@ -196,6 +196,9 @@ export function useRaceWebSocket(options?: WsOptions) {
           } else if (msg.type === "box_call") {
             // Relay box call from WS to BroadcastChannel (for driver view in same browser)
             ch?.postMessage({ type: "boxCall" });
+          } else if (msg.type === "driver_message") {
+            // Relay free-text driver alert from WS to BroadcastChannel
+            ch?.postMessage({ type: "driverMessage", text: msg.text || "" });
           }
         } catch {
           // ignore parse errors

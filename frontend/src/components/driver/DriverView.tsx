@@ -200,6 +200,43 @@ function useBoxAlert() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Free-text driver message hook (same transport as BOX alert)        */
+/* ------------------------------------------------------------------ */
+
+function useDriverMessage() {
+  const [msg, setMsg] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const ch = getDriverChannel();
+    if (!ch) return;
+
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === "driverMessage") {
+        const text = String(event.data.text || "").trim();
+        if (!text) return;
+        setMsg(text);
+        // Auto-dismiss after 30 seconds (same as the BOX alert).
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => setMsg(null), 30000);
+      }
+    };
+    ch.addEventListener("message", handler);
+    return () => {
+      ch.removeEventListener("message", handler);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  const dismiss = useCallback(() => {
+    setMsg(null);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  }, []);
+
+  return { msg, dismiss };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Sector card renderers                                              */
 /* ------------------------------------------------------------------ */
 //
@@ -609,6 +646,7 @@ export function DriverView() {
   const { dragging, registerRect, onTouchStart, onTouchMove, onTouchEnd } =
     useTouchDrag(driverCfg.cardOrder, driverCfg.setCardOrder);
   const boxAlert = useBoxAlert();
+  const driverMsg = useDriverMessage();
 
   // GPS sources (RaceBox BLE or phone GPS)
   const raceBox = useRaceBox();
@@ -1391,6 +1429,22 @@ export function DriverView() {
             BOX
           </span>
           <span className="text-sm text-white/60 mt-4">{t("driver.tapDismiss")}</span>
+        </div>
+      )}
+
+      {/* Free-text message overlay — white bg, big black bold text */}
+      {driverMsg.msg && (
+        <div
+          onClick={driverMsg.dismiss}
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center cursor-pointer bg-white px-6 py-8 text-center"
+        >
+          <span
+            className="font-black text-black leading-tight"
+            style={{ fontSize: "clamp(2rem, 9vw, 7rem)", wordBreak: "break-word", overflowWrap: "anywhere" }}
+          >
+            {driverMsg.msg}
+          </span>
+          <span className="text-sm text-black/50 mt-6">{t("driver.tapDismiss")}</span>
         </div>
       )}
 

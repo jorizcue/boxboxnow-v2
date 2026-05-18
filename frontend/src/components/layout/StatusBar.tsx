@@ -8,6 +8,7 @@ import { useRaceStore } from "@/hooks/useRaceState";
 import { useRaceClock } from "@/hooks/useRaceClock";
 import { useReplayTime } from "@/hooks/useReplayTime";
 import { api } from "@/lib/api";
+import { sendDriverMessage } from "@/lib/driverChannel";
 import { StyledSelect } from "@/components/shared/StyledSelect";
 import { SessionManager } from "@/components/auth/SessionManager";
 import { RainToggle } from "@/components/shared/RainToggle";
@@ -120,6 +121,21 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
   const [timeInput, setTimeInput] = useState("");
   const [seeking, setSeeking] = useState(false);
   const seekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Free-text message to the driver view (active during a race) ──
+  const [msgEditing, setMsgEditing] = useState(false);
+  const [msgInput, setMsgInput] = useState("");
+  const [msgSent, setMsgSent] = useState(false);
+
+  const sendMsg = useCallback(() => {
+    const v = msgInput.trim();
+    setMsgEditing(false);
+    if (!v) return;
+    sendDriverMessage(v);
+    setMsgInput("");
+    setMsgSent(true);
+    setTimeout(() => setMsgSent(false), 2000);
+  }, [msgInput]);
 
   const startTimeEdit = useCallback(() => {
     setTimeInput(replayTime || "");
@@ -483,6 +499,42 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
           {/* Right: actions. Username used to live here but moved to
               the sidebar account row at the bottom. */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Free-text message to the driver view — only while a race
+                is running (same availability window as the BOX call). */}
+            {raceStarted && !raceFinished && (
+              msgEditing ? (
+                <input
+                  type="text"
+                  autoFocus
+                  value={msgInput}
+                  onChange={(e) => setMsgInput(e.target.value.slice(0, 280))}
+                  onBlur={sendMsg}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); sendMsg(); }
+                    else if (e.key === "Escape") { e.preventDefault(); setMsgEditing(false); setMsgInput(""); }
+                  }}
+                  placeholder={t("driver.messagePlaceholder")}
+                  className="w-36 sm:w-52 text-[10px] sm:text-[11px] bg-black border border-accent/40 rounded px-2 py-1 text-neutral-100 placeholder:text-neutral-600 focus:outline-none focus:border-accent"
+                />
+              ) : (
+                <button
+                  onClick={() => setMsgEditing(true)}
+                  title={t("driver.message")}
+                  aria-label={t("driver.message")}
+                  className={`transition-colors ${msgSent ? "text-accent" : "text-neutral-400 hover:text-accent"}`}
+                >
+                  {msgSent ? (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                    </svg>
+                  )}
+                </button>
+              )
+            )}
             {/* Rain-mode toggle. Lives here so the strategist can flip
                 lluvia on/off from any tab without scrolling back to the
                 metric grid (where it used to live as a card). */}

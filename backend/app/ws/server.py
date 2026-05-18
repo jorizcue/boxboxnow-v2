@@ -389,6 +389,22 @@ async def race_websocket(
                             await ws.send_text(relay_msg)
                         except Exception as e:
                             logger.warning(f"BOX CALL relay failed: {e}")
+
+                elif msg.get("type") == "driver_message":
+                    # Free-text alert the strategist pushes to the driver
+                    # view. Relayed only to the SAME user's other
+                    # connections (web → driver app/device), exactly like
+                    # box_call. Capped server-side too.
+                    text = str(msg.get("text") or "").strip()[:280]
+                    if text:
+                        relay_msg = json.dumps({"type": "driver_message", "text": text})
+                        others = _ws_connections.get(user_id, set()) - {websocket}
+                        logger.info(f"DRIVER MSG from user={user_id}, relaying to {len(others)} other connection(s)")
+                        for ws in list(others):
+                            try:
+                                await ws.send_text(relay_msg)
+                            except Exception as e:
+                                logger.warning(f"DRIVER MSG relay failed: {e}")
             except json.JSONDecodeError:
                 pass
 

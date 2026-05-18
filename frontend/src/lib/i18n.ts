@@ -438,6 +438,8 @@ const translations: Record<string, Record<Language, string>> = {
   // BOX call button
   "box.callBox": { es: "Llamar a BOX", en: "Call BOX", it: "Chiama BOX", de: "BOX rufen", fr: "Appeler au BOX" },
   "box.sent": { es: "Enviado!", en: "Sent!", it: "Inviato!", de: "Gesendet!", fr: "Envoyé !" },
+  "driver.message": { es: "Mensaje al piloto", en: "Message to driver", it: "Messaggio al pilota", de: "Nachricht an Fahrer", fr: "Message au pilote" },
+  "driver.messagePlaceholder": { es: "Escribe un mensaje…", en: "Type a message…", it: "Scrivi un messaggio…", de: "Nachricht eingeben…", fr: "Écris un message…" },
 
   // === MFA ===
   "mfa.title": { es: "Autenticacion en dos pasos (MFA)", en: "Two-Factor Authentication (MFA)", it: "Autenticazione a due fattori (MFA)", de: "Zwei-Faktor-Authentifizierung (MFA)", fr: "Authentification à deux facteurs (MFA)" },

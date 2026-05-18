@@ -49,6 +49,29 @@ export function sendBoxCall() {
   }
 }
 
+/** Send a free-text alert to the driver view (BroadcastChannel + WebSocket).
+ *  Same transport as sendBoxCall: same-browser tabs via BroadcastChannel,
+ *  iOS app / other devices via the server WS relay. Capped at 280 chars. */
+export function sendDriverMessage(text: string) {
+  const msg = (text || "").trim().slice(0, 280);
+  if (!msg) return;
+
+  const ch = getDriverChannel();
+  ch?.postMessage({ type: "driverMessage", text: msg });
+
+  try {
+    const ws = _wsRef?.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "driver_message", text: msg }));
+      console.log("[DriverMessage] Sent via WebSocket");
+    } else {
+      console.warn("[DriverMessage] WebSocket not available");
+    }
+  } catch (e) {
+    console.error("[DriverMessage] Failed to send:", e);
+  }
+}
+
 /** Broadcast driver config changes to other windows (driver view, live). */
 export function broadcastDriverConfig(config: {
   visibleCards: Record<string, boolean>;
