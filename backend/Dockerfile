@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir \
     jenkspy scikit-learn pydantic-settings \
     python-dotenv bcrypt PyJWT \
     pyotp "qrcode[pil]" stripe resend \
-    openai
+    openai python-multipart
 
 COPY . .
 RUN mkdir -p data/logs

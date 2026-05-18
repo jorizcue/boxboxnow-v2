@@ -37,6 +37,26 @@ interface RaceSession {
   is_active: boolean;
 }
 
+/** Full config payload — used by both the manual Save button and the
+ *  regulation wizard (via the `bbn:apply-race-config` event). */
+interface ConfigValues {
+  circuitId: number;
+  name: string;
+  durationMin: number;
+  minStint: number;
+  maxStint: number;
+  minPits: number;
+  pitTime: number;
+  minDriverTime: number;
+  teamDriversCount: number;
+  rain: boolean;
+  pitClosedStart: number;
+  pitClosedEnd: number;
+  boxLines: number;
+  boxKarts: number;
+  ourKart: number;
+}
+
 export function ConfigPanel() {
   return (
     <div className="space-y-6">
@@ -150,85 +170,140 @@ function RaceSessionEditor() {
     }
   };
 
+  // Canonical create/update path — shared by the manual Save button and
+  // the regulation wizard. Keeps the circuit-change guard, zustand sync
+  // and WS-reconnect rule in one place.
+  const persistConfig = async (v: ConfigValues): Promise<RaceSession | null> => {
+    if (!v.circuitId) return null;
+    // Only send `circuit_id` on PATCH when it actually changed. The
+    // backend's `update_session` triggers a full stop+restart of the
+    // UserSession when `data.circuit_id != user_session.circuit_id`
+    // (config_routes.py:157-162), which would wipe every kart's stint
+    // history, pit count and lap buffer. Omitting the field when it
+    // hasn't changed keeps the guard silent and preserves live race
+    // state across routine parameter saves (min_pits, duration…). See
+    // pending_issues.md Issue #4.
+    const circuitChanged = !session || session.circuit_id !== v.circuitId;
+    const data: Record<string, unknown> = {
+      name: v.name,
+      duration_min: v.durationMin,
+      min_stint_min: v.minStint,
+      max_stint_min: v.maxStint,
+      min_pits: v.minPits,
+      pit_time_s: v.pitTime,
+      min_driver_time_min: v.minDriverTime,
+      team_drivers_count: v.teamDriversCount,
+      rain: v.rain,
+      pit_closed_start_min: v.pitClosedStart,
+      pit_closed_end_min: v.pitClosedEnd,
+      box_lines: v.boxLines,
+      box_karts: v.boxKarts,
+      our_kart_number: v.ourKart,
+      refresh_interval_s: 1,
+    };
+    if (circuitChanged) {
+      data.circuit_id = v.circuitId;
+    }
+
+    let result;
+    if (session) {
+      result = await api.updateSession(data);
+    } else {
+      // POST always requires circuit_id for a fresh session row.
+      result = await api.createSession({ ...data, circuit_id: v.circuitId });
+    }
+    setSession(result);
+
+    // Update zustand store config immediately so UI reflects changes
+    const selCircuit = circuits.find((c) => c.id === v.circuitId);
+    useRaceStore.setState((state) => ({
+      config: {
+        ...state.config,
+        circuitLengthM: selCircuit?.length_m ?? state.config.circuitLengthM,
+        pitTimeS: v.pitTime,
+        ourKartNumber: v.ourKart,
+        minPits: v.minPits,
+        maxStintMin: v.maxStint,
+        minStintMin: v.minStint,
+        durationMin: v.durationMin,
+        boxLines: v.boxLines,
+        boxKarts: v.boxKarts,
+        minDriverTimeMin: v.minDriverTime,
+        teamDriversCount: v.teamDriversCount,
+        pitClosedStartMin: v.pitClosedStart,
+        pitClosedEndMin: v.pitClosedEnd,
+        rain: v.rain,
+      },
+    }));
+
+    // Only force a WS reconnect when the CIRCUIT actually changed —
+    // that's the only case where the backend does stop_session +
+    // ensure_monitoring, which invalidates the current WS's reference
+    // to the old UserSession state. For routine parameter saves
+    // (min_pits, duration, pit_time…) the backend reconfigures in
+    // place and broadcasts a fresh snapshot over the same WS, so
+    // reconnecting would only destroy live state for no gain.
+    if (circuitChanged) {
+      useRaceStore.getState().requestWsReconnect();
+    }
+    return result;
+  };
+
+  const currentValues = (): ConfigValues => ({
+    circuitId,
+    name,
+    durationMin,
+    minStint,
+    maxStint,
+    minPits,
+    pitTime,
+    minDriverTime,
+    teamDriversCount,
+    rain,
+    pitClosedStart,
+    pitClosedEnd,
+    boxLines,
+    boxKarts,
+    ourKart,
+  });
+
   const saveSession = async () => {
     if (!circuitId) return;
     setSaving(true);
     try {
-      // Only send `circuit_id` on PATCH when it actually changed. The
-      // backend's `update_session` triggers a full stop+restart of the
-      // UserSession when `data.circuit_id != user_session.circuit_id`
-      // (config_routes.py:157-162), which would wipe every kart's stint
-      // history, pit count and lap buffer. Omitting the field when it
-      // hasn't changed keeps the guard silent and preserves live race
-      // state across routine parameter saves (min_pits, duration…). See
-      // pending_issues.md Issue #4.
-      const circuitChanged = !session || session.circuit_id !== circuitId;
-      const data: Record<string, unknown> = {
-        name,
-        duration_min: durationMin,
-        min_stint_min: minStint,
-        max_stint_min: maxStint,
-        min_pits: minPits,
-        pit_time_s: pitTime,
-        min_driver_time_min: minDriverTime,
-        team_drivers_count: teamDriversCount,
-        rain,
-        pit_closed_start_min: pitClosedStart,
-        pit_closed_end_min: pitClosedEnd,
-        box_lines: boxLines,
-        box_karts: boxKarts,
-        our_kart_number: ourKart,
-        refresh_interval_s: 1,
-      };
-      if (circuitChanged) {
-        data.circuit_id = circuitId;
-      }
-
-      let result;
-      if (session) {
-        result = await api.updateSession(data);
-      } else {
-        // POST always requires circuit_id for a fresh session row.
-        result = await api.createSession({ ...data, circuit_id: circuitId });
-      }
-      setSession(result);
-
-      // Update zustand store config immediately so UI reflects changes
-      useRaceStore.setState((state) => ({
-        config: {
-          ...state.config,
-          circuitLengthM: selectedCircuit?.length_m ?? state.config.circuitLengthM,
-          pitTimeS: pitTime,
-          ourKartNumber: ourKart,
-          minPits,
-          maxStintMin: maxStint,
-          minStintMin: minStint,
-          durationMin: durationMin,
-          boxLines: boxLines,
-          boxKarts: boxKarts,
-          minDriverTimeMin: minDriverTime,
-          teamDriversCount,
-          pitClosedStartMin: pitClosedStart,
-          pitClosedEndMin: pitClosedEnd,
-          rain,
-        },
-      }));
-
-      // Only force a WS reconnect when the CIRCUIT actually changed —
-      // that's the only case where the backend does stop_session +
-      // ensure_monitoring, which invalidates the current WS's reference
-      // to the old UserSession state. For routine parameter saves
-      // (min_pits, duration, pit_time…) the backend reconfigures in
-      // place and broadcasts a fresh snapshot over the same WS, so
-      // reconnecting would only destroy live state for no gain.
-      if (circuitChanged) {
-        useRaceStore.getState().requestWsReconnect();
-      }
+      await persistConfig(currentValues());
     } catch (e: any) {
       alert("Error: " + e.message);
     }
     setSaving(false);
   };
+
+  // The regulation wizard (ChatWidget) hands the confirmed config here
+  // via a window event so the canonical persist logic stays in one
+  // place. It replies with `bbn:race-config-applied`.
+  useEffect(() => {
+    const onApply = (e: Event) => {
+      const v = (e as CustomEvent).detail as ConfigValues;
+      persistConfig(v)
+        .then((res) => {
+          if (res) applySession(res);
+          window.dispatchEvent(
+            new CustomEvent("bbn:race-config-applied", { detail: { ok: !!res } }),
+          );
+        })
+        .catch((err: any) => {
+          window.dispatchEvent(
+            new CustomEvent("bbn:race-config-applied", {
+              detail: { ok: false, error: err?.message || "Error al guardar" },
+            }),
+          );
+        });
+    };
+    window.addEventListener("bbn:apply-race-config", onApply as EventListener);
+    return () =>
+      window.removeEventListener("bbn:apply-race-config", onApply as EventListener);
+    // persistConfig closes over `session`/`circuits`; rebind when they change.
+  }, [session, circuits]);
 
   if (loading) {
     return (
@@ -251,6 +326,26 @@ function RaceSessionEditor() {
           </span>
         )}
       </div>
+
+      {/* Regulation wizard CTA — opens the assistant in wizard mode */}
+      <button
+        type="button"
+        onClick={() =>
+          window.dispatchEvent(new CustomEvent("bbn:open-regulation-wizard"))
+        }
+        className="mb-5 w-full flex items-center gap-3 rounded-lg border border-accent/30 bg-accent/[0.07] px-3 py-2.5 text-left transition-colors hover:bg-accent/[0.12] hover:border-accent/50"
+      >
+        <span className="text-lg leading-none">📄</span>
+        <span className="flex-1">
+          <span className="block text-[12px] font-semibold text-accent">
+            Configura la carrera desde el reglamento
+          </span>
+          <span className="block text-[10px] text-neutral-400">
+            Sube el PDF y el asistente extrae los parámetros por ti
+          </span>
+        </span>
+        <span className="text-[10px] text-accent/70 uppercase tracking-wider">IA</span>
+      </button>
 
       <div className="space-y-5">
         {/* Circuit selector */}

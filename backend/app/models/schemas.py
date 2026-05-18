@@ -614,6 +614,10 @@ class ChatUsage(Base):
     message_count = Column(Integer, default=0, nullable=False)
     input_tokens = Column(Integer, default=0, nullable=False)
     output_tokens = Column(Integer, default=0, nullable=False)
+    # Separate, smaller daily cap for regulation-PDF extraction (OpenAI
+    # gpt-4o-mini with a file input is much pricier than a Groq chat
+    # message, so it gets its own counter instead of sharing message_count).
+    regulation_count = Column(Integer, default=0, nullable=False)
 
 
 class UsageEvent(Base):

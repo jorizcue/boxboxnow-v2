@@ -22,7 +22,8 @@ dependencies = [
     "pyotp>=2.9.0",
     "qrcode[pil]>=7.4.0",
     "stripe>=7.0",
-    "openai>=1.40.0",
+    "openai>=1.66.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]

@@ -73,6 +73,11 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     groq_api_key: str = ""
     chatbot_daily_message_limit: int = 30
+    # Separate, smaller daily cap for regulation-PDF extraction (OpenAI
+    # gpt-4o-mini + file input ≫ a Groq chat message in cost).
+    chatbot_daily_regulation_limit: int = 5
+    chatbot_regulation_model: str = "gpt-4o-mini"
+    chatbot_regulation_max_pdf_bytes: int = 8 * 1024 * 1024
     chatbot_max_input_chars: int = 800
     chatbot_max_output_tokens: int = 600
     chatbot_llm_model: str = "llama-3.1-8b-instant"

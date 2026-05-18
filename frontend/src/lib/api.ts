@@ -112,6 +112,25 @@ async function fetchRaw<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export interface RegulationExtractResult {
+  proposed: {
+    duration_min: number;
+    min_stint_min: number;
+    max_stint_min: number;
+    min_pits: number;
+    pit_time_s: number;
+    min_driver_time_min: number;
+    pit_closed_start_min: number;
+    pit_closed_end_min: number;
+    rain: boolean;
+  };
+  confidence: Record<string, number>;
+  circuit: { detected_name: string; matched_id: number | null; matched_name: string | null };
+  missing: string[];
+  notes: string;
+  remaining_today: number;
+}
+
 export const api = {
   // Waitlist (public)
   joinWaitlist: (email: string, name?: string) =>
@@ -280,6 +299,29 @@ export const api = {
     fetchApi<any>("/api/config/session", { method: "POST", body: JSON.stringify(data) }),
   updateSession: (data: any) =>
     fetchApi<any>("/api/config/session", { method: "PATCH", body: JSON.stringify(data) }),
+  // Multipart upload: don't go through fetchApi (it forces JSON
+  // Content-Type, which would break the multipart boundary).
+  extractRegulation: async (file: File): Promise<RegulationExtractResult> => {
+    const token = getToken();
+    const fd = new FormData();
+    fd.append("file", file);
+    const resp = await fetch(`${API_URL}/api/config/regulation/extract`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: fd,
+    });
+    if (!resp.ok) {
+      let detail = `Error ${resp.status}`;
+      try {
+        const j = await resp.json();
+        if (j?.detail) detail = j.detail;
+      } catch {}
+      const err = new Error(detail) as Error & { status?: number };
+      err.status = resp.status;
+      throw err;
+    }
+    return resp.json();
+  },
   getTeams: () => fetchApi<any[]>("/api/config/teams"),
   replaceTeams: (teams: any[]) =>
     fetchApi<any[]>("/api/config/teams", { method: "PUT", body: JSON.stringify(teams) }),

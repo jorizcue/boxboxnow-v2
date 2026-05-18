@@ -3,11 +3,14 @@
 import json
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, and_
 from sqlalchemy.orm import selectinload
 
+from app.config import get_settings
 from app.models.database import get_db
 from app.models.schemas import User, Circuit, UserCircuitAccess, RaceSession, TeamPosition, TeamDriver, UserPreferences, DriverConfigPreset
 from app.models.pydantic_models import (
@@ -17,7 +20,9 @@ from app.models.pydantic_models import (
     UserPreferencesOut, UserPreferencesUpdate,
     PresetCreate, PresetOut, PresetUpdate,
 )
-from app.api.auth_routes import get_current_user
+from app.api.auth_routes import get_current_user, require_active_subscription
+from app.chatbot import rate_limit
+from app.services import regulation_extract
 
 logger = logging.getLogger(__name__)
 
@@ -414,6 +419,169 @@ async def _verify_circuit_access(user: User, circuit_id: int, db: AsyncSession):
     from app.api.auth_routes import user_has_circuit_access
     if not await user_has_circuit_access(db, user.id, circuit_id):
         raise HTTPException(403, "No access to this circuit")
+
+
+# --- Regulation → race config (premium, OpenAI) ---
+
+_REG_DEFAULTS = {
+    "duration_min": 180,
+    "min_stint_min": 15,
+    "max_stint_min": 40,
+    "min_pits": 3,
+    "pit_time_s": 120,
+    "min_driver_time_min": 30,
+    "pit_closed_start_min": 0,
+    "pit_closed_end_min": 0,
+}
+
+
+class RegulationCircuit(BaseModel):
+    detected_name: str
+    matched_id: int | None = None
+    matched_name: str | None = None
+
+
+class RegulationExtractOut(BaseModel):
+    proposed: dict
+    confidence: dict
+    circuit: RegulationCircuit
+    missing: list[str]
+    notes: str
+    remaining_today: int
+
+
+async def _accessible_circuit_rows(user: User, db: AsyncSession) -> list[tuple[int, str]]:
+    """(id, name) of circuits the user can configure — same access rules
+    as list_my_circuits, used to fuzzy-match the regulation's circuit."""
+    now = datetime.now(timezone.utc)
+    if user.is_admin:
+        r = await db.execute(select(Circuit.id, Circuit.name).order_by(Circuit.name))
+        return [(i, n) for i, n in r.all()]
+
+    from app.models.schemas import UserAllCircuitAccess
+    has_all = (await db.execute(
+        select(UserAllCircuitAccess.id).where(
+            UserAllCircuitAccess.user_id == user.id,
+            UserAllCircuitAccess.valid_from <= now,
+            UserAllCircuitAccess.valid_until > now,
+        )
+    )).scalar_one_or_none() is not None
+
+    rows: dict[int, str] = {}
+    if has_all:
+        r = await db.execute(
+            select(Circuit.id, Circuit.name).where(
+                (Circuit.for_sale == True) | (Circuit.is_beta == True)  # noqa: E712
+            )
+        )
+        for i, n in r.all():
+            rows[i] = n
+    r = await db.execute(
+        select(Circuit.id, Circuit.name)
+        .join(UserCircuitAccess)
+        .where(
+            UserCircuitAccess.user_id == user.id,
+            UserCircuitAccess.valid_from <= now,
+            UserCircuitAccess.valid_until >= now,
+        )
+    )
+    for i, n in r.all():
+        rows[i] = n
+    return sorted(rows.items(), key=lambda x: x[1])
+
+
+@router.post("/regulation/extract", response_model=RegulationExtractOut)
+async def extract_regulation(
+    file: UploadFile = File(...),
+    user: User = Depends(require_active_subscription),
+    db: AsyncSession = Depends(get_db),
+):
+    """Read an uploaded race-regulation PDF with OpenAI and propose a
+    race configuration. Premium-gated, with its own small daily cap. The
+    document is untrusted: the model can only answer via a strict schema
+    and the result is NEVER auto-applied — the wizard shows it for
+    explicit confirmation before any write."""
+    settings = get_settings()
+    if not settings.openai_api_key:
+        raise HTTPException(503, "El asistente no está configurado en este entorno.")
+
+    fname = file.filename or "reglamento.pdf"
+    ctype = (file.content_type or "").lower()
+    if "pdf" not in ctype and not fname.lower().endswith(".pdf"):
+        raise HTTPException(415, "Solo se admite un PDF del reglamento.")
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "El archivo está vacío.")
+    max_bytes = settings.chatbot_regulation_max_pdf_bytes
+    if len(data) > max_bytes:
+        raise HTTPException(413, f"El PDF supera el máximo de {max_bytes // (1024 * 1024)} MB.")
+
+    # Reserve a slot up-front (against concurrent uploads) and commit so
+    # a failed/expensive OpenAI call still counts — same guard as chat.
+    allowed, remaining = await rate_limit.check_and_consume_regulation(db, user.id)
+    await db.commit()
+    if not allowed:
+        raise HTTPException(
+            429,
+            f"Has alcanzado el límite diario de {settings.chatbot_daily_regulation_limit} "
+            "análisis de reglamento. Inténtalo mañana.",
+        )
+
+    try:
+        parsed, in_tok, out_tok = await run_in_threadpool(
+            regulation_extract.extract_regulation, data, fname
+        )
+    except Exception as exc:
+        logger.exception("Regulation extraction failed: %s", exc)
+        raise HTTPException(502, "No se pudo leer el reglamento. Inténtalo de nuevo.")
+
+    # Token totals feed the admin cost panel (same columns as chat).
+    try:
+        await rate_limit.record_tokens(db, user.id, in_tok, out_tok)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+
+    confidence = parsed.get("confidence") or {}
+    proposed: dict = {}
+    missing: list[str] = []
+    for f, dflt in _REG_DEFAULTS.items():
+        v = parsed.get(f)
+        if v is None:
+            proposed[f] = dflt
+            missing.append(f)
+        else:
+            proposed[f] = v
+            try:
+                if float(confidence.get(f, 0) or 0) < 0.4:
+                    missing.append(f)
+            except (TypeError, ValueError):
+                missing.append(f)
+    proposed["rain"] = bool(parsed.get("rain") or False)
+
+    detected = (parsed.get("circuit_name") or "").strip()
+    circuits = await _accessible_circuit_rows(user, db)
+    matched = regulation_extract.match_circuit(detected, circuits) if detected else None
+    if matched:
+        circuit = RegulationCircuit(
+            detected_name=detected, matched_id=matched[0], matched_name=matched[1]
+        )
+    else:
+        circuit = RegulationCircuit(detected_name=detected)
+        missing.append("circuit")
+
+    # Never present in a regulation — always asked in the wizard.
+    missing.extend(["our_kart_number", "team_drivers_count"])
+
+    return RegulationExtractOut(
+        proposed=proposed,
+        confidence=confidence,
+        circuit=circuit,
+        missing=sorted(set(missing)),
+        notes=str(parsed.get("notes") or ""),
+        remaining_today=remaining,
+    )
 
 
 # --- User Preferences (driver view config) ---

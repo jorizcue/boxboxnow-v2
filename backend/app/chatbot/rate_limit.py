@@ -57,6 +57,42 @@ async def check_and_consume(
     return True, remaining
 
 
+async def check_and_consume_regulation(
+    db: AsyncSession,
+    user_id: int,
+) -> tuple[bool, int]:
+    """Same atomic check/increment as `check_and_consume` but against the
+    separate, smaller `regulation_count` cap. Regulation-PDF extraction
+    uses OpenAI gpt-4o-mini with a file input (far pricier than a Groq
+    chat message) so it can't share the chat message budget.
+
+    Returns (allowed, remaining_after). Caller commits separately so the
+    slot is reserved up-front against concurrent requests."""
+    settings = get_settings()
+    limit = settings.chatbot_daily_regulation_limit
+    today = date.today()
+
+    result = await db.execute(
+        select(ChatUsage).where(
+            ChatUsage.user_id == user_id,
+            ChatUsage.day == today,
+        )
+    )
+    usage = result.scalar_one_or_none()
+
+    if usage is None:
+        usage = ChatUsage(user_id=user_id, day=today, message_count=0)
+        db.add(usage)
+        await db.flush()
+
+    if (usage.regulation_count or 0) >= limit:
+        return False, 0
+
+    usage.regulation_count = (usage.regulation_count or 0) + 1
+    remaining = limit - usage.regulation_count
+    return True, remaining
+
+
 async def record_tokens(
     db: AsyncSession,
     user_id: int,
