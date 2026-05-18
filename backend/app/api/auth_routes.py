@@ -802,15 +802,19 @@ async def user_has_circuit_access(db, user_id: int, circuit_id: int) -> bool:
     """
     now = datetime.now(timezone.utc)
 
+    # .first() (not .scalar_one_or_none()): existence checks. A user can
+    # legitimately have multiple overlapping access rows (renewed/extended
+    # per-circuit grants, or several all-circuit grants); scalar_one_or_none
+    # raises MultipleResultsFound on >1 row. .limit(1) keeps it cheap.
     direct = await db.execute(
         select(UserCircuitAccess.id).where(
             UserCircuitAccess.user_id == user_id,
             UserCircuitAccess.circuit_id == circuit_id,
             UserCircuitAccess.valid_from <= now,
             UserCircuitAccess.valid_until > now,
-        )
+        ).limit(1)
     )
-    if direct.scalar_one_or_none() is not None:
+    if direct.first() is not None:
         return True
 
     all_grant = await db.execute(
@@ -818,9 +822,9 @@ async def user_has_circuit_access(db, user_id: int, circuit_id: int) -> bool:
             UserAllCircuitAccess.user_id == user_id,
             UserAllCircuitAccess.valid_from <= now,
             UserAllCircuitAccess.valid_until > now,
-        )
+        ).limit(1)
     )
-    if all_grant.scalar_one_or_none() is None:
+    if all_grant.first() is None:
         return False
 
     cflags = await db.execute(
@@ -839,23 +843,30 @@ async def user_has_any_active_circuit_access(db, user_id: int) -> bool:
     row exists for the user. Naive SQLite datetimes treated as UTC.
     """
     now = datetime.now(timezone.utc)
+    # NOTE: .first() (not .scalar_one_or_none()). This is an existence
+    # check — a user legitimately has MANY active circuit-access rows
+    # (one per circuit, or several all-circuit grants). scalar_one_or_none
+    # raises MultipleResultsFound on >1 row, which crashed the WS handshake
+    # (server.py gate) for every non-admin with 2+ circuit accesses —
+    # i.e. effectively all paying multi-circuit users. .limit(1) keeps it
+    # cheap on the per-connection hot path.
     direct = await db.execute(
         select(UserCircuitAccess.id).where(
             UserCircuitAccess.user_id == user_id,
             UserCircuitAccess.valid_from <= now,
             UserCircuitAccess.valid_until > now,
-        )
+        ).limit(1)
     )
-    if direct.scalar_one_or_none() is not None:
+    if direct.first() is not None:
         return True
     allg = await db.execute(
         select(UserAllCircuitAccess.id).where(
             UserAllCircuitAccess.user_id == user_id,
             UserAllCircuitAccess.valid_from <= now,
             UserAllCircuitAccess.valid_until > now,
-        )
+        ).limit(1)
     )
-    return allg.scalar_one_or_none() is not None
+    return allg.first() is not None
 
 
 async def require_active_circuit_access(
