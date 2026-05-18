@@ -75,11 +75,9 @@ function msToLapTime(ms: number): string {
 export function KartAnalyticsTab() {
   const t = useT();
   const { user } = useAuth();
-  const [dateFrom, setDateFrom] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return d.toISOString().split("T")[0];
-  });
+  // Default to the current day only (was last 7 days) — same expression
+  // as dateTo so the range is exactly "today".
+  const [dateFrom, setDateFrom] = useState(() => new Date().toISOString().split("T")[0]);
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().split("T")[0]);
   const [summaries, setSummaries] = useState<CircuitSummary[]>([]);
   const [selectedCircuitId, setSelectedCircuitId] = useState<number | null>(null);
