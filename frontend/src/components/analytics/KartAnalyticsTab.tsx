@@ -439,7 +439,13 @@ export function KartAnalyticsTab() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto">
-                  {selected.raceLogs.map((log) => (
+                  {[...selected.raceLogs]
+                    .sort(
+                      (a, b) =>
+                        new Date(a.race_date).getTime() -
+                          new Date(b.race_date).getTime() || a.id - b.id,
+                    )
+                    .map((log) => (
                     <button
                       key={log.id}
                       onClick={() => toggleRaceLog(log.id)}
