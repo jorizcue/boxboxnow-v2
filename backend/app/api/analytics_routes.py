@@ -447,9 +447,17 @@ async def get_scope_drivers(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Distinct driver names in scope plus the kart numbers each drove.
-    Powers the kart-analytics driver filter: the frontend uses ``name``
-    for autocomplete and ``karts`` to hide karts a driver never drove."""
+    """Distinct driver identities in scope plus the kart numbers each
+    drove. Powers the kart-analytics driver filter: the frontend uses
+    ``name`` for autocomplete and ``karts`` to hide karts a driver never
+    drove.
+
+    The label mirrors get_kart_drivers exactly: most timing feeds put
+    the racer/entrant in ``team_name`` and leave ``driver_name`` empty
+    (verified on Le Mans: 100% team_name, 0% driver_name), so grouping
+    by driver_name alone returned nothing and the filter never rendered.
+    Group by the combined (team, driver) identity instead so the names
+    match the 'Desglose pilotos' modal."""
     await _check_circuit_access(user, circuit_id, db)
 
     if race_log_ids:
@@ -462,25 +470,24 @@ async def get_scope_drivers(
         return []
 
     result = await db.execute(
-        select(KartLap.driver_name, KartLap.kart_number)
+        select(KartLap.team_name, KartLap.driver_name, KartLap.kart_number)
         .where(
             KartLap.race_log_id.in_(rl_ids),
-            KartLap.driver_name.isnot(None),
-            KartLap.driver_name != "",
+            KartLap.is_valid == True,
         )
         .distinct()
     )
 
-    by_driver: dict[str, set[int]] = defaultdict(set)
-    for driver_name, kart_number in result.all():
-        name = (driver_name or "").strip()
-        if name:
-            by_driver[name].add(kart_number)
+    by_label: dict[str, set[int]] = defaultdict(set)
+    for team_name, driver_name, kart_number in result.all():
+        team = (team_name or "").strip()
+        driver = (driver_name or "").strip()
+        label = " / ".join(p for p in [team, driver] if p) or "Desconocido"
+        by_label[label].add(kart_number)
 
-    return [
-        {"name": name, "karts": sorted(karts)}
-        for name, karts in sorted(by_driver.items())
-    ]
+    out = [{"name": lbl, "karts": sorted(karts)} for lbl, karts in by_label.items()]
+    out.sort(key=lambda d: d["name"].lower())
+    return out
 
 
 @router.get("/race-logs", response_model=list[RaceLogOut])
