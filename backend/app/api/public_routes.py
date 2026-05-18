@@ -11,6 +11,7 @@ from sqlalchemy import select
 from app.models.database import get_db
 from app.models.schemas import AppSetting, ProductTabConfig, Circuit
 from app.services.plan_translations import localize_plan
+from app.services.public_cache import public_cache, PUBLIC_TTL
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["public"])
@@ -26,16 +27,21 @@ async def site_status(db: AsyncSession = Depends(get_db)):
 
     Empty `launch_at` means "already launched" — countdown disabled.
     """
-    keys = ("site_launch_at", "site_maintenance", "google_auth_enabled")
-    result = await db.execute(select(AppSetting).where(AppSetting.key.in_(keys)))
-    rows = {s.key: s.value for s in result.scalars().all()}
-    raw_launch = (rows.get("site_launch_at") or "").strip()
-    return {
-        "launch_at": raw_launch or None,
-        "maintenance": (rows.get("site_maintenance") or "false").lower() == "true",
-        "google_auth_enabled": (rows.get("google_auth_enabled") or "false").lower() == "true",
-        "now": datetime.now(timezone.utc).isoformat(),
-    }
+    async def _load():
+        keys = ("site_launch_at", "site_maintenance", "google_auth_enabled")
+        result = await db.execute(select(AppSetting).where(AppSetting.key.in_(keys)))
+        rows = {s.key: s.value for s in result.scalars().all()}
+        raw_launch = (rows.get("site_launch_at") or "").strip()
+        return {
+            "launch_at": raw_launch or None,
+            "maintenance": (rows.get("site_maintenance") or "false").lower() == "true",
+            "google_auth_enabled": (rows.get("google_auth_enabled") or "false").lower() == "true",
+        }
+
+    # Cache only the DB-derived flags; ``now`` must stay fresh per
+    # request so the client countdown interpolates against real time.
+    cached = await public_cache.get_or_set("site-status", PUBLIC_TTL, _load)
+    return {**cached, "now": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/public/circuits")
@@ -48,15 +54,18 @@ async def list_public_circuits(db: AsyncSession = Depends(get_db)):
     and En estudio (!for_sale & beta). Circuits that are neither for
     sale nor beta are not platform-facing and are excluded.
     """
-    result = await db.execute(
-        select(Circuit)
-        .where((Circuit.for_sale == True) | (Circuit.is_beta == True))  # noqa: E712
-        .order_by(Circuit.name)
-    )
-    return [
-        {"name": c.name, "is_beta": c.is_beta, "for_sale": c.for_sale}
-        for c in result.scalars().all()
-    ]
+    async def _load():
+        result = await db.execute(
+            select(Circuit)
+            .where((Circuit.for_sale == True) | (Circuit.is_beta == True))  # noqa: E712
+            .order_by(Circuit.name)
+        )
+        return [
+            {"name": c.name, "is_beta": c.is_beta, "for_sale": c.for_sale}
+            for c in result.scalars().all()
+        ]
+
+    return await public_cache.get_or_set("public-circuits", PUBLIC_TTL, _load)
 
 
 @router.get("/plans")
@@ -69,35 +78,38 @@ async def list_plans(lang: str = "es", db: AsyncSession = Depends(get_db)):
     response SHAPE is unchanged; ``lang=es`` (or any unknown value) is
     byte-identical to the previous Spanish-only output (regression-safe).
     """
-    result = await db.execute(
-        select(ProductTabConfig)
-        .where(ProductTabConfig.is_visible == True)
-        .order_by(ProductTabConfig.sort_order)
-    )
-    configs = result.scalars().all()
-    plans = []
-    for c in configs:
-        es_features = _json.loads(c.features) if c.features else []
-        display_name, description, features = localize_plan(
-            display_name=c.display_name,
-            description=c.description,
-            features=es_features,
-            dn_i18n=c.display_name_i18n,
-            desc_i18n=c.description_i18n,
-            feat_i18n=c.features_i18n,
-            lang=lang,
+    async def _load():
+        result = await db.execute(
+            select(ProductTabConfig)
+            .where(ProductTabConfig.is_visible == True)
+            .order_by(ProductTabConfig.sort_order)
         )
-        plans.append({
-            "plan_type": c.plan_type,
-            "display_name": display_name,
-            "description": description,
-            "features": features,
-            "price_amount": c.price_amount,
-            "billing_interval": c.billing_interval,
-            "is_popular": c.is_popular,
-            "coming_soon": bool(c.coming_soon) if c.coming_soon is not None else False,
-            "sort_order": c.sort_order,
-            "per_circuit": bool(c.per_circuit) if c.per_circuit is not None else True,
-            "circuits_to_select": int(c.circuits_to_select) if c.circuits_to_select else 1,
-        })
-    return plans
+        configs = result.scalars().all()
+        plans = []
+        for c in configs:
+            es_features = _json.loads(c.features) if c.features else []
+            display_name, description, features = localize_plan(
+                display_name=c.display_name,
+                description=c.description,
+                features=es_features,
+                dn_i18n=c.display_name_i18n,
+                desc_i18n=c.description_i18n,
+                feat_i18n=c.features_i18n,
+                lang=lang,
+            )
+            plans.append({
+                "plan_type": c.plan_type,
+                "display_name": display_name,
+                "description": description,
+                "features": features,
+                "price_amount": c.price_amount,
+                "billing_interval": c.billing_interval,
+                "is_popular": c.is_popular,
+                "coming_soon": bool(c.coming_soon) if c.coming_soon is not None else False,
+                "sort_order": c.sort_order,
+                "per_circuit": bool(c.per_circuit) if c.per_circuit is not None else True,
+                "circuits_to_select": int(c.circuits_to_select) if c.circuits_to_select else 1,
+            })
+        return plans
+
+    return await public_cache.get_or_set(f"plans:{lang}", PUBLIC_TTL, _load)

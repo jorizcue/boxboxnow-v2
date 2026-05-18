@@ -33,6 +33,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from app.config import get_settings
 from app.models.database import get_db
 from app.services.driver_cards import ALL_DRIVER_CARD_IDS
+from app.services.public_cache import public_cache, PUBLIC_TTL
 from app.models.schemas import User, DeviceSession, UserTabAccess, UserCircuitAccess, UserAllCircuitAccess, Subscription, Circuit, AppSetting, ProductTabConfig, WaitlistEntry, UserPreferences
 from sqlalchemy.orm import selectinload
 from app.models.pydantic_models import (
@@ -217,13 +218,16 @@ async def _get_registration_config(db) -> dict:
 @router.get("/trial-config")
 async def get_trial_config(db: AsyncSession = Depends(get_db)):
     """Public endpoint: returns trial configuration for the frontend."""
-    trial_days = int(await _get_platform_setting(db, "trial_days"))
-    trial_banner_days = int(await _get_platform_setting(db, "trial_banner_days"))
-    return {
-        "trial_enabled": trial_days > 0,
-        "trial_days": trial_days,
-        "trial_banner_days": trial_banner_days,
-    }
+    async def _load():
+        trial_days = int(await _get_platform_setting(db, "trial_days"))
+        trial_banner_days = int(await _get_platform_setting(db, "trial_banner_days"))
+        return {
+            "trial_enabled": trial_days > 0,
+            "trial_days": trial_days,
+            "trial_banner_days": trial_banner_days,
+        }
+
+    return await public_cache.get_or_set("trial-config", PUBLIC_TTL, _load)
 
 
 class RateLimiter:
