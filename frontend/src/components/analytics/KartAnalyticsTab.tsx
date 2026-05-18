@@ -140,11 +140,16 @@ export function KartAnalyticsTab() {
     loadAll();
   }, [loadAll]);
 
-  // Reset session filter when circuit changes
+  // Reset the session filter when the circuit OR the date range
+  // changes. The session chips are date-scoped (getRaceLogs uses
+  // dateFrom/dateTo), so a selection made under one range must not
+  // leak as a stale filter into another — that was making the table
+  // show one day's aggregate (e.g. a 1:10.x best from a previous day)
+  // while the chips/popups reflected the newly-selected day.
   useEffect(() => {
     setSelectedRaceLogIds(new Set());
     setFilteredStats(null);
-  }, [selectedCircuitId]);
+  }, [selectedCircuitId, dateFrom, dateTo]);
 
   const toggleCircuit = (id: number) => {
     setSelectedCircuitId((prev) => (prev === id ? null : id));

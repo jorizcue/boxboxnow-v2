@@ -106,6 +106,29 @@ def _parse_date_range(date_from: str | None, date_to: str | None):
     return dt_from, dt_to
 
 
+def _dedup_laps(laps):
+    """Collapse the same physical lap re-emitted across race_log
+    fragments of ONE split session (Le Mans/CIK re-init → issues #7/#8).
+
+    A kart's (lap_number, lap_time_ms) is unique within a real race, so
+    an exact (kart_number, lap_number, lap_time_ms) repeat across the
+    selected race_logs is a fragment duplicate, not a distinct lap.
+    Dropping it stops double-counting in best5 / avg / lap counts and
+    the duplicate row in the "top 5 best laps" popup (e.g. kart 27 lap
+    13 = 1:11.649 appearing once per fragment). Keeps the first
+    occurrence; legitimately distinct laps (different number OR time)
+    are untouched."""
+    seen = set()
+    out = []
+    for lap in laps:
+        key = (lap.kart_number, lap.lap_number, lap.lap_time_ms)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(lap)
+    return out
+
+
 async def _get_race_log_ids(db: AsyncSession, circuit_id: int, dt_from, dt_to) -> list[int]:
     result = await db.execute(
         select(RaceLog.id).where(
@@ -144,7 +167,7 @@ async def get_kart_stats(
     result = await db.execute(
         select(KartLap).where(KartLap.race_log_id.in_(race_log_ids_list))
     )
-    all_laps = result.scalars().all()
+    all_laps = _dedup_laps(result.scalars().all())
 
     # Aggregate by kart_number
     kart_data: dict[int, dict] = defaultdict(lambda: {
@@ -238,7 +261,16 @@ async def get_kart_best_laps(
     if not rows:
         return []
 
-    laps = [(lap, race_date) for lap, race_date in rows]
+    # Drop fragment duplicates (same physical lap across split-session
+    # race_logs) before ranking, keeping the first per kart/lap/time.
+    seen: set = set()
+    laps = []
+    for lap, race_date in rows:
+        key = (lap.kart_number, lap.lap_number, lap.lap_time_ms)
+        if key in seen:
+            continue
+        seen.add(key)
+        laps.append((lap, race_date))
 
     if filter_outliers:
         times = [lap.lap_time_ms for lap, _ in laps]
@@ -295,7 +327,7 @@ async def get_kart_drivers(
             KartLap.is_valid == True,
         )
     )
-    all_laps = result.scalars().all()
+    all_laps = _dedup_laps(result.scalars().all())
 
     if not all_laps:
         return []
