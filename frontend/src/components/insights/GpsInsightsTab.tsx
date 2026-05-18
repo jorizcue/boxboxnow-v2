@@ -75,6 +75,8 @@ export function GpsInsightsTab() {
   const [compareIds, setCompareIds] = useState<Set<number>>(new Set());
   const [compareLaps, setCompareLaps] = useState<GpsLapDetail[]>([]);
   const [loadingCompare, setLoadingCompare] = useState(false);
+  // Microsector picked in the table → focuses both overlay charts.
+  const [selectedMicro, setSelectedMicro] = useState<{ index: number; startDist: number; endDist: number } | null>(null);
 
   // Fetch the user's accessible circuits once. Used to populate the
   // dropdown and to look up the configured GPS finish line for each.
@@ -103,6 +105,7 @@ export function GpsInsightsTab() {
     setDetailLap(null);
     setCompareIds(new Set());
     setCompareLaps([]);
+    setSelectedMicro(null);
     try {
       const params = selectedCircuit
         ? { circuit_id: selectedCircuit, limit: 200 }
@@ -166,6 +169,7 @@ export function GpsInsightsTab() {
     setLoadingCompare(true);
     setView("compare");
     setDetailLap(null);
+    setSelectedMicro(null);
     try {
       const [a, b] = await Promise.all([
         api.getGpsLapDetail(ids[0]) as Promise<GpsLapDetail>,
@@ -647,7 +651,7 @@ export function GpsInsightsTab() {
               {t("insights.compare.title")}
             </h3>
             <button
-              onClick={() => { setView("list"); setCompareLaps([]); setCompareIds(new Set()); }}
+              onClick={() => { setView("list"); setCompareLaps([]); setCompareIds(new Set()); setSelectedMicro(null); }}
               className="text-neutral-500 hover:text-white text-lg leading-none transition-colors"
             >
               ✕
@@ -658,7 +662,12 @@ export function GpsInsightsTab() {
             <div className="text-neutral-500 text-xs animate-pulse text-center py-8">{t("insights.compare.loading")}</div>
           ) : compareLaps.length === 2 ? (
             <>
-              <MicrosectorTable lapA={compareLaps[0]} lapB={compareLaps[1]} />
+              <MicrosectorTable
+                lapA={compareLaps[0]}
+                lapB={compareLaps[1]}
+                selectedIndex={selectedMicro?.index ?? null}
+                onSelect={setSelectedMicro}
+              />
 
               <div>
                 <div className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
@@ -670,6 +679,27 @@ export function GpsInsightsTab() {
                     lapB={compareLaps[1]}
                     height={220}
                     onHoverDistance={setCompareHoverDist}
+                    focusRange={selectedMicro ? [selectedMicro.startDist, selectedMicro.endDist] : null}
+                    onClearFocus={() => setSelectedMicro(null)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
+                  {t("insights.compare.speedDistanceDetail")}
+                </div>
+                <div className="bg-black/30 rounded-lg border border-border p-2">
+                  <SpeedTraceCompare
+                    lapA={compareLaps[0]}
+                    lapB={compareLaps[1]}
+                    height={240}
+                    onHoverDistance={setCompareHoverDist}
+                    focusRange={selectedMicro ? [selectedMicro.startDist, selectedMicro.endDist] : null}
+                    onClearFocus={() => setSelectedMicro(null)}
+                    apexesA={compareApexesA}
+                    apexesB={compareApexesB}
+                    brakeZones
                   />
                 </div>
               </div>

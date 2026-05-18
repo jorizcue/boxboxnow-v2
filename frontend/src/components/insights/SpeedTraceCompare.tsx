@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { GpsLapDetail } from "./types";
+import { speedToAccelMps2, smooth } from "./helpers";
 
 interface Props {
   lapA: GpsLapDetail;
@@ -15,9 +16,32 @@ interface Props {
   height?: number;
   /** Called with the distance (m) under the cursor, or null on leave. */
   onHoverDistance?: (dist: number | null) => void;
+  /** Externally driven zoom (e.g. a microsector selected in the table).
+   *  Takes precedence over the internal full view until cleared. */
+  focusRange?: [number, number] | null;
+  /** Called when the user resets the zoom (double-click / reset button)
+   *  or manually drag-zooms, so the parent can drop the microsector
+   *  selection and keep the table highlight in sync. */
+  onClearFocus?: () => void;
+  /** Detail treatment (matches the single-lap SpeedTrace): apex markers
+   *  per lap + braking bands from lap A. Off by default to keep the
+   *  plain overlay unchanged. */
+  apexesA?: number[];
+  apexesB?: number[];
+  brakeZones?: boolean;
 }
 
-export function SpeedTraceCompare({ lapA, lapB, height = 200, onHoverDistance }: Props) {
+export function SpeedTraceCompare({
+  lapA,
+  lapB,
+  height = 200,
+  onHoverDistance,
+  focusRange = null,
+  onClearFocus,
+  apexesA,
+  apexesB,
+  brakeZones = false,
+}: Props) {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const crosshairRef = useRef<HTMLDivElement>(null);
   const selectionRef = useRef<HTMLDivElement>(null);
@@ -28,12 +52,24 @@ export function SpeedTraceCompare({ lapA, lapB, height = 200, onHoverDistance }:
   const chartDimsRef = useRef({ padLeft: 38, plotW: 0, maxDist: 1, zoomMin: 0, zoomMax: 1 });
   const onHoverRef   = useRef(onHoverDistance);
   onHoverRef.current = onHoverDistance;
+  const onClearFocusRef = useRef(onClearFocus);
+  onClearFocusRef.current = onClearFocus;
 
   const isDraggingRef = useRef(false);
   const dragStartXRef = useRef(0);
 
   // Reset zoom when either lap changes.
   useEffect(() => { setZoomRange(null); }, [lapA, lapB]);
+
+  // Mirror an externally selected microsector into the zoom. Clearing
+  // the selection (focusRange → null) restores the full view.
+  useEffect(() => {
+    if (focusRange && focusRange[1] > focusRange[0]) {
+      setZoomRange([focusRange[0], focusRange[1]]);
+    } else {
+      setZoomRange(null);
+    }
+  }, [focusRange]);
 
   // ── Draw ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -93,6 +129,29 @@ export function SpeedTraceCompare({ lapA, lapB, height = 200, onHoverDistance }:
       : (maxDist >= 1000 ? `${(maxDist / 1000).toFixed(2)} km` : `${Math.round(maxDist)} m`);
     ctx.fillText(xLabel, pad.left + plotW / 2, h - 4);
 
+    // ── Braking bands from lap A (detail mode only) ────────────────────
+    if (brakeZones) {
+      const tsA = lapA.timestamps ?? [];
+      if (tsA.length === sA.length && sA.length > 1) {
+        const accel = smooth(speedToAccelMps2(sA, tsA), 5);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(pad.left, pad.top, plotW, plotH);
+        ctx.clip();
+        let bandStart = -1;
+        for (let i = 0; i < accel.length; i++) {
+          const isBrake = accel[i] < -3;
+          if (isBrake && bandStart === -1) bandStart = i;
+          if ((!isBrake || i === accel.length - 1) && bandStart !== -1) {
+            ctx.fillStyle = "rgba(248, 113, 113, 0.10)";
+            ctx.fillRect(xAt(dA[bandStart]), pad.top, xAt(dA[i]) - xAt(dA[bandStart]), plotH);
+            bandStart = -1;
+          }
+        }
+        ctx.restore();
+      }
+    }
+
     // ── Traces (canvas-clipped) ────────────────────────────────────────
     ctx.save();
     ctx.beginPath();
@@ -117,6 +176,23 @@ export function SpeedTraceCompare({ lapA, lapB, height = 200, onHoverDistance }:
     ctx.lineJoin    = "round";
     ctx.stroke();
 
+    // Apex markers per lap (detail mode)
+    const drawApexes = (idxs: number[] | undefined, dArr: number[], sArr: number[], color: string) => {
+      if (!idxs?.length) return;
+      for (const idx of idxs) {
+        if (idx < 0 || idx >= sArr.length || idx >= dArr.length) continue;
+        ctx.beginPath();
+        ctx.arc(xAt(dArr[idx]), yAt(sArr[idx]), 3, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = "rgba(0,0,0,0.6)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    };
+    drawApexes(apexesA, dA, sA, "rgba(96, 165, 250, 1)");
+    drawApexes(apexesB, dB, sB, "rgba(251, 146, 60, 1)");
+
     ctx.restore();
 
     // ── Legend ─────────────────────────────────────────────────────────
@@ -130,7 +206,14 @@ export function SpeedTraceCompare({ lapA, lapB, height = 200, onHoverDistance }:
     ctx.fillRect(pad.left + 64, pad.top + 4, 12, 3);
     ctx.fillStyle = "rgba(255,255,255,0.5)";
     ctx.fillText(`V${lapB.lap_number}`, pad.left + 80, pad.top + 9);
-  }, [lapA, lapB, zoomRange]);
+
+    if (brakeZones) {
+      ctx.fillStyle = "rgba(248, 113, 113, 0.55)";
+      ctx.fillRect(pad.left + 112, pad.top + 4, 10, 5);
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.fillText("Frenada", pad.left + 126, pad.top + 9);
+    }
+  }, [lapA, lapB, zoomRange, apexesA, apexesB, brakeZones]);
 
   // ── Event listeners (registered once; read state via refs) ───────────
   useEffect(() => {
@@ -199,10 +282,18 @@ export function SpeedTraceCompare({ lapA, lapB, height = 200, onHoverDistance }:
 
       const d1 = pixToD(Math.min(startX, x));
       const d2 = pixToD(Math.max(startX, x));
-      if (d2 - d1 > 0) setZoomRange([d1, d2]);
+      if (d2 - d1 > 0) {
+        setZoomRange([d1, d2]);
+        // Manual zoom overrides any microsector focus — drop the
+        // selection so the table highlight stays truthful.
+        onClearFocusRef.current?.();
+      }
     };
 
-    const handleDblClick = () => setZoomRange(null);
+    const handleDblClick = () => {
+      setZoomRange(null);
+      onClearFocusRef.current?.();
+    };
 
     canvas.addEventListener("mousemove",  handleMove);
     canvas.addEventListener("mouseleave", handleLeave);
@@ -246,7 +337,7 @@ export function SpeedTraceCompare({ lapA, lapB, height = 200, onHoverDistance }:
       {/* Zoom reset */}
       {zoomRange && (
         <button
-          onClick={() => setZoomRange(null)}
+          onClick={() => { setZoomRange(null); onClearFocusRef.current?.(); }}
           className="absolute top-1 right-1 z-10 text-[9px] px-1.5 py-0.5 rounded bg-black/60 border border-white/20 text-white/60 hover:text-white hover:border-white/40 transition-colors leading-none"
         >
           ↺ reset

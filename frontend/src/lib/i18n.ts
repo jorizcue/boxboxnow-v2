@@ -672,6 +672,7 @@ const translations: Record<string, Record<Language, string>> = {
   "insights.compare.title": { es: "Comparación de vueltas", en: "Lap comparison", it: "Confronto giri", de: "Rundenvergleich", fr: "Comparaison des tours" },
   "insights.compare.loading": { es: "Cargando...", en: "Loading...", it: "Caricamento...", de: "Wird geladen...", fr: "Chargement..." },
   "insights.compare.speedOverlay": { es: "Velocidad superpuesta", en: "Speed overlay", it: "Velocità sovrapposta", de: "Geschwindigkeitsüberlagerung", fr: "Vitesse superposée" },
+  "insights.compare.speedDistanceDetail": { es: "Velocidad vs distancia (detalle)", en: "Speed vs distance (detail)", it: "Velocità vs distanza (dettaglio)", de: "Geschwindigkeit vs. Distanz (Detail)", fr: "Vitesse vs distance (détail)" },
   "insights.compare.trackPrefix": { es: "Trazado", en: "Track", it: "Tracciato", de: "Strecke", fr: "Tracé" },
   "insights.compare.apexDetected": { es: "Apex detectados", en: "Apexes detected", it: "Apex rilevati", de: "Erkannte Apexe", fr: "Apex détectés" },
   "insights.compare.apexesSuffix": { es: "({n} apexes)", en: "({n} apexes)", it: "({n} apex)", de: "({n} Apexe)", fr: "({n} apex)" },
@@ -690,6 +691,8 @@ const translations: Record<string, Record<Language, string>> = {
   "insights.microsector.theoretical": { es: "Vuelta teórica", en: "Theoretical lap", it: "Giro teorico", de: "Theoretische Runde", fr: "Tour théorique" },
   "insights.microsector.vsBest": { es: "vs mejor real", en: "vs best real", it: "vs migliore reale", de: "vs beste reale", fr: "vs meilleur réel" },
   "insights.microsector.summary": { es: "{n} microsectores · ganador por sector", en: "{n} microsectors · winner per sector", it: "{n} microsettori · vincitore per settore", de: "{n} Mikrosektoren · Sieger pro Sektor", fr: "{n} micro-secteurs · gagnant par secteur" },
+  "insights.microsector.clickHint": { es: "Toca un sector para enfocarlo en las gráficas", en: "Tap a sector to focus it in the charts", it: "Tocca un settore per focalizzarlo nei grafici", de: "Sektor antippen, um ihn in den Diagrammen zu fokussieren", fr: "Touchez un secteur pour le cibler dans les graphiques" },
+  "insights.microsector.clearFocus": { es: "Quitar foco", en: "Clear focus", it: "Rimuovi focus", de: "Fokus entfernen", fr: "Retirer le focus" },
   "insights.microsector.fasterPrefix": { es: "más rápido", en: "faster", it: "più veloce", de: "schneller", fr: "plus rapide" },
 
   // === Driver config (panel + full tab) ===

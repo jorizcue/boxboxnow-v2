@@ -9,13 +9,29 @@ import type { GpsLapDetail } from "./types";
 import { microsectorTimes, formatLapTime, formatDelta, MICROSECTOR_COUNT } from "./helpers";
 import { useT } from "@/lib/i18n";
 
+export interface SelectedMicro {
+  index: number;
+  startDist: number;
+  endDist: number;
+}
+
 interface Props {
   lapA: GpsLapDetail;
   lapB: GpsLapDetail;
   count?: number;
+  /** Currently selected microsector index (controlled), or null. */
+  selectedIndex?: number | null;
+  /** Toggle a microsector. Passes null when the same row is clicked again. */
+  onSelect?: (m: SelectedMicro | null) => void;
 }
 
-export function MicrosectorTable({ lapA, lapB, count = MICROSECTOR_COUNT }: Props) {
+export function MicrosectorTable({
+  lapA,
+  lapB,
+  count = MICROSECTOR_COUNT,
+  selectedIndex = null,
+  onSelect,
+}: Props) {
   const t = useT();
   const data = useMemo(() => {
     const a = microsectorTimes(lapA, count);
@@ -50,6 +66,12 @@ export function MicrosectorTable({ lapA, lapB, count = MICROSECTOR_COUNT }: Prop
   const labelA = `V${lapA.lap_number}`;
   const labelB = `V${lapB.lap_number}`;
 
+  const pick = (r: { index: number; startDist: number; endDist: number }) => {
+    if (!onSelect) return;
+    if (selectedIndex === r.index) onSelect(null);
+    else onSelect({ index: r.index, startDist: r.startDist, endDist: r.endDist });
+  };
+
   return (
     <div className="space-y-3">
       {/* Summary */}
@@ -81,8 +103,24 @@ export function MicrosectorTable({ lapA, lapB, count = MICROSECTOR_COUNT }: Prop
 
       {/* Sector bars */}
       <div className="bg-black/30 rounded-lg border border-border p-3">
-        <div className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
-          {t("insights.microsector.summary", { n: data.rows.length })}
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[10px] text-neutral-400 uppercase tracking-wider">
+            {t("insights.microsector.summary", { n: data.rows.length })}
+          </div>
+          {onSelect && (
+            selectedIndex != null ? (
+              <button
+                onClick={() => onSelect(null)}
+                className="text-[10px] text-accent hover:text-accent/80 transition-colors"
+              >
+                {t("insights.microsector.clearFocus")} ✕
+              </button>
+            ) : (
+              <span className="text-[10px] text-neutral-600">
+                {t("insights.microsector.clickHint")}
+              </span>
+            )
+          )}
         </div>
         <div className="flex gap-0.5 h-8">
           {data.rows.map((r) => {
@@ -92,10 +130,18 @@ export function MicrosectorTable({ lapA, lapB, count = MICROSECTOR_COUNT }: Prop
                 : r.winner === "B"
                 ? "bg-orange-500"
                 : "bg-neutral-500";
+            const isSel = selectedIndex === r.index;
             return (
               <div
                 key={r.index}
-                className={`flex-1 ${bg} opacity-80 hover:opacity-100 transition-opacity`}
+                onClick={() => pick(r)}
+                className={`flex-1 ${bg} transition-all cursor-pointer ${
+                  isSel
+                    ? "opacity-100 ring-2 ring-white scale-y-110"
+                    : selectedIndex != null
+                    ? "opacity-30 hover:opacity-70"
+                    : "opacity-80 hover:opacity-100"
+                }`}
                 title={`Sector ${r.index + 1}: ${formatDelta(r.delta)} (${labelA} ${formatLapTime(r.durA)} | ${labelB} ${formatLapTime(r.durB)})`}
               />
             );
@@ -129,8 +175,18 @@ export function MicrosectorTable({ lapA, lapB, count = MICROSECTOR_COUNT }: Prop
             </thead>
             <tbody>
               {data.rows.map((r) => (
-                <tr key={r.index} className="border-t border-border">
-                  <td className="px-2 py-1.5 text-neutral-400">S{r.index + 1}</td>
+                <tr
+                  key={r.index}
+                  onClick={() => pick(r)}
+                  className={`border-t border-border cursor-pointer transition-colors ${
+                    selectedIndex === r.index
+                      ? "bg-accent/15 ring-1 ring-inset ring-accent/40"
+                      : "hover:bg-white/[0.04]"
+                  }`}
+                >
+                  <td className="px-2 py-1.5 text-neutral-400">
+                    {selectedIndex === r.index ? "▸ " : ""}S{r.index + 1}
+                  </td>
                   <td className="px-2 py-1.5 text-right text-neutral-500 font-mono">
                     {Math.round(r.startDist)}m
                   </td>
