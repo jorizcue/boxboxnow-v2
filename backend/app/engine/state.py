@@ -299,6 +299,13 @@ class RaceStateManager:
         # Session metadata (auto-detected from Apex signals)
         self.category: str = ""  # title1: "70 SILVER", "85 GOLD", etc.
         self.session_title: str = ""
+        # Identity (category||title) of the session whose karts are
+        # currently committed. None = no session committed yet (fresh
+        # process or right after a genuine reset, awaiting the next
+        # session's identity). Used to ignore Le Mans/CIK-style repeated
+        # `init|p|` re-sends within ONE session (which used to wipe all
+        # laps — see _maybe_reset_on_session_identity).
+        self._committed_session_sig: str | None = None
         self.real_start_time: str = ""  # HH:MM from green flag com|| message
         self.race_current_lap: int = 0  # Current lap in lap-based races
         self.race_total_laps: int = 0   # Total laps in lap-based races
@@ -379,6 +386,51 @@ class RaceStateManager:
             elapsed_s = 0
         return max(0, self.countdown_ms - int(elapsed_s * 1000))
 
+    def _session_sig(self) -> str:
+        """Stable identity of the current Apex session (category||title).
+        Le Mans/CIK increments the title every heat ("Session 13" →
+        "Session 14"), so a change here means a genuine new session."""
+        return f"{self.category}␟{self.session_title}"
+
+    def _reset_for_new_session(self):
+        """Destructive reset performed only for a GENUINE new session.
+
+        countdown_ms MUST be reset so that karts created in the next
+        init get stint_start_countdown_ms=0 (which _trigger_race_start
+        then properly sets to race_start_ms). has_sectors resets so a
+        sectorless circuit doesn't carry the flag from the previous
+        session (live mode keeps the same RaceStateManager)."""
+        self.karts.clear()
+        self.race_started = False
+        self.race_finished = False
+        self.countdown_ms = 0
+        self._first_countdown_ms = 0
+        self._race_start_ms = 0
+        self.has_sectors = False
+
+    def _maybe_reset_on_session_identity(self):
+        """React to the session identity (title1/title2), which Apex
+        sends slightly AFTER a session's first `init|p|` — so the
+        INIT-init handler defers the destructive reset to here.
+
+          - No identity yet → nothing to decide.
+          - No committed session (fresh build / post-reset): ADOPT this
+            identity for the karts just built. NOT a new session, do not
+            wipe. This is what preserves the first session's laps and,
+            crucially, the Le Mans warm-up laps that the old code lost.
+          - Identity changed vs the committed one: GENUINE new session/
+            heat → destructive reset; the next grid|| rebuilds the field.
+          - Identity unchanged: redundant title re-send → no-op.
+        """
+        if not self.session_title and not self.category:
+            return
+        sig = self._session_sig()
+        if self._committed_session_sig is None:
+            self._committed_session_sig = sig          # adopt, no reset
+        elif sig != self._committed_session_sig:
+            self._reset_for_new_session()              # genuine new session
+            self._committed_session_sig = sig
+
     def reset(self):
         """Reset all race state (used when starting/stopping replay)."""
         self.karts.clear()
@@ -389,6 +441,7 @@ class RaceStateManager:
         self.start_time = 0.0
         self.category = ""
         self.session_title = ""
+        self._committed_session_sig = None
         self.real_start_time = ""
         self._event_buffer.clear()
         self.fifo_queue.clear()
@@ -588,6 +641,29 @@ class RaceStateManager:
         row_id = event.row_id
 
         if event.type == EventType.INIT and event.value == "kart":
+            existing = self.karts.get(row_id)
+            if existing is not None:
+                # Same-session redundant re-init: Apex re-sent the grid
+                # without a session change (Le Mans/CIK warm-up). Keep
+                # ALL accumulated race state (laps, pits, stint, sectors,
+                # timing anchors) — only refresh the roster/display
+                # snapshot. Recreating the KartState here was the root
+                # cause of "no laps until ~lap 6" on circuits that
+                # re-send init|p| mid-session. (A genuine new session
+                # cleared self.karts via _reset_for_new_session, so
+                # `existing` is None there and a fresh kart is built.)
+                existing.team_name = event.extra.get("team_name", existing.team_name)
+                existing.position = event.extra.get("position", existing.position)
+                existing.gap = event.extra.get("gap", existing.gap)
+                existing.interval = event.extra.get("interval", existing.interval)
+                existing.pit_time = event.extra.get("pit_time", existing.pit_time)
+                try:
+                    snap_total = int(event.extra.get("total_laps", "0") or "0")
+                    if snap_total > existing.apex_total_laps:
+                        existing.apex_total_laps = snap_total
+                except (TypeError, ValueError):
+                    pass
+                return None
             kart = KartState(
                 row_id=row_id,
                 kart_number=event.extra.get("kart_number", 0),
@@ -632,20 +708,29 @@ class RaceStateManager:
             return None  # Init sends snapshot, not individual updates
 
         if event.type == EventType.INIT and event.value == "init":
-            # Reset state for new init block (new race / new session).
-            # countdown_ms MUST be reset so that karts created in this init
-            # get stint_start_countdown_ms=0 (which _trigger_race_start will
-            # then properly set to race_start_ms).
-            self.karts.clear()
-            self.race_started = False
-            self.race_finished = False
-            self.countdown_ms = 0
-            self._first_countdown_ms = 0
-            self._race_start_ms = 0
-            # Sector flag resets on init so circuits without sectors don't
-            # carry over the flag from a previous session in the same
-            # process (live mode keeps the same RaceStateManager).
-            self.has_sectors = False
+            # Le Mans / CIK timing re-sends `init|p|` several times during
+            # ONE session's warm-up (5× for a single session in prod
+            # 2026-05-18, spanning ~4 min). The old code wiped every kart
+            # + its lap history on EVERY init|p|, so laps run between
+            # re-sends were lost ("no laps until ~lap 6", all time columns
+            # collapsed to one value). A genuine new session/heat is
+            # identified by its title (Apex increments "Session N");
+            # redundant re-inits keep the same identity.
+            #
+            #   - first build ever / right after a reset (no committed
+            #     session) → reset now and await the identity.
+            #   - prior race already finished (checkered) → definitely a
+            #     new session even if the title string repeats → reset.
+            #   - otherwise DEFER: don't wipe. If this really is a new
+            #     session the (later-arriving) title change triggers the
+            #     reset in _maybe_reset_on_session_identity(); if it's a
+            #     redundant warm-up re-init the title is unchanged and
+            #     nothing is wiped — the following grid|| merges into the
+            #     existing karts (INIT-kart handler preserves lap history
+            #     when the row already exists).
+            if self._committed_session_sig is None or self.race_finished:
+                self._reset_for_new_session()
+                self._committed_session_sig = None  # adopt next identity
             return None
 
         # Get or skip unknown karts
@@ -1076,11 +1161,13 @@ class RaceStateManager:
         elif event.type == EventType.CATEGORY:
             self.category = event.value
             logger.info(f"Category: {self.category}")
+            self._maybe_reset_on_session_identity()
             return {"event": "category", "value": event.value}
 
         elif event.type == EventType.SESSION_TITLE:
             self.session_title = event.value
             logger.info(f"Session title: {self.session_title}")
+            self._maybe_reset_on_session_identity()
             return {"event": "sessionTitle", "value": event.value}
 
         elif event.type == EventType.TRACK_INFO:
