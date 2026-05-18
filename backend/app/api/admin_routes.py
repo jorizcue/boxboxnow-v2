@@ -25,6 +25,44 @@ from app.api.auth_routes import require_admin, hash_password, _user_out
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
+@router.get("/geocode")
+async def geocode(q: str, admin: User = Depends(require_admin)):
+    """Google-Maps-style place search for the circuits map: resolve a
+    town / address text to coordinates so the admin can jump there
+    instead of panning. Proxied server-side to send a proper
+    User-Agent per the Nominatim usage policy and to shield the browser
+    from CORS / rate concerns. Admin-only, low volume; failures degrade
+    to an empty list (the client also matches our own circuit names
+    locally first)."""
+    q = (q or "").strip()
+    if len(q) < 2:
+        return []
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={"q": q, "format": "jsonv2", "limit": 5},
+                headers={"User-Agent": "BoxBoxNow/1.0 (admin circuits map)"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as e:  # network / rate / parse — non-fatal
+        logger.warning(f"geocode failed for {q!r}: {e}")
+        return []
+    out = []
+    for item in (data if isinstance(data, list) else []):
+        try:
+            out.append({
+                "display_name": item.get("display_name", ""),
+                "lat": float(item["lat"]),
+                "lon": float(item["lon"]),
+            })
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
+
+
 # ─── Pit-gate diagnostic ────────────────────────────────────────────
 #
 # Defined at module-import time so it shows up under /api/admin even

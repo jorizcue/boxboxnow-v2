@@ -185,6 +185,10 @@ export const api = {
     fetchApi<any>(`/api/admin/users/${id}`, { method: "DELETE" }),
 
   getAllCircuits: () => fetchApi<any[]>("/api/admin/circuits"),
+  adminGeocode: (q: string) =>
+    fetchApi<{ display_name: string; lat: number; lon: number }[]>(
+      `/api/admin/geocode?q=${encodeURIComponent(q)}`,
+    ),
   createCircuit: (data: any) =>
     fetchApi<any>("/api/admin/circuits", { method: "POST", body: JSON.stringify(data) }),
   updateCircuit: (id: number, data: any) =>

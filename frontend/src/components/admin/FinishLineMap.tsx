@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { api } from "@/lib/api";
 
 interface LatLng {
   lat: number;
@@ -13,6 +14,9 @@ interface Props {
   p1: LatLng | null;
   p2: LatLng | null;
   onChange: (p1: LatLng | null, p2: LatLng | null) => void;
+  /** Our own circuits (name + coords) — searched locally before
+   *  falling back to place geocoding. */
+  circuits?: { name: string; lat: number; lng: number }[];
 }
 
 const MARKER_COLORS = { p1: "#22c55e", p2: "#ef4444" };
@@ -32,12 +36,46 @@ function createIcon(color: string, label: string) {
   });
 }
 
-export default function FinishLineMap({ p1, p2, onChange }: Props) {
+export default function FinishLineMap({ p1, p2, onChange, circuits }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<{ p1: L.Marker | null; p2: L.Marker | null }>({ p1: null, p2: null });
   const lineRef = useRef<L.Polyline | null>(null);
   const [placing, setPlacing] = useState<"p1" | "p2" | null>(null);
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchMsg, setSearchMsg] = useState<string | null>(null);
+
+  // Google-Maps-style search: match one of our circuits by name first
+  // (the catalog often isn't in OSM), otherwise geocode the text as a
+  // town/place via the backend Nominatim proxy, then fly there.
+  const handleSearch = async (e: FormEvent) => {
+    e.preventDefault();
+    const q = query.trim();
+    const map = mapRef.current;
+    if (!q || !map) return;
+    setSearchMsg(null);
+    const match = (circuits ?? []).find((c) =>
+      c.name.toLowerCase().includes(q.toLowerCase()),
+    );
+    if (match) {
+      map.setView([match.lat, match.lng], 16);
+      return;
+    }
+    setSearching(true);
+    try {
+      const res = await api.adminGeocode(q);
+      if (res.length > 0) {
+        map.setView([res[0].lat, res[0].lon], 13);
+      } else {
+        setSearchMsg("Sin resultados");
+      }
+    } catch {
+      setSearchMsg("Error de búsqueda");
+    } finally {
+      setSearching(false);
+    }
+  };
 
   // Initialize map
   useEffect(() => {
@@ -213,10 +251,35 @@ export default function FinishLineMap({ p1, p2, onChange }: Props) {
           </button>
         )}
       </div>
-      <div
-        ref={containerRef}
-        className="h-[300px] rounded-lg border border-border overflow-hidden"
-      />
+      <div className="relative">
+        <form
+          onSubmit={handleSearch}
+          className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] flex gap-1"
+        >
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar circuito o población…"
+            className="w-56 bg-black/80 border border-border rounded-md px-2 py-1.5 text-xs text-neutral-100 shadow-lg backdrop-blur outline-none focus:border-accent/60"
+          />
+          <button
+            type="submit"
+            disabled={searching}
+            className="bg-accent hover:bg-accent-hover text-black text-xs font-bold rounded-md px-2.5 py-1.5 shadow-lg disabled:opacity-50"
+          >
+            {searching ? "…" : "Ir"}
+          </button>
+        </form>
+        {searchMsg && (
+          <div className="absolute top-12 left-1/2 -translate-x-1/2 z-[1000] bg-black/80 text-[11px] text-red-300 rounded px-2 py-1">
+            {searchMsg}
+          </div>
+        )}
+        <div
+          ref={containerRef}
+          className="h-[300px] rounded-lg border border-border overflow-hidden"
+        />
+      </div>
     </div>
   );
 }

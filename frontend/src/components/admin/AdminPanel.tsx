@@ -1441,6 +1441,9 @@ function CircuitsManager() {
                      switching circuits reused a stale map → broken/gray
                      tiles until F5. */
                   key={editingId ?? "new"}
+                  circuits={circuits
+                    .filter((c) => c.finish_lat1 != null && c.finish_lon1 != null)
+                    .map((c) => ({ name: c.name, lat: Number(c.finish_lat1), lng: Number(c.finish_lon1) }))}
                   p1={form.finish_lat1 && form.finish_lon1 ? { lat: Number(form.finish_lat1), lng: Number(form.finish_lon1) } : null}
                   p2={form.finish_lat2 && form.finish_lon2 ? { lat: Number(form.finish_lat2), lng: Number(form.finish_lon2) } : null}
                   onChange={(p1, p2) => {

@@ -108,20 +108,29 @@ def _parse_date_range(date_from: str | None, date_to: str | None):
 
 def _dedup_laps(laps):
     """Collapse the same physical lap re-emitted across race_log
-    fragments of ONE split session (Le Mans/CIK re-init → issues #7/#8).
+    fragments of ONE split session (Le Mans/CIK re-init → issues
+    #7/#8/#1).
 
-    A kart's (lap_number, lap_time_ms) is unique within a real race, so
-    an exact (kart_number, lap_number, lap_time_ms) repeat across the
-    selected race_logs is a fragment duplicate, not a distinct lap.
-    Dropping it stops double-counting in best5 / avg / lap counts and
-    the duplicate row in the "top 5 best laps" popup (e.g. kart 27 lap
-    13 = 1:11.649 appearing once per fragment). Keeps the first
-    occurrence; legitimately distinct laps (different number OR time)
-    are untouched."""
+    Key is (kart_number, lap_time_ms) — NOT lap_number. When a session
+    is split into fragments, the SAME on-track lap is re-recorded in
+    each fragment but its lap_number is re-assigned (the fragments
+    restart numbering and the c6/c7 back-fill of #1 shifts it), so an
+    exact (lap_number, lap_time_ms) match misses them (verified in prod:
+    kart 39 / A.GARCIA had 28 rows across 3 fragments, all 28 "unique"
+    by lap_number+ms → still double-counted, showing 24 laps for a real
+    12). The lap *time* survives the split intact: a kart doing the
+    EXACT same millisecond twice does not happen in real karting (same
+    invariant pending_issues #1 already relies on), so (kart, ms) is the
+    robust fragment-dup signal. Collapsing it gives the real lap set
+    (A.GARCIA → 12) and still folds the exact-dup case (kart 27 lap 13 =
+    1:11.649 in two fragments). Trade-off: two genuinely distinct laps
+    by the same kart with identical ms-to-the-ms across the date range
+    collapse to one — negligible per the karting invariant above. Keeps
+    the first occurrence."""
     seen = set()
     out = []
     for lap in laps:
-        key = (lap.kart_number, lap.lap_number, lap.lap_time_ms)
+        key = (lap.kart_number, lap.lap_time_ms)
         if key in seen:
             continue
         seen.add(key)
@@ -266,7 +275,7 @@ async def get_kart_best_laps(
     seen: set = set()
     laps = []
     for lap, race_date in rows:
-        key = (lap.kart_number, lap.lap_number, lap.lap_time_ms)
+        key = (lap.kart_number, lap.lap_time_ms)  # see _dedup_laps: ms, not lap_number
         if key in seen:
             continue
         seen.add(key)
