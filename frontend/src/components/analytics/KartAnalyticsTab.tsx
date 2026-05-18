@@ -785,14 +785,15 @@ export function KartAnalyticsTab() {
       {/* Driver Breakdown Modal */}
       {driverModalKart !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setDriverModalKart(null)}>
-          <div className="bg-[#1a1a2e] border border-border rounded-xl shadow-xl p-6 w-[520px] max-w-[90vw] animate-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-[#1a1a2e] border border-border rounded-xl shadow-xl p-6 w-[520px] max-w-[90vw] max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
               <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
                 Desglose pilotos — Kart {driverModalKart}
               </h3>
               <button onClick={() => setDriverModalKart(null)} className="text-neutral-500 hover:text-white text-lg leading-none transition-colors">&times;</button>
             </div>
 
+            <div className="flex-1 overflow-y-auto min-h-0 -mx-1 px-1">
             {loadingDrivers ? (
               <p className="text-neutral-500 text-xs animate-pulse py-4 text-center">{t("analytics.loading")}</p>
             ) : driverBreakdown.length === 0 ? (
@@ -911,6 +912,7 @@ export function KartAnalyticsTab() {
                 </tbody>
               </table>
             )}
+            </div>
           </div>
         </div>
       )}
