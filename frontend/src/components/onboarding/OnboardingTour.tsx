@@ -49,16 +49,16 @@ const ALL_STEPS: TourStep[] = [
 
   // Carrera — real RaceTable rendered over seeded demo data.
   { key: "raceTable", target: "race-table", tab: "race", requiresTab: "race", demo: true },
-  { key: "raceCards", target: "race-cards", tab: "race", requiresTab: "race", demo: true },
+  { key: "raceCards", target: "metric-cards", tab: "race", requiresTab: "race", demo: true },
   { key: "raceLapsToMax", target: "race-card-laps-max", tab: "race", requiresTab: "race", demo: true },
   { key: "raceFutureStint", target: "race-card-future-stint", tab: "race", requiresTab: "race", demo: true },
   { key: "raceKartsNearPit", target: "race-card-karts-near-pit", tab: "race", requiresTab: "race", demo: true },
   { key: "raceCallBox", target: "race-call-box", tab: "race", requiresTab: "race", demo: true },
   { key: "raceStatus", target: "status-race", tab: "race", requiresTab: "race", demo: true },
 
-  // Box — real FifoQueue over the same seeded demo data.
+  // Box — real FifoQueue over the same seeded demo data (the metrics
+  // bar is the shared one, already covered by the raceCards step).
   { key: "boxLanes", target: "box-lanes", tab: "pit", requiresTab: "pit", demo: true },
-  { key: "boxCards", target: "box-cards", tab: "pit", requiresTab: "pit", demo: true },
   { key: "boxConfig", target: "box-config", tab: "pit", requiresTab: "pit", demo: true },
 
   { key: "live", target: "nav-live", tab: "live", requiresTab: "live" },

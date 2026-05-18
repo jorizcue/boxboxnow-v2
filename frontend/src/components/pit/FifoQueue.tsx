@@ -5,8 +5,6 @@ import { useRaceStore } from "@/hooks/useRaceState";
 import { useRaceClock } from "@/hooks/useRaceClock";
 import { useSimNow } from "@/hooks/useSimNow";
 import { tierHex, secondsToHMS, msToLapTime } from "@/lib/formatters";
-import { sendBoxCall } from "@/lib/driverChannel";
-import { trackAction } from "@/lib/tracker";
 import { computeStintMetrics } from "@/lib/stintCalc";
 import { api } from "@/lib/api";
 import type { FifoEntry } from "@/types/race";
@@ -247,140 +245,10 @@ export function FifoQueue() {
 
   return (
     <div className="race-layout flex flex-col h-full">
-      {/* ── Indicator cards (same as race tab) ── */}
-      <div className="sticky-cards sticky top-0 z-20 bg-black pb-2" data-tour="box-cards">
-        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-1.5 sm:gap-2">
-          {/* Driver / Last lap */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
-            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
-              {t("metric.driverLastLap")}
-            </span>
-            <span className="text-sm sm:text-base font-bold leading-none text-neutral-200 truncate max-w-full mb-0.5">
-              {ourKart?.driverName || ourKart?.teamName || "-"}
-            </span>
-            <span className={clsx(
-              "text-lg sm:text-xl font-mono font-black leading-none",
-              lastLapDelta === "faster" ? "text-green-400" :
-              lastLapDelta === "slower" ? "text-yellow-400" : "text-white"
-            )}>
-              {ourKart && ourKart.lastLapMs > 0 ? (
-                <>
-                  {lastLapDelta === "faster" && <span className="mr-0.5">↓</span>}
-                  {lastLapDelta === "slower" && <span className="mr-0.5">↑</span>}
-                  {msToLapTime(ourKart.lastLapMs)}
-                </>
-              ) : "-"}
-            </span>
-          </div>
-
-          {/* Avg 20 laps */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
-            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
-              {t("metric.avgLap")}
-            </span>
-            <span className="text-lg sm:text-xl font-mono font-black leading-none text-neutral-200">
-              {ourKart && ourKart.avgLapMs > 0 ? msToLapTime(Math.round(ourKart.avgLapMs)) : "-"}
-            </span>
-          </div>
-
-          {/* Position by avg */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
-            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
-              {t("metric.avgPosition")}
-            </span>
-            <span className={clsx(
-              "text-lg sm:text-xl font-mono font-black leading-none",
-              ourAvgPosition <= 3 ? "text-accent" : ourAvgPosition <= 10 ? "text-green-400" : "text-neutral-200"
-            )}>
-              {ourAvgPosition > 0 ? `${ourAvgPosition}/${sorted.length}` : "-"}
-            </span>
-          </div>
-
-          {/* Stint time */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
-            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
-              {t("metric.currentStint")}
-            </span>
-            <span className={clsx("text-lg sm:text-xl font-mono font-black leading-none", stintColor)}>
-              {secondsToHMS(ourStintSec)}
-            </span>
-          </div>
-
-          {/* Time to max stint */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
-            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
-              {t("metric.timeToMaxStint")}
-            </span>
-            <span className={clsx("text-lg sm:text-xl font-mono font-black leading-none", timeToMaxColor)}>
-              {secondsToHMS(timeToMaxStint)}
-            </span>
-            {realMaxStintMin < config.maxStintMin && (
-              <span className="text-[7px] text-orange-400 font-mono">
-                max {Math.floor(realMaxStintMin)}:{String(Math.round((realMaxStintMin % 1) * 60)).padStart(2, "0")}
-              </span>
-            )}
-          </div>
-
-          {/* Laps to max stint — same colour logic as the equivalent card
-              in DriverView (Vista Piloto): red when pit is forced closed or
-              ≤ 2 laps left, orange at ≤ 5, green when the pit window is open,
-              neutral otherwise. Previously this read text-neutral-200 always,
-              which was inconsistent with the Carrera/Driver view. */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
-            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
-              {t("metric.lapsToMaxStint")}
-            </span>
-            <span className={clsx(
-              "text-lg sm:text-xl font-mono font-black leading-none",
-              pitStatus?.isOpen === false
-                ? "text-red-400"
-                : lapsToMaxStint > 0 && lapsToMaxStint <= 2
-                  ? "text-red-400 animate-pulse"
-                  : lapsToMaxStint > 0 && lapsToMaxStint <= 5
-                    ? "text-orange-400"
-                    : pitStatus?.isOpen === true
-                      ? "text-green-400"
-                      : "text-neutral-200"
-            )}>
-              {lapsToMaxStint > 0 ? lapsToMaxStint.toFixed(1) : "0"}
-            </span>
-          </div>
-
-          {/* Average future stint — promoted to the top grid so it sits
-              next to lapsToMaxStint / kartsNearPit. The lower-grid copy
-              has been removed to avoid duplicating the same value twice
-              in one screen. */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
-            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
-              {t("pit.avgFutureStint")}
-            </span>
-            <span className={clsx(
-              "text-lg sm:text-xl font-mono font-black leading-none",
-              avgFutureStint?.warn ? "text-orange-400" : "text-neutral-200"
-            )}>
-              {avgFutureStint
-                ? secondsToHMS(Math.round(avgFutureStint.avgMin * 60))
-                : "-"}
-            </span>
-          </div>
-
-          {/* Karts near pit */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
-            <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
-              {t("metric.kartsNearPit")}
-            </span>
-            <span className={clsx(
-              "text-lg sm:text-xl font-mono font-black leading-none",
-              kartsNearPit > 3 ? "text-orange-400" : kartsNearPit > 0 ? "text-yellow-400" : "text-neutral-200"
-            )}>
-              {kartsNearPit}
-            </span>
-          </div>
-
-          {/* BOX call button */}
-          <BoxCallButton />
-        </div>
-      </div>
+      {/* The strategy-metrics card bar (formerly duplicated here) is
+          now the shared <MetricCardsBar/> rendered by the dashboard
+          shell so it persists across Carrera / Box / Live / Tracking /
+          Clasificación. Box body only below. */}
 
       {/* ── Box score + FIFO queue rows ── */}
       <div className="flex gap-2 sm:gap-3 mt-2" data-tour="box-lanes">
@@ -695,41 +563,6 @@ function FrozenOverlay() {
         </span>
       ))}
     </div>
-  );
-}
-
-/* ── BOX call button ── */
-function BoxCallButton() {
-  const t = useT();
-  const [sent, setSent] = useState(false);
-
-  const handleClick = useCallback(() => {
-    sendBoxCall();
-    trackAction("boxcall_sent", { from: "pit" });
-    setSent(true);
-    setTimeout(() => setSent(false), 2000);
-  }, []);
-
-  return (
-    <button
-      onClick={handleClick}
-      className={clsx(
-        "rounded-xl border-2 p-2 sm:p-3 flex flex-col items-center justify-center transition-all active:scale-95",
-        sent
-          ? "bg-red-500/20 border-red-400/60"
-          : "bg-red-500/10 border-red-500/40 hover:bg-red-500/25 hover:border-red-400/60"
-      )}
-    >
-      <span className="text-[8px] sm:text-[9px] text-red-300 uppercase tracking-widest font-bold mb-1">
-        {t("box.callBox")}
-      </span>
-      <span className={clsx(
-        "text-lg sm:text-xl font-black leading-none",
-        sent ? "text-red-300" : "text-red-500"
-      )}>
-        {sent ? t("box.sent") : "BOX"}
-      </span>
-    </button>
   );
 }
 

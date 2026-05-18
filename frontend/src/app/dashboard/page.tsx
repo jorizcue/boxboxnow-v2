@@ -28,6 +28,7 @@ import { CircuitSelector } from "@/components/checkout/CircuitSelector";
 import { EmbeddedCheckout } from "@/components/checkout/EmbeddedCheckout";
 import { AccountPanel } from "@/components/account/AccountPanel";
 import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
+import { MetricCardsBar } from "@/components/shared/MetricCardsBar";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { useSiteStatus } from "@/hooks/useSiteStatus";
@@ -397,12 +398,18 @@ function Dashboard({
           userTabs={userTabs}
           username={user?.username || ""}
         />
-        <main className="flex-1 overflow-auto p-2 sm:p-3">
+        <main className="flex-1 overflow-hidden p-2 sm:p-3 flex flex-col min-h-0">
+          {/* Shared strategy-metrics bar — stays mounted across these
+              tabs so the indicators persist while the body swaps. */}
+          {["race", "pit", "live", "tracking", "classification", "adjusted"].includes(activeTab) && (
+            <MetricCardsBar />
+          )}
+          <div className="flex-1 min-h-0 overflow-auto">
           {activeTab === "race" && userTabs.includes("race") && <RaceTable />}
           {activeTab === "pit" && userTabs.includes("pit") && <FifoQueue />}
           {/* LiveTiming stays mounted (hidden) so iframe replay doesn't restart on tab switch */}
           {userTabs.includes("live") && (
-            <div className={activeTab === "live" ? "" : "hidden"}>
+            <div className={activeTab === "live" ? "h-full" : "hidden"}>
               <LiveTiming />
             </div>
           )}
@@ -423,6 +430,7 @@ function Dashboard({
           {activeTab === "admin-marketing" && user?.is_admin && <AdminMarketingPanel />}
           {activeTab === "admin-analytics" && user?.is_admin && <AdminAnalyticsPanel />}
           {activeTab === "admin-ranking" && user?.is_admin && <AdminRankingPanel />}
+          </div>
         </main>
       </div>
       {/* Floating support chatbot — visible only when user has the `chat`

@@ -75,7 +75,7 @@ export function LiveTiming() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-120px)]">
+      <div className="flex items-center justify-center h-full">
         <p className="text-neutral-500 text-sm">{t("live.loading")}</p>
       </div>
     );
@@ -84,7 +84,7 @@ export function LiveTiming() {
   // Show Apex viewer when replay is active
   if (apexReplayUrl) {
     return (
-      <div className="w-full h-[calc(100vh-120px)] rounded-xl overflow-hidden border border-border relative">
+      <div className="w-full h-full rounded-xl overflow-hidden border border-border relative">
         <iframe
           ref={iframeRef}
           key={apexReplayUrl}
@@ -99,7 +99,7 @@ export function LiveTiming() {
 
   if (!url) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-120px)]">
+      <div className="flex items-center justify-center h-full">
         <p className="text-neutral-500 text-sm">
           {t("live.noUrl")}
           <br />
@@ -112,7 +112,7 @@ export function LiveTiming() {
   }
 
   return (
-    <div className="w-full h-[calc(100vh-120px)] rounded-xl overflow-hidden border border-border">
+    <div className="w-full h-full rounded-xl overflow-hidden border border-border">
       <iframe
         src={url}
         className="w-full h-full"
