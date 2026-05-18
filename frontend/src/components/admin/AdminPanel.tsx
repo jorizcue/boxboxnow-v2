@@ -1193,6 +1193,9 @@ function CircuitsManager() {
   const [form, setForm] = useState<CircuitForm>(emptyForm);
   // When set, swap the form panel for the inline TrackEditor.
   const [trackEditorFor, setTrackEditorFor] = useState<number | null>(null);
+  // Filter the circuit list by name — panning the map to find a
+  // circuit was painful; type-to-find + click is much faster.
+  const [circuitSearch, setCircuitSearch] = useState("");
 
   useEffect(() => {
     loadCircuits();
@@ -1275,8 +1278,18 @@ function CircuitsManager() {
           </button>
         </div>
 
+        <input
+          type="text"
+          value={circuitSearch}
+          onChange={(e) => setCircuitSearch(e.target.value)}
+          placeholder="Buscar circuito…"
+          className="w-full bg-black border border-border rounded-lg px-2 py-1.5 text-sm mb-3"
+        />
+
         <div className="space-y-2">
-          {circuits.map((c) => (
+          {circuits
+            .filter((c) => c.name.toLowerCase().includes(circuitSearch.trim().toLowerCase()))
+            .map((c) => (
             <div
               key={c.id}
               onClick={() => startEdit(c)}
@@ -1422,6 +1435,12 @@ function CircuitsManager() {
               <label className="text-[10px] text-neutral-400 uppercase tracking-wider">Finish Line (GPS)</label>
               <Suspense fallback={<div className="h-[300px] bg-white/5 rounded-lg animate-pulse" />}>
                 <FinishLineMap
+                  /* Remount per circuit so Leaflet re-inits cleanly at
+                     the right size AND re-centers on the selected
+                     circuit's coords (init centers on p1). Without this,
+                     switching circuits reused a stale map → broken/gray
+                     tiles until F5. */
+                  key={editingId ?? "new"}
                   p1={form.finish_lat1 && form.finish_lon1 ? { lat: Number(form.finish_lat1), lng: Number(form.finish_lon1) } : null}
                   p2={form.finish_lat2 && form.finish_lon2 ? { lat: Number(form.finish_lat2), lng: Number(form.finish_lon2) } : null}
                   onChange={(p1, p2) => {

@@ -10,6 +10,7 @@ export function LiveTiming() {
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
   const replayActive = useRaceStore((s) => s.replayActive);
   const replayFilename = useRaceStore((s) => s.replayFilename);
@@ -30,6 +31,27 @@ export function LiveTiming() {
   const sendToIframe = useCallback((msg: Record<string, unknown>) => {
     iframeRef.current?.contentWindow?.postMessage(msg, "*");
   }, []);
+
+  // The dashboard keeps this mounted but display:none on inactive
+  // tabs. An iframe whose Apex layout was computed at 0×0 (hidden)
+  // renders broken/half when later shown. When the wrapper resizes
+  // 0→visible, force the iframe to recompute its layout (same-origin
+  // replay: dispatch a real resize; cross-origin live: best-effort).
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (el.offsetWidth === 0 || el.offsetHeight === 0) return;
+      try {
+        iframeRef.current?.contentWindow?.dispatchEvent(new Event("resize"));
+      } catch {
+        /* cross-origin (live URL) — fall back to postMessage */
+      }
+      sendToIframe({ type: "bbn_relayout" });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [url, loading, replayActive, replayFilename, sendToIframe]);
 
   // Sync speed changes to Apex iframe
   useEffect(() => {
@@ -84,7 +106,7 @@ export function LiveTiming() {
   // Show Apex viewer when replay is active
   if (apexReplayUrl) {
     return (
-      <div className="w-full h-full rounded-xl overflow-hidden border border-border relative">
+      <div ref={wrapRef} className="w-full h-full rounded-xl overflow-hidden border border-border relative">
         <iframe
           ref={iframeRef}
           key={apexReplayUrl}
@@ -112,7 +134,7 @@ export function LiveTiming() {
   }
 
   return (
-    <div className="w-full h-full rounded-xl overflow-hidden border border-border">
+    <div ref={wrapRef} className="w-full h-full rounded-xl overflow-hidden border border-border">
       <iframe
         src={url}
         className="w-full h-full"

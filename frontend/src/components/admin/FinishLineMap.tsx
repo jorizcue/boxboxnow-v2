@@ -68,7 +68,20 @@ export default function FinishLineMap({ p1, p2, onChange }: Props) {
 
     mapRef.current = map;
 
+    // Leaflet caches the container pixel size at L.map() time. When the
+    // map is created/shown while its container is hidden or 0-sized
+    // (the admin circuits form before layout settles, or a tab switch),
+    // it only requests tiles for that stale viewport → the "gray half
+    // map" until a full reload. Recompute on ANY container resize,
+    // including the 0→visible transition, plus one kick after first
+    // paint for the initial hidden case.
+    const ro = new ResizeObserver(() => map.invalidateSize());
+    if (containerRef.current) ro.observe(containerRef.current);
+    const kick = setTimeout(() => map.invalidateSize(), 200);
+
     return () => {
+      ro.disconnect();
+      clearTimeout(kick);
       map.remove();
       mapRef.current = null;
     };

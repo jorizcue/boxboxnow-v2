@@ -73,13 +73,19 @@
 
 
 
-/* ---------  Track  --------- */
+/* ---------  Track / circuit logo  ---------
+   The live feed injects the venue's logo (e.g. "LOS SANTOS KARTING")
+   into the .track_d cell with an inline background-image that beats
+   our stylesheet. We don't want third-party circuit branding inside
+   the BoxBoxNow replay, so hide that cell entirely. */
 .track_d{
-	background-image:url(/api/apex-replay/static/track.png);
+	display:none !important;
 }
 
-/* ---------  Logo  --------- */
+/* ---------  Logo  ---------
+   Force our BoxBoxNow logo with !important so the feed can't override
+   a.logo with the circuit/sponsor image. */
 a.logo{
-	background-image:url(/api/apex-replay/static/logo.png);
+	background-image:url(/api/apex-replay/static/logo.png) !important;
 }
 
