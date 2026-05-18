@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRaceStore } from "./useRaceState";
 import { useAuth } from "./useAuth";
+import { api } from "@/lib/api";
 import { setDriverWsRef } from "@/lib/driverChannel";
 import type { WsMessage } from "@/types/race";
 
@@ -44,6 +45,11 @@ export function useRaceWebSocket(options?: WsOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout>>();
   const reconnectDelay = useRef(1000);
+  // Consecutive closes that happened WITHOUT the socket ever opening.
+  // A dead device session can surface as an opaque 1006 (not the app's
+  // 4001) so we can't logout on code alone — after a few of these we
+  // probe the session via REST to tell "ended" from "network blip".
+  const handshakeFailures = useRef(0);
   const viewParam = options?.view;
 
   const { token } = useAuth();
@@ -103,18 +109,44 @@ export function useRaceWebSocket(options?: WsOptions) {
       const viewSuffix = viewParam ? `&view=${viewParam}` : "";
       const ws = new WebSocket(`${WS_BASE}?token=${token}&device=web${viewSuffix}`);
       wsRef.current = ws;
+      let opened = false;
 
       ws.onopen = () => {
+        opened = true;
+        handshakeFailures.current = 0;
         setConnected(true);
         reconnectDelay.current = 1000;
       };
 
       ws.onclose = (event) => {
         setConnected(false);
-        // If server closed with 4001, session was terminated — logout
+        // Server closed with 4001 → device session terminated. Logout.
         if (event.code === 4001) {
           useAuth.getState().logout();
           return;
+        }
+        // Closed during the handshake (never opened) — e.g. an opaque
+        // 1006. This is what a killed/superseded device session looks
+        // like once the backend is reachable but rejects pre-accept on
+        // older builds, OR a genuine transient blip. Don't loop "Off"
+        // forever silently: after a few consecutive handshake failures,
+        // probe the session via REST. 401/failure ⇒ session ended ⇒
+        // logout (send the user to login); success ⇒ it was transient,
+        // keep reconnecting.
+        if (!opened) {
+          handshakeFailures.current += 1;
+          if (handshakeFailures.current >= 3) {
+            api
+              .getMe()
+              .then(() => {
+                handshakeFailures.current = 0;
+                scheduleReconnect();
+              })
+              .catch(() => {
+                useAuth.getState().logout();
+              });
+            return;
+          }
         }
         scheduleReconnect();
       };

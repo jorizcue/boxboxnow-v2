@@ -156,6 +156,16 @@ async def race_websocket(
     is_driver_view = view == "driver"
     client_kind = "mobile" if device == "mobile" else "web"
 
+    # Accept the handshake up-front so every rejection below is delivered
+    # to the browser as a real WebSocket close *with its code* (4001 auth
+    # / 4003 policy). Closing BEFORE accept() makes Starlette reject the
+    # upgrade as HTTP 403, which the browser surfaces as an opaque code
+    # 1006 — the SPA then can't tell "session ended" from a network blip
+    # and reconnects forever ("Off", no data, never logged out). Nothing
+    # is read from the socket before the auth/policy checks, so accepting
+    # first is safe.
+    await websocket.accept()
+
     # Authenticate
     if not token:
         await websocket.close(code=4001, reason="Missing token")
@@ -311,8 +321,6 @@ async def race_websocket(
         )
         await websocket.close(code=4003, reason="Max devices reached")
         return
-
-    await websocket.accept()
 
     # Register connection
     if user_id not in _ws_connections:
