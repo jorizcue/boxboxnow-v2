@@ -296,6 +296,16 @@ class RaceStateManager:
         # circuits without sector telemetry.
         self.has_sectors: bool = False
 
+        # True once the Apex grid has sent an `int` (interval) column for
+        # this session. While it stays False (circuit exposes only a
+        # `gap`/"Ecart" column — e.g. Le Mans CIK), the interval is
+        # synthesised from the gap column so the driver-view interval
+        # cards work on ALL clients (web/iOS/Android read the same
+        # `interval` field — no app release needed). Apex `int` values
+        # always take precedence and are never overwritten. Reset per
+        # session (mirrors has_sectors).
+        self._interval_col_seen: bool = False
+
         # Session metadata (auto-detected from Apex signals)
         self.category: str = ""  # title1: "70 SILVER", "85 GOLD", etc.
         self.session_title: str = ""
@@ -407,6 +417,50 @@ class RaceStateManager:
         self._first_countdown_ms = 0
         self._race_start_ms = 0
         self.has_sectors = False
+        self._interval_col_seen = False
+
+    @staticmethod
+    def _gap_to_ms(raw: str | None) -> int | None:
+        """Parse an Apex gap/'Ecart' string to milliseconds. Returns None
+        for non-time values (laps-down markers like '1 Tour', 'Leader',
+        empty) so the caller skips rather than fabricating a number.
+        Accepts 'N', 'N.mmm', 'M:SS.mmm', optional leading '+'."""
+        s = (raw or "").strip()
+        if s.startswith("+"):
+            s = s[1:]
+        if not s:
+            return None
+        body = s.replace(":", "", 1).replace(".", "", 1)
+        if not body.isdigit():
+            return None
+        return time_to_ms(s)
+
+    def _derive_intervals_from_gap(self) -> None:
+        """Fallback when the Apex grid exposes a `gap`/"Ecart" column but
+        NO `int` column (e.g. Le Mans CIK): set each kart's `interval`
+        (its distance to the kart immediately ahead) = its gap minus the
+        gap of the kart in front, in classification order. Leader → "".
+        No-op once a real Apex interval column has been seen — those
+        values take precedence and are never overwritten. Reuses the
+        existing `interval` field so every client (web/iOS/Android) gets
+        it with no app release."""
+        if self._interval_col_seen:
+            return
+        ordered = sorted(self.karts.values(), key=lambda k: k.position or 999)
+        for idx, k in enumerate(ordered):
+            if idx == 0:
+                k.interval = ""  # leader → driver-view "LIDER" sentinel
+                continue
+            ahead = ordered[idx - 1]
+            # The kart right behind the leader measures against gap 0
+            # (the leader IS the reference); others against the gap-to-
+            # leader of the kart immediately in front.
+            ahead_ms = 0 if idx - 1 == 0 else self._gap_to_ms(ahead.gap)
+            mine_ms = self._gap_to_ms(k.gap)
+            if ahead_ms is not None and mine_ms is not None and mine_ms >= ahead_ms:
+                k.interval = f"{(mine_ms - ahead_ms) / 1000:.3f}"
+            else:
+                k.interval = ""
 
     def _maybe_reset_on_session_identity(self):
         """React to the session identity (title1/title2), which Apex
@@ -511,6 +565,12 @@ class RaceStateManager:
                 updates.append(update)
             if event.type == EventType.INIT and event.value == "kart":
                 had_init_kart = True
+
+        # Circuits with a gap/"Ecart" column but no `int` column (Le Mans
+        # CIK) — synthesise interval-to-the-kart-ahead from gap so the
+        # driver-view interval cards populate. No-op when Apex sends a
+        # real interval column. Cheap: one sort + N subtractions.
+        self._derive_intervals_from_gap()
 
         # Skip outbound broadcasts while a silent rebuild is in flight (set
         # by the replay engine during init→target catch-up after a seek).
@@ -1009,6 +1069,7 @@ class RaceStateManager:
 
         elif event.type == EventType.INTERVAL and kart:
             kart.interval = event.value
+            self._interval_col_seen = True  # real Apex int column → never derive
             return {"event": "interval", "rowId": row_id, "value": event.value}
 
         elif event.type == EventType.TOTAL_LAPS and kart:
@@ -1408,6 +1469,7 @@ class RaceStateManager:
 
     def get_snapshot(self) -> dict:
         """Get full state snapshot for new client connections."""
+        self._derive_intervals_from_gap()  # fresh on connect (gap-only circuits)
         sorted_karts = sorted(self.karts.values(), key=lambda k: k.position or 999)
         return {
             "type": "snapshot",
