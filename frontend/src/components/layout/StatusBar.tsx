@@ -443,7 +443,7 @@ export function StatusBar({ connected, trackName, countdownMs }: StatusBarProps)
           </div>
 
           {/* Center: countdown + pit status (hidden on very small, visible on sm+) */}
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-2" data-tour="status-race">
             <span className="text-[11px] text-neutral-400 uppercase tracking-wider">{t("status.race")}</span>
             {raceStartTime && (
               <span className="text-[10px] text-neutral-400 font-mono tabular-nums">

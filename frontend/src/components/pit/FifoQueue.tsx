@@ -248,7 +248,7 @@ export function FifoQueue() {
   return (
     <div className="race-layout flex flex-col h-full">
       {/* ── Indicator cards (same as race tab) ── */}
-      <div className="sticky-cards sticky top-0 z-20 bg-black pb-2">
+      <div className="sticky-cards sticky top-0 z-20 bg-black pb-2" data-tour="box-cards">
         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-1.5 sm:gap-2">
           {/* Driver / Last lap */}
           <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
@@ -383,7 +383,7 @@ export function FifoQueue() {
       </div>
 
       {/* ── Box score + FIFO queue rows ── */}
-      <div className="flex gap-2 sm:gap-3 mt-2">
+      <div className="flex gap-2 sm:gap-3 mt-2" data-tour="box-lanes">
         {/* Box score card (left) */}
         <div className="flex-shrink-0 bg-surface rounded-xl border border-border p-3 sm:p-4 flex flex-col items-center justify-center w-24 sm:w-28">
           <span className={`w-2.5 h-2.5 rounded-full ${scoreDotColor} mb-1.5`} />
@@ -513,7 +513,7 @@ export function FifoQueue() {
       </div>
 
       {/* ── Pit info cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2 mt-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2 mt-3" data-tour="box-config">
         {/* Current pit time */}
         <PitCard
           label={t("pit.currentPit")}

@@ -4,16 +4,25 @@ import { useState, useEffect, useRef, useCallback, useMemo, type CSSProperties }
 import { createPortal } from "react-dom";
 import { useT } from "@/lib/i18n";
 import { useTour } from "@/hooks/useTour";
+import { useRaceStore } from "@/hooks/useRaceState";
+import { buildDemoRaceState } from "./demoRaceData";
 import type { Tab } from "@/components/layout/Sidebar";
 
 /**
  * First-run guided tour of the main menus (web, desktop-first).
  *
  * Lightweight, dependency-free: a click-blocking backdrop, a spotlight
- * ring drawn over a `[data-tour="…"]` anchor (always the Sidebar nav
- * item, so the target reliably exists regardless of which panel is
- * mounted), and a positioned tooltip card. Each step can switch the
- * active tab so the relevant screen shows (dimmed) behind the spotlight.
+ * ring drawn over a `[data-tour="…"]` anchor, and a positioned tooltip
+ * card. Each step can switch the active tab so the relevant screen
+ * shows (dimmed) behind the spotlight.
+ *
+ * For the Carrera / Box steps a new user has no live session, so we
+ * seed the race store with fictional demo data (`buildDemoRaceState`)
+ * and render the REAL `RaceTable` / `FifoQueue` — the walkthrough is
+ * pixel-identical to a live race. The four store mutators are patched
+ * to no-ops for the duration so a stray WebSocket frame can't wipe the
+ * demo; the user's prior store state + the real mutators are restored
+ * when the demo steps end (or the tour is skipped/closed).
  *
  * Auto-runs once per user (localStorage `boxboxnow-tour-seen-<id>`,
  * desktop width only). Relaunchable any time from the Sidebar.
@@ -28,6 +37,8 @@ interface TourStep {
   tab?: Tab;
   /** Only include this step if the user has this tab (undefined = always). */
   requiresTab?: string;
+  /** Needs the fictional demo race state seeded into the store. */
+  demo?: boolean;
 }
 
 const ALL_STEPS: TourStep[] = [
@@ -35,18 +46,34 @@ const ALL_STEPS: TourStep[] = [
   { key: "configParams", target: "nav-config", tab: "config", requiresTab: "config" },
   { key: "configTeams", target: "nav-config", tab: "config", requiresTab: "config" },
   { key: "configAuto", target: "nav-config", tab: "config", requiresTab: "config" },
-  { key: "race", target: "nav-race", tab: "race", requiresTab: "race" },
-  { key: "box", target: "nav-pit", tab: "pit", requiresTab: "pit" },
+
+  // Carrera — real RaceTable rendered over seeded demo data.
+  { key: "raceTable", target: "race-table", tab: "race", requiresTab: "race", demo: true },
+  { key: "raceCards", target: "race-cards", tab: "race", requiresTab: "race", demo: true },
+  { key: "raceLapsToMax", target: "race-card-laps-max", tab: "race", requiresTab: "race", demo: true },
+  { key: "raceFutureStint", target: "race-card-future-stint", tab: "race", requiresTab: "race", demo: true },
+  { key: "raceKartsNearPit", target: "race-card-karts-near-pit", tab: "race", requiresTab: "race", demo: true },
+  { key: "raceCallBox", target: "race-call-box", tab: "race", requiresTab: "race", demo: true },
+  { key: "raceStatus", target: "status-race", tab: "race", requiresTab: "race", demo: true },
+
+  // Box — real FifoQueue over the same seeded demo data.
+  { key: "boxLanes", target: "box-lanes", tab: "pit", requiresTab: "pit", demo: true },
+  { key: "boxCards", target: "box-cards", tab: "pit", requiresTab: "pit", demo: true },
+  { key: "boxConfig", target: "box-config", tab: "pit", requiresTab: "pit", demo: true },
+
   { key: "live", target: "nav-live", tab: "live", requiresTab: "live" },
   { key: "account", target: "nav-account", tab: "account" },
   { key: "outro", target: null },
 ];
 
 const TOOLTIP_W = 340;
+const TOOLTIP_H = 220;
 
 function seenKey(userId: number | undefined): string | null {
   return userId ? `boxboxnow-tour-seen-${userId}` : null;
 }
+
+type SavedStore = Partial<ReturnType<typeof useRaceStore.getState>>;
 
 export function OnboardingTour({
   setActiveTab,
@@ -66,6 +93,8 @@ export function OnboardingTour({
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
   const autoChecked = useRef(false);
+  const demoOnRef = useRef(false);
+  const savedRef = useRef<SavedStore | null>(null);
 
   // Steps the user can actually see (skip tabs they lack).
   const steps = useMemo(
@@ -74,6 +103,62 @@ export function OnboardingTour({
   );
 
   useEffect(() => setMounted(true), []);
+
+  // Seed the fictional demo race state and freeze the store mutators so
+  // a late WebSocket snapshot can't overwrite it mid-walkthrough.
+  const enterDemo = useCallback(() => {
+    if (demoOnRef.current) return;
+    const st = useRaceStore.getState();
+    savedRef.current = {
+      raceStarted: st.raceStarted,
+      raceFinished: st.raceFinished,
+      countdownMs: st.countdownMs,
+      trackName: st.trackName,
+      durationMs: st.durationMs,
+      karts: st.karts,
+      fifo: st.fifo,
+      classification: st.classification,
+      classificationMeta: st.classificationMeta,
+      config: st.config,
+      pitStatus: st.pitStatus,
+      connected: st.connected,
+      applySnapshot: st.applySnapshot,
+      applyUpdates: st.applyUpdates,
+      applyAnalytics: st.applyAnalytics,
+      applyFifoUpdate: st.applyFifoUpdate,
+    };
+    const noop = () => {};
+    useRaceStore.setState({
+      applySnapshot: noop,
+      applyUpdates: noop,
+      applyAnalytics: noop,
+      applyFifoUpdate: noop,
+    });
+    const d = buildDemoRaceState();
+    useRaceStore.setState({
+      raceStarted: d.raceStarted,
+      raceFinished: d.raceFinished,
+      countdownMs: d.countdownMs,
+      trackName: d.trackName,
+      durationMs: d.durationMs,
+      karts: d.karts,
+      fifo: d.fifo,
+      classification: d.classification,
+      classificationMeta: d.classificationMeta,
+      config: d.config,
+      pitStatus: d.pitStatus,
+      connected: d.connected,
+    });
+    demoOnRef.current = true;
+  }, []);
+
+  const exitDemo = useCallback(() => {
+    if (!demoOnRef.current) return;
+    const s = savedRef.current;
+    if (s) useRaceStore.setState(s);
+    savedRef.current = null;
+    demoOnRef.current = false;
+  }, []);
 
   // Auto-start once per user on desktop, unless already seen.
   useEffect(() => {
@@ -98,6 +183,13 @@ export function OnboardingTour({
     if (running) setStepIdx(0);
   }, [running]);
 
+  // Always restore the store if the tour stops for any reason
+  // (skip/close/relaunch) or the component unmounts.
+  useEffect(() => {
+    if (!running) exitDemo();
+  }, [running, exitDemo]);
+  useEffect(() => exitDemo, [exitDemo]);
+
   const markSeen = useCallback(() => {
     const k = seenKey(userId);
     try {
@@ -109,17 +201,20 @@ export function OnboardingTour({
 
   const finish = useCallback(() => {
     markSeen();
+    exitDemo();
     stop();
     setRect(null);
-  }, [markSeen, stop]);
+  }, [markSeen, exitDemo, stop]);
 
   const step = running && stepIdx < steps.length ? steps[stepIdx] : null;
 
-  // Position the spotlight on the current step's anchor. The anchor is a
-  // Sidebar nav item (always in the DOM), but we still retry briefly in
-  // case the tab switch / layout shift hasn't settled.
+  // Seed/restore demo data, switch tab, then position the spotlight on
+  // the step's anchor. We retry briefly because the tab switch + demo
+  // render (RaceTable / FifoQueue) hasn't laid out on the first frame.
   useEffect(() => {
     if (!step) return;
+    if (step.demo) enterDemo();
+    else exitDemo();
     if (step.tab) setActiveTab(step.tab);
 
     if (!step.target) {
@@ -138,11 +233,11 @@ export function OnboardingTour({
           return;
         }
       }
-      if (tries++ < 30) raf = requestAnimationFrame(locate);
+      if (tries++ < 60) raf = requestAnimationFrame(locate);
     };
     locate();
     return () => cancelAnimationFrame(raf);
-  }, [step, setActiveTab]);
+  }, [step, setActiveTab, enterDemo, exitDemo]);
 
   // Keep the spotlight aligned on resize/scroll.
   useEffect(() => {
@@ -178,17 +273,43 @@ export function OnboardingTour({
   const isLast = stepIdx === steps.length - 1;
   const PAD = 6;
 
-  // Tooltip placement: right of the anchor (sidebar is on the left);
-  // fall back to centered when there's no anchor or it would overflow.
+  // Placement: small left-side anchors (sidebar) → right of the anchor.
+  // Wide in-screen anchors → below if there's room, else above, else
+  // centered. Keeps the tooltip off the element it highlights.
   let tipStyle: CSSProperties;
   if (rect) {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const wantLeft = rect.left + rect.width + 16;
-    const fitsRight = wantLeft + TOOLTIP_W + 12 <= vw;
-    const left = fitsRight ? wantLeft : Math.max(12, (vw - TOOLTIP_W) / 2);
-    const top = Math.min(Math.max(12, rect.top), vh - 240);
-    tipStyle = { position: "fixed", top, left, width: TOOLTIP_W };
+    const rightX = rect.left + rect.width + 16;
+    const fitsRight = rightX + TOOLTIP_W + 12 <= vw && rect.width < vw * 0.5;
+    if (fitsRight) {
+      tipStyle = {
+        position: "fixed",
+        left: rightX,
+        top: Math.min(Math.max(12, rect.top), vh - TOOLTIP_H - 12),
+        width: TOOLTIP_W,
+      };
+    } else {
+      const cx = Math.min(
+        Math.max(12, rect.left + rect.width / 2 - TOOLTIP_W / 2),
+        vw - TOOLTIP_W - 12,
+      );
+      const belowY = rect.top + rect.height + 14;
+      const aboveY = rect.top - TOOLTIP_H - 14;
+      if (belowY + TOOLTIP_H + 12 <= vh) {
+        tipStyle = { position: "fixed", top: belowY, left: cx, width: TOOLTIP_W };
+      } else if (aboveY >= 12) {
+        tipStyle = { position: "fixed", top: aboveY, left: cx, width: TOOLTIP_W };
+      } else {
+        tipStyle = {
+          position: "fixed",
+          top: "50%",
+          left: "50%",
+          width: TOOLTIP_W,
+          transform: "translate(-50%, -50%)",
+        };
+      }
+    }
   } else {
     tipStyle = {
       position: "fixed",

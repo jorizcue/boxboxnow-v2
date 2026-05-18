@@ -216,7 +216,7 @@ export function RaceTable() {
   return (
     <div className="race-layout flex flex-col h-full">
       {/* Sticky indicator cards at the top */}
-      <div className="sticky-cards sticky top-0 z-20 bg-black pb-2">
+      <div className="sticky-cards sticky top-0 z-20 bg-black pb-2" data-tour="race-cards">
         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-1.5 sm:gap-2">
           {/* Driver / Last lap */}
           <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
@@ -290,7 +290,7 @@ export function RaceTable() {
           </div>
 
           {/* Laps to max stint */}
-          <div className={`bg-surface rounded-xl border ${lapsToMaxBorder} p-2 sm:p-3 flex flex-col items-center justify-between`}>
+          <div className={`bg-surface rounded-xl border ${lapsToMaxBorder} p-2 sm:p-3 flex flex-col items-center justify-between`} data-tour="race-card-laps-max">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.lapsToMaxStint")}
             </span>
@@ -302,7 +302,7 @@ export function RaceTable() {
           {/* Average future stint — moved here from the Box tab's lower
               grid so the strategist sees future-stint feasibility next
               to lapsToMaxStint without switching tabs. */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between" data-tour="race-card-future-stint">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("pit.avgFutureStint")}
             </span>
@@ -317,7 +317,7 @@ export function RaceTable() {
           </div>
 
           {/* Karts near pit */}
-          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between">
+          <div className="bg-surface rounded-xl border border-border p-2 sm:p-3 flex flex-col items-center justify-between" data-tour="race-card-karts-near-pit">
             <span className="text-[8px] sm:text-[9px] text-neutral-300 uppercase tracking-widest font-bold mb-1">
               {t("metric.kartsNearPit")}
             </span>
@@ -337,7 +337,7 @@ export function RaceTable() {
       {/* Scrollable race table */}
       <div className="race-table-scroll flex-1 overflow-y-auto overflow-x-auto -mx-2 sm:mx-0">
         <table className="w-full text-xs sm:text-sm">
-          <thead className="bg-surface text-neutral-200 sticky top-0 z-10 text-[10px] sm:text-[11px] uppercase tracking-wider">
+          <thead className="bg-surface text-neutral-200 sticky top-0 z-10 text-[10px] sm:text-[11px] uppercase tracking-wider" data-tour="race-table">
             <tr>
               <th className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center w-6 sm:w-8">#</th>
               <SortTh align="left" colKey="kartNumber" current={sortKey} dir={sortDir} onSort={toggleSort} className="w-8 sm:w-12">{t("race.kart")}</SortTh>
@@ -494,6 +494,7 @@ function BoxCallButton() {
   return (
     <button
       onClick={handleClick}
+      data-tour="race-call-box"
       className={clsx(
         "rounded-xl border-2 p-2 sm:p-3 flex flex-col items-center justify-center transition-all active:scale-95",
         sent
