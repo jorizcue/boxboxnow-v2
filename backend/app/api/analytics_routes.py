@@ -377,6 +377,67 @@ async def get_kart_drivers(
     return drivers
 
 
+@router.get("/kart-driver-laps")
+async def get_kart_driver_laps(
+    circuit_id: int,
+    kart_number: int,
+    team_name: str = Query("", description="Team as shown in the breakdown row"),
+    driver_name: str = Query("", description="Driver as shown in the breakdown row"),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    race_log_ids: str | None = Query(None, description="Comma-separated race_log IDs"),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """All valid laps a given driver did on a given kart, chronological.
+    Powers the expandable per-driver detail in the 'Desglose pilotos'
+    modal. Team/driver matching mirrors get_kart_drivers' grouping
+    (stripped strings) so the row count equals that row's 'Vueltas'."""
+    await _check_circuit_access(user, circuit_id, db)
+
+    if race_log_ids:
+        rl_ids = [int(x) for x in race_log_ids.split(",") if x.strip()]
+    else:
+        dt_from, dt_to = _parse_date_range(date_from, date_to)
+        rl_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)
+
+    if not rl_ids:
+        return []
+
+    result = await db.execute(
+        select(KartLap).where(
+            KartLap.race_log_id.in_(rl_ids),
+            KartLap.kart_number == kart_number,
+            KartLap.is_valid == True,
+        )
+    )
+    all_laps = _dedup_laps(result.scalars().all())
+
+    want_team = team_name.strip()
+    want_driver = driver_name.strip()
+    rows = [
+        lap
+        for lap in all_laps
+        if (lap.team_name or "").strip() == want_team
+        and (lap.driver_name or "").strip() == want_driver
+    ]
+    rows.sort(
+        key=lambda lap: (
+            lap.recorded_at.isoformat() if lap.recorded_at else "",
+            lap.lap_number,
+        )
+    )
+
+    return [
+        {
+            "lap_time_ms": lap.lap_time_ms,
+            "lap_number": lap.lap_number,
+            "recorded_at": lap.recorded_at.isoformat() if lap.recorded_at else "",
+        }
+        for lap in rows
+    ]
+
+
 @router.get("/drivers")
 async def get_scope_drivers(
     circuit_id: int,

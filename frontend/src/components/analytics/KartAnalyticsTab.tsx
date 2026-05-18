@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { api } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,6 +38,12 @@ interface DriverBreakdown {
   total_laps: number;
   avg_lap_ms: number;
   best_lap_ms: number;
+}
+
+interface DriverLap {
+  lap_time_ms: number;
+  lap_number: number;
+  recorded_at: string;
 }
 
 interface RaceLogEntry {
@@ -108,6 +114,10 @@ export function KartAnalyticsTab() {
   const [driverModalKart, setDriverModalKart] = useState<number | null>(null);
   const [driverBreakdown, setDriverBreakdown] = useState<DriverBreakdown[]>([]);
   const [loadingDrivers, setLoadingDrivers] = useState(false);
+  // Per-driver lap detail expanded inside the breakdown modal
+  const [expandedDriver, setExpandedDriver] = useState<string | null>(null);
+  const [driverLapsMap, setDriverLapsMap] = useState<Record<string, DriverLap[]>>({});
+  const [loadingDriverLapsKey, setLoadingDriverLapsKey] = useState<string | null>(null);
 
   // Reprocess day
   const [reprocessing, setReprocessing] = useState(false);
@@ -312,11 +322,50 @@ export function KartAnalyticsTab() {
     setDriverModalKart(kartNumber);
     setLoadingDrivers(true);
     setDriverBreakdown([]);
+    setExpandedDriver(null);
+    setDriverLapsMap({});
+    setLoadingDriverLapsKey(null);
     try {
       const drivers = await api.getKartDrivers(selectedCircuitId, kartNumber, dateFrom, dateTo, filterOutliers, activeRaceLogIds);
       setDriverBreakdown(drivers);
     } catch {}
     setLoadingDrivers(false);
+  };
+
+  // Lazily fetch (and cache) one driver's individual laps on the
+  // currently-open kart. Cached by display_name so re-expanding is
+  // instant and a refetch is skipped.
+  const fetchDriverLaps = async (d: DriverBreakdown) => {
+    if (!selectedCircuitId || driverModalKart == null) return;
+    if (driverLapsMap[d.display_name]) return;
+    setLoadingDriverLapsKey(d.display_name);
+    try {
+      const laps = await api.getKartDriverLaps(
+        selectedCircuitId,
+        driverModalKart,
+        d.team_name,
+        d.driver_name,
+        dateFrom,
+        dateTo,
+        activeRaceLogIds,
+      );
+      setDriverLapsMap((m) => ({ ...m, [d.display_name]: laps }));
+    } catch {
+      setDriverLapsMap((m) => ({ ...m, [d.display_name]: [] }));
+    }
+    setLoadingDriverLapsKey(null);
+  };
+
+  // Single click toggles; double click always ends expanded (the user
+  // asked for either gesture to reveal the laps).
+  const toggleDriverLaps = (d: DriverBreakdown) => {
+    const willExpand = expandedDriver !== d.display_name;
+    setExpandedDriver(willExpand ? d.display_name : null);
+    if (willExpand) fetchDriverLaps(d);
+  };
+  const expandDriverLaps = (d: DriverBreakdown) => {
+    setExpandedDriver(d.display_name);
+    fetchDriverLaps(d);
   };
 
   const SortIcon = ({ field }: { field: SortField }) => {
@@ -761,21 +810,103 @@ export function KartAnalyticsTab() {
                 </thead>
                 <tbody>
                   {driverBreakdown.map((d, idx) => (
-                    <tr key={d.display_name} className="border-t border-border">
-                      <td className="px-2 py-1.5 text-center text-neutral-500 text-xs">{idx + 1}</td>
-                      <td className="px-2 py-1.5 text-left text-white font-medium truncate max-w-[220px]">
-                        {d.display_name}
-                      </td>
-                      <td className="px-2 py-1.5 text-right font-mono font-semibold text-accent">
-                        {msToLapTime(d.avg_lap_ms)}
-                      </td>
-                      <td className="px-2 py-1.5 text-right font-mono text-purple-400">
-                        {msToLapTime(d.best_lap_ms)}
-                      </td>
-                      <td className="px-2 py-1.5 text-right text-neutral-400">
-                        {d.total_laps}
-                      </td>
-                    </tr>
+                    <Fragment key={d.display_name}>
+                      <tr className="border-t border-border">
+                        <td className="px-2 py-1.5 text-center text-neutral-500 text-xs">{idx + 1}</td>
+                        <td className="px-2 py-1.5 text-left">
+                          <button
+                            onClick={() => toggleDriverLaps(d)}
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              expandDriverLaps(d);
+                            }}
+                            className="flex items-center gap-1.5 text-white font-medium hover:text-accent transition-colors text-left max-w-[220px]"
+                            title="Ver vueltas de este piloto en el kart"
+                          >
+                            <span
+                              className={`text-[9px] text-neutral-500 transition-transform ${
+                                expandedDriver === d.display_name ? "rotate-90" : ""
+                              }`}
+                            >
+                              &#9656;
+                            </span>
+                            <span className="truncate">{d.display_name}</span>
+                          </button>
+                        </td>
+                        <td className="px-2 py-1.5 text-right font-mono font-semibold text-accent">
+                          {msToLapTime(d.avg_lap_ms)}
+                        </td>
+                        <td className="px-2 py-1.5 text-right font-mono text-purple-400">
+                          {msToLapTime(d.best_lap_ms)}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-neutral-400">
+                          {d.total_laps}
+                        </td>
+                      </tr>
+                      {expandedDriver === d.display_name && (
+                        <tr className="bg-black/20">
+                          <td colSpan={5} className="px-3 py-2">
+                            {loadingDriverLapsKey === d.display_name ? (
+                              <p className="text-neutral-500 text-xs animate-pulse py-2 text-center">
+                                {t("analytics.loading")}
+                              </p>
+                            ) : !driverLapsMap[d.display_name] ||
+                              driverLapsMap[d.display_name].length === 0 ? (
+                              <p className="text-neutral-500 text-xs py-2 text-center">
+                                {t("analytics.noData")}
+                              </p>
+                            ) : (
+                              <div className="max-h-[220px] overflow-y-auto">
+                                <table className="w-full text-xs">
+                                  <thead className="text-[9px] text-neutral-500 uppercase tracking-wider">
+                                    <tr>
+                                      <th className="text-center px-2 py-1 w-8">#</th>
+                                      <th className="text-right px-2 py-1">Tiempo</th>
+                                      <th className="text-right px-2 py-1">Vuelta</th>
+                                      <th className="text-left px-2 py-1">Hora</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {(() => {
+                                      const laps = driverLapsMap[d.display_name];
+                                      const best = Math.min(...laps.map((l) => l.lap_time_ms));
+                                      return laps.map((l, i) => (
+                                        <tr key={i} className="border-t border-border/50">
+                                          <td className="px-2 py-1 text-center text-neutral-600">
+                                            {i + 1}
+                                          </td>
+                                          <td
+                                            className={`px-2 py-1 text-right font-mono ${
+                                              l.lap_time_ms === best
+                                                ? "text-purple-400 font-semibold"
+                                                : "text-green-400"
+                                            }`}
+                                          >
+                                            {msToLapTime(l.lap_time_ms)}
+                                          </td>
+                                          <td className="px-2 py-1 text-right text-neutral-400">
+                                            {l.lap_number}
+                                          </td>
+                                          <td className="px-2 py-1 text-left text-neutral-500 whitespace-nowrap">
+                                            {l.recorded_at
+                                              ? new Date(l.recorded_at).toLocaleTimeString(undefined, {
+                                                  hour: "2-digit",
+                                                  minute: "2-digit",
+                                                  second: "2-digit",
+                                                })
+                                              : "-"}
+                                          </td>
+                                        </tr>
+                                      ));
+                                    })()}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

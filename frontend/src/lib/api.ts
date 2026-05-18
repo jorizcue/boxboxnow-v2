@@ -426,6 +426,15 @@ export const api = {
     if (raceLogIds && raceLogIds.length > 0) params.set("race_log_ids", raceLogIds.join(","));
     return fetchApi<any[]>(`/api/analytics/kart-drivers?${params}`);
   },
+  getKartDriverLaps: (circuitId: number, kartNumber: number, teamName: string, driverName: string, dateFrom?: string, dateTo?: string, raceLogIds?: number[]) => {
+    const params = new URLSearchParams({ circuit_id: String(circuitId), kart_number: String(kartNumber) });
+    params.set("team_name", teamName);
+    params.set("driver_name", driverName);
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    if (raceLogIds && raceLogIds.length > 0) params.set("race_log_ids", raceLogIds.join(","));
+    return fetchApi<{ lap_time_ms: number; lap_number: number; recorded_at: string }[]>(`/api/analytics/kart-driver-laps?${params}`);
+  },
   getAnalyticsDrivers: (circuitId: number, dateFrom?: string, dateTo?: string, raceLogIds?: number[]) => {
     const params = new URLSearchParams({ circuit_id: String(circuitId) });
     if (dateFrom) params.set("date_from", dateFrom);
