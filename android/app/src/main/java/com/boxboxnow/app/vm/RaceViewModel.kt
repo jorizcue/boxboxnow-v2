@@ -69,6 +69,10 @@ class RaceViewModel @Inject constructor(
     private val _boxCallActive = MutableStateFlow(false)
     val boxCallActive = _boxCallActive.asStateFlow()
 
+    // Free-text alert pushed by the strategist from the web. null = none.
+    private val _driverMessage = MutableStateFlow<String?>(null)
+    val driverMessage = _driverMessage.asStateFlow()
+
     /** Emits the circuit_id every time the backend notifies a live admin
      * edit of the circuit (e.g. new GPS finish-line). DriverScreen
      * collects it to re-fetch circuits + re-apply the finish line on
@@ -161,6 +165,7 @@ class RaceViewModel @Inject constructor(
 
     fun setOurKartNumber(v: Int) { _ourKartNumber.value = v }
     fun clearBoxCall() { _boxCallActive.value = false }
+    fun clearDriverMessage() { _driverMessage.value = null }
 
     init {
         ws.onMessage = { text -> handleMessage(text) }
@@ -618,6 +623,11 @@ class RaceViewModel @Inject constructor(
             }
 
             "box_call" -> { _boxCallActive.value = true }
+
+            "driver_message" -> {
+                val msg = el["text"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+                if (msg.isNotEmpty()) _driverMessage.value = msg.take(280)
+            }
 
             "circuit_updated" -> {
                 // Admin edited the circuit's GPS finish-line. Broadcast

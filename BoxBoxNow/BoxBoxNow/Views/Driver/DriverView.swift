@@ -268,10 +268,19 @@ struct DriverView: View {
                             raceVM.boxCallActive = false
                         }
                     }
+
+                    // ── Free-text message overlay (white / black) ──
+                    if let msg = raceVM.driverMessage {
+                        DriverMessageOverlay(text: msg) {
+                            raceVM.driverMessage = nil
+                        }
+                    }
                 }
                 .onTapGesture {
                     if raceVM.boxCallActive {
                         raceVM.boxCallActive = false
+                    } else if raceVM.driverMessage != nil {
+                        raceVM.driverMessage = nil
                     } else {
                         withAnimation { showMenu.toggle() }
                     }
@@ -391,6 +400,19 @@ struct DriverView: View {
                 // Auto-dismiss after 5 seconds (mirrors Android BoxCallOverlay)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                     raceVM.boxCallActive = false
+                }
+            }
+        }
+        .onChange(of: raceVM.driverMessageDate) {
+            if raceVM.driverMessage != nil {
+                // Same feedback + auto-dismiss window as the BOX call.
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                let shownAt = raceVM.driverMessageDate
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    // Only clear if no newer message arrived meanwhile.
+                    if raceVM.driverMessageDate == shownAt {
+                        raceVM.driverMessage = nil
+                    }
                 }
             }
         }

@@ -39,3 +39,39 @@ struct BoxCallOverlay: View {
         .transition(.opacity)
     }
 }
+
+/// Full-screen overlay for a free-text message the strategist sends from
+/// the web. White background, large bold black text so it's readable at
+/// a glance on track. Tap anywhere to dismiss. Mirrors `BoxCallOverlay`.
+struct DriverMessageOverlay: View {
+    let text: String
+    var onDismiss: () -> Void
+    @EnvironmentObject var langStore: LanguageStore
+
+    var body: some View {
+        ZStack {
+            Color.white
+                .ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                Text(text)
+                    .font(.system(size: 80, weight: .black))
+                    .foregroundColor(.black)
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.3)
+                    .lineLimit(6)
+                    .padding(.horizontal, 24)
+
+                Text(t("boxCall.tapToClose"))
+                    .font(.subheadline)
+                    .foregroundColor(.black.opacity(0.5))
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(text)
+        .accessibilityAddTraits(.isModal)
+        .accessibilityAction { onDismiss() }
+        .onTapGesture { onDismiss() }
+        .transition(.opacity)
+    }
+}

@@ -35,6 +35,9 @@ final class RaceViewModel: ObservableObject {
     @Published var replayActive = false
     @Published var boxCallActive = false
     @Published var boxCallDate = Date()
+    // Free-text alert pushed by the strategist from the web. nil = none.
+    @Published var driverMessage: String? = nil
+    @Published var driverMessageDate = Date()
 
     // Race config (updated live from WS snapshot config)
     @Published var ourKartNumber: Int = 0
@@ -643,6 +646,16 @@ final class RaceViewModel: ObservableObject {
             print("[RaceVM] BOX CALL received")
             boxCallActive = true
             boxCallDate = Date()
+
+        case "driver_message":
+            // Free-text alert from the web dashboard — overlay on the
+            // driver view (same relay path as box_call).
+            let msg = (json["text"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !msg.isEmpty {
+                print("[RaceVM] DRIVER MESSAGE received")
+                driverMessage = String(msg.prefix(280))
+                driverMessageDate = Date()
+            }
 
         case "preset_default_changed":
             // Web marked a different preset as the default. Re-post as a

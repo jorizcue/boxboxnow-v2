@@ -205,6 +205,7 @@ private fun DriverScreenContent(onBack: () -> Unit) {
     val boxScore by raceVM.boxScore.collectAsState()
     val isConnected by raceVM.isConnected.collectAsState()
     val boxCall by raceVM.boxCallActive.collectAsState()
+    val driverMessage by raceVM.driverMessage.collectAsState()
     val lastLap by driverVM.lapTracker.lastLapMs.collectAsState()
     val bestLap by driverVM.lapTracker.bestLapMs.collectAsState()
 
@@ -378,6 +379,7 @@ private fun DriverScreenContent(onBack: () -> Unit) {
                 indication = null,
                 onClick = {
                     if (boxCall) raceVM.clearBoxCall()
+                    else if (driverMessage != null) raceVM.clearDriverMessage()
                     else showMenu = !showMenu
                 },
             ),
@@ -422,7 +424,7 @@ private fun DriverScreenContent(onBack: () -> Unit) {
 
         // Menu handle — small dots on the right edge
         AnimatedVisibility(
-            visible = !showMenu && !boxCall,
+            visible = !showMenu && !boxCall && driverMessage == null,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.CenterEnd),
@@ -498,6 +500,18 @@ private fun DriverScreenContent(onBack: () -> Unit) {
             exit = fadeOut(),
         ) {
             BoxCallOverlay(onDismiss = { raceVM.clearBoxCall() })
+        }
+
+        // Full-screen free-text message overlay (white / black)
+        AnimatedVisibility(
+            visible = driverMessage != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            DriverMessageOverlay(
+                text = driverMessage.orEmpty(),
+                onDismiss = { raceVM.clearDriverMessage() },
+            )
         }
     }
 }
