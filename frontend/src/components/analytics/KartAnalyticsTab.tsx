@@ -91,6 +91,14 @@ export function KartAnalyticsTab() {
   const [loadingFiltered, setLoadingFiltered] = useState(false);
   const [filteredStats, setFilteredStats] = useState<KartStat[] | null>(null);
 
+  // Driver filter: autocomplete over the drivers in the current scope.
+  // Picking one hides karts that driver never drove — kart metrics stay
+  // global (user's choice), only the visible rows are restricted.
+  const [drivers, setDrivers] = useState<{ name: string; karts: number[] }[]>([]);
+  const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
+  const [driverQuery, setDriverQuery] = useState("");
+  const [driverDropdownOpen, setDriverDropdownOpen] = useState(false);
+
   // Best laps modal
   const [modalKart, setModalKart] = useState<number | null>(null);
   const [bestLaps, setBestLaps] = useState<BestLap[]>([]);
@@ -210,12 +218,40 @@ export function KartAnalyticsTab() {
     }
   }, [selectedRaceLogIds, applySessionFilter]);
 
+  // Load the driver list for the current scope (selected sessions if
+  // any, otherwise the date range). Feeds the driver autocomplete.
+  const loadDrivers = useCallback(async () => {
+    if (!selectedCircuitId) {
+      setDrivers([]);
+      return;
+    }
+    try {
+      const ids = selectedRaceLogIds.size > 0 ? Array.from(selectedRaceLogIds) : undefined;
+      const d = await api.getAnalyticsDrivers(selectedCircuitId, dateFrom, dateTo, ids);
+      setDrivers(d);
+    } catch {
+      setDrivers([]);
+    }
+  }, [selectedCircuitId, dateFrom, dateTo, selectedRaceLogIds]);
+
+  useEffect(() => {
+    loadDrivers();
+  }, [loadDrivers]);
+
+  // Clear the driver filter whenever the scope changes (circuit, dates
+  // or session selection) — the picked driver may not exist in the new
+  // scope and its kart set would be stale.
+  useEffect(() => {
+    setSelectedDriver(null);
+    setDriverQuery("");
+    setDriverDropdownOpen(false);
+  }, [selectedCircuitId, dateFrom, dateTo, selectedRaceLogIds]);
+
   const selected = summaries.find((s) => s.circuit.id === selectedCircuitId);
   const panelOpen = selected !== undefined && (selected.stats.length > 0 || selected.raceLogs.length > 0);
 
   // Use filtered stats if session filter is active, otherwise use full stats
   const activeStats = filteredStats !== null ? filteredStats : (selected?.stats || []);
-  const activeValidLaps = activeStats.reduce((a, s) => a + s.valid_laps, 0);
 
   // Sorted stats
   const sortedStats = useMemo(() => {
@@ -227,9 +263,24 @@ export function KartAnalyticsTab() {
     return copy;
   }, [activeStats, sortBy, sortDir]);
 
-  // Color scale for kart performance
-  const bestBest5 = sortedStats.length > 0 ? Math.min(...sortedStats.map((s) => s.best5_avg_ms)) : 0;
-  const worstBest5 = sortedStats.length > 0 ? Math.max(...sortedStats.map((s) => s.best5_avg_ms)) : 0;
+  // Driver filter: when a driver is picked, restrict the visible rows
+  // to the karts that driver drove. Metrics are NOT recomputed — each
+  // kart keeps its global numbers (user's explicit choice).
+  const driverKartSet = useMemo(() => {
+    if (!selectedDriver) return null;
+    const d = drivers.find((x) => x.name === selectedDriver);
+    return d ? new Set(d.karts) : new Set<number>();
+  }, [selectedDriver, drivers]);
+
+  const visibleStats = useMemo(
+    () => (driverKartSet ? sortedStats.filter((s) => driverKartSet.has(s.kart_number)) : sortedStats),
+    [sortedStats, driverKartSet],
+  );
+  const visibleValidLaps = visibleStats.reduce((a, s) => a + s.valid_laps, 0);
+
+  // Color scale for kart performance (relative to the visible set)
+  const bestBest5 = visibleStats.length > 0 ? Math.min(...visibleStats.map((s) => s.best5_avg_ms)) : 0;
+  const worstBest5 = visibleStats.length > 0 ? Math.max(...visibleStats.map((s) => s.best5_avg_ms)) : 0;
   const range = worstBest5 - bestBest5;
 
   const getSpeedColor = (ms: number): string => {
@@ -359,9 +410,9 @@ export function KartAnalyticsTab() {
                 <div className="flex items-center gap-3 text-[10px] text-neutral-400 mt-1">
                   <span className="text-accent font-semibold">{selectedRaceLogIds.size > 0 ? selectedRaceLogIds.size : selected.races}</span> {t("analytics.racesFound")}
                   <span className="text-neutral-600">|</span>
-                  <span className="text-accent font-semibold">{activeStats.length}</span> {t("analytics.karts")}
+                  <span className="text-accent font-semibold">{visibleStats.length}</span> {t("analytics.karts")}
                   <span className="text-neutral-600">|</span>
-                  <span className="text-accent font-semibold">{activeValidLaps.toLocaleString()}</span> {t("analytics.validLaps")}
+                  <span className="text-accent font-semibold">{visibleValidLaps.toLocaleString()}</span> {t("analytics.validLaps")}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -464,6 +515,79 @@ export function KartAnalyticsTab() {
               </div>
             )}
 
+            {/* Driver filter (autocomplete over drivers in scope) */}
+            {drivers.length > 0 && (
+              <div className="mb-4 bg-white/[0.02] rounded-lg border border-border p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-[10px] text-neutral-200 uppercase tracking-wider">
+                    Filtrar por piloto
+                    {selectedDriver && (
+                      <span className="ml-2 text-accent font-normal">({selectedDriver})</span>
+                    )}
+                  </h4>
+                  {selectedDriver && (
+                    <button
+                      onClick={() => {
+                        setSelectedDriver(null);
+                        setDriverQuery("");
+                        setDriverDropdownOpen(false);
+                      }}
+                      className="text-[10px] text-neutral-400 hover:text-white transition-colors"
+                    >
+                      Quitar
+                    </button>
+                  )}
+                </div>
+                <div className="relative max-w-[280px]">
+                  <input
+                    value={driverQuery}
+                    onChange={(e) => {
+                      setDriverQuery(e.target.value);
+                      setSelectedDriver(null);
+                      setDriverDropdownOpen(true);
+                    }}
+                    onFocus={() => setDriverDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setDriverDropdownOpen(false), 150)}
+                    placeholder="Escribe 3+ letras del nombre…"
+                    className="w-full bg-white/[0.03] border border-neutral-700/50 rounded-md px-2.5 py-1.5 text-[11px] text-neutral-100 outline-none focus:border-accent/50"
+                  />
+                  {driverDropdownOpen && driverQuery.trim().length >= 3 && (() => {
+                    const q = driverQuery.trim().toLowerCase();
+                    const matches = drivers
+                      .filter((d) => d.name.toLowerCase().includes(q))
+                      .slice(0, 30);
+                    return (
+                      <div className="absolute z-20 mt-1 w-full max-h-[200px] overflow-y-auto bg-[#15151f] border border-border rounded-md shadow-xl">
+                        {matches.length === 0 ? (
+                          <div className="px-2.5 py-2 text-[11px] text-neutral-500">
+                            Sin coincidencias
+                          </div>
+                        ) : (
+                          matches.map((d) => (
+                            <button
+                              key={d.name}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                setSelectedDriver(d.name);
+                                setDriverQuery(d.name);
+                                setDriverDropdownOpen(false);
+                              }}
+                              className="block w-full text-left px-2.5 py-1.5 text-[11px] text-neutral-300 hover:bg-accent/10 hover:text-accent transition-colors"
+                            >
+                              {d.name}
+                              <span className="ml-2 text-[9px] text-neutral-500">
+                                {d.karts.length} kart{d.karts.length === 1 ? "" : "s"}
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-[10px] text-neutral-400 uppercase tracking-wider">
@@ -494,7 +618,7 @@ export function KartAnalyticsTab() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedStats.map((s, idx) => (
+                  {visibleStats.map((s, idx) => (
                     <tr
                       key={s.kart_number}
                       className="border-t border-border hover:bg-black/30 transition-colors cursor-pointer"
@@ -525,9 +649,14 @@ export function KartAnalyticsTab() {
                   ))}
                 </tbody>
               </table>
+              {visibleStats.length === 0 && selectedDriver && (
+                <p className="text-neutral-500 text-xs py-6 text-center">
+                  Sin karts para «{selectedDriver}» en este filtro
+                </p>
+              )}
             </div>
 
-            {sortedStats.length > 0 && (
+            {visibleStats.length > 0 && (
               <div className="mt-3 flex items-center gap-4 text-[10px]">
                 <span className="text-green-400">{t("analytics.fast")}</span>
                 <span className="text-accent">{t("analytics.goodPace")}</span>

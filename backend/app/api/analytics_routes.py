@@ -377,6 +377,51 @@ async def get_kart_drivers(
     return drivers
 
 
+@router.get("/drivers")
+async def get_scope_drivers(
+    circuit_id: int,
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    race_log_ids: str | None = Query(None, description="Comma-separated race_log IDs"),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Distinct driver names in scope plus the kart numbers each drove.
+    Powers the kart-analytics driver filter: the frontend uses ``name``
+    for autocomplete and ``karts`` to hide karts a driver never drove."""
+    await _check_circuit_access(user, circuit_id, db)
+
+    if race_log_ids:
+        rl_ids = [int(x) for x in race_log_ids.split(",") if x.strip()]
+    else:
+        dt_from, dt_to = _parse_date_range(date_from, date_to)
+        rl_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)
+
+    if not rl_ids:
+        return []
+
+    result = await db.execute(
+        select(KartLap.driver_name, KartLap.kart_number)
+        .where(
+            KartLap.race_log_id.in_(rl_ids),
+            KartLap.driver_name.isnot(None),
+            KartLap.driver_name != "",
+        )
+        .distinct()
+    )
+
+    by_driver: dict[str, set[int]] = defaultdict(set)
+    for driver_name, kart_number in result.all():
+        name = (driver_name or "").strip()
+        if name:
+            by_driver[name].add(kart_number)
+
+    return [
+        {"name": name, "karts": sorted(karts)}
+        for name, karts in sorted(by_driver.items())
+    ]
+
+
 @router.get("/race-logs", response_model=list[RaceLogOut])
 async def list_race_logs(
     circuit_id: int,
