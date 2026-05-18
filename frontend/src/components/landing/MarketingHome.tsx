@@ -3,6 +3,7 @@
 import { Navbar } from "@/components/landing/Navbar";
 import { PricingToggle } from "@/components/landing/PricingToggle";
 import { FeatureComparisonTable } from "@/components/landing/FeatureComparisonTable";
+import { CompatibleCircuitsModal } from "@/components/landing/CompatibleCircuitsModal";
 import { LiveTicker } from "@/components/landing/LiveTicker";
 import { MiniRaceTable } from "@/components/landing/MiniRaceTable";
 import { TrialCTA, TrialSubtitle } from "@/components/landing/TrialCTA";
@@ -248,6 +249,11 @@ export function MarketingHome() {
             ))}
           </div>
         </div>
+      </section>
+
+      {/* ===== COMPATIBLE CIRCUITS CTA ===== */}
+      <section className="py-10 sm:py-12">
+        <CompatibleCircuitsModal />
       </section>
 
       {/* ===== FEATURES — 8-card grid ===== */}

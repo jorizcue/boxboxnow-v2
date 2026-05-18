@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.models.database import get_db
-from app.models.schemas import AppSetting, ProductTabConfig
+from app.models.schemas import AppSetting, ProductTabConfig, Circuit
 from app.services.plan_translations import localize_plan
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,27 @@ async def site_status(db: AsyncSession = Depends(get_db)):
         "google_auth_enabled": (rows.get("google_auth_enabled") or "false").lower() == "true",
         "now": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@router.get("/public/circuits")
+async def list_public_circuits(db: AsyncSession = Depends(get_db)):
+    """Public list of platform-compatible circuits for the landing page.
+
+    No auth. Returns every circuit that is for sale OR in beta; the
+    landing groups them client-side by the (for_sale, is_beta) flags
+    into Disponibles (for_sale & !beta), En pruebas (for_sale & beta)
+    and En estudio (!for_sale & beta). Circuits that are neither for
+    sale nor beta are not platform-facing and are excluded.
+    """
+    result = await db.execute(
+        select(Circuit)
+        .where((Circuit.for_sale == True) | (Circuit.is_beta == True))  # noqa: E712
+        .order_by(Circuit.name)
+    )
+    return [
+        {"name": c.name, "is_beta": c.is_beta, "for_sale": c.for_sale}
+        for c in result.scalars().all()
+    ]
 
 
 @router.get("/plans")

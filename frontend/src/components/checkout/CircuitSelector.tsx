@@ -274,7 +274,7 @@ export function CircuitSelector({
       ? circuits.find((c) => c.id === selectedIds[0])?.name
       : null;
 
-  const renderSelectable = (circuit: Circuit) => {
+  const renderSelectable = (circuit: Circuit, badgeKey: string | null) => {
     const checked = selectedIds.includes(circuit.id);
     const atCap = isMulti && !checked && selectedIds.length >= requiredCount;
     return (
@@ -305,9 +305,9 @@ export function CircuitSelector({
             </div>
           )}
           <span className="font-medium">{circuit.name}</span>
-          {circuit.is_beta && (
+          {badgeKey && (
             <span className="text-[10px] uppercase rounded px-1.5 py-0.5 bg-amber-500/15 text-amber-300 border border-amber-500/30">
-              {t("circuitSelector.badgeProvisional")}
+              {t(badgeKey)}
             </span>
           )}
         </div>
@@ -315,7 +315,7 @@ export function CircuitSelector({
     );
   };
 
-  const renderReadonly = (circuit: Circuit, dim: boolean) => (
+  const renderReadonly = (circuit: Circuit, dim: boolean, badgeKey: string | null) => (
     <div
       key={circuit.id}
       className={`w-full px-4 py-3 rounded-lg border border-border bg-black ${dim ? "text-neutral-500" : "text-neutral-300"}`}
@@ -325,9 +325,9 @@ export function CircuitSelector({
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
         <span className="font-medium">{circuit.name}</span>
-        {circuit.is_beta && (
+        {badgeKey && (
           <span className="text-[10px] uppercase rounded px-1.5 py-0.5 bg-amber-500/15 text-amber-300 border border-amber-500/30">
-            {t("circuitSelector.badgeProvisional")}
+            {t(badgeKey)}
           </span>
         )}
       </div>
@@ -349,7 +349,7 @@ export function CircuitSelector({
           <div>
             {sectionHeader(t("circuitSelector.sectionAvailable"))}
             <div className="space-y-2">
-              {available.map((c) => readonlyAll ? renderReadonly(c, false) : renderSelectable(c))}
+              {available.map((c) => readonlyAll ? renderReadonly(c, false, null) : renderSelectable(c, null))}
             </div>
           </div>
         )}
@@ -357,7 +357,7 @@ export function CircuitSelector({
           <div>
             {sectionHeader(t("circuitSelector.sectionTesting"))}
             <div className="space-y-2">
-              {testing.map((c) => readonlyAll ? renderReadonly(c, false) : renderSelectable(c))}
+              {testing.map((c) => readonlyAll ? renderReadonly(c, false, "circuitSelector.badgeTesting") : renderSelectable(c, "circuitSelector.badgeTesting"))}
             </div>
           </div>
         )}
@@ -365,7 +365,7 @@ export function CircuitSelector({
           <div>
             {sectionHeader(t("circuitSelector.sectionStudy"), t("circuitSelector.studySubtitle"))}
             <div className="space-y-2">
-              {study.map((c) => renderReadonly(c, true))}
+              {study.map((c) => renderReadonly(c, true, "circuitSelector.badgeStudy"))}
             </div>
           </div>
         )}

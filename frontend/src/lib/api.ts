@@ -441,6 +441,10 @@ export const api = {
       body: JSON.stringify({ email, username, password }),
     }),
 
+  // Public (no auth) — landing "compatible circuits" list
+  getPublicCircuits: () =>
+    fetchApi<{ name: string; is_beta: boolean; for_sale: boolean }[]>("/api/public/circuits"),
+
   // Stripe
   getCheckoutCircuits: () =>
     fetchApi<{ id: number; name: string; is_beta: boolean; for_sale: boolean }[]>("/api/stripe/circuits"),
