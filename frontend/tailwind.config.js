@@ -31,9 +31,19 @@ module.exports = {
           '0%, 100%': { backgroundColor: 'rgba(220, 38, 38, 1)' },
           '50%': { backgroundColor: 'rgba(220, 38, 38, 0.3)' },
         },
+        fadeIn: {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+        modalIn: {
+          from: { opacity: '0', transform: 'translateY(8px) scale(0.98)' },
+          to: { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
       },
       animation: {
         boxFlash: 'boxFlash 0.5s ease-in-out infinite',
+        fadeIn: 'fadeIn 0.2s ease-out',
+        modalIn: 'modalIn 0.22s cubic-bezier(0.16,1,0.3,1)',
       },
     },
   },
