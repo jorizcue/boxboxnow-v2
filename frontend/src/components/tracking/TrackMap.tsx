@@ -23,7 +23,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import type { KartState, TrackConfig } from "@/types/race";
 import { pointAtDistance } from "@/lib/polyline";
-import { computeKartProgressM, isKartInPit } from "@/lib/kartPosition";
+import { computeKartProgressM, isKartInPit, computePitGhostProgressM } from "@/lib/kartPosition";
 import { KartPopup } from "./KartPopup";
 
 // Tier color resolver — mirrors `lib/formatters.ts::tierColorClass`
@@ -54,6 +54,8 @@ interface Props {
   // trackConfig.defaultDirection). Passed in so the map and the side
   // panel always agree on the sentido that's currently active.
   direction: "forward" | "reversed";
+  /** Configured pit-stop duration (s) — drives the "if I pit now" ghost. */
+  pitTimeS: number;
 }
 
 export function TrackMap({
@@ -64,6 +66,7 @@ export function TrackMap({
   selectedKart,
   onSelectKart,
   direction,
+  pitTimeS,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -82,6 +85,10 @@ export function TrackMap({
   // cache, the same DOM element survives across ticks and CSS smooths
   // the kart's path between server snapshots.
   const iconCacheRef = useRef<Map<number, { tier: number; isMine: boolean; isPit: boolean }>>(new Map());
+  // Dedicated marker for the "if I pit now" ghost (kept out of the
+  // per-kart markers map so the stale-marker cleanup never touches it).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ghostRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [L, setL] = useState<any>(null);
 
@@ -124,6 +131,7 @@ export function TrackMap({
       map.remove();
       mapRef.current = null;
       layerRefs.current = { markers: new Map(), polyline: null, pitLane: null, sectors: [] };
+      ghostRef.current = null;
     };
   }, [L, trackConfig.trackPolyline]);
 
@@ -346,7 +354,45 @@ export function TrackMap({
         iconCache.delete(num);
       }
     });
-  }, [L, karts, countdownMs, trackConfig, direction, myKartNumber, selectedKart, onSelectKart]);
+
+    // "If I pit now" ghost — where our kart would rejoin relative to
+    // the field shown now (static-field estimate). Dashed hollow ring
+    // so it reads as a projection, not a real kart. Non-interactive,
+    // drawn under real markers.
+    const mine = karts.find((k) => k.kartNumber === myKartNumber);
+    let ghostLatLon: [number, number] | null = null;
+    if (mine) {
+      const gw = computePitGhostProgressM(mine, trackConfig, countdownMs, direction, pitTimeS);
+      if (gw != null) ghostLatLon = pointAtDistance(trackConfig.trackPolyline, gw, true);
+    }
+    if (ghostLatLon) {
+      if (ghostRef.current) {
+        ghostRef.current.setLatLng(ghostLatLon);
+      } else {
+        const ghostIcon = L.divIcon({
+          html: `
+            <div style="
+              width:30px; height:30px; border-radius:50%;
+              border:2px dashed #9fe556; opacity:0.7;
+              display:flex; align-items:center; justify-content:center;
+              font-family: ui-monospace, 'SF Mono', monospace;
+              font-size:8px; font-weight:700; color:#9fe556;
+            ">PIT</div>`,
+          className: "tracking-kart-icon",
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
+        });
+        ghostRef.current = L.marker(ghostLatLon, {
+          icon: ghostIcon,
+          interactive: false,
+          zIndexOffset: -100,
+        }).addTo(map);
+      }
+    } else if (ghostRef.current) {
+      map.removeLayer(ghostRef.current);
+      ghostRef.current = null;
+    }
+  }, [L, karts, countdownMs, trackConfig, direction, myKartNumber, selectedKart, onSelectKart, pitTimeS]);
 
   const popupKart = useMemo(
     () => karts.find((k) => k.kartNumber === selectedKart) ?? null,

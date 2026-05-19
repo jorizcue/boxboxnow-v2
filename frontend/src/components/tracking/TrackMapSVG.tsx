@@ -62,7 +62,7 @@ import {
   polylineBounds,
   type LatLonBounds,
 } from "@/lib/svgPath";
-import { computeKartProgressM, isKartInPit } from "@/lib/kartPosition";
+import { computeKartProgressM, isKartInPit, computePitGhostProgressM } from "@/lib/kartPosition";
 import { pointAtDistance } from "@/lib/polyline";
 
 function tierColor(score: number | undefined): string {
@@ -86,6 +86,8 @@ interface Props {
   selectedKart: number | null;
   onSelectKart: (k: number | null) => void;
   direction: "forward" | "reversed";
+  /** Configured pit-stop duration (s) — drives the "if I pit now" ghost. */
+  pitTimeS: number;
 }
 
 /** Convert a polyline-walk distance (m) to a percentage along the SVG
@@ -109,6 +111,7 @@ export function TrackMapSVG({
   selectedKart,
   onSelectKart,
   direction,
+  pitTimeS,
 }: Props) {
   // Resolve geometry once per trackConfig change. If the operator has
   // configured `svg_viewbox` + `svg_paths.track` we use those verbatim.
@@ -181,6 +184,15 @@ export function TrackMapSVG({
         return { kart, isPit, pct, walkM, pitOffsetY };
       });
   }, [karts, trackConfig, countdownMs, direction, totalM]);
+
+  // "If I pit now" ghost: where our kart would rejoin relative to the
+  // field shown right now (static-field estimate, see helper).
+  const ghostPct = useMemo(() => {
+    const mine = karts.find((k) => k.kartNumber === myKartNumber);
+    if (!mine) return null;
+    const walk = computePitGhostProgressM(mine, trackConfig, countdownMs, direction, pitTimeS);
+    return walk != null ? pctFromPolylineWalk(walk, totalM) : null;
+  }, [karts, myKartNumber, trackConfig, countdownMs, direction, pitTimeS, totalM]);
 
   return (
     <div className="relative">
@@ -308,6 +320,42 @@ export function TrackMapSVG({
             );
           })}
         </g>
+
+        {/* "If I pit now" ghost — where our kart would rejoin relative
+            to the field shown now. Dashed hollow ring so it reads as a
+            projection, not a real kart. Non-interactive. */}
+        {ghostPct != null && geom.trackPath && (
+          <g
+            className="tracking-svg-kart"
+            style={{
+              offsetPath: `path("${geom.trackPath}")`,
+              offsetDistance: `${ghostPct.toFixed(3)}%`,
+              transition: "offset-distance 220ms linear",
+              pointerEvents: "none",
+            }}
+          >
+            <circle
+              r={7}
+              fill="none"
+              stroke="#9fe556"
+              strokeWidth={1.5}
+              strokeDasharray="3 2"
+              opacity={0.7}
+              vectorEffect="non-scaling-stroke"
+            />
+            <text
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={6}
+              fontWeight={700}
+              fill="#9fe556"
+              opacity={0.85}
+              style={{ pointerEvents: "none" }}
+            >
+              PIT
+            </text>
+          </g>
+        )}
       </svg>
 
       {/* Tiny corner badge so the operator knows which renderer is

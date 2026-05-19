@@ -167,3 +167,53 @@ export function computeKartProgressM(
   progress = ((progress % total) + total) % total;
   return progress;
 }
+
+/**
+ * Polyline-walk distance for the "if I pit NOW" ghost marker of our own
+ * kart. It answers the strategist's question "where would I rejoin
+ * relative to the field shown right now?": a static-field estimate that
+ * drops our current track position back by the distance the field
+ * advances during the configured pit time at our own pace.
+ *
+ *   offsetM = (pitTimeS / lapSeconds) · trackLengthM
+ *   ghost   = currentProgress − offsetM   (in race direction)
+ *
+ * Because `computeKartProgressM` places the kart at
+ * `anchor + sign·traveled`, shifting `traveled` by −offsetM is just
+ * `currentProgress − sign·offsetM` (sign = +1 forward, −1 reversed).
+ *
+ * Returns null when not meaningful: no kart / in pit / no pace / no
+ * pit time / no track length. The pace is clamped to a sane karting
+ * lap range so a garbage out-lap can't yield an absurd offset. This is
+ * an estimate (rivals assumed to hold pace, no SC/traffic/their pits).
+ */
+export function computePitGhostProgressM(
+  kart: KartState,
+  cfg: TrackConfig,
+  countdownMs: number,
+  direction: "forward" | "reversed",
+  pitTimeS: number,
+): number | null {
+  const total = cfg.trackLengthM ?? 0;
+  if (total <= 0 || !pitTimeS || pitTimeS <= 0) return null;
+  if (isKartInPit(kart)) return null;
+
+  const current = computeKartProgressM(kart, cfg, countdownMs, direction);
+  if (current == null) return null;
+
+  let lapMs =
+    kart.lastLapMs && kart.lastLapMs > 0
+      ? kart.lastLapMs
+      : kart.avgLapMs && kart.avgLapMs > 0
+        ? kart.avgLapMs
+        : 0;
+  if (lapMs <= 0) return null;
+  // Clamp to a plausible kart lap (20s–10min) so a bad out-lap or a
+  // stale 0.x value doesn't produce a nonsensical offset.
+  lapMs = Math.min(600_000, Math.max(20_000, lapMs));
+
+  const offsetM = (pitTimeS * 1000 / lapMs) * total;
+  const sign = direction === "reversed" ? -1 : 1;
+  const ghost = current - sign * offsetM;
+  return ((ghost % total) + total) % total;
+}

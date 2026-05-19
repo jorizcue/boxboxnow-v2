@@ -235,6 +235,7 @@ export function TrackingTab() {
               selectedKart={selectedKart}
               onSelectKart={setSelectedKart}
               direction={direction}
+              pitTimeS={config.pitTimeS}
             />
           ) : (
             <TrackMap
@@ -245,6 +246,7 @@ export function TrackingTab() {
               selectedKart={selectedKart}
               onSelectKart={setSelectedKart}
               direction={direction}
+              pitTimeS={config.pitTimeS}
             />
           )}
           {/* Legend */}
