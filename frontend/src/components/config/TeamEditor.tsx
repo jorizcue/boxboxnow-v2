@@ -130,6 +130,12 @@ export function TeamEditor() {
   };
 
   const importFromLiveTiming = async () => {
+    // Total replace (user's choice): wipe the current grid and load the
+    // Live one as-is. This loses manually-entered drivers and their
+    // differentials, so guard it behind an explicit confirmation.
+    if (teams.length > 0 && !window.confirm(t("teams.replaceConfirm"))) {
+      return;
+    }
     setImporting(true);
     try {
       const data = await api.getLiveTeams();
@@ -139,43 +145,19 @@ export function TeamEditor() {
         return;
       }
 
-      const existingByKart = new Map(teams.map((t) => [t.kart, t]));
+      // Build the grid purely from Live — no merge with existing teams.
+      const fresh: Team[] = data.teams.map((lt: any) => ({
+        id: newId(),
+        position: lt.position,
+        kart: lt.kart,
+        team_name: lt.team_name,
+        drivers: (lt.drivers || []).map((d: any) => ({
+          driver_name: d.driver_name,
+          differential_ms: 0,
+        })),
+      }));
 
-      const merged: Team[] = data.teams.map((lt: any) => {
-        const existing = existingByKart.get(lt.kart);
-        if (existing) {
-          const existingDrivers = new Map(
-            existing.drivers.map((d) => [d.driver_name.toLowerCase(), d])
-          );
-          const mergedDrivers = [...existing.drivers];
-          for (const ld of lt.drivers || []) {
-            if (!existingDrivers.has(ld.driver_name.toLowerCase())) {
-              mergedDrivers.push({
-                driver_name: ld.driver_name,
-                differential_ms: 0,
-              });
-            }
-          }
-          return {
-            ...existing,
-            position: lt.position,
-            team_name: lt.team_name || existing.team_name,
-            drivers: mergedDrivers,
-          };
-        }
-        return {
-          id: newId(),
-          position: lt.position,
-          kart: lt.kart,
-          team_name: lt.team_name,
-          drivers: (lt.drivers || []).map((d: any) => ({
-            driver_name: d.driver_name,
-            differential_ms: 0,
-          })),
-        };
-      });
-
-      setTeams(merged);
+      setTeams(fresh);
       alert(
         data.hasDrivers
           ? t("teams.importedWithDrivers", { count: data.kartCount })
