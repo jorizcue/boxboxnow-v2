@@ -710,12 +710,18 @@ export const api = {
   // GPS Telemetry
   saveGpsLaps: (laps: any[]) =>
     fetchApi("/api/gps/laps", { method: "POST", body: JSON.stringify({ laps }) }),
-  getGpsLaps: (params?: { circuit_id?: number; limit?: number }) => {
+  getGpsLaps: (params?: { circuit_id?: number; limit?: number; owner_id?: number }) => {
     const qs = new URLSearchParams();
     if (params?.circuit_id) qs.set("circuit_id", String(params.circuit_id));
     if (params?.limit) qs.set("limit", String(params.limit));
+    // Admin-only: list another pilot's laps (ignored server-side for non-admins).
+    if (params?.owner_id) qs.set("owner_id", String(params.owner_id));
     return fetchApi(`/api/gps/laps?${qs}`);
   },
+  getGpsCircuitPilots: (circuitId: number) =>
+    fetchApi<{ user_id: number; name: string }[]>(
+      `/api/gps/circuit-pilots?circuit_id=${circuitId}`,
+    ),
   getGpsLapDetail: (lapId: number) => fetchApi(`/api/gps/laps/${lapId}`),
   deleteGpsLap: (lapId: number) =>
     fetchApi(`/api/gps/laps/${lapId}`, { method: "DELETE" }),

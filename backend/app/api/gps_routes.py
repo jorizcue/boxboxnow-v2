@@ -87,12 +87,23 @@ async def save_laps(
 async def list_laps(
     circuit_id: int | None = Query(None),
     race_session_id: int | None = Query(None),
+    owner_id: int | None = Query(
+        None, description="Admin-only: list another pilot's laps instead of the caller's"
+    ),
     limit: int = Query(50, le=200),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List GPS laps for the current user (summary only, no trace data)."""
-    q = select(GpsTelemetryLap).where(GpsTelemetryLap.user_id == user.id)
+    """List GPS laps (summary only, no trace data). Defaults to the
+    caller's laps; admins may pass `owner_id` to list another pilot's
+    laps for cross-pilot comparison (same admin-bypass precedent as
+    /laps/window). Non-admins: `owner_id` is ignored."""
+    target_id = (
+        owner_id
+        if owner_id is not None and getattr(user, "is_admin", False)
+        else user.id
+    )
+    q = select(GpsTelemetryLap).where(GpsTelemetryLap.user_id == target_id)
     if circuit_id is not None:
         q = q.where(GpsTelemetryLap.circuit_id == circuit_id)
     if race_session_id is not None:
@@ -102,6 +113,27 @@ async def list_laps(
     result = await db.execute(q)
     rows = result.scalars().all()
     return [_to_out(r, include_traces=False) for r in rows]
+
+
+@router.get("/circuit-pilots")
+async def circuit_pilots(
+    circuit_id: int = Query(...),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin-only: distinct pilots that have GPS laps on a circuit, for
+    the cross-pilot comparison picker. Returns [{user_id, name}]."""
+    if not getattr(user, "is_admin", False):
+        raise HTTPException(status_code=403, detail="Admin only")
+    result = await db.execute(
+        select(GpsTelemetryLap.user_id, User.username)
+        .join(User, User.id == GpsTelemetryLap.user_id)
+        .where(GpsTelemetryLap.circuit_id == circuit_id)
+        .distinct()
+    )
+    pilots = [{"user_id": uid, "name": name} for uid, name in result.all()]
+    pilots.sort(key=lambda p: (p["name"] or "").lower())
+    return pilots
 
 
 @router.get("/laps/window", response_model=list[GpsLapOut])
@@ -165,13 +197,13 @@ async def get_lap_detail(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get a single GPS lap with full trace data."""
-    result = await db.execute(
-        select(GpsTelemetryLap).where(
-            GpsTelemetryLap.id == lap_id,
-            GpsTelemetryLap.user_id == user.id,
-        )
-    )
+    """Get a single GPS lap with full trace data. Admins may read any
+    pilot's lap (cross-pilot comparison); non-admins only their own —
+    same admin-bypass precedent as /laps/window."""
+    q = select(GpsTelemetryLap).where(GpsTelemetryLap.id == lap_id)
+    if not getattr(user, "is_admin", False):
+        q = q.where(GpsTelemetryLap.user_id == user.id)
+    result = await db.execute(q)
     row = result.scalar_one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="Lap not found")

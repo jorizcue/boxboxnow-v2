@@ -23,6 +23,10 @@ interface Props {
   selectedIndex?: number | null;
   /** Toggle a microsector. Passes null when the same row is clicked again. */
   onSelect?: (m: SelectedMicro | null) => void;
+  /** Override the V-number labels (e.g. "Piloto · V12" when comparing
+   *  laps from different pilots). Defaults to "V{lap_number}". */
+  labelA?: string;
+  labelB?: string;
 }
 
 export function MicrosectorTable({
@@ -31,6 +35,8 @@ export function MicrosectorTable({
   count = MICROSECTOR_COUNT,
   selectedIndex = null,
   onSelect,
+  labelA: labelAProp,
+  labelB: labelBProp,
 }: Props) {
   const t = useT();
   const data = useMemo(() => {
@@ -63,8 +69,8 @@ export function MicrosectorTable({
     return { rows, sumA, sumB, sumBest };
   }, [lapA, lapB, count]);
 
-  const labelA = `V${lapA.lap_number}`;
-  const labelB = `V${lapB.lap_number}`;
+  const labelA = labelAProp ?? `V${lapA.lap_number}`;
+  const labelB = labelBProp ?? `V${lapB.lap_number}`;
 
   const pick = (r: { index: number; startDist: number; endDist: number }) => {
     if (!onSelect) return;

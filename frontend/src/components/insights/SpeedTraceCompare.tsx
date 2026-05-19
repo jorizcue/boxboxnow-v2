@@ -29,6 +29,9 @@ interface Props {
   apexesA?: number[];
   apexesB?: number[];
   brakeZones?: boolean;
+  /** Legend labels; default "V{lap_number}". */
+  labelA?: string;
+  labelB?: string;
 }
 
 export function SpeedTraceCompare({
@@ -41,6 +44,8 @@ export function SpeedTraceCompare({
   apexesA,
   apexesB,
   brakeZones = false,
+  labelA,
+  labelB,
 }: Props) {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const crosshairRef = useRef<HTMLDivElement>(null);
@@ -201,19 +206,23 @@ export function SpeedTraceCompare({
     ctx.fillStyle = "rgba(255,255,255,0.5)";
     ctx.font      = "10px sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(`V${lapA.lap_number}`, pad.left + 24, pad.top + 9);
+    const legA = labelA ?? `V${lapA.lap_number}`;
+    const legB = labelB ?? `V${lapB.lap_number}`;
+    ctx.fillText(legA, pad.left + 24, pad.top + 9);
+    const bx = pad.left + 24 + ctx.measureText(legA).width + 12;
     ctx.fillStyle = "rgba(251, 146, 60, 0.95)";
-    ctx.fillRect(pad.left + 64, pad.top + 4, 12, 3);
+    ctx.fillRect(bx, pad.top + 4, 12, 3);
     ctx.fillStyle = "rgba(255,255,255,0.5)";
-    ctx.fillText(`V${lapB.lap_number}`, pad.left + 80, pad.top + 9);
+    ctx.fillText(legB, bx + 16, pad.top + 9);
 
     if (brakeZones) {
+      const fx = bx + 16 + ctx.measureText(legB).width + 16;
       ctx.fillStyle = "rgba(248, 113, 113, 0.55)";
-      ctx.fillRect(pad.left + 112, pad.top + 4, 10, 5);
+      ctx.fillRect(fx, pad.top + 4, 10, 5);
       ctx.fillStyle = "rgba(255,255,255,0.5)";
-      ctx.fillText("Frenada", pad.left + 126, pad.top + 9);
+      ctx.fillText("Frenada", fx + 14, pad.top + 9);
     }
-  }, [lapA, lapB, zoomRange, apexesA, apexesB, brakeZones]);
+  }, [lapA, lapB, zoomRange, apexesA, apexesB, brakeZones, labelA, labelB]);
 
   // ── Event listeners (registered once; read state via refs) ───────────
   useEffect(() => {

@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useReplayClockMs } from "@/hooks/useReplayClockMs";
+import { useAuth } from "@/hooks/useAuth";
 import { useT } from "@/lib/i18n";
 import type { CircuitOption, GpsLapDetail, GpsLapSummary, GpsStats, LatLon } from "./types";
 import {
@@ -78,6 +79,32 @@ export function GpsInsightsTab() {
   // Microsector picked in the table → focuses both overlay charts.
   const [selectedMicro, setSelectedMicro] = useState<{ index: number; startDist: number; endDist: number } | null>(null);
 
+  // ── Admin: cross-pilot compare (two independent A/B selectors) ──────
+  const user = useAuth((s) => s.user);
+  const isAdmin = !!user?.is_admin;
+  const [circuitPilots, setCircuitPilots] = useState<{ user_id: number; name: string }[]>([]);
+  const [pilotA, setPilotA] = useState<number | null>(null);
+  const [pilotB, setPilotB] = useState<number | null>(null);
+  const [lapsA, setLapsA] = useState<GpsLapSummary[]>([]);
+  const [lapsB, setLapsB] = useState<GpsLapSummary[]>([]);
+  const [lapAId, setLapAId] = useState<number | null>(null);
+  const [lapBId, setLapBId] = useState<number | null>(null);
+  // Pilot-prefixed labels for the compare charts (null = plain "V{n}").
+  const [compareLabels, setCompareLabels] = useState<[string, string] | null>(null);
+
+  const pilotOptions = useMemo(() => {
+    const opts = [...circuitPilots];
+    if (user && !opts.some((p) => p.user_id === user.id)) {
+      opts.unshift({ user_id: user.id, name: `${user.username} (tú)` });
+    }
+    return opts;
+  }, [circuitPilots, user]);
+
+  const pilotName = useCallback(
+    (id: number | null) => pilotOptions.find((p) => p.user_id === id)?.name ?? "—",
+    [pilotOptions],
+  );
+
   // Fetch the user's accessible circuits once. Used to populate the
   // dropdown and to look up the configured GPS finish line for each.
   useEffect(() => {
@@ -99,6 +126,63 @@ export function GpsInsightsTab() {
     })();
   }, []);
 
+  // Admin: load the pilots that have GPS laps on the selected circuit and
+  // default both A/B slots to the admin themselves.
+  useEffect(() => {
+    if (!isAdmin || !selectedCircuit) {
+      setCircuitPilots([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const ps = await api.getGpsCircuitPilots(selectedCircuit);
+        if (cancelled) return;
+        setCircuitPilots(ps);
+      } catch {
+        if (!cancelled) setCircuitPilots([]);
+      }
+    })();
+    setPilotA(user?.id ?? null);
+    setPilotB(user?.id ?? null);
+    setLapAId(null);
+    setLapBId(null);
+    return () => { cancelled = true; };
+  }, [isAdmin, selectedCircuit, user?.id]);
+
+  // Load a slot's lap list whenever its pilot changes (admin only).
+  useEffect(() => {
+    if (!isAdmin || !selectedCircuit || pilotA == null) { setLapsA([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const d = (await api.getGpsLaps({ circuit_id: selectedCircuit, owner_id: pilotA, limit: 200 })) as unknown;
+        if (cancelled) return;
+        setLapsA(Array.isArray(d) ? (d as GpsLapSummary[]) : []);
+      } catch {
+        if (!cancelled) setLapsA([]);
+      }
+    })();
+    setLapAId(null);
+    return () => { cancelled = true; };
+  }, [isAdmin, selectedCircuit, pilotA]);
+
+  useEffect(() => {
+    if (!isAdmin || !selectedCircuit || pilotB == null) { setLapsB([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const d = (await api.getGpsLaps({ circuit_id: selectedCircuit, owner_id: pilotB, limit: 200 })) as unknown;
+        if (cancelled) return;
+        setLapsB(Array.isArray(d) ? (d as GpsLapSummary[]) : []);
+      } catch {
+        if (!cancelled) setLapsB([]);
+      }
+    })();
+    setLapBId(null);
+    return () => { cancelled = true; };
+  }, [isAdmin, selectedCircuit, pilotB]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setView("list");
@@ -106,6 +190,7 @@ export function GpsInsightsTab() {
     setCompareIds(new Set());
     setCompareLaps([]);
     setSelectedMicro(null);
+    setCompareLabels(null);
     try {
       const params = selectedCircuit
         ? { circuit_id: selectedCircuit, limit: 200 }
@@ -170,6 +255,7 @@ export function GpsInsightsTab() {
     setView("compare");
     setDetailLap(null);
     setSelectedMicro(null);
+    setCompareLabels(null); // own-laps flow → plain "V{n}"
     try {
       const [a, b] = await Promise.all([
         api.getGpsLapDetail(ids[0]) as Promise<GpsLapDetail>,
@@ -178,6 +264,32 @@ export function GpsInsightsTab() {
       setCompareLaps([a, b]);
     } catch {
       setCompareLaps([]);
+    }
+    setLoadingCompare(false);
+  };
+
+  // Admin cross-pilot compare: lap A (pilot A) vs lap B (pilot B). Lap
+  // detail is readable across users via the admin bypass; labels carry
+  // the pilot name so the traces are unambiguous.
+  const doCompareAB = async () => {
+    if (lapAId == null || lapBId == null) return;
+    setLoadingCompare(true);
+    setView("compare");
+    setDetailLap(null);
+    setSelectedMicro(null);
+    try {
+      const [a, b] = await Promise.all([
+        api.getGpsLapDetail(lapAId) as Promise<GpsLapDetail>,
+        api.getGpsLapDetail(lapBId) as Promise<GpsLapDetail>,
+      ]);
+      setCompareLaps([a, b]);
+      setCompareLabels([
+        `${pilotName(pilotA)} · V${a.lap_number}`,
+        `${pilotName(pilotB)} · V${b.lap_number}`,
+      ]);
+    } catch {
+      setCompareLaps([]);
+      setCompareLabels(null);
     }
     setLoadingCompare(false);
   };
@@ -373,6 +485,64 @@ export function GpsInsightsTab() {
           </button>
         )}
       </div>
+
+      {/* ── Admin: cross-pilot compare (two A/B selectors) ────────── */}
+      {view === "list" && isAdmin && selectedCircuit && (
+        <div className="bg-white/[0.03] rounded-xl border border-accent/30 p-4 mb-3">
+          <div className="text-[11px] text-accent uppercase tracking-wider font-medium mb-1">
+            {t("insights.crosspilot.title")}
+          </div>
+          <div className="text-[10px] text-neutral-500 mb-3">
+            {t("insights.crosspilot.hint")}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {([
+              { key: "A", color: "text-blue-400", pilot: pilotA, setPilot: setPilotA, laps: lapsA, lapId: lapAId, setLapId: setLapAId },
+              { key: "B", color: "text-orange-400", pilot: pilotB, setPilot: setPilotB, laps: lapsB, lapId: lapBId, setLapId: setLapBId },
+            ] as const).map((slot) => (
+              <div key={slot.key} className="bg-black/30 rounded-lg border border-border p-3 space-y-2">
+                <div className={`text-[10px] uppercase tracking-wider font-semibold ${slot.color}`}>
+                  {slot.key}
+                </div>
+                <select
+                  value={slot.pilot ?? ""}
+                  onChange={(e) => slot.setPilot(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full rounded-md border border-border bg-bg px-2 py-1.5 text-xs text-muted focus:border-accent/50 focus:outline-none"
+                >
+                  <option value="">{t("insights.crosspilot.selectPilot")}</option>
+                  {pilotOptions.map((p) => (
+                    <option key={p.user_id} value={p.user_id}>{p.name}</option>
+                  ))}
+                </select>
+                <select
+                  value={slot.lapId ?? ""}
+                  onChange={(e) => slot.setLapId(e.target.value ? Number(e.target.value) : null)}
+                  disabled={slot.laps.length === 0}
+                  className="w-full rounded-md border border-border bg-bg px-2 py-1.5 text-xs text-muted focus:border-accent/50 focus:outline-none disabled:opacity-40"
+                >
+                  <option value="">
+                    {slot.laps.length === 0 ? t("insights.crosspilot.noLaps") : t("insights.crosspilot.selectLap")}
+                  </option>
+                  {slot.laps.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      V{l.lap_number} · {formatLapTime(l.duration_ms)} · {formatDateShort(l.recorded_at)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end mt-3">
+            <button
+              onClick={doCompareAB}
+              disabled={lapAId == null || lapBId == null || lapAId === lapBId}
+              className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {t("insights.crosspilot.compare")}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── List view ─────────────────────────────────────────────── */}
       {view === "list" && !loading && laps.length > 0 && (
@@ -667,6 +837,8 @@ export function GpsInsightsTab() {
                 lapB={compareLaps[1]}
                 selectedIndex={selectedMicro?.index ?? null}
                 onSelect={setSelectedMicro}
+                labelA={compareLabels?.[0]}
+                labelB={compareLabels?.[1]}
               />
 
               <div>
@@ -681,6 +853,8 @@ export function GpsInsightsTab() {
                     onHoverDistance={setCompareHoverDist}
                     focusRange={selectedMicro ? [selectedMicro.startDist, selectedMicro.endDist] : null}
                     onClearFocus={() => setSelectedMicro(null)}
+                    labelA={compareLabels?.[0]}
+                    labelB={compareLabels?.[1]}
                   />
                 </div>
               </div>
@@ -700,6 +874,8 @@ export function GpsInsightsTab() {
                     apexesA={compareApexesA}
                     apexesB={compareApexesB}
                     brakeZones
+                    labelA={compareLabels?.[0]}
+                    labelB={compareLabels?.[1]}
                   />
                 </div>
               </div>
