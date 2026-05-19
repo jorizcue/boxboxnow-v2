@@ -176,10 +176,14 @@ export function OnTrackPanel({
         return { kart: k, inPit, progressM, sector, lapPct, currentLapMs };
       })
       .sort((a, b) => {
-        // Sort by race position from the timing table (existing field
-        // — already takes laps + gap into account, more correct than
-        // sorting purely by polyline distance).
-        return (a.kart.position || 999) - (b.kart.position || 999);
+        // Strictly the Apex timing-table order: P1 first. Karts without
+        // an Apex position yet (0/undefined — practice, race start) go
+        // to the bottom, tie-broken by kart number so the order is
+        // stable and NEVER biased toward our configured/selected kart.
+        const pa = a.kart.position && a.kart.position > 0 ? a.kart.position : Infinity;
+        const pb = b.kart.position && b.kart.position > 0 ? b.kart.position : Infinity;
+        if (pa !== pb) return pa - pb;
+        return a.kart.kartNumber - b.kart.kartNumber;
       });
   }, [karts, trackConfig, countdownMs, direction]);
 
@@ -204,8 +208,12 @@ export function OnTrackPanel({
               key={kart.kartNumber}
               onClick={() => onSelectKart(isSelected ? null : kart.kartNumber)}
               className={`w-full text-left flex items-center gap-2 px-1.5 py-1.5 rounded-lg transition-colors border-b border-border/40 last:border-0 ${
-                isSelected ? "bg-white/[0.05]" : "hover:bg-white/[0.02]"
-              } ${isMine ? "bg-accent/[0.05]" : ""} ${isCrossingMeta ? "tracking-meta-flash" : ""}`}
+                isMine
+                  ? "bg-accent/15 ring-1 ring-inset ring-accent/60"
+                  : isSelected
+                  ? "bg-white/[0.05]"
+                  : "hover:bg-white/[0.02]"
+              } ${isCrossingMeta ? "tracking-meta-flash" : ""}`}
             >
               <span
                 className="w-6 h-6 rounded-full flex items-center justify-center font-mono font-bold text-[10px] shrink-0"
@@ -218,11 +226,22 @@ export function OnTrackPanel({
                 {kart.kartNumber}
               </span>
               <div className="flex-1 min-w-0 space-y-0.5">
-                {/* Row 1: driver name + race position. */}
+                {/* Row 1: team / driver + race position. */}
                 <div className="flex items-center justify-between gap-1">
-                  <span className="text-[11px] font-semibold text-neutral-200 truncate">
-                    {kart.driverName || "—"}
-                  </span>
+                  {(() => {
+                    const team = kart.teamName?.trim() || "";
+                    const drv = kart.driverName?.trim() || "";
+                    const primary = team || drv || "—";
+                    const secondary = team && drv && team !== drv ? drv : null;
+                    return (
+                      <span className="min-w-0 truncate text-[11px]">
+                        <span className="font-semibold text-neutral-200">{primary}</span>
+                        {secondary && (
+                          <span className="ml-1 text-neutral-500">· {secondary}</span>
+                        )}
+                      </span>
+                    );
+                  })()}
                   <span className="text-[10px] font-mono font-bold text-neutral-400 shrink-0">
                     P{kart.position || "?"}
                   </span>

@@ -373,10 +373,11 @@ export function TrackMap({
           html: `
             <div style="
               width:30px; height:30px; border-radius:50%;
-              border:2px dashed #9fe556; opacity:0.7;
+              background:#9fe556; border:2px solid #0a0a0a;
+              box-shadow:0 1px 3px rgba(0,0,0,0.6);
               display:flex; align-items:center; justify-content:center;
               font-family: ui-monospace, 'SF Mono', monospace;
-              font-size:8px; font-weight:700; color:#9fe556;
+              font-size:8px; font-weight:700; color:#0a0a0a;
             ">PIT</div>`,
           className: "tracking-kart-icon",
           iconSize: [30, 30],

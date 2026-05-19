@@ -54,7 +54,8 @@
  * overlap. The fan uses the same +3 m offset trick as the Leaflet
  * renderer.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useT } from "@/lib/i18n";
 import type { KartState, TrackConfig } from "@/types/race";
 import {
   autoSvgFromPolyline,
@@ -113,6 +114,7 @@ export function TrackMapSVG({
   direction,
   pitTimeS,
 }: Props) {
+  const t = useT();
   // Resolve geometry once per trackConfig change. If the operator has
   // configured `svg_viewbox` + `svg_paths.track` we use those verbatim.
   // Otherwise we derive both from the lat/lon polyline.
@@ -194,13 +196,22 @@ export function TrackMapSVG({
     return walk != null ? pctFromPolylineWalk(walk, totalM) : null;
   }, [karts, myKartNumber, trackConfig, countdownMs, direction, pitTimeS, totalM]);
 
+  // Free map rotation (deg). The whole SVG rotates; kart bubbles and
+  // sensor labels are counter-rotated so numbers/text stay upright.
+  const [rotation, setRotation] = useState(0);
+  const cr = rotation ? `rotate(${-rotation})` : undefined;
+
   return (
     <div className="relative">
       <svg
         viewBox={geom.viewBox}
         preserveAspectRatio="xMidYMid meet"
         className="w-full h-[480px] bg-black rounded-lg overflow-hidden"
-        style={{ display: "block" }}
+        style={{
+          display: "block",
+          transform: rotation ? `rotate(${rotation}deg)` : undefined,
+          transformOrigin: "center",
+        }}
       >
         {/* Layer 1: background image of the track. Only rendered if
             the operator has set one. */}
@@ -245,21 +256,21 @@ export function TrackMapSVG({
 
         {/* Sensor markers — same dot+tooltip vibe as the Leaflet view. */}
         {sensorPoints.meta && (
-          <g transform={`translate(${sensorPoints.meta[0]} ${sensorPoints.meta[1]})`}>
+          <g transform={`translate(${sensorPoints.meta[0]} ${sensorPoints.meta[1]}) ${cr ?? ""}`}>
             <circle r={4} fill="#000" stroke="#fff" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
             <text y={-8} textAnchor="middle" fontSize={9} fill="#fff"
                   style={{ paintOrder: "stroke", stroke: "#000", strokeWidth: 3 }}>META</text>
           </g>
         )}
         {sensorPoints.pitIn && (
-          <g transform={`translate(${sensorPoints.pitIn[0]} ${sensorPoints.pitIn[1]})`}>
+          <g transform={`translate(${sensorPoints.pitIn[0]} ${sensorPoints.pitIn[1]}) ${cr ?? ""}`}>
             <circle r={4} fill="#000" stroke="#e59a2e" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
             <text y={-8} textAnchor="middle" fontSize={9} fill="#e59a2e"
                   style={{ paintOrder: "stroke", stroke: "#000", strokeWidth: 3 }}>PIT-IN</text>
           </g>
         )}
         {sensorPoints.pitOut && (
-          <g transform={`translate(${sensorPoints.pitOut[0]} ${sensorPoints.pitOut[1]})`}>
+          <g transform={`translate(${sensorPoints.pitOut[0]} ${sensorPoints.pitOut[1]}) ${cr ?? ""}`}>
             <circle r={4} fill="#000" stroke="#e59a2e" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
             <text y={-8} textAnchor="middle" fontSize={9} fill="#e59a2e"
                   style={{ paintOrder: "stroke", stroke: "#000", strokeWidth: 3 }}>PIT-OUT</text>
@@ -282,7 +293,7 @@ export function TrackMapSVG({
               return (
                 <g
                   key={kart.kartNumber}
-                  transform={`translate(${x} ${y + (pitOffsetY ?? 0)})`}
+                  transform={`translate(${x} ${y + (pitOffsetY ?? 0)}) ${cr ?? ""}`}
                   style={{ cursor: "pointer" }}
                   onClick={() => onSelectKart(isSelected ? null : kart.kartNumber)}
                 >
@@ -308,14 +319,16 @@ export function TrackMapSVG({
                 }}
                 onClick={() => onSelectKart(isSelected ? null : kart.kartNumber)}
               >
-                {isMine && (
-                  <circle r={9} fill="none" stroke="#9fe556" strokeWidth={1.5} opacity={0.6}
+                <g transform={cr}>
+                  {isMine && (
+                    <circle r={9} fill="none" stroke="#9fe556" strokeWidth={1.5} opacity={0.6}
+                            vectorEffect="non-scaling-stroke" />
+                  )}
+                  <circle r={6} fill={fill} stroke={isMine ? "#fff" : "#000"} strokeWidth={1.2}
                           vectorEffect="non-scaling-stroke" />
-                )}
-                <circle r={6} fill={fill} stroke={isMine ? "#fff" : "#000"} strokeWidth={1.2}
-                        vectorEffect="non-scaling-stroke" />
-                <text textAnchor="middle" dominantBaseline="central" fontSize={7} fontWeight={700} fill={text}
-                      style={{ pointerEvents: "none" }}>{kart.kartNumber}</text>
+                  <text textAnchor="middle" dominantBaseline="central" fontSize={7} fontWeight={700} fill={text}
+                        style={{ pointerEvents: "none" }}>{kart.kartNumber}</text>
+                </g>
               </g>
             );
           })}
@@ -334,26 +347,25 @@ export function TrackMapSVG({
               pointerEvents: "none",
             }}
           >
-            <circle
-              r={7}
-              fill="none"
-              stroke="#9fe556"
-              strokeWidth={1.5}
-              strokeDasharray="3 2"
-              opacity={0.7}
-              vectorEffect="non-scaling-stroke"
-            />
-            <text
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize={6}
-              fontWeight={700}
-              fill="#9fe556"
-              opacity={0.85}
-              style={{ pointerEvents: "none" }}
-            >
-              PIT
-            </text>
+            <g transform={cr}>
+              <circle
+                r={8}
+                fill="#9fe556"
+                stroke="#0a0a0a"
+                strokeWidth={1.5}
+                vectorEffect="non-scaling-stroke"
+              />
+              <text
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={6}
+                fontWeight={700}
+                fill="#0a0a0a"
+                style={{ pointerEvents: "none" }}
+              >
+                PIT
+              </text>
+            </g>
           </g>
         )}
       </svg>
@@ -362,6 +374,35 @@ export function TrackMapSVG({
           active. Helps when debugging "looks the same as before". */}
       <div className="absolute top-1 right-1 text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/70 text-accent border border-accent/40">
         SVG {geom.autoGenerated ? "(auto)" : "(custom)"}
+      </div>
+
+      {/* Free-rotation control. Sibling of the <svg> (HTML, not rotated)
+          so it stays put while the map turns. */}
+      <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded-md bg-black/70 border border-border px-2 py-1">
+        <span className="text-[9px] uppercase tracking-wider text-neutral-400">
+          {t("tracking.rotate")}
+        </span>
+        <input
+          type="range"
+          min={0}
+          max={359}
+          step={1}
+          value={rotation}
+          onChange={(e) => setRotation(Number(e.target.value))}
+          className="w-24 accent-accent cursor-pointer"
+          aria-label={t("tracking.rotate")}
+        />
+        <span className="text-[9px] font-mono tabular-nums text-neutral-300 w-7 text-right">
+          {rotation}°
+        </span>
+        <button
+          onClick={() => setRotation(0)}
+          disabled={rotation === 0}
+          title={t("tracking.rotate")}
+          className="text-[10px] text-neutral-400 hover:text-white disabled:opacity-30 leading-none"
+        >
+          ↺
+        </button>
       </div>
     </div>
   );
