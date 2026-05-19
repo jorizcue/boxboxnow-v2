@@ -27,6 +27,9 @@ interface Props {
   apexes?: number[];           // sample indices to mark as apex
   hoverDistance?: number | null; // metres from start; drives white dot
   height?: number;
+  /** [startDist, endDist] in metres: when set, the selected microsector
+   *  is overlaid as a bright thick line so only that sector stands out. */
+  highlightRange?: [number, number] | null;
 }
 
 // Lazy-load Leaflet on the client only — Next.js SSR doesn't have `window`.
@@ -81,6 +84,7 @@ export function TrackMap({
   apexes,
   hoverDistance,
   height = 360,
+  highlightRange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -191,6 +195,24 @@ export function TrackMap({
         }
       }
 
+      // ── Selected-microsector highlight ────────────────────────────────
+      if (highlightRange && distances.length > 1) {
+        const hs = indexAtDist(distances, highlightRange[0]);
+        const he = indexAtDist(distances, highlightRange[1]);
+        const segPts = positions
+          .slice(hs, he + 1)
+          .map((p) => [p.lat, p.lon] as [number, number]);
+        if (segPts.length >= 2) {
+          Lany.polyline(segPts, {
+            color: "#9fe556",
+            weight: 9,
+            opacity: 0.95,
+            lineJoin: "round",
+            lineCap: "round",
+          }).addTo(group).bindTooltip("Microsector seleccionado", { direction: "top", sticky: true });
+        }
+      }
+
       // ── Apex markers ──────────────────────────────────────────────────
       if (apexes && apexes.length) {
         for (const idx of apexes) {
@@ -250,7 +272,7 @@ export function TrackMap({
       cancelled = true;
       if (t1) clearTimeout(t1);
     };
-  }, [lap, finishLine, colorMode, apexes]);
+  }, [lap, finishLine, colorMode, apexes, highlightRange]);
 
   // ── Cache lat/lon/dist arrays when lap changes ────────────────────────
   useEffect(() => {

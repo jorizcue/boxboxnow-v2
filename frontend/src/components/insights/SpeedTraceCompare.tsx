@@ -32,6 +32,31 @@ interface Props {
   /** Legend labels; default "V{lap_number}". */
   labelA?: string;
   labelB?: string;
+  /** Metric plotted on Y. "speed" (km/h, ≥0) keeps the original look;
+   *  the rest are signed and use a symmetric axis around 0. "accel" is
+   *  derived from speed/time (m/s²); the G metrics use the IMU arrays. */
+  metric?: ChartMetric;
+}
+
+export type ChartMetric = "speed" | "gforce_lat" | "gforce_lon" | "accel";
+
+function metricSeries(lap: GpsLapDetail, m: ChartMetric): number[] {
+  if (m === "gforce_lat") return lap.gforce_lat ?? [];
+  if (m === "gforce_lon") return lap.gforce_lon ?? [];
+  if (m === "accel") {
+    const sp = lap.speeds ?? [];
+    const ts = lap.timestamps ?? [];
+    return sp.length > 1 && ts.length === sp.length
+      ? smooth(speedToAccelMps2(sp, ts), 5)
+      : [];
+  }
+  return lap.speeds ?? [];
+}
+
+function metricUnit(m: ChartMetric): string {
+  if (m === "accel") return "m/s²";
+  if (m === "speed") return "km/h";
+  return "G";
 }
 
 export function SpeedTraceCompare({
@@ -46,6 +71,7 @@ export function SpeedTraceCompare({
   brakeZones = false,
   labelA,
   labelB,
+  metric = "speed",
 }: Props) {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const crosshairRef = useRef<HTMLDivElement>(null);
@@ -79,11 +105,12 @@ export function SpeedTraceCompare({
   // ── Draw ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
-    const sA = lapA.speeds ?? [];
+    const sA = metricSeries(lapA, metric);
     const dA = lapA.distances ?? [];
-    const sB = lapB.speeds ?? [];
+    const sB = metricSeries(lapB, metric);
     const dB = lapB.distances ?? [];
     if (!canvas || sA.length < 2 || sB.length < 2) return;
+    const signed = metric !== "speed";
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -100,7 +127,17 @@ export function SpeedTraceCompare({
     const plotW    = w - pad.left - pad.right;
     const plotH    = h - pad.top - pad.bottom;
     const maxDist  = Math.max(dA[dA.length - 1] || 0, dB[dB.length - 1] || 0) || 1;
-    const maxSpeed = Math.ceil(Math.max(...sA, ...sB) / 10) * 10 || 100;
+    let yMin: number, yMax: number;
+    if (!signed) {
+      yMin = 0;
+      yMax = Math.ceil(Math.max(1, ...sA, ...sB) / 10) * 10 || 100;
+    } else {
+      const m = Math.max(...sA.map(Math.abs), ...sB.map(Math.abs));
+      const stepBase = metric === "accel" ? 2 : 0.2; // m/s² vs G
+      const top = Math.max(stepBase, Math.ceil((m || stepBase) / stepBase) * stepBase);
+      yMin = -top;
+      yMax = top;
+    }
 
     const xMin   = zoomRange ? Math.max(0, zoomRange[0])       : 0;
     const xMax   = zoomRange ? Math.min(maxDist, zoomRange[1]) : maxDist;
@@ -109,19 +146,35 @@ export function SpeedTraceCompare({
     chartDimsRef.current = { padLeft: pad.left, plotW, maxDist, zoomMin: xMin, zoomMax: xMax };
 
     const xAt = (d: number) => pad.left + ((d - xMin) / xRange) * plotW;
-    const yAt = (s: number) => pad.top + plotH - (s / maxSpeed) * plotH;
+    const yAt = (v: number) => pad.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
 
     // ── Grid + Y labels ────────────────────────────────────────────────
-    ctx.strokeStyle = "rgba(255,255,255,0.06)";
-    ctx.lineWidth   = 1;
-    ctx.fillStyle   = "rgba(255,255,255,0.4)";
-    ctx.font        = "9px monospace";
-    ctx.textAlign   = "right";
-    for (let s = 0; s <= maxSpeed; s += 20) {
-      const y = yAt(s);
-      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + plotW, y); ctx.stroke();
-      ctx.fillText(`${s}`, pad.left - 4, y + 3);
+    ctx.font      = "9px monospace";
+    ctx.textAlign = "right";
+    const ticks: number[] = [];
+    if (!signed) {
+      for (let s = 0; s <= yMax; s += 20) ticks.push(s);
+    } else {
+      for (let k = -2; k <= 2; k++) ticks.push((k / 2) * yMax);
     }
+    for (const v of ticks) {
+      const y = yAt(v);
+      const isZero = signed && Math.abs(v) < 1e-9;
+      ctx.strokeStyle = isZero ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.06)";
+      ctx.lineWidth   = 1;
+      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + plotW, y); ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
+      ctx.fillText(metric === "speed" ? `${v}` : v.toFixed(metric === "accel" ? 0 : 1), pad.left - 4, y + 3);
+    }
+    // Y-axis unit (rotated, like the single-lap SpeedTrace)
+    ctx.save();
+    ctx.translate(10, pad.top + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = "rgba(255,255,255,0.3)";
+    ctx.font      = "9px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(metricUnit(metric), 0, 0);
+    ctx.restore();
 
     // X-axis label (range when zoomed)
     ctx.fillStyle = "rgba(255,255,255,0.3)";
@@ -136,9 +189,12 @@ export function SpeedTraceCompare({
 
     // ── Braking bands from lap A (detail mode only) ────────────────────
     if (brakeZones) {
+      // Braking is always derived from real speed, independent of the
+      // selected Y metric.
+      const spA = lapA.speeds ?? [];
       const tsA = lapA.timestamps ?? [];
-      if (tsA.length === sA.length && sA.length > 1) {
-        const accel = smooth(speedToAccelMps2(sA, tsA), 5);
+      if (tsA.length === spA.length && spA.length > 1) {
+        const accel = smooth(speedToAccelMps2(spA, tsA), 5);
         ctx.save();
         ctx.beginPath();
         ctx.rect(pad.left, pad.top, plotW, plotH);
@@ -222,7 +278,7 @@ export function SpeedTraceCompare({
       ctx.fillStyle = "rgba(255,255,255,0.5)";
       ctx.fillText("Frenada", fx + 14, pad.top + 9);
     }
-  }, [lapA, lapB, zoomRange, apexesA, apexesB, brakeZones, labelA, labelB]);
+  }, [lapA, lapB, zoomRange, apexesA, apexesB, brakeZones, labelA, labelB, metric]);
 
   // ── Event listeners (registered once; read state via refs) ───────────
   useEffect(() => {

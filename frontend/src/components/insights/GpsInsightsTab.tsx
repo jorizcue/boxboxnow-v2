@@ -24,7 +24,7 @@ import {
 } from "./helpers";
 import { TrackMap } from "./TrackMap";
 import { SpeedTrace } from "./SpeedTrace";
-import { SpeedTraceCompare } from "./SpeedTraceCompare";
+import { SpeedTraceCompare, type ChartMetric } from "./SpeedTraceCompare";
 import { GForceScatter } from "./GForceScatter";
 import { SpeedHistogram } from "./SpeedHistogram";
 import { ApexList } from "./ApexList";
@@ -40,6 +40,40 @@ function lapTimeColor(ms: number, bestMs: number, avgMs: number): string {
   if (bestMs > 0 && ms <= bestMs * 1.005) return "text-green-400";
   if (avgMs > 0 && ms <= avgMs) return "text-yellow-400";
   return "text-red-400";
+}
+
+/** Segmented metric selector shown above each comparison chart. */
+function MetricPicker({
+  value,
+  onChange,
+}: {
+  value: ChartMetric;
+  onChange: (m: ChartMetric) => void;
+}) {
+  const t = useT();
+  const opts: { id: ChartMetric; label: string }[] = [
+    { id: "speed", label: t("insights.compare.metric.speed") },
+    { id: "gforce_lat", label: t("insights.compare.metric.gLat") },
+    { id: "gforce_lon", label: t("insights.compare.metric.gLon") },
+    { id: "accel", label: t("insights.compare.metric.accel") },
+  ];
+  return (
+    <div className="flex gap-1 text-[10px]">
+      {opts.map((o) => (
+        <button
+          key={o.id}
+          onClick={() => onChange(o.id)}
+          className={`px-2 py-0.5 rounded ${
+            value === o.id
+              ? "bg-accent/20 text-accent"
+              : "text-neutral-500 hover:text-white"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function GpsInsightsTab() {
@@ -78,6 +112,9 @@ export function GpsInsightsTab() {
   const [loadingCompare, setLoadingCompare] = useState(false);
   // Microsector picked in the table → focuses both overlay charts.
   const [selectedMicro, setSelectedMicro] = useState<{ index: number; startDist: number; endDist: number } | null>(null);
+  // Independent metric per comparison chart (user chose "selector en ambas").
+  const [metricOverlay, setMetricOverlay] = useState<ChartMetric>("speed");
+  const [metricDetail, setMetricDetail] = useState<ChartMetric>("speed");
 
   // ── Admin: cross-pilot compare (two independent A/B selectors) ──────
   const user = useAuth((s) => s.user);
@@ -842,14 +879,18 @@ export function GpsInsightsTab() {
               />
 
               <div>
-                <div className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
-                  {t("insights.compare.speedOverlay")}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-[10px] text-neutral-400 uppercase tracking-wider">
+                    {t("insights.compare.speedOverlay")}
+                  </div>
+                  <MetricPicker value={metricOverlay} onChange={setMetricOverlay} />
                 </div>
                 <div className="bg-black/30 rounded-lg border border-border p-2">
                   <SpeedTraceCompare
                     lapA={compareLaps[0]}
                     lapB={compareLaps[1]}
                     height={220}
+                    metric={metricOverlay}
                     onHoverDistance={setCompareHoverDist}
                     focusRange={selectedMicro ? [selectedMicro.startDist, selectedMicro.endDist] : null}
                     onClearFocus={() => setSelectedMicro(null)}
@@ -860,14 +901,18 @@ export function GpsInsightsTab() {
               </div>
 
               <div>
-                <div className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
-                  {t("insights.compare.speedDistanceDetail")}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-[10px] text-neutral-400 uppercase tracking-wider">
+                    {t("insights.compare.speedDistanceDetail")}
+                  </div>
+                  <MetricPicker value={metricDetail} onChange={setMetricDetail} />
                 </div>
                 <div className="bg-black/30 rounded-lg border border-border p-2">
                   <SpeedTraceCompare
                     lapA={compareLaps[0]}
                     lapB={compareLaps[1]}
                     height={240}
+                    metric={metricDetail}
                     onHoverDistance={setCompareHoverDist}
                     focusRange={selectedMicro ? [selectedMicro.startDist, selectedMicro.endDist] : null}
                     onClearFocus={() => setSelectedMicro(null)}
@@ -896,6 +941,7 @@ export function GpsInsightsTab() {
                         height={260}
                         apexes={i === 0 ? compareApexesA : compareApexesB}
                         hoverDistance={compareHoverDist}
+                        highlightRange={selectedMicro ? [selectedMicro.startDist, selectedMicro.endDist] : null}
                       />
                     )}
                   </div>
