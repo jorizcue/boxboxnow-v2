@@ -514,6 +514,12 @@ class ReplayEngine:
         actual_start = max(start_block, 0)
         prev_time = blocks[actual_start][0] if actual_start < len(blocks) else None
 
+        # Whether a race is currently running, tracked across blocks so the
+        # gap-pacing below can tell a mid-race feed stall apart from idle
+        # time between sessions. Sticky: set by a countdown signal, cleared
+        # by the chequered flag (mirrors analyze_log / the parser).
+        race_running = False
+
         for i in range(actual_start, len(blocks)):
             if not self._active:
                 break
@@ -530,8 +536,22 @@ class ReplayEngine:
             if prev_time and i > actual_start:
                 delta = (timestamp - prev_time).total_seconds()
                 if delta > 0:
-                    # Cap large gaps (idle periods between sessions) to 10s
-                    capped_delta = min(delta, 10.0)
+                    # Idle gaps (between sessions / overnight) are skipped
+                    # by capping the wait at 10s. A mid-race feed stall,
+                    # however, is REAL race time: compressing it makes the
+                    # next ("catch-up") frame jump the race state forward
+                    # while only 10s of wall time passed, so the tracking
+                    # module's on-track interpolation snaps the kart
+                    # position AND the current-lap timer forward ~10s (the
+                    # bug reported on DR7 replays). While a race is running
+                    # we therefore replay short stalls at full real time.
+                    # The 45s ceiling sits well above the observed 8–30s
+                    # feed gaps but below the 60s idle heartbeat, so a
+                    # stale race_running flag still can't un-skip idle.
+                    if race_running and delta <= 45.0:
+                        capped_delta = delta
+                    else:
+                        capped_delta = min(delta, 10.0)
                     remaining = capped_delta / self._speed
                     while remaining > 0 and self._active:
                         while self._paused and self._active:
@@ -551,6 +571,12 @@ class ReplayEngine:
                     await self.on_events(events)
             except Exception as e:
                 logger.error(f"Error replaying block {i}: {e}", exc_info=True)
+
+            # Update race-running for the NEXT gap's pacing decision.
+            if 'data-flag="chequered"' in message:
+                race_running = False
+            elif "dyn1|countdown|" in message or "dyn1|count|" in message:
+                race_running = True
 
         self._active = False
         self._progress = 1.0
