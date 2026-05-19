@@ -475,7 +475,7 @@ export const api = {
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     if (raceLogIds && raceLogIds.length > 0) params.set("race_log_ids", raceLogIds.join(","));
-    return fetchApi<{ lap_time_ms: number; lap_number: number; recorded_at: string }[]>(`/api/analytics/kart-driver-laps?${params}`);
+    return fetchApi<{ lap_time_ms: number; lap_number: number; recorded_at: string; is_valid: boolean }[]>(`/api/analytics/kart-driver-laps?${params}`);
   },
   getAnalyticsDrivers: (circuitId: number, dateFrom?: string, dateTo?: string, raceLogIds?: number[]) => {
     const params = new URLSearchParams({ circuit_id: String(circuitId) });

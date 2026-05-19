@@ -394,6 +394,7 @@ const translations: Record<string, Record<Language, string>> = {
   "analytics.team": { es: "Equipo", en: "Team", it: "Squadra", de: "Team", fr: "Équipe" },
   "analytics.driver": { es: "Piloto", en: "Driver", it: "Pilota", de: "Fahrer", fr: "Pilote" },
   "analytics.time": { es: "Tiempo", en: "Time", it: "Tempo", de: "Zeit", fr: "Temps" },
+  "analytics.invalidLap": { es: "no válida", en: "invalid", it: "non valida", de: "ungültig", fr: "non valide" },
   "analytics.lapNum": { es: "Vuelta", en: "Lap", it: "Giro", de: "Runde", fr: "Tour" },
 
   // === Driver View ===

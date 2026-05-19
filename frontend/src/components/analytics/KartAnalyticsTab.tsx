@@ -44,6 +44,7 @@ interface DriverLap {
   lap_time_ms: number;
   lap_number: number;
   recorded_at: string;
+  is_valid: boolean;
 }
 
 interface RaceLogEntry {
@@ -870,20 +871,37 @@ export function KartAnalyticsTab() {
                                   <tbody>
                                     {(() => {
                                       const laps = driverLapsMap[d.display_name];
-                                      const best = Math.min(...laps.map((l) => l.lap_time_ms));
+                                      // "Best" highlight only among VALID laps
+                                      // (mirrors the row's "Mejor vuelta").
+                                      const validTimes = laps
+                                        .filter((l) => l.is_valid)
+                                        .map((l) => l.lap_time_ms);
+                                      const best = validTimes.length ? Math.min(...validTimes) : -1;
                                       return laps.map((l, i) => (
-                                        <tr key={i} className="border-t border-border/50">
+                                        <tr
+                                          key={i}
+                                          className={`border-t border-border/50 ${
+                                            l.is_valid ? "" : "opacity-50"
+                                          }`}
+                                        >
                                           <td className="px-2 py-1 text-center text-neutral-600">
                                             {i + 1}
                                           </td>
                                           <td
                                             className={`px-2 py-1 text-right font-mono ${
-                                              l.lap_time_ms === best
+                                              !l.is_valid
+                                                ? "text-neutral-500"
+                                                : l.lap_time_ms === best
                                                 ? "text-purple-400 font-semibold"
                                                 : "text-green-400"
                                             }`}
                                           >
                                             {msToLapTime(l.lap_time_ms)}
+                                            {!l.is_valid && (
+                                              <span className="ml-1.5 text-[8px] uppercase tracking-wider text-neutral-600">
+                                                {t("analytics.invalidLap")}
+                                              </span>
+                                            )}
                                           </td>
                                           <td className="px-2 py-1 text-right text-neutral-400">
                                             {l.lap_number}

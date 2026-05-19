@@ -389,10 +389,13 @@ async def get_kart_driver_laps(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """All valid laps a given driver did on a given kart, chronological.
-    Powers the expandable per-driver detail in the 'Desglose pilotos'
-    modal. Team/driver matching mirrors get_kart_drivers' grouping
-    (stripped strings) so the row count equals that row's 'Vueltas'."""
+    """ALL laps a given driver did on a given kart, chronological —
+    valid AND invalid. Powers the expandable per-driver detail in the
+    'Desglose pilotos' modal: it must reconcile with the replay (raw
+    feed), so invalid laps (out/post-pit + slow-jump per state.py) are
+    returned too, flagged via `is_valid`, while the row's count/avg/best
+    stay valid-only (get_kart_drivers). Team/driver matching mirrors
+    get_kart_drivers' grouping (stripped strings)."""
     await _check_circuit_access(user, circuit_id, db)
 
     if race_log_ids:
@@ -408,7 +411,6 @@ async def get_kart_driver_laps(
         select(KartLap).where(
             KartLap.race_log_id.in_(rl_ids),
             KartLap.kart_number == kart_number,
-            KartLap.is_valid == True,
         )
     )
     all_laps = _dedup_laps(result.scalars().all())
@@ -433,6 +435,7 @@ async def get_kart_driver_laps(
             "lap_time_ms": lap.lap_time_ms,
             "lap_number": lap.lap_number,
             "recorded_at": lap.recorded_at.isoformat() if lap.recorded_at else "",
+            "is_valid": bool(lap.is_valid),
         }
         for lap in rows
     ]
