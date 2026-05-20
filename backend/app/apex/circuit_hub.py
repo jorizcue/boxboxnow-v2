@@ -15,6 +15,7 @@ import ssl
 from datetime import datetime, date, timezone
 from pathlib import Path
 from typing import Callable, Awaitable
+from urllib.parse import urlparse
 
 import websockets
 from sqlalchemy import select, delete
@@ -40,6 +41,43 @@ _RE_TEAM_NAME = re.compile(r'<td[^>]*class="[^"]*\bdr\b[^"]*"[^>]*>([^<]*)</td>'
 def _safe_name(name: str) -> str:
     """Convert circuit name to safe directory name."""
     return re.sub(r'[^\w\-]', '_', name.strip())[:50]
+
+
+def _build_apex_ws_url(circuit, settings) -> str:
+    """Build the Apex Timing WebSocket URL for a circuit.
+
+    Apex hosts venues on (at least) two different tenants and the WS
+    URL shape is different for each — verified empirically from the
+    live page DevTools (browser network panel):
+
+      * **Modern tenant** — page lives at ``live.apex-timing.com/<slug>/``.
+        WS is ``wss://live-data.apex-timing.com:{ws_port}/`` (TLS, the
+        circuit's full ``ws_port`` used as-is, separate ``live-data.``
+        subdomain). Example: Finales SWS / 3mkevents → ws_port=7823 →
+        wss://live-data.apex-timing.com:7823/.
+
+      * **Legacy tenant** — page lives at
+        ``www.apex-timing.com/live-timing/<slug>/index.html``.
+        WS is ``ws://{settings.apex_ws_host}:{ws_port_data or ws_port-1}``,
+        the existing convention (port = ws_port − 1).
+
+    Detection is by the host of ``circuit.live_timing_url``. Anything
+    we can't identify falls back to legacy so circuits without a URL
+    stored behave exactly as before.
+    """
+    live_url = (circuit.live_timing_url or "").strip()
+    host = ""
+    if live_url:
+        try:
+            host = (urlparse(live_url).hostname or "").lower()
+        except Exception:
+            host = ""
+
+    if host == "live.apex-timing.com":
+        return f"wss://live-data.apex-timing.com:{circuit.ws_port}/"
+
+    ws_port = circuit.ws_port_data or (circuit.ws_port - 1)
+    return f"ws://{settings.apex_ws_host}:{ws_port}"
 
 
 class DailyRecorder:
@@ -835,8 +873,7 @@ class CircuitHub:
             circuits = result.scalars().all()
 
         for circuit in circuits:
-            ws_port = circuit.ws_port_data or (circuit.ws_port - 1)
-            ws_url = f"ws://{settings.apex_ws_host}:{ws_port}"
+            ws_url = _build_apex_ws_url(circuit, settings)
 
             conn = CircuitConnection(
                 circuit.id,
@@ -894,8 +931,7 @@ class CircuitHub:
             return False
 
         settings = get_settings()
-        ws_port = circuit.ws_port_data or (circuit.ws_port - 1)
-        ws_url = f"ws://{settings.apex_ws_host}:{ws_port}"
+        ws_url = _build_apex_ws_url(circuit, settings)
 
         # Stop existing if any
         if conn:
