@@ -32,8 +32,9 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import { useTracker } from "@/hooks/useTracker";
 import { useT } from "@/lib/i18n";
-import { IndicatorsModal } from "./IndicatorsModal";
 import { INDICATOR_MODULES, type PlanInclusion } from "./indicatorsData";
+
+type InlineKey = "race" | "box" | "mobile";
 
 type T = ReturnType<typeof useT>;
 
@@ -99,12 +100,10 @@ type Row = {
   /** Tag this row as a price row so we can style it differently
    *  (bold + larger). */
   emphasis?: boolean;
-  /** When set, the row label becomes a button (with ⓘ) that opens the
-   *  indicators modal for that module. */
-  expandKey?: "race" | "box";
-  /** When set, the row label toggles an inline breakdown of the mobile
-   *  app indicators rendered as additional sub-rows below this one. */
-  mobileExpand?: boolean;
+  /** When set, the row label becomes a toggle that expands the module's
+   *  full indicator list as additional sub-rows below this one. Each
+   *  indicator gets its per-plan ✓/—/Próximamente cells. */
+  inlineKey?: InlineKey;
 };
 
 const YES: Cell = { kind: "yes" };
@@ -219,12 +218,12 @@ const buildRows = (t: T): Row[] => {
   {
     label: t("landing.compare.row.moduloCarrera"),
     values: { ind_m: NO, ind_a: NO, end_b: YES, end_pro_m: YES, end_pro_a: YES },
-    expandKey: "race",
+    inlineKey: "race",
   },
   {
     label: t("landing.compare.row.moduloBox"),
     values: { ind_m: NO, ind_a: NO, end_b: YES, end_pro_m: YES, end_pro_a: YES },
-    expandKey: "box",
+    inlineKey: "box",
   },
   {
     label: t("landing.compare.row.replay"),
@@ -253,7 +252,7 @@ const buildRows = (t: T): Row[] => {
   {
     label: t("landing.compare.row.appMovil"),
     values: { ind_m: SOON, ind_a: SOON, end_b: SOON, end_pro_m: SOON, end_pro_a: SOON },
-    mobileExpand: true,
+    inlineKey: "mobile",
   },
   {
     label: t("landing.compare.row.clasificacionReal"),
@@ -276,8 +275,14 @@ export function FeatureComparisonTable() {
   const t = useT();
   const COLUMNS = buildColumns(t);
   const ROWS = buildRows(t);
-  const [expandModule, setExpandModule] = useState<"race" | "box" | null>(null);
-  const [mobileExpanded, setMobileExpanded] = useState(false);
+  const [expanded, setExpanded] = useState<Set<InlineKey>>(new Set());
+  const toggleExpanded = (key: InlineKey) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   // Columns flagged "venta próximamente" from the admin product config.
   const [comingSoon, setComingSoon] = useState<Partial<Record<ColumnKey, boolean>>>({});
@@ -397,43 +402,33 @@ export function FeatureComparisonTable() {
                       scope="row"
                       className="sticky left-0 z-10 bg-black/70 backdrop-blur text-left py-3 pl-5 pr-4 font-normal text-neutral-200"
                     >
-                      {row.expandKey ? (
-                        <button
-                          type="button"
-                          onClick={() => setExpandModule(row.expandKey!)}
-                          className="inline-flex items-center gap-1.5 text-left hover:text-accent transition-colors group"
-                          title={t("landing.compare.viewIndicators")}
-                        >
-                          <span>{row.label}</span>
-                          <span
-                            aria-hidden
-                            className="text-[10px] w-4 h-4 inline-flex items-center justify-center rounded-full border border-accent/40 text-accent group-hover:bg-accent/15 transition-colors"
-                          >
-                            i
-                          </span>
-                        </button>
-                      ) : row.mobileExpand ? (
-                        <button
-                          type="button"
-                          onClick={() => setMobileExpanded((v) => !v)}
-                          aria-expanded={mobileExpanded}
-                          className="inline-flex items-center gap-1.5 text-left hover:text-accent transition-colors group"
-                          title={t("landing.compare.viewIndicators")}
-                        >
-                          <span>{row.label}</span>
-                          <svg
-                            aria-hidden
-                            className={`w-3.5 h-3.5 text-accent transition-transform ${
-                              mobileExpanded ? "rotate-180" : ""
-                            }`}
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={2.5}
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
+                      {row.inlineKey ? (
+                        (() => {
+                          const isOpen = expanded.has(row.inlineKey);
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => toggleExpanded(row.inlineKey!)}
+                              aria-expanded={isOpen}
+                              className="inline-flex items-center gap-1.5 text-left hover:text-accent transition-colors group"
+                              title={t("landing.compare.viewIndicators")}
+                            >
+                              <span>{row.label}</span>
+                              <svg
+                                aria-hidden
+                                className={`w-3.5 h-3.5 text-accent transition-transform ${
+                                  isOpen ? "rotate-180" : ""
+                                }`}
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth={2.5}
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                          );
+                        })()
                       ) : (
                         row.label
                       )}
@@ -461,13 +456,14 @@ export function FeatureComparisonTable() {
                       );
                     })}
                   </tr>
-                  {row.mobileExpand && mobileExpanded &&
-                    INDICATOR_MODULES.mobile.sections.flatMap((section, sIdx) => {
-                      const rows: ReactNode[] = [];
+                  {row.inlineKey && expanded.has(row.inlineKey) &&
+                    INDICATOR_MODULES[row.inlineKey].sections.flatMap((section, sIdx) => {
+                      const inlineKey = row.inlineKey!;
+                      const subRows: ReactNode[] = [];
                       if (section.titleKey) {
-                        rows.push(
+                        subRows.push(
                           <tr
-                            key={`mob-sec-${i}-${sIdx}`}
+                            key={`sub-sec-${i}-${sIdx}`}
                             className="bg-black/20 border-t border-border/20"
                           >
                             <td
@@ -489,9 +485,9 @@ export function FeatureComparisonTable() {
                         );
                       }
                       section.indicators.forEach((ind, iIdx) => {
-                        rows.push(
+                        subRows.push(
                           <tr
-                            key={`mob-ind-${i}-${sIdx}-${iIdx}`}
+                            key={`sub-ind-${inlineKey}-${i}-${sIdx}-${iIdx}`}
                             className="border-t border-border/20 hover:bg-white/[0.02] transition-colors"
                           >
                             <th
@@ -522,7 +518,7 @@ export function FeatureComparisonTable() {
                           </tr>,
                         );
                       });
-                      return rows;
+                      return subRows;
                     })}
                 </Fragment>
               );
@@ -534,11 +530,6 @@ export function FeatureComparisonTable() {
       <p className="mt-4 text-center text-xs text-neutral-500">
         {t("landing.compare.scrollHint")}
       </p>
-
-      <IndicatorsModal
-        moduleKey={expandModule}
-        onClose={() => setExpandModule(null)}
-      />
     </div>
   );
 }
