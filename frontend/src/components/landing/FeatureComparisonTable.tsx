@@ -32,6 +32,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useTracker } from "@/hooks/useTracker";
 import { useT } from "@/lib/i18n";
+import { IndicatorsModal } from "./IndicatorsModal";
 
 type T = ReturnType<typeof useT>;
 
@@ -97,6 +98,9 @@ type Row = {
   /** Tag this row as a price row so we can style it differently
    *  (bold + larger). */
   emphasis?: boolean;
+  /** When set, the row label becomes a button (with ⓘ) that opens the
+   *  indicators modal for that module. */
+  expandKey?: "race" | "box" | "mobile";
 };
 
 const YES: Cell = { kind: "yes" };
@@ -215,14 +219,12 @@ const buildRows = (t: T): Row[] => {
   {
     label: t("landing.compare.row.moduloCarrera"),
     values: { ind_m: NO, ind_a: NO, end_b: YES, end_pro_m: YES, end_pro_a: YES },
+    expandKey: "race",
   },
   {
     label: t("landing.compare.row.moduloBox"),
     values: { ind_m: NO, ind_a: NO, end_b: YES, end_pro_m: YES, end_pro_a: YES },
-  },
-  {
-    label: t("landing.compare.row.liveTiming"),
-    values: { ind_m: NO, ind_a: NO, end_b: YES, end_pro_m: YES, end_pro_a: YES },
+    expandKey: "box",
   },
   {
     label: t("landing.compare.row.replay"),
@@ -249,6 +251,11 @@ const buildRows = (t: T): Row[] => {
     },
   },
   {
+    label: t("landing.compare.row.appMovil"),
+    values: { ind_m: SOON, ind_a: SOON, end_b: SOON, end_pro_m: SOON, end_pro_a: SOON },
+    expandKey: "mobile",
+  },
+  {
     label: t("landing.compare.row.clasificacionReal"),
     values: { ind_m: NO, ind_a: NO, end_b: NO, end_pro_m: SOON, end_pro_a: SOON },
   },
@@ -269,6 +276,7 @@ export function FeatureComparisonTable() {
   const t = useT();
   const COLUMNS = buildColumns(t);
   const ROWS = buildRows(t);
+  const [expandModule, setExpandModule] = useState<"race" | "box" | "mobile" | null>(null);
 
   // Columns flagged "venta próximamente" from the admin product config.
   const [comingSoon, setComingSoon] = useState<Partial<Record<ColumnKey, boolean>>>({});
@@ -390,7 +398,24 @@ export function FeatureComparisonTable() {
                     scope="row"
                     className="sticky left-0 z-10 bg-black/70 backdrop-blur text-left py-3 pl-5 pr-4 font-normal text-neutral-200"
                   >
-                    {row.label}
+                    {row.expandKey ? (
+                      <button
+                        type="button"
+                        onClick={() => setExpandModule(row.expandKey!)}
+                        className="inline-flex items-center gap-1.5 text-left hover:text-accent transition-colors group"
+                        title={t("landing.compare.viewIndicators")}
+                      >
+                        <span>{row.label}</span>
+                        <span
+                          aria-hidden
+                          className="text-[10px] w-4 h-4 inline-flex items-center justify-center rounded-full border border-accent/40 text-accent group-hover:bg-accent/15 transition-colors"
+                        >
+                          i
+                        </span>
+                      </button>
+                    ) : (
+                      row.label
+                    )}
                     {row.hint && (
                       <div className="text-[11px] text-neutral-500 mt-0.5">
                         {row.hint}
@@ -424,6 +449,11 @@ export function FeatureComparisonTable() {
       <p className="mt-4 text-center text-xs text-neutral-500">
         {t("landing.compare.scrollHint")}
       </p>
+
+      <IndicatorsModal
+        moduleKey={expandModule}
+        onClose={() => setExpandModule(null)}
+      />
     </div>
   );
 }
