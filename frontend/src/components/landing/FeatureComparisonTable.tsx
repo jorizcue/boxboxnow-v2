@@ -27,12 +27,13 @@
  * tweak features, edit that one array.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { api } from "@/lib/api";
 import { useTracker } from "@/hooks/useTracker";
 import { useT } from "@/lib/i18n";
 import { IndicatorsModal } from "./IndicatorsModal";
+import { INDICATOR_MODULES, type PlanInclusion } from "./indicatorsData";
 
 type T = ReturnType<typeof useT>;
 
@@ -100,7 +101,10 @@ type Row = {
   emphasis?: boolean;
   /** When set, the row label becomes a button (with ⓘ) that opens the
    *  indicators modal for that module. */
-  expandKey?: "race" | "box" | "mobile";
+  expandKey?: "race" | "box";
+  /** When set, the row label toggles an inline breakdown of the mobile
+   *  app indicators rendered as additional sub-rows below this one. */
+  mobileExpand?: boolean;
 };
 
 const YES: Cell = { kind: "yes" };
@@ -209,10 +213,6 @@ const buildRows = (t: T): Row[] => {
 
   { section: t("landing.compare.section.funcionalidades") },
   {
-    label: t("landing.compare.row.vistaPiloto"),
-    values: { ind_m: SOON, ind_a: SOON, end_b: SOON, end_pro_m: SOON, end_pro_a: SOON },
-  },
-  {
     label: t("landing.compare.row.configCarrera"),
     values: { ind_m: YES, ind_a: YES, end_b: YES, end_pro_m: YES, end_pro_a: YES },
   },
@@ -253,7 +253,7 @@ const buildRows = (t: T): Row[] => {
   {
     label: t("landing.compare.row.appMovil"),
     values: { ind_m: SOON, ind_a: SOON, end_b: SOON, end_pro_m: SOON, end_pro_a: SOON },
-    expandKey: "mobile",
+    mobileExpand: true,
   },
   {
     label: t("landing.compare.row.clasificacionReal"),
@@ -276,7 +276,8 @@ export function FeatureComparisonTable() {
   const t = useT();
   const COLUMNS = buildColumns(t);
   const ROWS = buildRows(t);
-  const [expandModule, setExpandModule] = useState<"race" | "box" | "mobile" | null>(null);
+  const [expandModule, setExpandModule] = useState<"race" | "box" | null>(null);
+  const [mobileExpanded, setMobileExpanded] = useState(false);
 
   // Columns flagged "venta próximamente" from the admin product config.
   const [comingSoon, setComingSoon] = useState<Partial<Record<ColumnKey, boolean>>>({});
@@ -390,56 +391,140 @@ export function FeatureComparisonTable() {
                 );
               }
               return (
-                <tr
-                  key={`row-${i}`}
-                  className="border-t border-border/30 hover:bg-white/[0.02] transition-colors"
-                >
-                  <th
-                    scope="row"
-                    className="sticky left-0 z-10 bg-black/70 backdrop-blur text-left py-3 pl-5 pr-4 font-normal text-neutral-200"
-                  >
-                    {row.expandKey ? (
-                      <button
-                        type="button"
-                        onClick={() => setExpandModule(row.expandKey!)}
-                        className="inline-flex items-center gap-1.5 text-left hover:text-accent transition-colors group"
-                        title={t("landing.compare.viewIndicators")}
-                      >
-                        <span>{row.label}</span>
-                        <span
-                          aria-hidden
-                          className="text-[10px] w-4 h-4 inline-flex items-center justify-center rounded-full border border-accent/40 text-accent group-hover:bg-accent/15 transition-colors"
+                <Fragment key={`row-${i}`}>
+                  <tr className="border-t border-border/30 hover:bg-white/[0.02] transition-colors">
+                    <th
+                      scope="row"
+                      className="sticky left-0 z-10 bg-black/70 backdrop-blur text-left py-3 pl-5 pr-4 font-normal text-neutral-200"
+                    >
+                      {row.expandKey ? (
+                        <button
+                          type="button"
+                          onClick={() => setExpandModule(row.expandKey!)}
+                          className="inline-flex items-center gap-1.5 text-left hover:text-accent transition-colors group"
+                          title={t("landing.compare.viewIndicators")}
                         >
-                          i
-                        </span>
-                      </button>
-                    ) : (
-                      row.label
-                    )}
-                    {row.hint && (
-                      <div className="text-[11px] text-neutral-500 mt-0.5">
-                        {row.hint}
-                      </div>
-                    )}
-                  </th>
-                  {COLUMNS.map((col) => {
-                    const value = row.values?.[col.key];
-                    return (
-                      <td
-                        key={col.key}
-                        className={`py-3 px-4 text-center align-middle ${
-                          col.popular ? "bg-accent/[0.03]" : ""
-                        } ${row.emphasis ? "text-white font-semibold" : "text-neutral-400"}`}
-                      >
-                        <CellRenderer
-                          value={value}
-                          includedLabel={t("landing.compare.included")}
-                          soonLabel={t("landing.compare.soon")}
-                        />
-                      </td>
-                    );
-                  })}
-                </tr>
+                          <span>{row.label}</span>
+                          <span
+                            aria-hidden
+                            className="text-[10px] w-4 h-4 inline-flex items-center justify-center rounded-full border border-accent/40 text-accent group-hover:bg-accent/15 transition-colors"
+                          >
+                            i
+                          </span>
+                        </button>
+                      ) : row.mobileExpand ? (
+                        <button
+                          type="button"
+                          onClick={() => setMobileExpanded((v) => !v)}
+                          aria-expanded={mobileExpanded}
+                          className="inline-flex items-center gap-1.5 text-left hover:text-accent transition-colors group"
+                          title={t("landing.compare.viewIndicators")}
+                        >
+                          <span>{row.label}</span>
+                          <svg
+                            aria-hidden
+                            className={`w-3.5 h-3.5 text-accent transition-transform ${
+                              mobileExpanded ? "rotate-180" : ""
+                            }`}
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2.5}
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      ) : (
+                        row.label
+                      )}
+                      {row.hint && (
+                        <div className="text-[11px] text-neutral-500 mt-0.5">
+                          {row.hint}
+                        </div>
+                      )}
+                    </th>
+                    {COLUMNS.map((col) => {
+                      const value = row.values?.[col.key];
+                      return (
+                        <td
+                          key={col.key}
+                          className={`py-3 px-4 text-center align-middle ${
+                            col.popular ? "bg-accent/[0.03]" : ""
+                          } ${row.emphasis ? "text-white font-semibold" : "text-neutral-400"}`}
+                        >
+                          <CellRenderer
+                            value={value}
+                            includedLabel={t("landing.compare.included")}
+                            soonLabel={t("landing.compare.soon")}
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  {row.mobileExpand && mobileExpanded &&
+                    INDICATOR_MODULES.mobile.sections.flatMap((section, sIdx) => {
+                      const rows: ReactNode[] = [];
+                      if (section.titleKey) {
+                        rows.push(
+                          <tr
+                            key={`mob-sec-${i}-${sIdx}`}
+                            className="bg-black/20 border-t border-border/20"
+                          >
+                            <td
+                              colSpan={COLUMNS.length + 1}
+                              className="sticky left-0 z-10 bg-black/30 backdrop-blur py-2 pl-10 pr-4"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-neutral-300">
+                                  {t(section.titleKey)}
+                                </span>
+                                {section.comingSoon && (
+                                  <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[9px] font-semibold text-amber-300 uppercase tracking-wider">
+                                    {t("landing.indicators.comingSoon")}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>,
+                        );
+                      }
+                      section.indicators.forEach((ind, iIdx) => {
+                        rows.push(
+                          <tr
+                            key={`mob-ind-${i}-${sIdx}-${iIdx}`}
+                            className="border-t border-border/20 hover:bg-white/[0.02] transition-colors"
+                          >
+                            <th
+                              scope="row"
+                              className="sticky left-0 z-10 bg-black/60 backdrop-blur text-left py-2 pl-10 pr-4 font-normal text-[12px] text-neutral-400"
+                            >
+                              {t(ind.nameKey)}
+                            </th>
+                            {COLUMNS.map((col) => {
+                              const inclusion: PlanInclusion = ind.plans[col.key];
+                              const cell: Cell =
+                                inclusion === "yes" ? YES : inclusion === "soon" ? SOON : NO;
+                              return (
+                                <td
+                                  key={col.key}
+                                  className={`py-2 px-4 text-center align-middle ${
+                                    col.popular ? "bg-accent/[0.03]" : ""
+                                  } text-neutral-500`}
+                                >
+                                  <CellRenderer
+                                    value={cell}
+                                    includedLabel={t("landing.compare.included")}
+                                    soonLabel={t("landing.compare.soon")}
+                                  />
+                                </td>
+                              );
+                            })}
+                          </tr>,
+                        );
+                      });
+                      return rows;
+                    })}
+                </Fragment>
               );
             })}
           </tbody>
