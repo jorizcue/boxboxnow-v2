@@ -257,14 +257,14 @@ export function DriverConfigTab() {
           // backends, admins, trial users without a plan match).
           const allowed = user?.allowed_cards;
           const allowedSet = allowed && allowed.length > 0 ? new Set(allowed) : null;
-          // Resolve the localized label up-front so the alphabetical sort
-          // matches what the user sees (German "Ø Runde" vs Spanish
-          // "Vuelta media" → totally different order).
+          // Order matches the BBN indicator spreadsheet (kept in
+          // ALL_DRIVER_CARDS catalog order — NOT re-sorted alphabetically
+          // by localized label so the picker stays consistent across
+          // languages and aligned with the landing's comparison table).
           const groupCards = ALL_DRIVER_CARDS
             .filter((c) => c.group === group.id)
             .filter((c) => !allowedSet || allowedSet.has(c.id))
-            .map((c) => ({ ...c, _localLabel: t(c.labelKey) }))
-            .sort((a, b) => a._localLabel.localeCompare(b._localLabel, lang, { sensitivity: 'base' }));
+            .map((c) => ({ ...c, _localLabel: t(c.labelKey) }));
           if (groupCards.length === 0) return null;
           const isGps = group.id === "gps";
           return (
@@ -350,6 +350,16 @@ const CARD_ACCENTS: Record<DriverCardId, string> = {
   deltaCurrentS2: "from-yellow-500/20 to-yellow-500/5 border-yellow-500/30",
   deltaCurrentS3: "from-yellow-500/20 to-yellow-500/5 border-yellow-500/30",
   deltaSectorsCurrent: "from-yellow-500/20 to-yellow-500/5 border-yellow-500/30",
+  // 2026-05 additions (Excel red-font rows)
+  stintTime: "from-neutral-500/20 to-neutral-500/5 border-neutral-500/30",
+  totalLaps: "from-neutral-500/20 to-neutral-500/5 border-neutral-500/30",
+  stintLaps: "from-neutral-500/20 to-neutral-500/5 border-neutral-500/30",
+  sectors: "from-purple-500/20 to-purple-500/5 border-purple-500/30",
+  bestS1: "from-purple-500/20 to-purple-500/5 border-purple-500/30",
+  bestS2: "from-purple-500/20 to-purple-500/5 border-purple-500/30",
+  bestS3: "from-purple-500/20 to-purple-500/5 border-purple-500/30",
+  timeToMaxStint: "from-orange-500/20 to-orange-500/5 border-orange-500/30",
+  kartTier: "from-accent/20 to-accent/5 border-accent/30",
 };
 
 const CARD_SAMPLE_VALUES: Record<DriverCardId, string> = {
@@ -386,6 +396,16 @@ const CARD_SAMPLE_VALUES: Record<DriverCardId, string> = {
   deltaCurrentS2: "-0.09s",
   deltaCurrentS3: "+0.31s",
   deltaSectorsCurrent: "S1 +0.12s",
+  // 2026-05 additions (Excel red-font rows)
+  stintTime: "12:45",
+  totalLaps: "47",
+  stintLaps: "12",
+  sectors: "S1 21.345",
+  bestS1: "21.345",
+  bestS2: "19.812",
+  bestS3: "22.114",
+  timeToMaxStint: "07:13",
+  kartTier: "TIER 87",
 };
 
 /* ------------------------------------------------------------------ */

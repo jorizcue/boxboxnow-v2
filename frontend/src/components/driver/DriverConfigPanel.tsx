@@ -126,13 +126,13 @@ export function DriverConfigPanel({ onClose }: { onClose: () => void }) {
           // the editor down to nothing.
           const allowed = user?.allowed_cards;
           const allowedSet = allowed && allowed.length > 0 ? new Set(allowed) : null;
-          // Resolve localized label up-front so the sort respects the
-          // active language (German "Ø Runde" vs Spanish "Vuelta media").
+          // Order matches the BBN indicator spreadsheet (kept in
+          // ALL_DRIVER_CARDS catalog order — NOT re-sorted alphabetically
+          // by localized label).
           const groupCards = ALL_DRIVER_CARDS
             .filter((c) => c.group === group.id)
             .filter((c) => !allowedSet || allowedSet.has(c.id))
-            .map((c) => ({ ...c, _localLabel: t(c.labelKey) }))
-            .sort((a, b) => a._localLabel.localeCompare(b._localLabel, lang, { sensitivity: 'base' }));
+            .map((c) => ({ ...c, _localLabel: t(c.labelKey) }));
           if (groupCards.length === 0) return null;
           return (
             <div key={group.id} className="space-y-1">

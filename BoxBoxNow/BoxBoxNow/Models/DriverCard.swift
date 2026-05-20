@@ -23,40 +23,48 @@ enum DriverCardGroup: String, CaseIterable {
 }
 
 enum DriverCard: String, CaseIterable, Codable, Identifiable {
+    // Carrera - Apex (raw Apex live timing). Order matches the BBN
+    // indicator spreadsheet (App móvil · Tarjetas Carrera · Timing).
     case raceTimer
-    case currentLapTime
+    case stintTime
+    case bestStintLap
     case lastLap
-    case deltaBestLap
-    case gForceRadar
+    case apexPosition    // Raw Apex live timing position (e.g. "4/7")
+    case totalLaps
+    case stintLaps
+    case intervalAhead   // Apex interval to kart in front (myKart.interval)
+    case intervalBehind  // Apex interval reported by the kart behind me
+    /// Composite card: best S1 / S2 / S3 of this driver combined into
+    /// one card, 3 lines. Distinct from `deltaSectors` (vs field-best).
+    case sectors
+    case bestS1
+    case bestS2
+    case bestS3
+
+    // Carrera - BBN (BoxBoxNow-derived analytics). Order matches the
+    // BBN indicator spreadsheet (App móvil · Tarjetas Carrera · BBN).
     case position
-    case realPos
-    case gapAhead
-    case gapBehind
     case avgLap20
     case best3
     case avgFutureStint
-    case boxScore
-    case bestStintLap
-    case gpsLapDelta
-    case gpsSpeed
-    case gpsGForce
+    case timeToMaxStint
     case lapsToMaxStint
-    case pitWindow
-    case pitCount
-    case currentPit
-    // Sector telemetry — only meaningful on circuits whose Apex grid
-    // declares `s1|s2|s3` columns. Auto-hide via `requiresSectors` when
-    // the active session doesn't expose sectors.
-    case deltaBestS1
-    case deltaBestS2
-    case deltaBestS3
+    case kartTier
     case theoreticalBestLap
+    // Sector delta cards. Auto-hide via `requiresSectors` when the
+    // active session doesn't expose sectors.
     /// Combined view of S1/S2/S3 deltas in three lines on a single
     /// card — same colored-by-sign math as `deltaBestS1/2/3` but
     /// without the leader's kart number / team / driver. Saves grid
     /// real estate when the pilot wants the three-sector summary at
     /// a glance.
     case deltaSectors
+    case deltaBestS1
+    case deltaBestS2
+    case deltaBestS3
+    /// Combined view of S1/S2/S3 current-pass deltas in three lines,
+    /// mirroring `deltaSectors` but reading `sectorMetaCurrent`.
+    case deltaSectorsCurrent
     // Current-pass sector cards — compare the pilot's latest sector
     // against the fastest *live pass* among on-track karts
     // (sectorMetaCurrent). Purely additive; existing "Δ Mejor" cards
@@ -64,16 +72,25 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
     case deltaCurrentS1
     case deltaCurrentS2
     case deltaCurrentS3
-    /// Combined view of S1/S2/S3 current-pass deltas in three lines,
-    /// mirroring `deltaSectors` but reading `sectorMetaCurrent`.
-    case deltaSectorsCurrent
-    // Raw Apex live timing — these surface the values straight from
-    // the live timing grid (column `data-type="int"` / `data-type="rk"`),
-    // distinct from the existing `gapAhead`/`gapBehind`/`position` cards
-    // that derive from the adjusted classification or avg-lap pace.
-    case intervalAhead   // Apex interval to kart in front (myKart.interval)
-    case intervalBehind  // Apex interval reported by the kart behind me
-    case apexPosition    // Raw Apex live timing position (e.g. "4/7")
+    case realPos
+    case gapAhead
+    case gapBehind
+
+    // Box (Excel order)
+    case currentPit
+    case boxScore
+    case pitCount
+    case pitWindow
+
+    // GPS (Excel order). `currentLapTime` lives here because it needs a
+    // GPS fix to be useful (without GPS we don't know "where in the lap"
+    // the kart is).
+    case deltaBestLap
+    case gpsLapDelta
+    case gForceRadar
+    case gpsGForce
+    case gpsSpeed
+    case currentLapTime
 
     var id: String { rawValue }
 
@@ -81,13 +98,16 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .boxScore, .pitCount, .currentPit, .pitWindow:
             return .box
-        case .deltaBestLap, .gForceRadar, .gpsLapDelta, .gpsSpeed, .gpsGForce:
+        case .currentLapTime, .deltaBestLap, .gForceRadar, .gpsLapDelta, .gpsSpeed, .gpsGForce:
+            // GPS group. `currentLapTime` lives here because it needs a
+            // GPS fix to be useful.
             return .gps
         // Carrera - Apex: raw Apex live-timing values, no client-side
         // recomputation, mirrors what the pilot would see on Apex's
         // own live timing screen.
-        case .raceTimer, .lastLap, .bestStintLap, .apexPosition,
-             .intervalAhead, .intervalBehind:
+        case .raceTimer, .stintTime, .bestStintLap, .lastLap, .apexPosition,
+             .totalLaps, .stintLaps, .intervalAhead, .intervalBehind,
+             .sectors, .bestS1, .bestS2, .bestS3:
             return .raceApex
         default:
             // Carrera - BBN: BoxBoxNow-derived analytics (avg pace,
@@ -144,6 +164,16 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .deltaCurrentS2: return "2.circle.fill"
         case .deltaCurrentS3: return "3.circle.fill"
         case .deltaSectorsCurrent: return "square.stack.3d.up.fill"
+        // 2026-05 additions
+        case .stintTime:        return "stopwatch.fill"
+        case .totalLaps:        return "number"
+        case .stintLaps:        return "repeat.circle"
+        case .sectors:          return "rectangle.3.group"
+        case .bestS1:           return "1.square.fill"
+        case .bestS2:           return "2.square.fill"
+        case .bestS3:           return "3.square.fill"
+        case .timeToMaxStint:   return "hourglass"
+        case .kartTier:         return "rosette"
         }
     }
 
@@ -166,7 +196,10 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
     var requiresSectors: Bool {
         switch self {
         case .deltaBestS1, .deltaBestS2, .deltaBestS3, .theoreticalBestLap, .deltaSectors,
-             .deltaCurrentS1, .deltaCurrentS2, .deltaCurrentS3, .deltaSectorsCurrent:
+             .deltaCurrentS1, .deltaCurrentS2, .deltaCurrentS3, .deltaSectorsCurrent,
+             // Best-sector cards (single + composite) — only meaningful on
+             // circuits whose Apex grid declares `s1|s2|s3` columns.
+             .sectors, .bestS1, .bestS2, .bestS3:
             return true
         default:
             return false
@@ -209,6 +242,16 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .deltaCurrentS2: return "-0.09s"
         case .deltaCurrentS3: return "+0.31s"
         case .deltaSectorsCurrent: return "S1 +0.12s"
+        // 2026-05 additions
+        case .stintTime:        return "12:45"
+        case .totalLaps:        return "47"
+        case .stintLaps:        return "12"
+        case .sectors:          return "S1 21.345"
+        case .bestS1:           return "21.345"
+        case .bestS2:           return "19.812"
+        case .bestS3:           return "22.114"
+        case .timeToMaxStint:   return "07:13"
+        case .kartTier:         return "TIER 87"
         }
     }
 
@@ -244,6 +287,14 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .deltaSectors:    return .yellow // same family as deltaBestS1/2/3
         case .deltaCurrentS1, .deltaCurrentS2, .deltaCurrentS3: return .yellow
         case .deltaSectorsCurrent: return .yellow
+        // 2026-05 additions
+        case .stintTime:        return .gray
+        case .totalLaps:        return .gray
+        case .stintLaps:        return .gray
+        case .sectors:          return .purple
+        case .bestS1, .bestS2, .bestS3: return .purple
+        case .timeToMaxStint:   return .orange
+        case .kartTier:         return .accentColor
         }
     }
 

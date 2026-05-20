@@ -36,6 +36,9 @@ export interface KartState {
   stintDurationS: number;
   stintStartTime: number;  // epoch seconds
   stintElapsedMs: number;  // accumulated lap time in stint (ms)
+  // Countdown until the driver hits the maximum allowed stint
+  // (max_stint_min × 60s − stintElapsed). Null when no max is configured.
+  timeToMaxStintMs?: number | null;
   stintStartCountdownMs: number;  // race clock (ms) when stint started
   pitInCountdownMs?: number;     // race clock (ms) when pit entry occurred
   pitHistory: PitRecord[];

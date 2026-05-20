@@ -43,6 +43,12 @@ struct KartState: Identifiable, Codable, Hashable {
     var bestS2Ms: Double?
     var bestS3Ms: Double?
 
+    /// Countdown until this kart hits the configured maximum stint
+    /// (max_stint_min × 60s − stintElapsed). Null when no max is set.
+    /// Backend-computed in KartState.to_dict; clients render directly
+    /// — same as `timeToMaxStint` card in the driver view.
+    var timeToMaxStintMs: Double?
+
     // Computed helpers
     var laps: Int { totalLaps }
     var isInPit: Bool { pitStatus == "in_pit" }
@@ -78,5 +84,6 @@ struct KartState: Identifiable, Codable, Hashable {
         case driverDifferentialMs
         case currentS1Ms, currentS2Ms, currentS3Ms
         case bestS1Ms, bestS2Ms, bestS3Ms
+        case timeToMaxStintMs
     }
 }

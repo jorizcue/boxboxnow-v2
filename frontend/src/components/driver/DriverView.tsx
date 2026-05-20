@@ -410,6 +410,87 @@ function renderTheoreticalBestLapCard(
   };
 }
 
+/** Format milliseconds as mm:ss for stint-time / time-to-max-stint cards. */
+function msToMMSS(ms: number): string {
+  const safeMs = Math.max(0, Math.round(ms));
+  const totalSec = Math.floor(safeMs / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+/** Single-sector PB card: "Best S1: 21.345" — single value, mono font.
+ *  Renders "--" stub on circuits without sector data or before the
+ *  kart's first complete sector. */
+function renderBestSectorCard(
+  n: 1 | 2 | 3,
+  hasSectors: boolean,
+  myKart: KartState | null,
+  label: string,
+): { label: string; content: React.ReactNode; accent: string } {
+  const stubAccent = "from-neutral-500/15 to-neutral-500/5 border-neutral-500/30";
+  const bestMs = n === 1 ? myKart?.bestS1Ms : n === 2 ? myKart?.bestS2Ms : myKart?.bestS3Ms;
+  if (!hasSectors || !bestMs || bestMs <= 0) {
+    return {
+      label,
+      accent: stubAccent,
+      content: (
+        <span className="text-3xl sm:text-4xl font-mono font-black text-neutral-600 leading-none">--</span>
+      ),
+    };
+  }
+  return {
+    label,
+    accent: "from-purple-500/20 to-purple-500/5 border-purple-500/30",
+    content: (
+      <span className="text-3xl sm:text-4xl font-mono font-black text-purple-400 leading-none">
+        {(bestMs / 1000).toFixed(3)}
+      </span>
+    ),
+  };
+}
+
+/** Composite "mejores sectores" card: 3 lines (Best S1 / Best S2 / Best
+ *  S3) — the same driver's per-sector PBs combined into one card. */
+function renderBestSectorsCard(
+  hasSectors: boolean,
+  myKart: KartState | null,
+  label: string,
+): { label: string; content: React.ReactNode; accent: string } {
+  const stubAccent = "from-neutral-500/15 to-neutral-500/5 border-neutral-500/30";
+  const bests = [myKart?.bestS1Ms ?? 0, myKart?.bestS2Ms ?? 0, myKart?.bestS3Ms ?? 0];
+  if (!hasSectors || bests.every((v) => v <= 0)) {
+    return {
+      label,
+      accent: stubAccent,
+      content: (
+        <span className="text-3xl sm:text-4xl font-mono font-black text-neutral-600 leading-none">--</span>
+      ),
+    };
+  }
+  return {
+    label,
+    accent: "from-purple-500/20 to-purple-500/5 border-purple-500/30",
+    content: (
+      <div className="flex flex-col items-stretch h-full w-full justify-center gap-1 sm:gap-1.5 px-2">
+        {([1, 2, 3] as const).map((n) => {
+          const ms = bests[n - 1];
+          return (
+            <div key={n} className="flex items-center justify-between">
+              <span className="text-xs sm:text-sm font-semibold text-neutral-400 tracking-wide w-7">
+                S{n}
+              </span>
+              <span className="text-lg sm:text-xl md:text-2xl font-mono font-black leading-none text-purple-400">
+                {ms > 0 ? (ms / 1000).toFixed(3) : "—"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    ),
+  };
+}
+
 /** Combined sector-delta card: 3 lines (S1/S2/S3), each with the
  *  sector label on the left and the delta value on the right. Reuses
  *  `computeSectorDelta` so the math is shared with the per-sector
@@ -1397,6 +1478,68 @@ export function DriverView() {
     intervalAhead: renderApexIntervalAheadCard(ourKartObj, apexAhead),
     intervalBehind: renderApexIntervalBehindCard(apexBehind),
     apexPosition: renderApexPositionCard(ourKartObj, karts),
+    // ── New 2026-05 indicators (Excel red-font rows) ──
+    stintTime: {
+      label: t("card.stintTime"),
+      accent: "from-neutral-500/20 to-neutral-500/5 border-neutral-500/30",
+      content: (
+        <span className="text-3xl sm:text-4xl font-mono font-black text-white leading-none">
+          {msToMMSS(ourKartObj?.stintElapsedMs ?? 0)}
+        </span>
+      ),
+    },
+    totalLaps: {
+      label: t("card.totalLaps"),
+      accent: "from-neutral-500/20 to-neutral-500/5 border-neutral-500/30",
+      content: (
+        <span className="text-3xl sm:text-4xl font-mono font-black text-white leading-none">
+          {ourKartObj?.totalLaps ?? 0}
+        </span>
+      ),
+    },
+    stintLaps: {
+      label: t("card.stintLaps"),
+      accent: "from-neutral-500/20 to-neutral-500/5 border-neutral-500/30",
+      content: (
+        <span className="text-3xl sm:text-4xl font-mono font-black text-white leading-none">
+          {ourKartObj?.stintLapsCount ?? 0}
+        </span>
+      ),
+    },
+    sectors: renderBestSectorsCard(hasSectors, ourKartObj, t("card.sectors")),
+    bestS1: renderBestSectorCard(1, hasSectors, ourKartObj, t("card.bestS1")),
+    bestS2: renderBestSectorCard(2, hasSectors, ourKartObj, t("card.bestS2")),
+    bestS3: renderBestSectorCard(3, hasSectors, ourKartObj, t("card.bestS3")),
+    timeToMaxStint: (() => {
+      const ms = ourKartObj?.timeToMaxStintMs ?? null;
+      const isUrgent = ms !== null && ms < 2 * 60_000;
+      return {
+        label: t("card.timeToMaxStint"),
+        accent: isUrgent
+          ? "from-orange-500/25 to-orange-500/5 border-orange-400/50"
+          : "from-neutral-500/20 to-neutral-500/5 border-neutral-500/30",
+        content: (
+          <span className={`text-3xl sm:text-4xl font-mono font-black leading-none ${isUrgent ? "text-orange-400" : "text-white"}`}>
+            {ms !== null ? msToMMSS(ms) : "--:--"}
+          </span>
+        ),
+      };
+    })(),
+    kartTier: (() => {
+      const score = ourKartObj?.tierScore ?? 0;
+      return {
+        label: t("card.kartTier"),
+        accent: "from-neutral-500/20 to-neutral-500/5 border-neutral-500/30",
+        content: (
+          <span
+            className="text-3xl sm:text-4xl font-mono font-black leading-none"
+            style={{ color: tierHex(score) }}
+          >
+            TIER {score}
+          </span>
+        ),
+      };
+    })(),
   };
 
   // Count visible cards to calculate grid rows

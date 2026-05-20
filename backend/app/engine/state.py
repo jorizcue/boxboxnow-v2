@@ -176,7 +176,7 @@ class KartState:
                 sums.setdefault(name, []).append(lap["lapTime"])
         return {name: sum(times) / len(times) for name, times in sums.items() if times}
 
-    def to_dict(self) -> dict:
+    def to_dict(self, max_stint_min: int | None = None) -> dict:
         # `totalLaps` is what the dashboard displays as VLT. We expose
         # the MAX of (our recorded count, Apex's `tlp` counter) so the
         # cell stays in sync with Apex even when we can't capture every
@@ -208,6 +208,13 @@ class KartState:
             "stintDurationS": self.stint_duration_s(),
             "stintStartTime": self.stint_start_time,  # kept for backwards compat
             "stintElapsedMs": self.stint_elapsed_ms,
+            # Countdown until the driver hits the maximum allowed stint
+            # (driver-app `timeToMaxStint` card). Computed from the race
+            # config — None when no max is configured.
+            "timeToMaxStintMs": (
+                max(0, max_stint_min * 60_000 - self.stint_elapsed_ms)
+                if max_stint_min is not None else None
+            ),
             "stintStartCountdownMs": self.stint_start_countdown_ms,
             "pitInCountdownMs": self.pit_in_countdown_ms if self.pit_in_countdown_ms else None,
             "pitHistory": [p.to_dict() for p in self.pit_history],
@@ -1478,7 +1485,7 @@ class RaceStateManager:
                 "raceFinished": self.race_finished,
                 "countdownMs": self.countdown_ms,
                 "trackName": self.track_name,
-                "karts": [k.to_dict() for k in sorted_karts],
+                "karts": [k.to_dict(max_stint_min=self.max_stint_min) for k in sorted_karts],
                 "fifo": {
                     "queue": self.fifo_queue,
                     "score": self.fifo_score,

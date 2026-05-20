@@ -2496,11 +2496,10 @@ function PlatformSettingsManager() {
                       </p>
                       <div className="space-y-3">
                         {DRIVER_CARD_GROUPS.map((group) => {
+                          // Order matches the BBN indicator spreadsheet
+                          // (catalog order — NOT alphabetical).
                           const groupCards = ALL_DRIVER_CARDS
-                            .filter((c) => c.group === group.id)
-                            .sort((a, b) =>
-                              a.label.localeCompare(b.label, "es", { sensitivity: "base" }),
-                            );
+                            .filter((c) => c.group === group.id);
                           if (groupCards.length === 0) return null;
                           const groupIds: string[] = groupCards.map((c) => c.id);
                           const allActive = groupIds.every((id) =>

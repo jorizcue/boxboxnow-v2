@@ -789,6 +789,15 @@ const translations: Record<string, Record<Language, string>> = {
   "card.gForceRadar": { es: "G-Force (diana)", en: "G-Force (target)", it: "G-Force (bersaglio)", de: "G-Force (Zielscheibe)", fr: "G-Force (cible)" },
   "card.gpsGForce": { es: "G-Force (números)", en: "G-Force (numbers)", it: "G-Force (numeri)", de: "G-Force (Zahlen)", fr: "G-Force (chiffres)" },
   "card.gpsSpeed": { es: "Velocidad GPS", en: "GPS speed", it: "Velocità GPS", de: "GPS-Geschwindigkeit", fr: "Vitesse GPS" },
+  "card.stintTime": { es: "Tiempo de stint", en: "Stint time", it: "Tempo stint", de: "Stint-Zeit", fr: "Temps du relais" },
+  "card.totalLaps": { es: "Número de vueltas totales", en: "Total laps", it: "Giri totali", de: "Gesamtrunden", fr: "Tours totaux" },
+  "card.stintLaps": { es: "Número de vueltas stint", en: "Stint laps", it: "Giri nello stint", de: "Stint-Runden", fr: "Tours du relais" },
+  "card.sectors": { es: "Mejores sectores", en: "Best sectors", it: "Migliori settori", de: "Beste Sektoren", fr: "Meilleurs secteurs" },
+  "card.bestS1": { es: "Mejor S1", en: "Best S1", it: "Miglior S1", de: "Beste S1", fr: "Meilleur S1" },
+  "card.bestS2": { es: "Mejor S2", en: "Best S2", it: "Miglior S2", de: "Beste S2", fr: "Meilleur S2" },
+  "card.bestS3": { es: "Mejor S3", en: "Best S3", it: "Miglior S3", de: "Beste S3", fr: "Meilleur S3" },
+  "card.timeToMaxStint": { es: "Tiempo hasta stint máximo", en: "Time to max stint", it: "Tempo al stint massimo", de: "Zeit bis Max-Stint", fr: "Temps jusqu'au relais max" },
+  "card.kartTier": { es: "Calificación del kart", en: "Kart tier", it: "Categoria kart", de: "Kart-Stufe", fr: "Catégorie kart" },
 
   // === Tracking (live spatial map) ===
   "tracking.title": { es: "Tracking en vivo", en: "Live tracking", it: "Tracking live", de: "Live-Tracking", fr: "Suivi en direct" },

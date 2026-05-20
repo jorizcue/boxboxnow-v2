@@ -618,6 +618,103 @@ struct DriverCardView: View {
                         .foregroundColor(Color(.systemGray3))
                 }
             }
+
+        // ── 2026-05 indicators (Excel red-font rows) ──
+
+        // Current stint elapsed time, mm:ss.
+        case .stintTime:
+            Text(Formatters.msToMMSS(kart?.stintElapsedMs ?? 0))
+                .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                .foregroundColor(.white)
+                .minimumScaleFactor(0.5)
+                .lineLimit(1)
+
+        // Total laps completed by this kart.
+        case .totalLaps:
+            Text("\(kart?.totalLaps ?? 0)")
+                .font(.system(size: bigFont, weight: .black, design: .monospaced))
+                .foregroundColor(.white)
+                .minimumScaleFactor(0.5)
+                .lineLimit(1)
+
+        // Laps in the current stint.
+        case .stintLaps:
+            Text("\(kart?.stintLapsCount ?? 0)")
+                .font(.system(size: bigFont, weight: .black, design: .monospaced))
+                .foregroundColor(.white)
+                .minimumScaleFactor(0.5)
+                .lineLimit(1)
+
+        // Composite: best S1 / S2 / S3 of this driver, 3 lines.
+        case .sectors:
+            let bests: [Double] = [kart?.bestS1Ms ?? 0, kart?.bestS2Ms ?? 0, kart?.bestS3Ms ?? 0]
+            let allEmpty = bests.allSatisfy { $0 <= 0 }
+            if !hasSectors || allEmpty {
+                Text("--")
+                    .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                    .foregroundColor(Color(.systemGray3))
+            } else {
+                VStack(spacing: 2 * scale) {
+                    ForEach(1...3, id: \.self) { n in
+                        HStack {
+                            Text("S\(n)")
+                                .font(.system(size: smallFont, weight: .semibold))
+                                .foregroundColor(Color(.systemGray))
+                            Spacer()
+                            let ms = bests[n - 1]
+                            Text(ms > 0 ? String(format: "%.3f", ms / 1000.0) : "—")
+                                .font(.system(size: subFont, weight: .black, design: .monospaced))
+                                .foregroundColor(.purple)
+                        }
+                    }
+                }
+            }
+
+        // Single-sector PB cards.
+        case .bestS1, .bestS2, .bestS3:
+            let bestMs: Double = {
+                switch card {
+                case .bestS1: return kart?.bestS1Ms ?? 0
+                case .bestS2: return kart?.bestS2Ms ?? 0
+                case .bestS3: return kart?.bestS3Ms ?? 0
+                default: return 0
+                }
+            }()
+            if !hasSectors || bestMs <= 0 {
+                Text("--")
+                    .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                    .foregroundColor(Color(.systemGray3))
+            } else {
+                Text(String(format: "%.3f", bestMs / 1000.0))
+                    .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                    .foregroundColor(.purple)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+            }
+
+        // Countdown to maximum stint (mm:ss). Orange when < 2 min.
+        case .timeToMaxStint:
+            if let remaining = kart?.timeToMaxStintMs {
+                let urgent = remaining < 2 * 60_000
+                Text(Formatters.msToMMSS(remaining))
+                    .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                    .foregroundColor(urgent ? .orange : .white)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+            } else {
+                Text("--:--")
+                    .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                    .foregroundColor(Color(.systemGray3))
+            }
+
+        // Kart tier rating (0-100). Color follows tierHex on web.
+        case .kartTier:
+            let score = Int(kart?.tierScore ?? 0)
+            Text("TIER \(score)")
+                .font(.system(size: mainFont, weight: .black, design: .monospaced))
+                .foregroundColor(Formatters.tierColor(score))
+                .minimumScaleFactor(0.5)
+                .lineLimit(1)
         }
     }
 
@@ -989,6 +1086,42 @@ struct DriverCardView: View {
                 }
             }
             return "Delta sectores actual: \(parts.joined(separator: ", "))"
+        // 2026-05 additions
+        case .stintTime:
+            return "Tiempo de stint: \(Formatters.msToMMSS(kart?.stintElapsedMs ?? 0))"
+        case .totalLaps:
+            return "Vueltas totales: \(kart?.totalLaps ?? 0)"
+        case .stintLaps:
+            return "Vueltas del stint: \(kart?.stintLapsCount ?? 0)"
+        case .sectors:
+            let s1 = kart?.bestS1Ms ?? 0, s2 = kart?.bestS2Ms ?? 0, s3 = kart?.bestS3Ms ?? 0
+            guard raceVM.hasSectors, s1 > 0 || s2 > 0 || s3 > 0 else {
+                return "Mejores sectores: sin datos"
+            }
+            var parts: [String] = []
+            for (n, ms) in [(1, s1), (2, s2), (3, s3)] {
+                if ms > 0 { parts.append("S\(n) \(String(format: "%.3f", ms / 1000))") }
+            }
+            return "Mejores sectores: \(parts.joined(separator: ", "))"
+        case .bestS1, .bestS2, .bestS3:
+            let ms: Double = {
+                switch card {
+                case .bestS1: return kart?.bestS1Ms ?? 0
+                case .bestS2: return kart?.bestS2Ms ?? 0
+                case .bestS3: return kart?.bestS3Ms ?? 0
+                default: return 0
+                }
+            }()
+            let label = card == .bestS1 ? "S1" : card == .bestS2 ? "S2" : "S3"
+            if !raceVM.hasSectors || ms <= 0 { return "Mejor \(label): sin datos" }
+            return "Mejor \(label): \(String(format: "%.3f", ms / 1000))"
+        case .timeToMaxStint:
+            if let r = kart?.timeToMaxStintMs {
+                return "Tiempo hasta stint maximo: \(Formatters.msToMMSS(r))"
+            }
+            return "Tiempo hasta stint maximo: sin datos"
+        case .kartTier:
+            return "Calificacion del kart: \(Int(kart?.tierScore ?? 0))"
         }
     }
 

@@ -75,8 +75,9 @@ fun CardVisibilityScreen(onBack: () -> Unit) {
     val grouped: List<Pair<DriverCardGroup, List<DriverCard>>> =
         DriverCardGroup.entries.mapNotNull { group ->
             if (!canShowBox && group == DriverCardGroup.BOX) return@mapNotNull null
-            // Use sortedByGroupAndName so cards appear alphabetically within each group
-            val cards = DriverCard.sortedByGroupAndName
+            // Order matches the BBN indicator spreadsheet (catalog order —
+            // NOT alphabetical by localized label).
+            val cards = DriverCard.byGroupAndCatalogOrder
                 .filter { it.group == group }
                 .filter { allowed == null || allowed.contains(it.key) }
             if (cards.isEmpty()) null else group to cards

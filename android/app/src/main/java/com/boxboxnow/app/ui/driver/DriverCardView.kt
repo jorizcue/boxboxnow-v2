@@ -782,6 +782,146 @@ private fun CardContent(
                 }
             }
         }
+
+        // ── 2026-05 indicators (Excel red-font rows) ──
+
+        // Current stint elapsed time, mm:ss.
+        DriverCard.StintTime -> Text(
+            text = Formatters.msToMMSS(ourKart?.stintElapsedMs ?: 0.0),
+            color = Color.White,
+            fontSize = mainFont,
+            fontWeight = FontWeight.Black,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+        )
+
+        // Total laps completed by this kart.
+        DriverCard.TotalLaps -> Text(
+            text = (ourKart?.totalLaps ?: 0).toString(),
+            color = Color.White,
+            fontSize = bigFont,
+            fontWeight = FontWeight.Black,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+        )
+
+        // Laps in current stint.
+        DriverCard.StintLaps -> Text(
+            text = (ourKart?.stintLapsCount ?: 0).toString(),
+            color = Color.White,
+            fontSize = bigFont,
+            fontWeight = FontWeight.Black,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+        )
+
+        // Composite: best S1 / S2 / S3 of this driver, 3 lines.
+        DriverCard.Sectors -> {
+            val bests = listOf(
+                ourKart?.bestS1Ms ?: 0.0,
+                ourKart?.bestS2Ms ?: 0.0,
+                ourKart?.bestS3Ms ?: 0.0,
+            )
+            val allEmpty = bests.all { it <= 0.0 }
+            if (!hasSectors || allEmpty) {
+                Text(
+                    "--",
+                    color = BoxBoxNowColors.SystemGray3,
+                    fontSize = mainFont,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace,
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy((2f * scale).dp)) {
+                    bests.forEachIndexed { i, ms ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "S${i + 1}",
+                                color = BoxBoxNowColors.SystemGray,
+                                fontSize = smallFont,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            Text(
+                                if (ms > 0.0) "%.3f".format(ms / 1000.0) else "—",
+                                color = Color(0xFF9C27B0),
+                                fontSize = (mainFont.value * 0.55f).sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Single-sector PBs.
+        DriverCard.BestS1, DriverCard.BestS2, DriverCard.BestS3 -> {
+            val ms = when (card) {
+                DriverCard.BestS1 -> ourKart?.bestS1Ms ?: 0.0
+                DriverCard.BestS2 -> ourKart?.bestS2Ms ?: 0.0
+                DriverCard.BestS3 -> ourKart?.bestS3Ms ?: 0.0
+                else -> 0.0
+            }
+            if (!hasSectors || ms <= 0.0) {
+                Text(
+                    "--",
+                    color = BoxBoxNowColors.SystemGray3,
+                    fontSize = mainFont,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace,
+                )
+            } else {
+                Text(
+                    "%.3f".format(ms / 1000.0),
+                    color = Color(0xFF9C27B0),
+                    fontSize = mainFont,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                )
+            }
+        }
+
+        // Countdown to maximum stint (mm:ss). Orange when < 2 min.
+        DriverCard.TimeToMaxStint -> {
+            val remaining = ourKart?.timeToMaxStintMs
+            if (remaining != null) {
+                val urgent = remaining < 2 * 60_000.0
+                Text(
+                    Formatters.msToMMSS(remaining),
+                    color = if (urgent) Color(0xFFFF9F0A) else Color.White,
+                    fontSize = mainFont,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                )
+            } else {
+                Text(
+                    "--:--",
+                    color = BoxBoxNowColors.SystemGray3,
+                    fontSize = mainFont,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
+        }
+
+        // Kart tier rating (0-100). Color follows tierHex on web.
+        DriverCard.KartTier -> {
+            val score = (ourKart?.tierScore ?: 0.0).toInt()
+            Text(
+                "TIER $score",
+                color = Formatters.tierColor(score),
+                fontSize = mainFont,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+            )
+        }
     }
 }
 

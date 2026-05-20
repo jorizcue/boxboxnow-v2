@@ -62,6 +62,15 @@ enum Formatters {
         return String(format: "%d:%02d", min, sec)
     }
 
+    /// Milliseconds to MM:SS — used by stintTime and timeToMaxStint cards.
+    static func msToMMSS(_ ms: Double) -> String {
+        let safe = max(0, Int(ms))
+        let totalSec = safe / 1000
+        let m = totalSec / 60
+        let s = totalSec % 60
+        return String(format: "%02d:%02d", m, s)
+    }
+
     /// Tier hex color for box score (0-100) — matches web tierHex()
     static func tierColor(_ score: Int) -> Color {
         if score >= 100 { return Color(red: 0.624, green: 0.898, blue: 0.337) } // #9fe556

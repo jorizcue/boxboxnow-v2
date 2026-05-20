@@ -56,6 +56,15 @@ object Formatters {
         return "%d:%02d".format(min, sec)
     }
 
+    /** Milliseconds to MM:SS — used by stintTime and timeToMaxStint cards. */
+    fun msToMMSS(ms: Double): String {
+        val safe = maxOf(0, ms.toInt())
+        val totalSec = safe / 1000
+        val m = totalSec / 60
+        val s = totalSec % 60
+        return "%02d:%02d".format(m, s)
+    }
+
     /** Tier hex color for box score (0-100) — matches web tierHex() */
     fun tierColor(score: Int): Color = when {
         score >= 100 -> Color(0xFF9FE556)

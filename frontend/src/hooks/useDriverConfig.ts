@@ -11,47 +11,56 @@ import { broadcastDriverConfig } from "@/lib/driverChannel";
 /* ------------------------------------------------------------------ */
 
 export type DriverCardId =
+  // Carrera - Apex (raw Apex live timing)
   | "raceTimer"
-  | "currentLapTime"
+  | "stintTime"
+  | "bestStintLap"
   | "lastLap"
-  | "deltaBestLap"
-  | "gForceRadar"
+  | "apexPosition"
+  | "totalLaps"
+  | "stintLaps"
+  | "intervalAhead"
+  | "intervalBehind"
+  | "sectors"  // best S1/S2/S3 of this driver combined into one card, 3 lines
+  | "bestS1"
+  | "bestS2"
+  | "bestS3"
+  // Carrera - BBN (BoxBoxNow-derived analytics)
   | "position"
-  | "realPos"
-  | "gapAhead"
-  | "gapBehind"
   | "avgLap20"
   | "best3"
   | "avgFutureStint"
-  | "boxScore"
-  | "gpsLapDelta"
-  | "gpsSpeed"
-  | "gpsGForce"
-  | "bestStintLap"
+  | "timeToMaxStint"
   | "lapsToMaxStint"
-  | "pitWindow"
-  | "pitCount"
-  | "currentPit"
-  // Sector telemetry — only meaningful on circuits whose Apex grid
-  // declares `s1|s2|s3` data-type columns. The cards self-handle the
-  // "no sector data" state with a "--" placeholder, so they're safe
-  // to leave enabled on circuits without sectors.
+  | "kartTier"
+  | "theoreticalBestLap"
+  // Sector deltas — only meaningful on circuits whose Apex grid declares
+  // `s1|s2|s3` data-type columns. The cards self-handle the "no sector
+  // data" state with a "--" placeholder.
+  | "deltaSectors"  // S1/S2/S3 deltas combined into one card, 3 lines
   | "deltaBestS1"
   | "deltaBestS2"
   | "deltaBestS3"
-  | "theoreticalBestLap"
-  | "deltaSectors"  // S1/S2/S3 deltas combined into one card, 3 lines
+  | "deltaSectorsCurrent"
   | "deltaCurrentS1"
   | "deltaCurrentS2"
   | "deltaCurrentS3"
-  | "deltaSectorsCurrent"
-  // Raw Apex live timing — distinct from gapAhead/gapBehind (which
-  // derive from the adjusted classification) and from position
-  // (avg-pace) / realPos (adjusted). These surface the values
-  // straight from Apex's `data-type="int"` and `data-type="rk"`.
-  | "intervalAhead"
-  | "intervalBehind"
-  | "apexPosition";
+  | "realPos"
+  | "gapAhead"
+  | "gapBehind"
+  // Box
+  | "currentPit"
+  | "boxScore"
+  | "pitCount"
+  | "pitWindow"
+  // GPS — `currentLapTime` lives here because it needs a GPS fix to be
+  // useful (without GPS we don't know "where in the lap" the kart is).
+  | "deltaBestLap"
+  | "gpsLapDelta"
+  | "gForceRadar"
+  | "gpsGForce"
+  | "gpsSpeed"
+  | "currentLapTime";
 
 // Card groups in the preset editor. The legacy single "race" group was
 // split into two — "raceApex" (raw Apex live timing values) and
@@ -69,55 +78,62 @@ export const ALL_DRIVER_CARDS: {
   requiresGps: boolean;
   group: DriverCardGroup;
 }[] = [
-  // --- CARRERA - APEX (raw Apex live timing) ---
+  // --- CARRERA - APEX (raw Apex live timing). Order matches the BBN
+  //     indicator spreadsheet (App móvil · Tarjetas Carrera · Timing). ---
   { id: "raceTimer", labelKey: "card.raceTimer", label: "Tiempo de carrera", requiresGps: false, group: "raceApex" },
-  { id: "lastLap", labelKey: "card.lastLap", label: "Última vuelta", requiresGps: false, group: "raceApex" },
+  { id: "stintTime", labelKey: "card.stintTime", label: "Tiempo de stint", requiresGps: false, group: "raceApex" },
   { id: "bestStintLap", labelKey: "card.bestStintLap", label: "Mejor vuelta stint", requiresGps: false, group: "raceApex" },
+  { id: "lastLap", labelKey: "card.lastLap", label: "Última vuelta", requiresGps: false, group: "raceApex" },
   { id: "apexPosition", labelKey: "card.apexPosition", label: "Posición Apex", requiresGps: false, group: "raceApex" },
+  { id: "totalLaps", labelKey: "card.totalLaps", label: "Número de vueltas totales", requiresGps: false, group: "raceApex" },
+  { id: "stintLaps", labelKey: "card.stintLaps", label: "Número de vueltas stint", requiresGps: false, group: "raceApex" },
   { id: "intervalAhead", labelKey: "card.intervalAhead", label: "Intervalo kart delante", requiresGps: false, group: "raceApex" },
   { id: "intervalBehind", labelKey: "card.intervalBehind", label: "Intervalo kart detrás", requiresGps: false, group: "raceApex" },
+  // Composite sector card (best S1 / S2 / S3 of this driver — 3 lines).
+  { id: "sectors", labelKey: "card.sectors", label: "Mejores sectores", requiresGps: false, group: "raceApex" },
+  { id: "bestS1", labelKey: "card.bestS1", label: "Mejor S1", requiresGps: false, group: "raceApex" },
+  { id: "bestS2", labelKey: "card.bestS2", label: "Mejor S2", requiresGps: false, group: "raceApex" },
+  { id: "bestS3", labelKey: "card.bestS3", label: "Mejor S3", requiresGps: false, group: "raceApex" },
 
-  // --- CARRERA - BBN (BoxBoxNow-derived analytics) ---
-  // Note: `currentLapTime` lives in the GPS block (see below) because
-  // it's the only race-tab card that requires a GPS fix to be useful
-  // — without GPS we don't know "where in the lap" the kart is and
-  // the running timer is meaningless. Pre-2026-05-15 it sat here in
-  // raceBbn, which confused operators picking the card without
-  // realising it'd be dead on a kart with no GPS module.
+  // --- CARRERA - BBN (BoxBoxNow-derived analytics). Order matches the
+  //     BBN indicator spreadsheet (App móvil · Tarjetas Carrera · BBN). ---
+  { id: "position", labelKey: "card.position", label: "Posición (tiempos medios)", requiresGps: false, group: "raceBbn" },
   { id: "avgLap20", labelKey: "card.avgLap20", label: "Vuelta media (20v)", requiresGps: false, group: "raceBbn" },
   { id: "best3", labelKey: "card.best3", label: "Media Mejor 3 v", requiresGps: false, group: "raceBbn" },
-  { id: "position", labelKey: "card.position", label: "Posición (tiempos medios)", requiresGps: false, group: "raceBbn" },
-  { id: "realPos", labelKey: "card.realPos", label: "Posición (clasif. real)", requiresGps: false, group: "raceBbn" },
-  { id: "gapAhead", labelKey: "card.gapAhead", label: "Gap Real Kart delante", requiresGps: false, group: "raceBbn" },
-  { id: "gapBehind", labelKey: "card.gapBehind", label: "Gap Real Kart detrás", requiresGps: false, group: "raceBbn" },
   { id: "avgFutureStint", labelKey: "card.avgFutureStint", label: "Media stint futuro", requiresGps: false, group: "raceBbn" },
+  { id: "timeToMaxStint", labelKey: "card.timeToMaxStint", label: "Tiempo hasta stint máximo", requiresGps: false, group: "raceBbn" },
   { id: "lapsToMaxStint", labelKey: "card.lapsToMaxStint", label: "Vueltas hasta stint máximo", requiresGps: false, group: "raceBbn" },
+  { id: "kartTier", labelKey: "card.kartTier", label: "Calificación del kart", requiresGps: false, group: "raceBbn" },
   { id: "theoreticalBestLap", labelKey: "card.theoreticalBestLap", label: "Mejor vuelta teórica sectores", requiresGps: false, group: "raceBbn" },
-  // Sector cards classified as BBN — they're computed from Apex sector
-  // events but only meaningful as deltas vs the field's best, which is
-  // our own analytics. Appear "--" on circuits without sector data.
+  // Sector delta cards. Computed from Apex sector events vs the field's
+  // best ("Mejor S*") or vs the current lap so far ("Actual S*"). Appear
+  // "--" on circuits without sector data.
+  { id: "deltaSectors", labelKey: "card.deltaSectors", label: "Δ Sectores", requiresGps: false, group: "raceBbn" },
   { id: "deltaBestS1", labelKey: "card.deltaBestS1", label: "Δ Mejor S1", requiresGps: false, group: "raceBbn" },
   { id: "deltaBestS2", labelKey: "card.deltaBestS2", label: "Δ Mejor S2", requiresGps: false, group: "raceBbn" },
   { id: "deltaBestS3", labelKey: "card.deltaBestS3", label: "Δ Mejor S3", requiresGps: false, group: "raceBbn" },
-  { id: "deltaSectors", labelKey: "card.deltaSectors", label: "Δ Sectores", requiresGps: false, group: "raceBbn" },
+  { id: "deltaSectorsCurrent", labelKey: "card.deltaSectorsCurrent", label: "Δ Sectores Actual", requiresGps: false, group: "raceBbn" },
   { id: "deltaCurrentS1", labelKey: "card.deltaCurrentS1", label: "Δ Actual S1", requiresGps: false, group: "raceBbn" },
   { id: "deltaCurrentS2", labelKey: "card.deltaCurrentS2", label: "Δ Actual S2", requiresGps: false, group: "raceBbn" },
   { id: "deltaCurrentS3", labelKey: "card.deltaCurrentS3", label: "Δ Actual S3", requiresGps: false, group: "raceBbn" },
-  { id: "deltaSectorsCurrent", labelKey: "card.deltaSectorsCurrent", label: "Δ Sectores Actual", requiresGps: false, group: "raceBbn" },
+  { id: "realPos", labelKey: "card.realPos", label: "Posición (clasif. real)", requiresGps: false, group: "raceBbn" },
+  { id: "gapAhead", labelKey: "card.gapAhead", label: "Gap Real Kart delante", requiresGps: false, group: "raceBbn" },
+  { id: "gapBehind", labelKey: "card.gapBehind", label: "Gap Real Kart detrás", requiresGps: false, group: "raceBbn" },
 
-  // --- BOX group (alphabetical by label) ---
+  // --- BOX (Excel order). ---
   { id: "currentPit", labelKey: "card.currentPit", label: "Pit en curso", requiresGps: false, group: "box" },
-  { id: "pitCount", labelKey: "card.pitCount", label: "PITS (realizados / mínimos)", requiresGps: false, group: "box" },
   { id: "boxScore", labelKey: "card.boxScore", label: "Puntuación Box", requiresGps: false, group: "box" },
+  { id: "pitCount", labelKey: "card.pitCount", label: "PITS (realizados / mínimos)", requiresGps: false, group: "box" },
   { id: "pitWindow", labelKey: "card.pitWindow", label: "Ventana de pit (open/closed)", requiresGps: false, group: "box" },
 
-  // --- GPS group (alphabetical by label) ---
-  { id: "currentLapTime", labelKey: "card.currentLapTime", label: "Vuelta actual (tiempo real)", requiresGps: true, group: "gps" },
+  // --- GPS (Excel order). `currentLapTime` lives here because it's the
+  //     only race-tab card that requires a GPS fix to be useful. ---
   { id: "deltaBestLap", labelKey: "card.deltaBestLap", label: "Delta vs Best Lap (GPS)", requiresGps: true, group: "gps" },
   { id: "gpsLapDelta", labelKey: "card.gpsLapDelta", label: "Delta vuelta anterior GPS", requiresGps: true, group: "gps" },
   { id: "gForceRadar", labelKey: "card.gForceRadar", label: "G-Force (diana)", requiresGps: true, group: "gps" },
   { id: "gpsGForce", labelKey: "card.gpsGForce", label: "G-Force (números)", requiresGps: true, group: "gps" },
   { id: "gpsSpeed", labelKey: "card.gpsSpeed", label: "Velocidad GPS", requiresGps: true, group: "gps" },
+  { id: "currentLapTime", labelKey: "card.currentLapTime", label: "Vuelta actual (tiempo real)", requiresGps: true, group: "gps" },
 ];
 
 export const DRIVER_CARD_GROUPS: { id: DriverCardGroup; labelKey: string; label: string }[] = [

@@ -166,6 +166,10 @@ data class KartState(
     val stintLapsCount: Int? = null,
     val stintDurationS: Double? = null,
     val stintElapsedMs: Double? = null,
+    /** Countdown until this kart hits the configured maximum stint
+     *  (max_stint_min × 60s − stintElapsed). Null when no max is set.
+     *  Backend-computed in KartState.to_dict. */
+    val timeToMaxStintMs: Double? = null,
     val stintStartCountdownMs: Double? = null,
     val stintStartTime: Double? = null,
     val pitInCountdownMs: Double? = null,
