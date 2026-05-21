@@ -118,19 +118,31 @@ def parse_log_file(filepath: str) -> list[tuple[datetime, str]]:
         if message.strip():
             blocks.append((current_timestamp, message))
 
-    # Filter out garbage messages and sanitize binary-contaminated ones
+    # Sanitize first, then validate. The previous "validate then sanitize"
+    # order rejected legitimate Apex init blocks from modern venues (e.g.
+    # live-data.apex-timing.com / Finales SWS Endurance), whose `init|`
+    # line carries a binary payload — `_is_valid_apex_message` saw the
+    # non-printable bytes and tossed the whole block, taking title1/title2/
+    # grid/countdown with it. By sanitizing per-line first, the binary tail
+    # of the init line gets truncated to its printable head and the rest
+    # of the block (which is plain text) survives — so analyze_log can
+    # detect raceStarts again. The post-sanitization validation still
+    # catches the cases this filter was originally there for: HTTP scanner
+    # requests (CONNECT / GET / …) keep their textual first line intact,
+    # and full TLS handshake blocks sanitize to an empty `sanitized_lines`.
     clean_blocks = []
     for ts, message in blocks:
-        if not _is_valid_apex_message(message):
-            continue
-        # Sanitize individual lines (strip trailing binary)
         sanitized_lines = []
         for line in message.split("\n"):
             clean = _sanitize_apex_line(line)
             if clean:
                 sanitized_lines.append(clean)
-        if sanitized_lines:
-            clean_blocks.append((ts, "\n".join(sanitized_lines)))
+        if not sanitized_lines:
+            continue
+        sanitized = "\n".join(sanitized_lines)
+        if not _is_valid_apex_message(sanitized):
+            continue
+        clean_blocks.append((ts, sanitized))
 
     return clean_blocks
 
