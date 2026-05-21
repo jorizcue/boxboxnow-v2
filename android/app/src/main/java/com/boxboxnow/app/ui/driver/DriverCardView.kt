@@ -103,6 +103,13 @@ fun DriverCardView(
         // when out of the safe window. Only computed for that card.
         avgFutureWarn = if (card == DriverCard.AvgFutureStint)
             raceVM.computeAvgFutureStint(raceClockMs)?.warn else null,
+        // Sector cards (Δ Mejor / Δ Actual S1/2/3) consult sectorMeta
+        // (session-PB) so the background can flip purple/green/yellow
+        // based on the driver's latest sector pass — same Apex live-
+        // timing semantic. Both families share sectorMeta (NOT
+        // sectorMetaCurrent) so the background reflects the pilot's
+        // status, independent of the per-card delta basis.
+        sectorMeta = sectorMeta,
     )
     val prominent = card == DriverCard.Position || card == DriverCard.RealPos || card == DriverCard.PitWindow
     val bgAlpha = if (prominent) 0.18f else 0.12f
@@ -266,6 +273,7 @@ private fun cardAccent(
     pitOpen: Boolean? = null,
     lapsToMax: Double? = null,
     avgFutureWarn: Boolean? = null,
+    sectorMeta: SectorMeta? = null,
 ): Color {
     val gray = BoxBoxNowColors.SystemGray
     return when (card) {
@@ -310,8 +318,57 @@ private fun cardAccent(
         // `card.accent`. Keeps the card's frame in sync with its value.
         DriverCard.AvgFutureStint ->
             if (avgFutureWarn == true) Color(0xFFFF453A) else card.accent
+        // Sector delta cards (Δ Mejor S1/2/3 + Δ Actual S1/2/3) — pick
+        // the background per Apex's live-timing semantic:
+        //   purple = driver's latest pass at this sector is the field-
+        //            wide session-best,
+        //   green  = matches the driver's own session PB but not the
+        //            field's best,
+        //   yellow = no improvement on the driver's own PB.
+        // Both families share sectorMeta (NOT sectorMetaCurrent) so the
+        // tint reflects the pilot's status, not the per-card delta basis.
+        DriverCard.DeltaBestS1, DriverCard.DeltaCurrentS1 ->
+            sectorBgColor(1, ourKart, sectorMeta)
+        DriverCard.DeltaBestS2, DriverCard.DeltaCurrentS2 ->
+            sectorBgColor(2, ourKart, sectorMeta)
+        DriverCard.DeltaBestS3, DriverCard.DeltaCurrentS3 ->
+            sectorBgColor(3, ourKart, sectorMeta)
         else -> card.accent
     }
+}
+
+/**
+ * Pick the background tint for a single-sector delta card. Mirrors the
+ * web `sectorBgStatus` helper in DriverView.tsx and the iOS
+ * `sectorBgColor` helper — comparisons use strict equality because the
+ * backend writes `bestSNMs = currentSNMs` when a pass improves the PB,
+ * so any "this pass became the PB" satisfies `currentSNMs == bestSNMs`
+ * until the next sector crossing overwrites `currentSNMs`. Same trick
+ * for field-best via `sectorMeta.sN.bestMs`.
+ */
+private fun sectorBgColor(n: Int, ourKart: KartState?, sectorMeta: SectorMeta?): Color {
+    val cur = when (n) {
+        1 -> ourKart?.currentS1Ms ?: 0.0
+        2 -> ourKart?.currentS2Ms ?: 0.0
+        3 -> ourKart?.currentS3Ms ?: 0.0
+        else -> 0.0
+    }
+    if (cur <= 0.0) return Color(0xFFFFCC00) // yellow — no data yet
+    val best = when (n) {
+        1 -> ourKart?.bestS1Ms ?: 0.0
+        2 -> ourKart?.bestS2Ms ?: 0.0
+        3 -> ourKart?.bestS3Ms ?: 0.0
+        else -> 0.0
+    }
+    val fieldBest = when (n) {
+        1 -> sectorMeta?.s1?.bestMs ?: 0.0
+        2 -> sectorMeta?.s2?.bestMs ?: 0.0
+        3 -> sectorMeta?.s3?.bestMs ?: 0.0
+        else -> 0.0
+    }
+    if (fieldBest > 0.0 && cur == fieldBest) return Color(0xFF9C27B0) // purple
+    if (best > 0.0 && cur == best) return Color(0xFF30D158)           // green
+    return Color(0xFFFFCC00)                                          // yellow
 }
 
 // ─────────────────────── Per-card content ───────────────────────

@@ -185,9 +185,56 @@ struct DriverCardView: View {
             }
             return .cyan
 
+        // Sector delta cards (Δ Mejor S1/2/3 + Δ Actual S1/2/3) — pick the
+        // background per Apex's live-timing semantic:
+        //   purple = driver's latest pass is the session-best across all
+        //            karts for this sector,
+        //   green  = matches the driver's own session PB but not the
+        //            field's best,
+        //   yellow = no improvement on the driver's own PB.
+        // Both card families share the same color (driven by sectorMeta,
+        // the session-PB meta — NOT sectorMetaCurrent) so the background
+        // reflects the pilot's status, not the per-card delta basis.
+        case .deltaBestS1, .deltaCurrentS1:
+            return sectorBgColor(for: 1)
+        case .deltaBestS2, .deltaCurrentS2:
+            return sectorBgColor(for: 2)
+        case .deltaBestS3, .deltaCurrentS3:
+            return sectorBgColor(for: 3)
+
         default:
             return card.accentColor
         }
+    }
+
+    /// Pick the background tint for a single-sector delta card. Mirrors the
+    /// web `sectorBgStatus` helper in DriverView.tsx — comparisons use strict
+    /// equality because the backend writes `bestSNMs = currentSNMs` when a
+    /// pass improves the PB, so any "this pass became the PB" satisfies
+    /// `currentSNMs == bestSNMs` until the next sector crossing overwrites
+    /// `currentSNMs`. Same trick for field-best via `sectorMeta.sN.bestMs`.
+    private func sectorBgColor(for n: Int) -> Color {
+        let cur: Double = {
+            switch n {
+            case 1: return kart?.currentS1Ms ?? 0
+            case 2: return kart?.currentS2Ms ?? 0
+            case 3: return kart?.currentS3Ms ?? 0
+            default: return 0
+            }
+        }()
+        guard cur > 0 else { return .yellow }
+        let best: Double = {
+            switch n {
+            case 1: return kart?.bestS1Ms ?? 0
+            case 2: return kart?.bestS2Ms ?? 0
+            case 3: return kart?.bestS3Ms ?? 0
+            default: return 0
+            }
+        }()
+        let fieldBest = raceVM.sectorMeta?.best(for: n)?.bestMs ?? 0
+        if fieldBest > 0 && cur == fieldBest { return .purple }
+        if best > 0 && cur == best { return .green }
+        return .yellow
     }
 
     private var cardBorderColor: Color { cardAccentColor }

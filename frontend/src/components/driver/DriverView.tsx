@@ -290,6 +290,59 @@ function computeSectorDelta(
   return null;
 }
 
+/** Sector-card background status — same purple/green/yellow semantic
+ *  Apex uses on its live timing grid:
+ *
+ *    fieldBest    = driver's latest pass at this sector matches the
+ *                   session-wide PB across all karts (purple).
+ *    personalBest = matches the driver's own session PB but not the
+ *                   field's best (green).
+ *    none         = latest pass didn't improve the driver's own PB
+ *                   (yellow / default).
+ *
+ *  Backed entirely by data already in the snapshot: `currentSNMs`
+ *  (latest pass), `bestSNMs` (own session PB) and `sectorMeta.sN.bestMs`
+ *  (field-best PB). No new backend field needed.
+ *
+ *  We compare with strict equality because the backend mutates
+ *  `bestSNMs ← currentSNMs` when a pass improves the PB — so any pass
+ *  that became the PB satisfies `currentSNMs === bestSNMs` until the
+ *  next sector crossing overwrites `currentSNMs`. Same for field-best
+ *  via `sectorMeta.sN.bestMs`. */
+type SectorBgStatus = "fieldBest" | "personalBest" | "none";
+
+function sectorBgStatus(
+  sectorIdx: 1 | 2 | 3,
+  pbMeta: SectorMeta | null,
+  myKart: KartState | null,
+): SectorBgStatus {
+  if (!myKart) return "none";
+  const cur = sectorIdx === 1 ? myKart.currentS1Ms
+    : sectorIdx === 2 ? myKart.currentS2Ms
+    : myKart.currentS3Ms;
+  const best = sectorIdx === 1 ? myKart.bestS1Ms
+    : sectorIdx === 2 ? myKart.bestS2Ms
+    : myKart.bestS3Ms;
+  if (!cur || cur <= 0) return "none";
+  const leader = pbMeta
+    ? (sectorIdx === 1 ? pbMeta.s1 : sectorIdx === 2 ? pbMeta.s2 : pbMeta.s3)
+    : null;
+  if (leader && leader.bestMs > 0 && cur === leader.bestMs) return "fieldBest";
+  if (best && best > 0 && cur === best) return "personalBest";
+  return "none";
+}
+
+function sectorBgAccent(status: SectorBgStatus): string {
+  switch (status) {
+    case "fieldBest":
+      return "from-purple-500/25 to-purple-500/5 border-purple-400/50";
+    case "personalBest":
+      return "from-green-500/25 to-green-500/5 border-green-400/50";
+    case "none":
+      return "from-yellow-500/20 to-yellow-500/5 border-yellow-500/30";
+  }
+}
+
 function renderSectorDeltaCard(
   sectorIdx: 1 | 2 | 3,
   hasSectors: boolean,
@@ -297,6 +350,12 @@ function renderSectorDeltaCard(
   myKart: KartState | null,
   label: string,
   current: boolean = false,
+  /** Session-PB meta used to color the card background. Defaults to the
+   *  same `sectorMeta` parameter (so Δ Mejor S* cards keep one source of
+   *  truth); Δ Actual S* callers pass `sectorMetaCurrent` for delta math
+   *  but the field-PB meta here so both card families share the same
+   *  Apex-style purple/green/yellow background. */
+  pbMeta: SectorMeta | null = sectorMeta,
 ): { label: string; content: React.ReactNode; accent: string } {
   const stubAccent = "from-neutral-500/15 to-neutral-500/5 border-neutral-500/30";
 
@@ -316,10 +375,7 @@ function renderSectorDeltaCard(
   }
 
   const { deltaMs, isMine } = result;
-
-  const accent = isMine
-    ? "from-green-500/25 to-green-500/5 border-green-400/50"
-    : "from-red-500/25 to-red-500/5 border-red-400/50";
+  const accent = sectorBgAccent(sectorBgStatus(sectorIdx, pbMeta, myKart));
 
   const leaderName = (() => {
     const t = (leader.teamName ?? "").trim();
@@ -1467,9 +1523,12 @@ export function DriverView() {
     deltaBestS3: renderSectorDeltaCard(3, hasSectors, sectorMeta, ourKartObj, "Δ Mejor S3"),
     theoreticalBestLap: renderTheoreticalBestLapCard(hasSectors, ourKartObj),
     deltaSectors: renderDeltaSectorsCard(hasSectors, sectorMeta, ourKartObj, "Δ Sectores"),
-    deltaCurrentS1: renderSectorDeltaCard(1, hasSectors, sectorMetaCurrent, ourKartObj, t("card.deltaCurrentS1"), true),
-    deltaCurrentS2: renderSectorDeltaCard(2, hasSectors, sectorMetaCurrent, ourKartObj, t("card.deltaCurrentS2"), true),
-    deltaCurrentS3: renderSectorDeltaCard(3, hasSectors, sectorMetaCurrent, ourKartObj, t("card.deltaCurrentS3"), true),
+    // Δ Actual cards use sectorMetaCurrent for the delta math but the
+    // session-PB sectorMeta for background color, so both families share
+    // the same Apex-style purple/green/yellow paint.
+    deltaCurrentS1: renderSectorDeltaCard(1, hasSectors, sectorMetaCurrent, ourKartObj, t("card.deltaCurrentS1"), true, sectorMeta),
+    deltaCurrentS2: renderSectorDeltaCard(2, hasSectors, sectorMetaCurrent, ourKartObj, t("card.deltaCurrentS2"), true, sectorMeta),
+    deltaCurrentS3: renderSectorDeltaCard(3, hasSectors, sectorMetaCurrent, ourKartObj, t("card.deltaCurrentS3"), true, sectorMeta),
     deltaSectorsCurrent: renderDeltaSectorsCard(hasSectors, sectorMetaCurrent, ourKartObj, t("card.deltaSectorsCurrent"), true),
     // ── Raw Apex live timing cards ──
     // intervalAhead = myKart.interval (gap to kart in front per Apex)
