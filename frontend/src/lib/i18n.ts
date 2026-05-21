@@ -976,7 +976,7 @@ const translations: Record<string, Record<Language, string>> = {
   "landing.nav.features": { es: "Funcionalidades", en: "Features", it: "Funzionalità", de: "Funktionen", fr: "Fonctionnalités" },
   "landing.nav.pricing": { es: "Precios", en: "Pricing", it: "Prezzi", de: "Preise", fr: "Tarifs" },
   "landing.nav.demo": { es: "Demo", en: "Demo", it: "Demo", de: "Demo", fr: "Démo" },
-  "landing.nav.login": { es: "Iniciar sesion", en: "Log in", it: "Accedi", de: "Anmelden", fr: "Connexion" },
+  "landing.nav.login": { es: "Iniciar sesión", en: "Log in", it: "Accedi", de: "Anmelden", fr: "Connexion" },
   "landing.nav.start": { es: "Empezar", en: "Get started", it: "Inizia", de: "Loslegen", fr: "Commencer" },
   "landing.nav.menu": { es: "Menú", en: "Menu", it: "Menu", de: "Menü", fr: "Menu" },
 
@@ -1225,12 +1225,12 @@ const translations: Record<string, Record<Language, string>> = {
   // Trial CTA (TrialCTA / TrialSubtitle)
   "landing.trial.loading": { es: "Cargando...", en: "Loading...", it: "Caricamento...", de: "Lädt...", fr: "Chargement..." },
   "landing.trial.createAccount": { es: "Crear cuenta gratis", en: "Create free account", it: "Crea un account gratis", de: "Kostenloses Konto erstellen", fr: "Créer un compte gratuit" },
-  "landing.trial.startFreeDays": { es: "Empieza gratis — {days} dias", en: "Start free — {days} days", it: "Inizia gratis — {days} giorni", de: "Kostenlos starten — {days} Tage", fr: "Commencez gratuitement — {days} jours" },
-  "landing.trial.tryIt": { es: "Pruebalo", en: "Try it", it: "Provalo", de: "Probier es aus", fr: "Essayez-le" },
-  "landing.trial.noCard": { es: "Sin tarjeta de credito · Cancela cuando quieras", en: "No credit card · Cancel anytime", it: "Senza carta di credito · Annulla quando vuoi", de: "Keine Kreditkarte · Jederzeit kündbar", fr: "Sans carte bancaire · Annulez quand vous voulez" },
+  "landing.trial.startFreeDays": { es: "Empieza gratis — {days} días", en: "Start free — {days} days", it: "Inizia gratis — {days} giorni", de: "Kostenlos starten — {days} Tage", fr: "Commencez gratuitement — {days} jours" },
+  "landing.trial.tryIt": { es: "Pruébalo", en: "Try it", it: "Provalo", de: "Probier es aus", fr: "Essayez-le" },
+  "landing.trial.noCard": { es: "Sin tarjeta de crédito · Cancela cuando quieras", en: "No credit card · Cancel anytime", it: "Senza carta di credito · Annulla quando vuoi", de: "Keine Kreditkarte · Jederzeit kündbar", fr: "Sans carte bancaire · Annulez quand vous voulez" },
 
   // Live ticker (LiveTicker)
-  "landing.ticker.leader": { es: "LIDER", en: "LEADER", it: "LEADER", de: "FÜHRENDER", fr: "LEADER" },
+  "landing.ticker.leader": { es: "LÍDER", en: "LEADER", it: "LEADER", de: "FÜHRENDER", fr: "LEADER" },
 };
 
 /**
