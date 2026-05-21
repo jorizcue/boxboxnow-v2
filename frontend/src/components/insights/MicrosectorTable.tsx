@@ -66,7 +66,21 @@ export function MicrosectorTable({
         winner: dA < dB ? "A" : dA > dB ? "B" : "tie",
       });
     }
-    return { rows, sumA, sumB, sumBest };
+    // The per-microsector durations come from interpolating the GPS trace
+    // at 20 equally-spaced distance points, so sumA / sumB equal
+    // (ts[last] - ts[first]) of the GPS samples — which is a few ms short
+    // of `lap.duration_ms` (the canonical finish-line-to-finish-line lap
+    // time stored in the DB) because GPS samples don't fall exactly on
+    // the finish line at the 25 Hz cadence. We surface the canonical
+    // duration in the header cards so the totals match the lap selector,
+    // and rescale the "theoretical best" into the same canonical reference
+    // by applying the microsector savings vs the better actual lap. The
+    // per-row deltas stay in microsector units (correct for sampling
+    // since both laps come from the same trace shape).
+    const microSavings = Math.max(0, Math.min(sumA, sumB) - sumBest);
+    const bestCanonical = Math.min(lapA.duration_ms, lapB.duration_ms);
+    const theoreticalCanonical = Math.max(0, bestCanonical - microSavings);
+    return { rows, sumA, sumB, sumBest, microSavings, bestCanonical, theoreticalCanonical };
   }, [lapA, lapB, count]);
 
   const labelA = labelAProp ?? `V${lapA.lap_number}`;
@@ -85,13 +99,13 @@ export function MicrosectorTable({
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
           <div className="text-[10px] text-neutral-400 uppercase tracking-wider">{labelA}</div>
           <div className="text-base font-mono font-semibold text-blue-300">
-            {formatLapTime(data.sumA)}
+            {formatLapTime(lapA.duration_ms)}
           </div>
         </div>
         <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
           <div className="text-[10px] text-neutral-400 uppercase tracking-wider">{labelB}</div>
           <div className="text-base font-mono font-semibold text-orange-300">
-            {formatLapTime(data.sumB)}
+            {formatLapTime(lapB.duration_ms)}
           </div>
         </div>
         <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
@@ -99,10 +113,10 @@ export function MicrosectorTable({
             {t("insights.microsector.theoretical")}
           </div>
           <div className="text-base font-mono font-semibold text-purple-300">
-            {formatLapTime(data.sumBest)}
+            {formatLapTime(data.theoreticalCanonical)}
           </div>
           <div className="text-[10px] text-neutral-500 mt-0.5">
-            {formatDelta(data.sumBest - Math.min(data.sumA, data.sumB))} {t("insights.microsector.vsBest")}
+            {formatDelta(-data.microSavings)} {t("insights.microsector.vsBest")}
           </div>
         </div>
       </div>
