@@ -323,6 +323,14 @@ class RaceStateManager:
         # `init|p|` re-sends within ONE session (which used to wipe all
         # laps — see _maybe_reset_on_session_identity).
         self._committed_session_sig: str | None = None
+        # Set True by _reset_for_new_session() so the owning UserSession can
+        # reset the box FIFO in lockstep with the karts. Apex re-sends
+        # `init|` on every WS reconnection; resetting the FIFO on ANY init
+        # (the old behaviour) wiped the box queue mid-race even though the
+        # karts — guarded by _committed_session_sig — survived. Gating the
+        # FIFO reset on this flag keeps the two in sync (genuine new session
+        # only). registry.on_events consumes + clears it after handle_events.
+        self._fifo_reset_pending: bool = False
         self.real_start_time: str = ""  # HH:MM from green flag com|| message
         self.race_current_lap: int = 0  # Current lap in lap-based races
         self.race_total_laps: int = 0   # Total laps in lap-based races
@@ -425,6 +433,9 @@ class RaceStateManager:
         self._race_start_ms = 0
         self.has_sectors = False
         self._interval_col_seen = False
+        # Signal the owning UserSession to reset the box FIFO too — the karts
+        # were just wiped for a genuine new session, so the queue must follow.
+        self._fifo_reset_pending = True
 
     @staticmethod
     def _gap_to_ms(raw: str | None) -> int | None:
@@ -1000,16 +1011,18 @@ class RaceStateManager:
             # 0:00 and end equally late. Same fix as lines 558/966.
             kart.pit_in_countdown_ms = self._interpolated_countdown_ms()  # Save race clock at pit-in
 
-            # Calculate stint duration (time on track) and race elapsed time
+            # Calculate stint duration (time on track) and race elapsed time.
+            # BOTH use the interpolated countdown, NOT raw self.countdown_ms
+            # (which is ≤30s stale: Apex pushes the countdown only every
+            # ~30s). With the raw value, per-driver on-track totals drifted
+            # 10–30s per stint vs Apex's own `otr` time, because the
+            # stint-start anchor (set at pit-out) and this pit-in reading
+            # each carried an independent 0–30s staleness offset and their
+            # difference could swing ±30s. Same rationale as
+            # pit_in_countdown_ms above and race_time_ms below.
             duration_total_ms = self.duration_min * 60 * 1000
-            on_track_ms = kart.stint_start_countdown_ms - self.countdown_ms
-            # Interpolated, NOT raw self.countdown_ms (≤30s stale): the Box
-            # "Pit en curso" card computes elapsed = raceElapsed(live
-            # interpolated clock) − pitRecord.race_time_ms, so a stale raw
-            # anchor makes that card start at the staleness offset (e.g.
-            # 0:09) instead of 0:00. Same rationale as pit_in_countdown_ms
-            # above / lines 558,966.
             icd = self._interpolated_countdown_ms()
+            on_track_ms = kart.stint_start_countdown_ms - icd
             race_time_ms = duration_total_ms - icd if icd > 0 else abs(icd) + duration_total_ms
             stint_laps = sum(1 for lap in kart.all_laps if lap.get("pitNumber") == kart.pit_count - 1)
 
@@ -1057,12 +1070,24 @@ class RaceStateManager:
             kart.pit_status = "racing"
             kart.stint_start_time = time.time()
             kart.stint_elapsed_ms = 0  # Reset stint timer on pit out
-            kart.stint_start_countdown_ms = self.countdown_ms  # Race clock at stint start
+            # Interpolated, NOT raw self.countdown_ms (≤30s stale): this is
+            # the stint-start anchor that on_track_ms subtracts from at the
+            # next pit-in, so a stale anchor here biases the per-driver
+            # on-track total. Matches the interpolated read on the pit-in side.
+            kart.stint_start_countdown_ms = self._interpolated_countdown_ms()  # Race clock at stint start
             kart.pit_in_countdown_ms = 0  # Clear pit-in marker
             return {"event": "pitOut", "rowId": row_id,
                     "kartNumber": kart.kart_number,
                     "pitCount": kart.pit_count,
-                    "stintStartCountdownMs": self.countdown_ms}
+                    # Emit the interpolated anchor we just stored (line above),
+                    # NOT raw self.countdown_ms. The frontend applies this
+                    # incrementally (useRaceState pitOut handler) and there is
+                    # no periodic full snapshot during a stint to re-sync it,
+                    # so a raw value here would leave the live "STINT EN CURSO"
+                    # card (stintStartCountdownMs − clock) biased by the 0–30s
+                    # countdown staleness for the whole stint. Keeps the event
+                    # payload consistent with the snapshot (to_dict line ~218).
+                    "stintStartCountdownMs": kart.stint_start_countdown_ms}
 
         elif event.type == EventType.RANKING and kart:
             kart.position = int(event.value)

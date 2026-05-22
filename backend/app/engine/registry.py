@@ -41,24 +41,30 @@ class UserSession:
                 for row_id, kart in self.state.karts.items()
             }
 
-            # A fresh `INIT init` means Apex is starting a new session / race.
-            # `state.handle_events` will wipe karts + race flags from the
-            # RaceStateManager, but the FIFO manager (which lives on the
-            # UserSession, not on the state) keeps its internal deque and
-            # history from the previous session — so the Box tab kept
-            # showing kart entries from the prior race until enough pit-ins
-            # in the new one pushed them out of the deque. Reset the fifo
-            # and mirror the cleared snapshot into state.fifo_queue BEFORE
-            # handle_events runs, so the snapshot it broadcasts after the
-            # INIT already reflects the clean box.
-            has_init_reset = any(
-                e.type == EventType.INIT and e.value == "init" for e in events
-            )
-            if has_init_reset:
+            await self.state.handle_events(events)
+
+            # Reset the box FIFO ONLY when state confirmed a GENUINE new
+            # session. Apex re-sends `init|` on EVERY WebSocket reconnection,
+            # not just at race start — so the old "reset on any INIT init"
+            # logic wiped the box queue on mid-race reconnects (observed at
+            # Le Mans SWS Endurance: re-inits at 09:51 and 14:42 of the same
+            # "Race" session each cleared the queue). The karts survived
+            # because they're guarded by _committed_session_sig; the FIFO
+            # was not. We now gate the FIFO reset on the same session-identity
+            # decision: _reset_for_new_session() sets _fifo_reset_pending, so
+            # the queue is wiped iff the karts were (Qualify→Race, heat→heat),
+            # never on a plain reconnect. Deferred until AFTER handle_events
+            # because Apex sends the title (which decides session identity)
+            # slightly after the first `init|`.
+            if self.state._fifo_reset_pending:
+                self.state._fifo_reset_pending = False
                 self.fifo.reset(self.state.box_karts, self.state.box_lines)
                 self.fifo.apply_to_state(self.state)
-
-            await self.state.handle_events(events)
+                # handle_events may have already broadcast a snapshot carrying
+                # the pre-reset queue (or not broadcast at all if the title
+                # arrived in a title-only batch) — re-broadcast so every
+                # client converges on the cleared box.
+                await self.broadcast_snapshot()
 
             # Detect init kart batch -> trigger driver loading from PHP API
             init_kart_events = [e for e in events
