@@ -270,7 +270,18 @@ export const api = {
     return _snakeToTrackConfig(raw);
   },
   adminImportOsm: (circuitId: number) =>
-    fetchApi<{ polyline: [number, number][] | null; reason?: string }>(
+    fetchApi<{
+      candidates?: {
+        polyline: [number, number][];
+        lengthM: number;
+        nodeCount: number;
+        closed: boolean;
+        name: string;
+        osmId: number;
+      }[];
+      polyline: [number, number][] | null;
+      reason?: string;
+    }>(
       `/api/admin/circuits/${circuitId}/import-osm`,
       { method: "POST" },
     ),

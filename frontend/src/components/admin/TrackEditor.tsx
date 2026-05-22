@@ -70,6 +70,18 @@ export function TrackEditor({ circuitId, onClose }: Props) {
   const [placingMarker, setPlacingMarker] = useState<MarkerKey | null>(null);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
+  // OSM candidate layouts. Venues like RKC Paris map several tracks; the
+  // backend now returns all of them (longest-first) so the operator can
+  // pick the right one instead of the auto-picked most-detailed loop.
+  const [osmCandidates, setOsmCandidates] = useState<{
+    polyline: [number, number][];
+    lengthM: number;
+    nodeCount: number;
+    closed: boolean;
+    name: string;
+    osmId: number;
+  }[]>([]);
+  const [selectedOsmId, setSelectedOsmId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -297,21 +309,36 @@ export function TrackEditor({ circuitId, onClose }: Props) {
     return () => { map.off("click", handler); };
   }, [L, placingMarker, trackPolyline, pitLanePolyline]);
 
+  // Hydrate the editor with one candidate's polyline (closing the loop).
+  const loadCandidatePolyline = useCallback((polyline: [number, number][]) => {
+    const pts = polyline.map((p) => [p[0], p[1]]) as [number, number][];
+    if (pts.length >= 4 &&
+        (pts[0][0] !== pts[pts.length - 1][0] || pts[0][1] !== pts[pts.length - 1][1])) {
+      pts.push([pts[0][0], pts[0][1]]);
+    }
+    setTrackPolyline(pts);
+  }, []);
+
   const handleImportOsm = useCallback(async () => {
     setImporting(true);
     setImportMsg(null);
+    setOsmCandidates([]);
     try {
       const res = await api.adminImportOsm(circuitId);
-      if (!res.polyline || res.polyline.length < 4) {
-        setImportMsg(t("admin.tracking.osmNoMatch"));
-      } else {
-        const pts = res.polyline as [number, number][];
-        // Close the loop
-        if (pts[0][0] !== pts[pts.length - 1][0] || pts[0][1] !== pts[pts.length - 1][1]) {
-          pts.push([pts[0][0], pts[0][1]]);
-        }
-        setTrackPolyline(pts);
+      const candidates = res.candidates ?? [];
+      if (candidates.length > 0) {
+        // Default to the longest (first); keep the list so the operator
+        // can switch to another layout (RKC Paris has several).
+        setOsmCandidates(candidates);
+        setSelectedOsmId(candidates[0].osmId);
+        loadCandidatePolyline(candidates[0].polyline);
         setImportMsg(null);
+      } else if (res.polyline && res.polyline.length >= 4) {
+        // Backward-compat: older backend returns only `polyline`.
+        loadCandidatePolyline(res.polyline as [number, number][]);
+        setImportMsg(null);
+      } else {
+        setImportMsg(t("admin.tracking.osmNoMatch"));
       }
     } catch (e) {
       // The backend returns 400 with a clear Spanish message when a
@@ -333,9 +360,11 @@ export function TrackEditor({ circuitId, onClose }: Props) {
     } finally {
       setImporting(false);
     }
-  }, [circuitId, t]);
+  }, [circuitId, t, loadCandidatePolyline]);
 
   const handleClearTrack = () => {
+    setOsmCandidates([]);
+    setSelectedOsmId(null);
     setTrackPolyline(null);
     setMarkerDistances({ meta: 0, s1: null, s2: null, s3: null, pitBox: null });
     setPitInLatLon(null);
@@ -427,6 +456,43 @@ export function TrackEditor({ circuitId, onClose }: Props) {
           <span className="text-xs text-orange-400">{importMsg}</span>
         )}
       </div>
+
+      {/* OSM candidate layouts — only when more than one track was found
+          near the circuit (e.g. RKC Paris). Operator picks which to load. */}
+      {osmCandidates.length > 1 && (
+        <div className="bg-surface border border-border rounded-xl p-3 space-y-2">
+          <div className="text-[11px] text-neutral-400 uppercase tracking-wider">
+            {t("admin.tracking.osmCandidates")} ({osmCandidates.length})
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {osmCandidates.map((c) => {
+              const active = c.osmId === selectedOsmId;
+              return (
+                <button
+                  key={c.osmId}
+                  onClick={() => {
+                    setSelectedOsmId(c.osmId);
+                    loadCandidatePolyline(c.polyline);
+                  }}
+                  title={`OSM way/${c.osmId}`}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors text-left ${
+                    active
+                      ? "border-accent/60 bg-accent/15 text-accent"
+                      : "border-border bg-black/30 text-neutral-300 hover:border-accent/40"
+                  }`}
+                >
+                  <span className="font-mono font-semibold">{c.lengthM} m</span>
+                  {" · "}
+                  {c.closed ? t("admin.tracking.osmClosed") : t("admin.tracking.osmOpen")}
+                  {" · "}
+                  <span className="text-neutral-500">{c.nodeCount} {t("admin.tracking.osmVertices")}</span>
+                  {c.name ? ` · ${c.name}` : ""}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Map */}
       <div ref={containerRef} className="w-full h-[520px] rounded-lg overflow-hidden bg-black border border-border" />

@@ -599,15 +599,19 @@ async def admin_import_osm(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Query Overpass API for a karting track near the circuit's
-    finish-line coordinates and return the candidate polyline.
+    """Query Overpass API for karting tracks near the circuit's
+    finish-line coordinates and return ALL candidate polylines.
 
-    Doesn't save anything — just returns the points so the editor
-    can preview them and let the admin tweak before persisting via
-    PUT /track-config. Falls back to `{"polyline": null}` when OSM
-    has nothing useful nearby (editor switches to manual tracing).
+    Doesn't save anything — returns the candidates (sorted longest-first)
+    so the editor can let the admin choose the right layout before
+    persisting via PUT /track-config. Venues like RKC Paris map several
+    tracks; the old auto-pick (by node count) grabbed the most-detailed
+    loop rather than the longest. `polyline` is kept (= the longest
+    candidate) for backward compatibility with older clients.
+    Returns `{"candidates": [], "polyline": null}` when OSM has nothing
+    useful nearby (editor switches to manual tracing).
     """
-    from app.engine.osm_import import import_from_osm
+    from app.engine.osm_import import list_osm_candidates
 
     result = await db.execute(select(Circuit).where(Circuit.id == circuit_id))
     circuit = result.scalar_one_or_none()
@@ -628,10 +632,11 @@ async def admin_import_osm(
         lat = (circuit.finish_lat1 + circuit.finish_lat2) / 2
         lon = (circuit.finish_lon1 + circuit.finish_lon2) / 2
 
-    pts = await import_from_osm(lat, lon)
-    if not pts:
-        return {"polyline": None, "reason": "no_match"}
-    return {"polyline": [[lat_, lon_] for lat_, lon_ in pts]}
+    candidates = await list_osm_candidates(lat, lon)
+    if not candidates:
+        return {"candidates": [], "polyline": None, "reason": "no_match"}
+    # `polyline` = longest candidate, kept for backward compatibility.
+    return {"candidates": candidates, "polyline": candidates[0]["polyline"]}
 
 
 # --- Circuit Access ---

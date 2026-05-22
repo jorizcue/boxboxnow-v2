@@ -20,6 +20,7 @@ again. Keeping the function pure & sync-ish makes it trivially testable.
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any
 
 import httpx
@@ -64,11 +65,9 @@ out skel qt;
 """.strip()
 
 
-async def import_from_osm(lat: float, lon: float, radius_m: int = SEARCH_RADIUS_M) -> list[tuple[float, float]] | None:
-    """Query Overpass for tracks near (lat, lon) and return the best polyline.
-
-    Returns `None` when there's no match or the API is unreachable —
-    callers should fall back to manual tracing in the admin editor.
+async def _query_overpass(lat: float, lon: float, radius_m: int) -> dict[str, Any] | None:
+    """POST the Overpass query and return the parsed JSON payload, or None
+    on any network / API failure.
 
     Overpass requires:
       * Body sent as `application/x-www-form-urlencoded` with the
@@ -86,18 +85,57 @@ async def import_from_osm(lat: float, lon: float, radius_m: int = SEARCH_RADIUS_
         async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
             resp = await client.post(OVERPASS_URL, data={"data": query})
             resp.raise_for_status()
-            payload = resp.json()
+            return resp.json()
     except Exception as e:
         logger.warning(f"OSM import: Overpass call failed: {e}")
         return None
 
-    return _extract_best_polyline(payload)
+
+def _haversine_m(a: tuple[float, float], b: tuple[float, float]) -> float:
+    """Great-circle distance in meters between two (lat, lon) points."""
+    radius = 6371000.0
+    lat1, lon1 = a
+    lat2, lon2 = b
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlmb = math.radians(lon2 - lon1)
+    h = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlmb / 2) ** 2
+    return 2 * radius * math.asin(math.sqrt(h))
 
 
-def _extract_best_polyline(payload: dict[str, Any]) -> list[tuple[float, float]] | None:
-    """Pick the longest way from an Overpass response and return its
-    polyline as a list of (lat, lon) tuples.
+def _polyline_length_m(pts: list[tuple[float, float]]) -> float:
+    return sum(_haversine_m(pts[i], pts[i + 1]) for i in range(len(pts) - 1))
+
+
+async def list_osm_candidates(
+    lat: float, lon: float, radius_m: int = SEARCH_RADIUS_M
+) -> list[dict[str, Any]]:
+    """Return ALL candidate track ways near (lat, lon), sorted longest-first.
+
+    Each candidate is a dict:
+        {
+          "polyline":  [[lat, lon], ...],
+          "lengthM":   <int meters>,
+          "nodeCount": <int>,
+          "closed":    <bool>,        # first point == last point
+          "name":      <str>,         # OSM name/ref or "" if untagged
+          "osmId":     <int>,         # OSM way id (lets the operator verify)
+        }
+
+    Venues like RKC Paris have several layouts mapped in OSM; returning the
+    full list (instead of auto-picking by node count, which favoured the
+    most-detailed-but-shorter loop) lets the admin choose the right one in
+    the editor. Empty list on no match / API failure.
     """
+    payload = await _query_overpass(lat, lon, radius_m)
+    if not payload:
+        return []
+    return _extract_candidates(payload)
+
+
+def _extract_candidates(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Build the candidate list from an Overpass response, sorted by
+    geographic length descending (longest = the main circuit ribbon)."""
     elements = payload.get("elements") or []
     nodes: dict[int, tuple[float, float]] = {}
     ways: list[dict] = []
@@ -113,18 +151,36 @@ def _extract_best_polyline(payload: dict[str, Any]) -> list[tuple[float, float]]
             ways.append(el)
 
     if not ways or not nodes:
-        return None
+        return []
 
-    # Build candidate polylines and pick the one with most vertices
-    # (proxy for "the actual track"). Service roads / pit fences are
-    # typically much shorter.
-    best: list[tuple[float, float]] | None = None
+    candidates: list[dict[str, Any]] = []
     for w in ways:
         node_ids = w.get("nodes") or []
         pts = [nodes[nid] for nid in node_ids if nid in nodes]
         if len(pts) < 4:
             continue  # too short to be a kart track
-        if best is None or len(pts) > len(best):
-            best = pts
+        tags = w.get("tags") or {}
+        length = _polyline_length_m(pts)
+        candidates.append({
+            "polyline": [[la, lo] for la, lo in pts],
+            "lengthM": round(length),
+            "nodeCount": len(pts),
+            "closed": pts[0] == pts[-1],
+            "name": tags.get("name") or tags.get("ref") or "",
+            "osmId": w.get("id"),
+        })
 
-    return best
+    # Longest first — the main circuit beats service roads / shorter layouts.
+    candidates.sort(key=lambda c: c["lengthM"], reverse=True)
+    return candidates
+
+
+async def import_from_osm(lat: float, lon: float, radius_m: int = SEARCH_RADIUS_M) -> list[tuple[float, float]] | None:
+    """Backward-compatible single-best import: returns the LONGEST candidate's
+    polyline as (lat, lon) tuples, or None when there's no match / API is
+    unreachable. New callers should prefer `list_osm_candidates`.
+    """
+    candidates = await list_osm_candidates(lat, lon, radius_m)
+    if not candidates:
+        return None
+    return [(la, lo) for la, lo in candidates[0]["polyline"]]
