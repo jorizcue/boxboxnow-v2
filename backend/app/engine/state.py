@@ -112,6 +112,16 @@ class KartState:
     valid_laps: list[dict] = field(default_factory=list)  # {lapTime, totalLap, pitNumber, created_at}
     all_laps: list[dict] = field(default_factory=list)
 
+    # Incremental cache for `driverAvgLapMs` — avoids iterating
+    # `valid_laps` on every snapshot, which scaled O(valid_laps) and
+    # was the main driver of the linear CPU ramp on 24h endurance
+    # races. Updated in `_record_lap` (mirrors the valid-lap filter:
+    # only increments when the lap is accepted as valid AND the
+    # kart has a known driver name). Reset to `{}` automatically
+    # whenever the kart object is rebuilt (new session via
+    # `_reset_for_new_session`). Format: {driver_name: [sum_ms, count]}.
+    driver_lap_totals: dict[str, list[int]] = field(default_factory=dict)
+
     # Analytics results (set by clustering/classification engines)
     tier_score: int = 50
     avg_lap_ms: float = 0.0
@@ -168,13 +178,20 @@ class KartState:
         return min(stint_laps) if stint_laps else 0
 
     def driver_avg_lap_ms_map(self) -> dict:
-        """Compute average lap time per driver from valid laps."""
-        sums: dict[str, list[int]] = {}
-        for lap in self.valid_laps:
-            name = lap.get("driverName", "")
-            if name:
-                sums.setdefault(name, []).append(lap["lapTime"])
-        return {name: sum(times) / len(times) for name, times in sums.items() if times}
+        """Compute average lap time per driver from valid laps.
+
+        Reads from the incremental `driver_lap_totals` cache (updated
+        in `_record_lap` when a lap passes the valid-lap filter), so
+        the cost is O(drivers) ~ O(4-5) instead of O(valid_laps) which
+        used to grow with race duration. Return shape is unchanged
+        (float ms per driver) — callers (web `DriverDetails.tsx`) get
+        the same contract.
+        """
+        return {
+            name: total[0] / total[1]
+            for name, total in self.driver_lap_totals.items()
+            if total[1] > 0
+        }
 
     def to_dict(self, max_stint_min: int | None = None) -> dict:
         # `totalLaps` is what the dashboard displays as VLT. We expose
@@ -217,7 +234,17 @@ class KartState:
             ),
             "stintStartCountdownMs": self.stint_start_countdown_ms,
             "pitInCountdownMs": self.pit_in_countdown_ms if self.pit_in_countdown_ms else None,
-            "pitHistory": [p.to_dict() for p in self.pit_history],
+            # Solo los últimos 10 pits — el `pit_history` interno se
+            # mantiene completo en memoria (clasificación ajustada lo
+            # itera entero en `classification.py`), pero los clientes
+            # web solo consumen `pitHistory[-1]` para la box-tab FIFO
+            # (`FifoQueue.tsx`), y las apps iOS/Android no lo leen.
+            # Mandar la lista entera en cada snapshot era O(pits) en
+            # bytes — en una carrera de 24h con 48 karts y ~30 pits
+            # cada uno = 1.440 records JSON por snapshot. Truncar a 10
+            # cubre todos los usos actuales y deja margen para algún
+            # consumidor futuro.
+            "pitHistory": [p.to_dict() for p in self.pit_history[-10:]],
             "driverTotalMs": self.driver_total_ms,
             "driverAvgLapMs": self.driver_avg_lap_ms_map(),
             "tierScore": self.tier_score,
@@ -670,6 +697,18 @@ class RaceStateManager:
 
         if is_valid:
             kart.valid_laps.append(lap_record)
+            # Incremental per-driver running average — mirror of the
+            # `for lap in valid_laps` aggregation that used to live in
+            # `driver_avg_lap_ms_map()`. Same filter (only valid laps),
+            # same key (kart.driver_name at the time of the lap). Keeps
+            # `driverAvgLapMs` O(drivers) on every snapshot instead of
+            # O(valid_laps), which is what made the snapshot cost scale
+            # linearly with race duration.
+            driver_name = kart.driver_name or ""
+            if driver_name:
+                totals = kart.driver_lap_totals.setdefault(driver_name, [0, 0])
+                totals[0] += lap_ms
+                totals[1] += 1
 
         # Update lastLapTime AFTER filter check (matches original order)
         kart.last_lap_ms = lap_ms
