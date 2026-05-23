@@ -122,6 +122,24 @@ class KartState:
     # `_reset_for_new_session`). Format: {driver_name: [sum_ms, count]}.
     driver_lap_totals: dict[str, list[int]] = field(default_factory=dict)
 
+    # Incremental caches for the per-stint fields that the snapshot
+    # serializer used to compute by filtering `all_laps`/`valid_laps`
+    # by `pitNumber == pit_count` on every emission — O(laps) per
+    # snapshot, growing with race duration (the visible CPU ramp on
+    # SWS Endurance). Both reset to 0 in the PIT_OUT handler so they
+    # track the *current* stint only; the previous-stint history
+    # lives in `pit_history[].stint_laps`.
+    #
+    # - `current_stint_lap_count`: incremented in `_record_lap` on
+    #   every LAP (mirrors the old filter on `all_laps`, which counted
+    #   ALL laps in the stint — including outliers — not just valid).
+    # - `current_stint_best_lap_ms`: updated in `_record_lap` AFTER
+    #   the valid-lap filter (mirrors the old `min(stint_laps)` over
+    #   `valid_laps` filtered by `pitNumber`). 0 means "no valid lap
+    #   in current stint yet", same sentinel as before.
+    current_stint_lap_count: int = 0
+    current_stint_best_lap_ms: int = 0
+
     # Analytics results (set by clustering/classification engines)
     tier_score: int = 50
     avg_lap_ms: float = 0.0
@@ -169,13 +187,24 @@ class KartState:
         return self.stint_elapsed_ms / 1000.0
 
     def stint_lap_count(self) -> int:
-        """Number of laps in current stint (all laps, not just valid)."""
-        return sum(1 for lap in self.all_laps if lap.get("pitNumber") == self.pit_count)
+        """Number of laps in current stint (all laps, not just valid).
+
+        Reads from the incremental `current_stint_lap_count` cache,
+        which is bumped in `_record_lap` on every LAP and reset to 0
+        in the PIT_OUT handler. O(1) — replaces the old O(all_laps)
+        filter that grew with race duration.
+        """
+        return self.current_stint_lap_count
 
     def best_stint_lap_ms(self) -> int:
-        """Best valid lap time in the current stint (0 if no valid laps yet)."""
-        stint_laps = [lap["lapTime"] for lap in self.valid_laps if lap.get("pitNumber") == self.pit_count]
-        return min(stint_laps) if stint_laps else 0
+        """Best valid lap time in the current stint (0 if no valid laps yet).
+
+        Reads from the incremental `current_stint_best_lap_ms` cache,
+        updated in `_record_lap` for valid laps and reset to 0 in the
+        PIT_OUT handler. O(1) — replaces the old O(valid_laps) scan
+        that grew with race duration.
+        """
+        return self.current_stint_best_lap_ms
 
     def driver_avg_lap_ms_map(self) -> dict:
         """Compute average lap time per driver from valid laps.
@@ -684,6 +713,10 @@ class RaceStateManager:
 
         # Always add to all_laps
         kart.all_laps.append(lap_record)
+        # Mirror of the old `sum(1 for lap in all_laps if pitNumber ==
+        # pit_count)` in `stint_lap_count()` — same filter (every lap
+        # for the current pit number), but O(1). Resets to 0 in PIT_OUT.
+        kart.current_stint_lap_count += 1
 
         # Outlier filter:
         # 1. Skip if total_lap <= lastPitLap + num_vueltas_descarte
@@ -709,6 +742,12 @@ class RaceStateManager:
                 totals = kart.driver_lap_totals.setdefault(driver_name, [0, 0])
                 totals[0] += lap_ms
                 totals[1] += 1
+            # Mirror of the old `min(stint_laps)` filtered over
+            # `valid_laps` in `best_stint_lap_ms()`. Same input set
+            # (valid laps only, current pit), now O(1). 0 sentinel
+            # means "no valid lap in current stint"; cleared in PIT_OUT.
+            if kart.current_stint_best_lap_ms == 0 or lap_ms < kart.current_stint_best_lap_ms:
+                kart.current_stint_best_lap_ms = lap_ms
 
         # Update lastLapTime AFTER filter check (matches original order)
         kart.last_lap_ms = lap_ms
@@ -1109,6 +1148,13 @@ class RaceStateManager:
             kart.pit_status = "racing"
             kart.stint_start_time = time.time()
             kart.stint_elapsed_ms = 0  # Reset stint timer on pit out
+            # Reset the per-stint incremental caches so the next stint
+            # starts from zero. Without this they'd keep accumulating
+            # across stints and the per-stint cards (`stintLapsCount`,
+            # `bestStintLapMs`) would show carry-over from the
+            # previous stint until the kart re-pitted.
+            kart.current_stint_lap_count = 0
+            kart.current_stint_best_lap_ms = 0
             # Interpolated, NOT raw self.countdown_ms (≤30s stale): this is
             # the stint-start anchor that on_track_ms subtracts from at the
             # next pit-in, so a stale anchor here biases the per-driver
