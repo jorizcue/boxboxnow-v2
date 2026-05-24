@@ -92,19 +92,10 @@ export function TrackMap({
   // cache, the same DOM element survives across ticks and CSS smooths
   // the kart's path between server snapshots.
   const iconCacheRef = useRef<Map<number, { tier: number; isMine: boolean; isPit: boolean }>>(new Map());
-  // Ghost del "if I pit now" — formado por TRES capas Leaflet:
-  //  - outline: línea negra gruesa perpendicular al trazado (10 px)
-  //  - bar:     línea verde discontinua encima de la outline (6 px)
-  //  - label:   divIcon "PIT" con halo verde sobre el punto del ghost
-  // La barra extiende ~22 m a cada lado del polyline, así sigue
-  // visible aunque el ghost caiga en medio de un cluster de karts
-  // (los markers de karts son divIcons de ~22 px). Cada capa tiene
-  // su propio ref para poder updatearlas in-place en cada tick sin
-  // recrear los DOM nodes — preserva las transiciones CSS.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ghostBarRef = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ghostOutlineRef = useRef<any>(null);
+  // Ghost del "if I pit now" — un único divIcon Leaflet con la
+  // estrella SVG + chip "PIT". Update vía `setLatLng` preserva la
+  // transición CSS (.tracking-pit-ghost {transition: transform...})
+  // así el marker glide suave entre ticks de countdown.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ghostLabelRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -172,8 +163,6 @@ export function TrackMap({
       map.remove();
       mapRef.current = null;
       layerRefs.current = { markers: new Map(), polyline: null, pitLane: null, sectors: [] };
-      ghostBarRef.current = null;
-      ghostOutlineRef.current = null;
       ghostLabelRef.current = null;
     };
   }, [L, trackConfig.trackPolyline]);
@@ -414,99 +403,70 @@ export function TrackMap({
     });
 
     // "If I pit now" ghost — where our kart would rejoin relative to
-    // the field shown now (static-field estimate). Antes era un
-    // circulito verde de 30 px con "PIT" dentro que quedaba enterrado
-    // bajo el cluster de markers de karts (cada kart es un divIcon
-    // de ~22 px, hasta 30 karts apilándose en el mismo tramo).
-    //
-    // Ahora son TRES capas:
-    //  - outline: barra negra perpendicular al trazado (~44 m total)
-    //  - bar:     barra verde discontinua encima del outline
-    //  - label:   chip "PIT" elevado por encima del cluster vía
-    //             zIndexOffset alto + halo verde para destacar
-    //
-    // La perpendicular se calcula vía: pointAtDistance(walk±5 m) para
-    // obtener dos puntos cercanos al ghost → tangente local en planar
-    // (lat scale 1, lon scale cos(lat)) → rotación 90° → endpoints.
-    // Cada capa se update-ea in-place (setLatLngs / setLatLng) en
-    // lugar de recrear el DOM, así Leaflet no rompe transiciones.
+    // the field shown now (static-field estimate). El marker es una
+    // ESTRELLA verde de 5 puntas + chip "PIT" pequeño debajo. Forma
+    // distintiva del círculo que usan los karts → se identifica sin
+    // confundirse aunque caiga sobre o cerca de un kart, y los picos
+    // de la estrella le dan presencia visual sin tapar el track.
+    // Intentos anteriores (barra perpendicular en movimiento) se
+    // descartaron porque visualmente competían con la pista.
     const mine = karts.find((k) => k.kartNumber === myKartNumber);
     let ghostLatLon: [number, number] | null = null;
-    let ghostBarP1: [number, number] | null = null;
-    let ghostBarP2: [number, number] | null = null;
     if (mine) {
       const gw = computePitGhostProgressM(mine, trackConfig, countdownMs, direction, pitTimeS);
-      const total = trackConfig.trackLengthM ?? 0;
-      if (gw != null && total > 0) {
+      if (gw != null && trackConfig.trackPolyline) {
         ghostLatLon = pointAtDistance(trackConfig.trackPolyline, gw, true);
-        const before = pointAtDistance(trackConfig.trackPolyline, ((gw - 5) % total + total) % total, true);
-        const after  = pointAtDistance(trackConfig.trackPolyline, (gw + 5) % total, true);
-        const cosLat = Math.cos(ghostLatLon[0] * Math.PI / 180);
-        const dLatM = (after[0] - before[0]) * 111000;
-        const dLonM = (after[1] - before[1]) * 111000 * cosLat;
-        const mag = Math.hypot(dLatM, dLonM);
-        if (mag > 0) {
-          const halfLen = 22; // m a cada lado — un pelín más larga que PIT-IN/OUT (18 m)
-          const dLatDeg = (-dLonM / mag) / 111000;
-          const dLonDeg = ( dLatM  / mag) / (111000 * cosLat);
-          ghostBarP1 = [ghostLatLon[0] + dLatDeg * halfLen, ghostLatLon[1] + dLonDeg * halfLen];
-          ghostBarP2 = [ghostLatLon[0] - dLatDeg * halfLen, ghostLatLon[1] - dLonDeg * halfLen];
-        }
       }
     }
 
     if (ghostLatLon) {
-      // ── outline ──
-      if (ghostBarP1 && ghostBarP2) {
-        if (ghostOutlineRef.current) {
-          ghostOutlineRef.current.setLatLngs([ghostBarP1, ghostBarP2]);
-        } else {
-          ghostOutlineRef.current = L.polyline([ghostBarP1, ghostBarP2], {
-            color: "#000", weight: 12, opacity: 0.9, lineCap: "round",
-            interactive: false,
-          }).addTo(map);
-        }
-        if (ghostBarRef.current) {
-          ghostBarRef.current.setLatLngs([ghostBarP1, ghostBarP2]);
-        } else {
-          ghostBarRef.current = L.polyline([ghostBarP1, ghostBarP2], {
-            color: "#9fe556", weight: 6, opacity: 1, lineCap: "round",
-            dashArray: "8 4",
-            interactive: false,
-          }).addTo(map);
-        }
-      }
-      // ── label ──
-      // Halo verde alrededor del chip ("box-shadow: 0 0 ... ") + chip
-      // con borde negro grueso. zIndexOffset 1800 lo pone POR ENCIMA
-      // de los kart markers (zIndexOffset 0) y de las barras PIT-IN/OUT
-      // (zIndexOffset 1500).
+      // Single divIcon: estrella SVG + chip "PIT" debajo. Update
+      // posición vía `setLatLng` para preservar la transición CSS
+      // (.tracking-pit-ghost {transition: transform 220ms}) y que
+      // el marker glide suave entre ticks como hacen los karts.
       if (ghostLabelRef.current) {
         ghostLabelRef.current.setLatLng(ghostLatLon);
       } else {
+        // Estrella de 5 puntas centrada en (0,0), radio externo 14,
+        // radio interno 5.6 (proporción clásica ≈0.4). El path se
+        // generó offline; cambiar el viewBox no afecta a la escala
+        // porque el container fija ancho/alto.
+        const starPath = "M 0,-14 L 4.11,-4.32 L 14,-4.32 L 6.27,1.13 L 9.05,10.81 L 0,5.6 L -9.05,10.81 L -6.27,1.13 L -14,-4.32 L -4.11,-4.32 Z";
         const ghostIcon = L.divIcon({
-          html: `<div style="
-            background:#9fe556;color:#0a0a0a;border:2px solid #0a0a0a;
-            padding:2px 7px;font-size:11px;font-weight:800;
-            letter-spacing:1px;white-space:nowrap;border-radius:4px;
-            font-family:ui-monospace,'SF Mono',monospace;
-            transform:translate(-50%,-160%);
-            box-shadow:0 0 0 1px rgba(0,0,0,0.7),0 0 16px rgba(159,229,86,0.7);
-          ">PIT</div>`,
+          html: `<div class="tracking-pit-ghost-inner" style="
+            position:relative;width:36px;height:50px;
+            transform:translate(-50%,-50%);
+          ">
+            <svg width="36" height="36" viewBox="-16 -16 32 32"
+                 style="position:absolute;top:0;left:0;
+                        filter:drop-shadow(0 0 4px rgba(159,229,86,0.7));">
+              <path d="${starPath}"
+                    fill="#9fe556" stroke="#0a0a0a"
+                    stroke-width="1.8" stroke-linejoin="round" />
+            </svg>
+            <div style="
+              position:absolute;top:32px;left:50%;transform:translateX(-50%);
+              background:#0a0a0a;color:#9fe556;
+              border:1px solid #9fe556;
+              padding:0 4px;font-size:8px;font-weight:800;
+              letter-spacing:0.5px;border-radius:2px;
+              font-family:ui-monospace,'SF Mono',monospace;
+              white-space:nowrap;
+            ">PIT</div>
+          </div>`,
           className: "tracking-pit-ghost",
           iconSize: [0, 0],
         });
         ghostLabelRef.current = L.marker(ghostLatLon, {
           icon: ghostIcon,
           interactive: false,
+          // zIndexOffset alto → estrella por encima de los kart
+          // markers (zIndexOffset 0) y de los sensores PIT-IN/OUT.
           zIndexOffset: 1800,
         }).addTo(map);
       }
     } else {
-      // No hay ghost → quitar las tres capas
-      if (ghostOutlineRef.current) { map.removeLayer(ghostOutlineRef.current); ghostOutlineRef.current = null; }
-      if (ghostBarRef.current)     { map.removeLayer(ghostBarRef.current);     ghostBarRef.current     = null; }
-      if (ghostLabelRef.current)   { map.removeLayer(ghostLabelRef.current);   ghostLabelRef.current   = null; }
+      if (ghostLabelRef.current) { map.removeLayer(ghostLabelRef.current); ghostLabelRef.current = null; }
     }
   }, [L, karts, countdownMs, trackConfig, direction, myKartNumber, selectedKart, onSelectKart, pitTimeS]);
 

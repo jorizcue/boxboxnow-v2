@@ -321,6 +321,15 @@ button {
   will-change: transform;
 }
 
+/* "If I pit now" ghost — misma transición que los karts para que la
+   estrella glide suave entre ticks de countdown (10 Hz). El divIcon
+   está cacheado en un único ref así que `setLatLng` actualiza la
+   posición sin recrear el DOM. */
+.leaflet-marker-icon.tracking-pit-ghost {
+  transition: transform 220ms linear;
+  will-change: transform;
+}
+
 /*
  * META-crossing highlight on the OnTrackPanel rows. Triggered each
  * time a kart's `lastLapCompleteCountdownMs` changes (i.e. it just

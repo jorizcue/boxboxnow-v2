@@ -193,48 +193,16 @@ export function TrackMapSVG({
       });
   }, [karts, trackConfig, countdownMs, direction, totalM]);
 
-  // "If I pit now" ghost: dónde reapareceríamos en el trazado tras el
-  // pit (estimación estática del campo, ver helper). Devolvemos tres
-  // piezas:
-  //   - pct:   posición en %% sobre el path, para el label que monta
-  //            offset-path (movimiento suave vía CSS transition).
-  //   - point: coords SVG del ghost (para colocar la barra perpendicular
-  //            sin depender del runtime de offset-path).
-  //   - bar:   endpoints (p1, p2) de la barra perpendicular, calculados
-  //            con el mismo truco que `sensorPoints` para PIT-IN/OUT
-  //            (snap a polyline + tangente vía pointAtDistance(±5 m) +
-  //            rotación 90°). Halflen 22 m → barra ~44 m total, que
-  //            asoma por encima del cluster de karts (hasta ~30 markers
-  //            apilándose en el mismo tramo no pueden taparla).
-  // Recomputado en cada tick (countdownMs en deps) — coste despreciable
-  // (4 muestras de pointAtDistance + 1 snap, todas O(polyline)).
-  const ghostState = useMemo(() => {
-    const empty = { pct: null as number | null, point: null as [number, number] | null, bar: null as { p1: [number, number]; p2: [number, number] } | null };
-    if (!geom.bounds || totalM <= 0 || !trackConfig.trackPolyline) return empty;
+  // "If I pit now" ghost: dónde reapareceríamos en el trazado tras
+  // el pit (estimación estática del campo, ver helper). Solo el
+  // % sobre el path SVG, que es lo que necesita `offset-distance`
+  // para mover la estrella de forma suave (transición CSS).
+  const ghostPct = useMemo(() => {
     const mine = karts.find((k) => k.kartNumber === myKartNumber);
-    if (!mine) return empty;
+    if (!mine) return null;
     const walkM = computePitGhostProgressM(mine, trackConfig, countdownMs, direction, pitTimeS);
-    if (walkM == null) return empty;
-    const pct = pctFromPolylineWalk(walkM, totalM);
-    const polyline = trackConfig.trackPolyline;
-    const ghostLL = pointAtDistance(polyline, walkM, true);
-    const proj = (lat: number, lon: number) => projectLatLon(lat, lon, geom.bounds as LatLonBounds);
-    const point = proj(ghostLL[0], ghostLL[1]);
-    const before = pointAtDistance(polyline, ((walkM - 5) % totalM + totalM) % totalM, true);
-    const after  = pointAtDistance(polyline, (walkM + 5) % totalM, true);
-    const cosLat = Math.cos(ghostLL[0] * Math.PI / 180);
-    const dLatM = (after[0] - before[0]) * 111000;
-    const dLonM = (after[1] - before[1]) * 111000 * cosLat;
-    const mag = Math.hypot(dLatM, dLonM);
-    if (mag === 0) return { pct, point, bar: null };
-    const halfLen = 22;
-    const dLatDeg = (-dLonM / mag) / 111000;
-    const dLonDeg = ( dLatM  / mag) / (111000 * cosLat);
-    const p1LL: [number, number] = [ghostLL[0] + dLatDeg * halfLen, ghostLL[1] + dLonDeg * halfLen];
-    const p2LL: [number, number] = [ghostLL[0] - dLatDeg * halfLen, ghostLL[1] - dLonDeg * halfLen];
-    return { pct, point, bar: { p1: proj(p1LL[0], p1LL[1]), p2: proj(p2LL[0], p2LL[1]) } };
-  }, [karts, myKartNumber, trackConfig, countdownMs, direction, pitTimeS, totalM, geom.bounds]);
-  const ghostPct = ghostState.pct;
+    return walkM != null ? pctFromPolylineWalk(walkM, totalM) : null;
+  }, [karts, myKartNumber, trackConfig, countdownMs, direction, pitTimeS, totalM]);
 
   // Rotation viene como prop desde TrackingTab (estado compartido).
   // El SVG entero rota; kart bubbles y labels se contra-rotan para que
@@ -386,32 +354,10 @@ export function TrackMapSVG({
             Ahora son tres elementos:
               · outline: línea negra perpendicular (strokeWidth 10)
               · bar:     línea verde discontinua encima (strokeWidth 6)
-              · chip:    "PIT" rotando con offset-path (mantiene la
-                         animación suave del label) con halo verde
-                         y borde negro grueso para destacarse encima
-                         del enjambre de karts
-            Las dos primeras se posicionan via SVG coords proyectados
-            (no offset-path): se update-an una vez por React render
-            (10 Hz) — ligero jitter respecto al label de offset-path
-            pero la barra es lo bastante ancha como para que no se
-            note. */}
-        {ghostState.bar && (
-          <g style={{ pointerEvents: "none" }}>
-            <line
-              x1={ghostState.bar.p1[0]} y1={ghostState.bar.p1[1]}
-              x2={ghostState.bar.p2[0]} y2={ghostState.bar.p2[1]}
-              stroke="#000" strokeWidth={11} strokeLinecap="round"
-              opacity={0.9} vectorEffect="non-scaling-stroke"
-            />
-            <line
-              x1={ghostState.bar.p1[0]} y1={ghostState.bar.p1[1]}
-              x2={ghostState.bar.p2[0]} y2={ghostState.bar.p2[1]}
-              stroke="#9fe556" strokeWidth={6} strokeLinecap="round"
-              strokeDasharray="6 4"
-              vectorEffect="non-scaling-stroke"
-            />
-          </g>
-        )}
+              Forma de ESTRELLA en lugar del círculo que usan los
+              karts — distintiva sin necesidad de barras perpendiculares
+              ni elementos extra. Tamaño ligeramente mayor que el kart
+              marker (r=6) para destacar. */}
         {ghostPct != null && geom.trackPath && (
           <g
             className="tracking-svg-kart"
@@ -423,28 +369,33 @@ export function TrackMapSVG({
             }}
           >
             <g transform={cr}>
-              {/* Halo verde semi-transparente para destacar el chip
-                  por encima del cluster de karts */}
-              <circle
-                r={14}
-                fill="#9fe556"
-                opacity={0.25}
-                vectorEffect="non-scaling-stroke"
-              />
-              <circle
-                r={10}
+              {/* Estrella de 5 puntas. Path generado con radio externo
+                  10, radio interno 4 (proporción ≈0.4). Halo verde
+                  semi-transparente debajo para que destaque sobre
+                  cualquier fondo. */}
+              <circle r={11} fill="#9fe556" opacity={0.2} vectorEffect="non-scaling-stroke" />
+              <path
+                d="M 0,-10 L 2.94,-3.09 L 9.51,-3.09 L 4.29,1.18 L 6.16,8.09 L 0,3.82 L -6.16,8.09 L -4.29,1.18 L -9.51,-3.09 L -2.94,-3.09 Z"
                 fill="#9fe556"
                 stroke="#0a0a0a"
-                strokeWidth={2}
+                strokeWidth={1.5}
+                strokeLinejoin="round"
                 vectorEffect="non-scaling-stroke"
               />
               <text
+                x={0} y={14}
                 textAnchor="middle"
-                dominantBaseline="central"
-                fontSize={7}
+                dominantBaseline="hanging"
+                fontSize={6}
                 fontWeight={800}
-                fill="#0a0a0a"
-                style={{ pointerEvents: "none", letterSpacing: "0.5px" }}
+                fill="#9fe556"
+                style={{
+                  pointerEvents: "none",
+                  letterSpacing: "0.5px",
+                  paintOrder: "stroke",
+                  stroke: "#0a0a0a",
+                  strokeWidth: 3,
+                }}
               >
                 PIT
               </text>
