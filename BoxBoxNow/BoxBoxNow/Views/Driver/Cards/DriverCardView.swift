@@ -696,7 +696,7 @@ struct DriverCardView: View {
         case .sectors:
             let bests: [Double] = [kart?.bestS1Ms ?? 0, kart?.bestS2Ms ?? 0, kart?.bestS3Ms ?? 0]
             let allEmpty = bests.allSatisfy { $0 <= 0 }
-            if !hasSectors || allEmpty {
+            if !raceVM.hasSectors || allEmpty {
                 Text("--")
                     .font(.system(size: mainFont, weight: .black, design: .monospaced))
                     .foregroundColor(Color(.systemGray3))
@@ -727,7 +727,7 @@ struct DriverCardView: View {
                 default: return 0
                 }
             }()
-            if !hasSectors || bestMs <= 0 {
+            if !raceVM.hasSectors || bestMs <= 0 {
                 Text("--")
                     .font(.system(size: mainFont, weight: .black, design: .monospaced))
                     .foregroundColor(Color(.systemGray3))
