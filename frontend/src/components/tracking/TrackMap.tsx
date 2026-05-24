@@ -56,12 +56,11 @@ interface Props {
   direction: "forward" | "reversed";
   /** Configured pit-stop duration (s) — drives the "if I pit now" ghost. */
   pitTimeS: number;
-  /** Aceptado por compatibilidad con la interfaz común con
-   *  TrackMapSVG, pero ignorado: Leaflet no rota correctamente sólo
-   *  con CSS transform — los tiles dejan de cargarse en las esquinas
-   *  rotadas y los labels (META, PIT-IN…) quedan al revés. El slider
-   *  de rotación en `TrackingTab` se esconde cuando este renderer
-   *  está activo, así que el prop nunca llega ≠ 0 en la práctica. */
+  /** Rotación del mapa en grados (CW desde norte). Aplicada vía
+   *  plugin `leaflet-rotate` (parchea `L.Map` con `setBearing`),
+   *  no via CSS transform — el plugin gestiona la carga de tiles
+   *  para el viewport rotado y mantiene los markers en sus
+   *  coordenadas geográficas correctas. */
   rotation?: number;
 }
 
@@ -74,8 +73,7 @@ export function TrackMap({
   onSelectKart,
   direction,
   pitTimeS,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  rotation: _rotation = 0,
+  rotation = 0,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -112,10 +110,24 @@ export function TrackMap({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [L, setL] = useState<any>(null);
 
-  // Load Leaflet on the client (the package only works in browser).
+  // Cargamos Leaflet en cliente (el paquete sólo funciona en browser).
+  // Acto seguido cargamos el plugin `leaflet-rotate` para que parchee
+  // `L.Map` y nos dé soporte de rotación nativa (carga de tiles
+  // alineada al bearing, contra-rotación opcional de markers, etc.).
+  // El plugin lee `window.L` para encontrar Leaflet en runtime, así
+  // que lo asignamos antes del import dinámico. El import es de
+  // side-effect: no exporta nada, sólo muta L.Map.prototype.
   useEffect(() => {
     (async () => {
       const mod = await import("leaflet");
+      if (typeof window !== "undefined") {
+        (window as unknown as { L: typeof mod.default }).L = mod.default;
+      }
+      // @ts-expect-error — leaflet-rotate no expone tipos.
+      // El side-effect import sólo parchea L.Map.prototype; la API
+      // resultante (setBearing, opciones rotate/bearing/…) está
+      // augmentada en src/types/leaflet-rotate.d.ts.
+      await import("leaflet-rotate");
       setL(mod.default);
     })();
   }, []);
@@ -130,6 +142,15 @@ export function TrackMap({
       zoomControl: true,
       attributionControl: true,
       preferCanvas: true,  // canvas renderer is faster for many markers
+      // Soporte de rotación vía plugin leaflet-rotate (parcheado al
+      // load). Desactivamos el control nativo del plugin porque ya
+      // hay un slider en TrackingTab; touchRotate / shiftKeyRotate
+      // off para no robar gestos al pan/zoom del estratega.
+      rotate: true,
+      bearing: 0,
+      rotateControl: false,
+      touchRotate: false,
+      shiftKeyRotate: false,
     });
     mapRef.current = map;
 
@@ -156,6 +177,17 @@ export function TrackMap({
       ghostLabelRef.current = null;
     };
   }, [L, trackConfig.trackPolyline]);
+
+  // Aplica `rotation` (deg, CW desde norte) cada vez que cambia el
+  // slider del top bar. `setBearing` es el método añadido por el
+  // plugin leaflet-rotate cuando el mapa se crea con `rotate: true`.
+  // El plugin redibuja tiles + transforma layers correctamente, así
+  // que no hay que tocar nada más aquí.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || typeof map.setBearing !== "function") return;
+    map.setBearing(rotation);
+  }, [rotation]);
 
   // Draw the static track + pit lane + sector marks. Re-runs when the
   // track config changes (rare — only after admin edits + reload).
