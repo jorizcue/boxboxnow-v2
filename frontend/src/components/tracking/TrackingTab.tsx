@@ -33,6 +33,7 @@ import type { TrackConfig } from "@/types/race";
 import { TrackMap } from "./TrackMap";
 import { TrackMapSVG } from "./TrackMapSVG";
 import { OnTrackPanel } from "./OnTrackPanel";
+import { BoxFifoView, PitInProgressCard } from "@/components/pit/BoxStatusPanel";
 
 // LocalStorage key for the per-user renderer preference (Leaflet vs
 // SVG). The SVG renderer is in beta — it animates karts with CSS
@@ -69,6 +70,11 @@ export function TrackingTab() {
   // operator's choice survives reloads. Default is "svg" because we
   // expect it to be visibly smoother once we validate it.
   const [renderer, setRenderer] = useState<RendererPref>("svg");
+  // Map rotation (deg, 0–359). Vive aquí (no en los renderers) para
+  // que cambiar de Leaflet ↔ SVG preserve la orientación que el
+  // estratega ya tenía elegida. -180..180 mapea CCW/CW a un slider
+  // simétrico alrededor de 0 (norte arriba).
+  const [rotation, setRotation] = useState(0);
   useEffect(() => {
     try {
       const stored = localStorage.getItem(RENDERER_PREF_KEY);
@@ -193,7 +199,34 @@ export function TrackingTab() {
             <span className="ml-1 opacity-60">⇄</span>
           </button>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Rotación del mapa. Vive en el top bar (no dentro del
+              renderer) para que sea visible aunque el operador esté
+              en Leaflet — antes solo el renderer SVG la exponía. El
+              slider va de -180 a +180 grados con paso de 5° y un
+              botón ⟲ para volver a 0 (norte arriba). El valor se
+              propaga a ambos renderers via prop. */}
+          <div className="inline-flex items-center gap-1 text-[10px] text-neutral-400">
+            <span className="font-bold uppercase tracking-wider mr-1">{t("tracking.rotate")}</span>
+            <input
+              type="range"
+              min={-180}
+              max={180}
+              step={5}
+              value={rotation}
+              onChange={(e) => setRotation(Number(e.target.value))}
+              className="w-24 accent-accent"
+              title={`${rotation}°`}
+            />
+            <span className="font-mono w-9 text-right">{rotation}°</span>
+            <button
+              type="button"
+              onClick={() => setRotation(0)}
+              disabled={rotation === 0}
+              className="ml-0.5 px-1 py-0.5 rounded border border-border text-neutral-400 hover:text-white disabled:opacity-30 transition-colors"
+              title="Reset rotación"
+            >⟲</button>
+          </div>
           {/* Renderer picker. The SVG path-based renderer (offset-path)
               is in beta — letting the operator A/B between them on
               the fly is the fastest way to validate the new approach
@@ -236,6 +269,7 @@ export function TrackingTab() {
               onSelectKart={setSelectedKart}
               direction={direction}
               pitTimeS={config.pitTimeS}
+              rotation={rotation}
             />
           ) : (
             <TrackMap
@@ -247,6 +281,7 @@ export function TrackingTab() {
               onSelectKart={setSelectedKart}
               direction={direction}
               pitTimeS={config.pitTimeS}
+              rotation={rotation}
             />
           )}
           {/* Legend */}
@@ -276,6 +311,18 @@ export function TrackingTab() {
           onSelectKart={setSelectedKart}
           direction={direction}
         />
+      </div>
+
+      {/* ── Box (score + queue) + Pit en curso ──
+          Mismas piezas que muestra la pestaña Box. Aquí se renderizan
+          en una fila por debajo del mapa para que el estratega no
+          tenga que cambiar de pestaña durante el seguimiento en vivo.
+          PitInProgressCard ocupa un tile fino a la derecha del bloque
+          de Box; el grid auto-fit baja el card a la fila siguiente en
+          móviles. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_140px] gap-3 mt-3">
+        <BoxFifoView />
+        <PitInProgressCard />
       </div>
     </div>
   );

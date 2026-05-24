@@ -22,7 +22,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import type { KartState, TrackConfig } from "@/types/race";
-import { pointAtDistance } from "@/lib/polyline";
+import { pointAtDistance, snapToPolyline } from "@/lib/polyline";
 import { computeKartProgressM, isKartInPit, computePitGhostProgressM } from "@/lib/kartPosition";
 import { KartPopup } from "./KartPopup";
 
@@ -56,6 +56,13 @@ interface Props {
   direction: "forward" | "reversed";
   /** Configured pit-stop duration (s) — drives the "if I pit now" ghost. */
   pitTimeS: number;
+  /** Free rotation aplicada al contenedor (deg). 0 = norte arriba.
+   *  Leaflet no soporta rotación nativa así que la aplicamos vía CSS
+   *  transform al div contenedor — los tiles y polylines rotan con él.
+   *  Los eventos de mouse quedan ligeramente desalineados con rotaciones
+   *  intermedias; lo dejamos como trade-off aceptable (el estratega usa
+   *  la rotación para ORIENTAR, no para interactuar). */
+  rotation?: number;
 }
 
 export function TrackMap({
@@ -67,6 +74,7 @@ export function TrackMap({
   onSelectKart,
   direction,
   pitTimeS,
+  rotation = 0,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -85,10 +93,21 @@ export function TrackMap({
   // cache, the same DOM element survives across ticks and CSS smooths
   // the kart's path between server snapshots.
   const iconCacheRef = useRef<Map<number, { tier: number; isMine: boolean; isPit: boolean }>>(new Map());
-  // Dedicated marker for the "if I pit now" ghost (kept out of the
-  // per-kart markers map so the stale-marker cleanup never touches it).
+  // Ghost del "if I pit now" — formado por TRES capas Leaflet:
+  //  - outline: línea negra gruesa perpendicular al trazado (10 px)
+  //  - bar:     línea verde discontinua encima de la outline (6 px)
+  //  - label:   divIcon "PIT" con halo verde sobre el punto del ghost
+  // La barra extiende ~22 m a cada lado del polyline, así sigue
+  // visible aunque el ghost caiga en medio de un cluster de karts
+  // (los markers de karts son divIcons de ~22 px). Cada capa tiene
+  // su propio ref para poder updatearlas in-place en cada tick sin
+  // recrear los DOM nodes — preserva las transiciones CSS.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ghostRef = useRef<any>(null);
+  const ghostBarRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ghostOutlineRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ghostLabelRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [L, setL] = useState<any>(null);
 
@@ -131,7 +150,9 @@ export function TrackMap({
       map.remove();
       mapRef.current = null;
       layerRefs.current = { markers: new Map(), polyline: null, pitLane: null, sectors: [] };
-      ghostRef.current = null;
+      ghostBarRef.current = null;
+      ghostOutlineRef.current = null;
+      ghostLabelRef.current = null;
     };
   }, [L, trackConfig.trackPolyline]);
 
@@ -205,30 +226,86 @@ export function TrackMap({
     drawSensorTick(trackConfig.s2DistanceM, "S2", "#9fe556");
     drawSensorTick(trackConfig.s3DistanceM, "S3", "#9fe556");
 
-    // Pit-in / pit-out: prefer the free lat/lon (placed by the operator
-    // on the physical sensor) and fall back to the legacy
-    // distance-along-polyline value when not yet migrated.
-    const drawFreeTick = (latLon: [number, number] | null, label: string, color: string) => {
-      if (!latLon) return;
-      const marker = L.circleMarker([latLon[0], latLon[1]], {
-        radius: 5,
-        color,
-        weight: 2,
-        fillColor: "#000",
-        fillOpacity: 1,
-      }).bindTooltip(label, { permanent: true, direction: "top", className: "track-sensor-tooltip" }).addTo(map);
-      refs.sectors.push(marker);
+    // Pit-in / pit-out: barra PERPENDICULAR al trazado en lugar del
+    // antiguo punto pequeño. El punto se perdía cuando un kart pasaba
+    // por encima (el divIcon del kart mide ~22 px y tapaba el círculo
+    // de radio 5 del sensor). Con la barra:
+    //  - se extiende ~18 m a cada lado del polyline (~36 m totales)
+    //    así que asoma fuera del rango del kart marker incluso si éste
+    //    está justo encima del punto del sensor;
+    //  - outline negro grueso debajo + naranja brillante encima para
+    //    contraste contra cualquier fondo de imagen satelital;
+    //  - label en un divIcon DOM con zIndexOffset alto para que vaya
+    //    siempre por encima del enjambre de karts.
+    const drawPitBar = (latLon: [number, number] | null, label: string) => {
+      if (!latLon || !trackConfig.trackPolyline || !trackConfig.trackLengthM) return;
+      const total = trackConfig.trackLengthM;
+      // Tangente del polyline en el punto: snap → walk → puntos
+      // próximos (±5 m). Si el snap cae sobre un vértice exacto la
+      // tangente se aproxima desde 5 m antes y después con módulo
+      // total para soportar pit-in muy cerca de polyline[0].
+      const [walkM] = snapToPolyline(trackConfig.trackPolyline, latLon, true);
+      const before = pointAtDistance(trackConfig.trackPolyline, ((walkM - 5) % total + total) % total, true);
+      const after  = pointAtDistance(trackConfig.trackPolyline, (walkM + 5) % total, true);
+      const cosLat = Math.cos(latLon[0] * Math.PI / 180);
+      // Tangente proyectada a planar local (lat scale 1, lon scale cos(lat))
+      const dLatM = (after[0] - before[0]) * 111000;
+      const dLonM = (after[1] - before[1]) * 111000 * cosLat;
+      const mag = Math.hypot(dLatM, dLonM);
+      if (mag === 0) {
+        // Tangente nula (vértice degenerado) → fallback al punto.
+        const fallback = L.circleMarker(latLon, {
+          radius: 8, color: "#ff9b1a", weight: 3, fillColor: "#000", fillOpacity: 1,
+        }).addTo(map);
+        refs.sectors.push(fallback);
+        return;
+      }
+      // Perpendicular (rotación 90° CCW de la tangente normalizada),
+      // convertida de planar de vuelta a deltas lat/lon.
+      const halfLen = 18; // m a cada lado
+      const dLatDeg = (-dLonM / mag) / 111000;
+      const dLonDeg = ( dLatM  / mag) / (111000 * cosLat);
+      const p1: [number, number] = [latLon[0] + dLatDeg * halfLen, latLon[1] + dLonDeg * halfLen];
+      const p2: [number, number] = [latLon[0] - dLatDeg * halfLen, latLon[1] - dLonDeg * halfLen];
+      const outline = L.polyline([p1, p2], { color: "#000", weight: 10, opacity: 0.9, lineCap: "round" }).addTo(map);
+      const bar     = L.polyline([p1, p2], { color: "#ff9b1a", weight: 5, opacity: 1, lineCap: "round" }).addTo(map);
+      // Label como divIcon con zIndexOffset alto: se sitúa sobre los
+      // markers de karts (zIndexOffset 0 por defecto). El offset
+      // visual (`translate(-50%, -120%)`) coloca el chip encima del
+      // punto del sensor.
+      const labelMarker = L.marker(latLon, {
+        icon: L.divIcon({
+          className: "track-pit-label",
+          html: `<div style="
+            background:#0a0a0a;color:#ff9b1a;border:1px solid #ff9b1a;
+            padding:1px 5px;font-size:9px;font-weight:700;
+            letter-spacing:0.5px;white-space:nowrap;border-radius:3px;
+            transform:translate(-50%,-150%);box-shadow:0 0 0 1px rgba(0,0,0,0.6);
+          ">${label}</div>`,
+          iconSize: [0, 0],
+        }),
+        zIndexOffset: 1500,
+        interactive: false,
+      }).addTo(map);
+      refs.sectors.push(outline, bar, labelMarker);
     };
-    if (trackConfig.pitEntryLat != null && trackConfig.pitEntryLon != null) {
-      drawFreeTick([trackConfig.pitEntryLat, trackConfig.pitEntryLon], "PIT-IN", "#e59a2e");
-    } else {
-      drawSensorTick(trackConfig.pitEntryDistanceM, "PIT-IN", "#e59a2e");
-    }
-    if (trackConfig.pitExitLat != null && trackConfig.pitExitLon != null) {
-      drawFreeTick([trackConfig.pitExitLat, trackConfig.pitExitLon], "PIT-OUT", "#e59a2e");
-    } else {
-      drawSensorTick(trackConfig.pitExitDistanceM, "PIT-OUT", "#e59a2e");
-    }
+    // Preferimos lat/lon (modo moderno editor); si falta, derivamos
+    // lat/lon desde la distancia almacenada via `pointAtDistance`
+    // para mantener la barra perpendicular también en configs antiguas.
+    const pitInLatLon: [number, number] | null =
+      trackConfig.pitEntryLat != null && trackConfig.pitEntryLon != null
+        ? [trackConfig.pitEntryLat, trackConfig.pitEntryLon]
+        : trackConfig.pitEntryDistanceM != null && trackConfig.trackPolyline
+          ? pointAtDistance(trackConfig.trackPolyline, trackConfig.pitEntryDistanceM, true)
+          : null;
+    const pitOutLatLon: [number, number] | null =
+      trackConfig.pitExitLat != null && trackConfig.pitExitLon != null
+        ? [trackConfig.pitExitLat, trackConfig.pitExitLon]
+        : trackConfig.pitExitDistanceM != null && trackConfig.trackPolyline
+          ? pointAtDistance(trackConfig.trackPolyline, trackConfig.pitExitDistanceM, true)
+          : null;
+    drawPitBar(pitInLatLon, "PIT-IN");
+    drawPitBar(pitOutLatLon, "PIT-OUT");
     // No `direction` in deps: sensors are physical points and the
     // visual position does NOT change with the direction toggle.
   }, [L, trackConfig]);
@@ -356,42 +433,98 @@ export function TrackMap({
     });
 
     // "If I pit now" ghost — where our kart would rejoin relative to
-    // the field shown now (static-field estimate). Dashed hollow ring
-    // so it reads as a projection, not a real kart. Non-interactive,
-    // drawn under real markers.
+    // the field shown now (static-field estimate). Antes era un
+    // circulito verde de 30 px con "PIT" dentro que quedaba enterrado
+    // bajo el cluster de markers de karts (cada kart es un divIcon
+    // de ~22 px, hasta 30 karts apilándose en el mismo tramo).
+    //
+    // Ahora son TRES capas:
+    //  - outline: barra negra perpendicular al trazado (~44 m total)
+    //  - bar:     barra verde discontinua encima del outline
+    //  - label:   chip "PIT" elevado por encima del cluster vía
+    //             zIndexOffset alto + halo verde para destacar
+    //
+    // La perpendicular se calcula igual que en `drawPitBar`: snap a
+    // polyline → tangente vía pointAtDistance(±5 m) → rotación 90°.
+    // Cada capa se update-ea in-place (setLatLngs / setLatLng) en
+    // lugar de recrear el DOM, así Leaflet no rompe transiciones.
     const mine = karts.find((k) => k.kartNumber === myKartNumber);
     let ghostLatLon: [number, number] | null = null;
+    let ghostBarP1: [number, number] | null = null;
+    let ghostBarP2: [number, number] | null = null;
     if (mine) {
       const gw = computePitGhostProgressM(mine, trackConfig, countdownMs, direction, pitTimeS);
-      if (gw != null) ghostLatLon = pointAtDistance(trackConfig.trackPolyline, gw, true);
+      const total = trackConfig.trackLengthM ?? 0;
+      if (gw != null && total > 0) {
+        ghostLatLon = pointAtDistance(trackConfig.trackPolyline, gw, true);
+        const before = pointAtDistance(trackConfig.trackPolyline, ((gw - 5) % total + total) % total, true);
+        const after  = pointAtDistance(trackConfig.trackPolyline, (gw + 5) % total, true);
+        const cosLat = Math.cos(ghostLatLon[0] * Math.PI / 180);
+        const dLatM = (after[0] - before[0]) * 111000;
+        const dLonM = (after[1] - before[1]) * 111000 * cosLat;
+        const mag = Math.hypot(dLatM, dLonM);
+        if (mag > 0) {
+          const halfLen = 22; // m a cada lado — un pelín más larga que PIT-IN/OUT (18 m)
+          const dLatDeg = (-dLonM / mag) / 111000;
+          const dLonDeg = ( dLatM  / mag) / (111000 * cosLat);
+          ghostBarP1 = [ghostLatLon[0] + dLatDeg * halfLen, ghostLatLon[1] + dLonDeg * halfLen];
+          ghostBarP2 = [ghostLatLon[0] - dLatDeg * halfLen, ghostLatLon[1] - dLonDeg * halfLen];
+        }
+      }
     }
+
     if (ghostLatLon) {
-      if (ghostRef.current) {
-        ghostRef.current.setLatLng(ghostLatLon);
+      // ── outline ──
+      if (ghostBarP1 && ghostBarP2) {
+        if (ghostOutlineRef.current) {
+          ghostOutlineRef.current.setLatLngs([ghostBarP1, ghostBarP2]);
+        } else {
+          ghostOutlineRef.current = L.polyline([ghostBarP1, ghostBarP2], {
+            color: "#000", weight: 12, opacity: 0.9, lineCap: "round",
+            interactive: false,
+          }).addTo(map);
+        }
+        if (ghostBarRef.current) {
+          ghostBarRef.current.setLatLngs([ghostBarP1, ghostBarP2]);
+        } else {
+          ghostBarRef.current = L.polyline([ghostBarP1, ghostBarP2], {
+            color: "#9fe556", weight: 6, opacity: 1, lineCap: "round",
+            dashArray: "8 4",
+            interactive: false,
+          }).addTo(map);
+        }
+      }
+      // ── label ──
+      // Halo verde alrededor del chip ("box-shadow: 0 0 ... ") + chip
+      // con borde negro grueso. zIndexOffset 1800 lo pone POR ENCIMA
+      // de los kart markers (zIndexOffset 0) y de las barras PIT-IN/OUT
+      // (zIndexOffset 1500).
+      if (ghostLabelRef.current) {
+        ghostLabelRef.current.setLatLng(ghostLatLon);
       } else {
         const ghostIcon = L.divIcon({
-          html: `
-            <div style="
-              width:30px; height:30px; border-radius:50%;
-              background:#9fe556; border:2px solid #0a0a0a;
-              box-shadow:0 1px 3px rgba(0,0,0,0.6);
-              display:flex; align-items:center; justify-content:center;
-              font-family: ui-monospace, 'SF Mono', monospace;
-              font-size:8px; font-weight:700; color:#0a0a0a;
-            ">PIT</div>`,
-          className: "tracking-kart-icon",
-          iconSize: [30, 30],
-          iconAnchor: [15, 15],
+          html: `<div style="
+            background:#9fe556;color:#0a0a0a;border:2px solid #0a0a0a;
+            padding:2px 7px;font-size:11px;font-weight:800;
+            letter-spacing:1px;white-space:nowrap;border-radius:4px;
+            font-family:ui-monospace,'SF Mono',monospace;
+            transform:translate(-50%,-160%);
+            box-shadow:0 0 0 1px rgba(0,0,0,0.7),0 0 16px rgba(159,229,86,0.7);
+          ">PIT</div>`,
+          className: "tracking-pit-ghost",
+          iconSize: [0, 0],
         });
-        ghostRef.current = L.marker(ghostLatLon, {
+        ghostLabelRef.current = L.marker(ghostLatLon, {
           icon: ghostIcon,
           interactive: false,
-          zIndexOffset: -100,
+          zIndexOffset: 1800,
         }).addTo(map);
       }
-    } else if (ghostRef.current) {
-      map.removeLayer(ghostRef.current);
-      ghostRef.current = null;
+    } else {
+      // No hay ghost → quitar las tres capas
+      if (ghostOutlineRef.current) { map.removeLayer(ghostOutlineRef.current); ghostOutlineRef.current = null; }
+      if (ghostBarRef.current)     { map.removeLayer(ghostBarRef.current);     ghostBarRef.current     = null; }
+      if (ghostLabelRef.current)   { map.removeLayer(ghostLabelRef.current);   ghostLabelRef.current   = null; }
     }
   }, [L, karts, countdownMs, trackConfig, direction, myKartNumber, selectedKart, onSelectKart, pitTimeS]);
 
@@ -401,8 +534,19 @@ export function TrackMap({
   );
 
   return (
-    <div className="relative">
-      <div ref={containerRef} className="w-full h-[480px] rounded-lg overflow-hidden bg-black" />
+    // Wrapper extra para limitar el clipping de la rotación: el div
+    // interno con `rotate(N deg)` puede salir de su caja en
+    // diagonales (cuando N ∈ (0°, 90°)). El outer recorta el exceso
+    // así el layout flexible de TrackingTab no salta de tamaño al
+    // rotar. La rotación se aplica SOLO al div con el contenedor del
+    // mapa, no al popup, que se sigue posicionando respecto al
+    // outer no rotado.
+    <div className="relative overflow-hidden">
+      <div
+        ref={containerRef}
+        className="w-full h-[480px] rounded-lg overflow-hidden bg-black"
+        style={rotation ? { transform: `rotate(${rotation}deg)`, transformOrigin: "center" } : undefined}
+      />
       {popupKart && (
         <KartPopup
           kart={popupKart}

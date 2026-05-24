@@ -803,8 +803,15 @@ const translations: Record<string, Record<Language, string>> = {
   "tracking.title": { es: "Tracking en vivo", en: "Live tracking", it: "Tracking live", de: "Live-Tracking", fr: "Suivi en direct" },
   "tracking.emptyNoCircuit": { es: "Selecciona un circuito con sesión activa para ver el mapa.", en: "Select a circuit with an active session to see the map.", it: "Seleziona un circuito con sessione attiva per vedere la mappa.", de: "Wähle eine Strecke mit aktiver Sitzung, um die Karte zu sehen.", fr: "Sélectionnez un circuit avec une session active pour voir la carte." },
   "tracking.emptyNoTrack": { es: "Este circuito no tiene trazado configurado todavía. Pídele al admin que lo trace en Admin → Circuitos → Editar trazado.", en: "This circuit hasn't been mapped yet. Ask the admin to trace it via Admin → Circuits → Edit track.", it: "Questo circuito non ha ancora il tracciato configurato. Chiedi all'admin di tracciarlo da Admin → Circuiti → Modifica tracciato.", de: "Diese Strecke wurde noch nicht erfasst. Bitte den Admin, sie unter Admin → Strecken → Streckenführung zu zeichnen.", fr: "Ce circuit n'a pas encore été tracé. Demandez à l'admin de le tracer via Admin → Circuits → Modifier le tracé." },
-  "tracking.direction.forward": { es: "Sentido ▶ horario", en: "Direction ▶ clockwise", it: "Senso ▶ orario", de: "Richtung ▶ Uhrzeigersinn", fr: "Sens ▶ horaire" },
-  "tracking.direction.reversed": { es: "Sentido ◀ antihorario", en: "Direction ◀ counterclockwise", it: "Senso ◀ antiorario", de: "Richtung ◀ Gegenuhrzeigersinn", fr: "Sens ◀ antihoraire" },
+  // Labels intercambiados respecto a los valores de código: en este
+  // proyecto el polyline se traza típicamente en sentido contrario
+  // al de carrera (origen OSM Overpass), de modo que el valor
+  // `forward` del código (= polyline-up) corresponde visualmente a
+  // ANTIHORARIO y `reversed` (= polyline-down) a HORARIO. Mantenemos
+  // los valores de código para no migrar la BD; solo invertimos los
+  // textos para que el operador vea la dirección de carrera real.
+  "tracking.direction.forward": { es: "Sentido ◀ antihorario", en: "Direction ◀ counterclockwise", it: "Senso ◀ antiorario", de: "Richtung ◀ Gegenuhrzeigersinn", fr: "Sens ◀ antihoraire" },
+  "tracking.direction.reversed": { es: "Sentido ▶ horario", en: "Direction ▶ clockwise", it: "Senso ▶ orario", de: "Richtung ▶ Uhrzeigersinn", fr: "Sens ▶ horaire" },
   "tracking.direction.toggleHint": { es: "Click para invertir el sentido de carrera", en: "Click to flip the race direction", it: "Clicca per invertire il senso di marcia", de: "Klicken zum Umkehren der Fahrtrichtung", fr: "Cliquez pour inverser le sens" },
   "tracking.live": { es: "EN VIVO", en: "LIVE", it: "IN DIRETTA", de: "LIVE", fr: "EN DIRECT" },
   "tracking.legend.tier": { es: "Tier:", en: "Tier:", it: "Tier:", de: "Tier:", fr: "Tier:" },
@@ -839,8 +846,12 @@ const translations: Record<string, Record<Language, string>> = {
   "admin.tracking.marker.pitOut": { es: "Pit-out", en: "Pit-out", it: "Pit-out", de: "Box-Ausgang", fr: "Sortie des stands" },
   "admin.tracking.marker.pitBox": { es: "Boxes (parking)", en: "Pit boxes (parking)", it: "Boxes (parking)", de: "Boxen (Parkplatz)", fr: "Boxes (parking)" },
   "admin.tracking.direction": { es: "Sentido de marcha por defecto", en: "Default direction of travel", it: "Senso di marcia predefinito", de: "Standardfahrtrichtung", fr: "Sens de marche par défaut" },
-  "admin.tracking.direction.forward": { es: "Horario", en: "Clockwise", it: "Orario", de: "Uhrzeigersinn", fr: "Horaire" },
-  "admin.tracking.direction.reversed": { es: "Antihorario", en: "Counterclockwise", it: "Antiorario", de: "Gegenuhrzeigersinn", fr: "Antihoraire" },
+  // Ver nota arriba en `tracking.direction.*`: labels intercambiados
+  // a propósito (valor `forward` ↔ "Antihorario", `reversed` ↔
+  // "Horario") para que el botón del editor coincida con la
+  // dirección real de carrera.
+  "admin.tracking.direction.forward": { es: "Antihorario", en: "Counterclockwise", it: "Antiorario", de: "Gegenuhrzeigersinn", fr: "Antihoraire" },
+  "admin.tracking.direction.reversed": { es: "Horario", en: "Clockwise", it: "Orario", de: "Uhrzeigersinn", fr: "Horaire" },
   "admin.tracking.save": { es: "Guardar trazado", en: "Save track", it: "Salva tracciato", de: "Strecke speichern", fr: "Enregistrer le tracé" },
   "admin.tracking.saved": { es: "✓ Trazado guardado", en: "✓ Track saved", it: "✓ Tracciato salvato", de: "✓ Strecke gespeichert", fr: "✓ Tracé enregistré" },
   "admin.tracking.saving": { es: "Guardando...", en: "Saving...", it: "Salvataggio...", de: "Speichern...", fr: "Enregistrement..." },

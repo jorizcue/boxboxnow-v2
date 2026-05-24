@@ -549,6 +549,36 @@ async def admin_save_track_config(
             raise HTTPException(400, "default_direction must be forward|reversed")
         circuit.default_direction = payload.default_direction
 
+    # Auto-snap pit-in/out lat/lon onto the track polyline so the
+    # tracking module's pit-ghost calc always has a polyline-walk
+    # distance to work with — independently of whether the operator
+    # typed the legacy `*_distance_m` field or just dropped the
+    # marker on the map (which is the modern flow: the editor sends
+    # lat/lon, not a distance). Runs on EVERY save so the distance
+    # stays in lockstep with the latest polyline + marker positions
+    # (if the polyline is retraced, the cached distances are
+    # recomputed automatically). Skips silently if there's no
+    # polyline yet (operator can save markers before tracing the
+    # polyline — distances will be filled the next save).
+    if circuit.track_polyline:
+        try:
+            from app.engine.polyline_geometry import snap_to_polyline
+            poly = [(p[0], p[1]) for p in json.loads(circuit.track_polyline)]
+            if circuit.pit_entry_lat is not None and circuit.pit_entry_lon is not None:
+                dist, _ = snap_to_polyline(
+                    poly, (circuit.pit_entry_lat, circuit.pit_entry_lon), closed=True
+                )
+                circuit.pit_entry_distance_m = float(dist)
+            if circuit.pit_exit_lat is not None and circuit.pit_exit_lon is not None:
+                dist, _ = snap_to_polyline(
+                    poly, (circuit.pit_exit_lat, circuit.pit_exit_lon), closed=True
+                )
+                circuit.pit_exit_distance_m = float(dist)
+        except Exception:
+            # A bad polyline shouldn't block the rest of the save;
+            # the ghost falls back to gap=0 when distances are null.
+            pass
+
     # Renderer SVG. Los 3 campos son independientes y opcionales: el
     # operador puede subir la imagen primero, luego el viewbox, luego
     # los paths uno por uno. Cada campo se persiste sólo si llega

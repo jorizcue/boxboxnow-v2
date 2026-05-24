@@ -54,7 +54,7 @@
  * overlap. The fan uses the same +3 m offset trick as the Leaflet
  * renderer.
  */
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useT } from "@/lib/i18n";
 import type { KartState, TrackConfig } from "@/types/race";
 import {
@@ -64,7 +64,7 @@ import {
   type LatLonBounds,
 } from "@/lib/svgPath";
 import { computeKartProgressM, isKartInPit, computePitGhostProgressM } from "@/lib/kartPosition";
-import { pointAtDistance } from "@/lib/polyline";
+import { pointAtDistance, snapToPolyline } from "@/lib/polyline";
 
 function tierColor(score: number | undefined): string {
   const s = score ?? 0;
@@ -89,6 +89,11 @@ interface Props {
   direction: "forward" | "reversed";
   /** Configured pit-stop duration (s) — drives the "if I pit now" ghost. */
   pitTimeS: number;
+  /** Free rotation aplicada al SVG entero (deg, 0 = norte arriba).
+   *  Antes era estado local del renderer (con su propio slider abajo);
+   *  ahora viene de TrackingTab para que coincida entre Leaflet ↔ SVG
+   *  y se preserve cambiando de renderer. El slider local se elimina. */
+  rotation?: number;
 }
 
 /** Convert a polyline-walk distance (m) to a percentage along the SVG
@@ -113,6 +118,7 @@ export function TrackMapSVG({
   onSelectKart,
   direction,
   pitTimeS,
+  rotation = 0,
 }: Props) {
   const t = useT();
   // Resolve geometry once per trackConfig change. If the operator has
@@ -141,7 +147,8 @@ export function TrackMapSVG({
   // metaDistanceM = 619.48 on a 707.90 m polyline, so polyline[0] is
   // at the bottom-right of the track and META is up on the top straight.
   const sensorPoints = useMemo(() => {
-    if (!geom.bounds) return { meta: null, pitIn: null, pitOut: null };
+    const empty = { meta: null, pitIn: null, pitOut: null, pitInPerp: null, pitOutPerp: null };
+    if (!geom.bounds) return empty;
     const proj = (lat: number, lon: number) => projectLatLon(lat, lon, geom.bounds as LatLonBounds);
     const polyline = trackConfig.trackPolyline;
     let meta: [number, number] | null = null;
@@ -150,13 +157,48 @@ export function TrackMapSVG({
       const [lat, lon] = pointAtDistance(polyline, metaDist, true);
       meta = proj(lat, lon);
     }
-    const pitIn = trackConfig.pitEntryLat != null && trackConfig.pitEntryLon != null
-      ? proj(trackConfig.pitEntryLat, trackConfig.pitEntryLon)
-      : null;
-    const pitOut = trackConfig.pitExitLat != null && trackConfig.pitExitLon != null
-      ? proj(trackConfig.pitExitLat, trackConfig.pitExitLon)
-      : null;
-    return { meta, pitIn, pitOut };
+    const pitInLL: [number, number] | null =
+      trackConfig.pitEntryLat != null && trackConfig.pitEntryLon != null
+        ? [trackConfig.pitEntryLat, trackConfig.pitEntryLon]
+        : null;
+    const pitOutLL: [number, number] | null =
+      trackConfig.pitExitLat != null && trackConfig.pitExitLon != null
+        ? [trackConfig.pitExitLat, trackConfig.pitExitLon]
+        : null;
+    const pitIn = pitInLL ? proj(pitInLL[0], pitInLL[1]) : null;
+    const pitOut = pitOutLL ? proj(pitOutLL[0], pitOutLL[1]) : null;
+
+    // Endpoints de la barra perpendicular al trazado en PIT-IN/OUT
+    // (~18 m a cada lado). Misma matemática que `drawPitBar` en
+    // TrackMap.tsx: snap a polyline, tangente vía pointAtDistance(±5),
+    // rotar 90° en planar local, convertir de vuelta a lat/lon y
+    // proyectar a SVG. La barra rota con el SVG igual que el
+    // polyline (lo cual es lo que queremos: si rotas el mapa, la
+    // barra rota con la pista).
+    const total = trackConfig.trackLengthM ?? 0;
+    const computePerp = (
+      ll: [number, number] | null,
+    ): { p1: [number, number]; p2: [number, number] } | null => {
+      if (!ll || !polyline || polyline.length < 2 || total <= 0) return null;
+      const [walkM] = snapToPolyline(polyline, ll, true);
+      const before = pointAtDistance(polyline, ((walkM - 5) % total + total) % total, true);
+      const after = pointAtDistance(polyline, (walkM + 5) % total, true);
+      const cosLat = Math.cos(ll[0] * Math.PI / 180);
+      const dLatM = (after[0] - before[0]) * 111000;
+      const dLonM = (after[1] - before[1]) * 111000 * cosLat;
+      const mag = Math.hypot(dLatM, dLonM);
+      if (mag === 0) return null;
+      const halfLen = 18;
+      const dLatDeg = (-dLonM / mag) / 111000;
+      const dLonDeg = ( dLatM  / mag) / (111000 * cosLat);
+      const p1LL: [number, number] = [ll[0] + dLatDeg * halfLen, ll[1] + dLonDeg * halfLen];
+      const p2LL: [number, number] = [ll[0] - dLatDeg * halfLen, ll[1] - dLonDeg * halfLen];
+      return { p1: proj(p1LL[0], p1LL[1]), p2: proj(p2LL[0], p2LL[1]) };
+    };
+    const pitInPerp = computePerp(pitInLL);
+    const pitOutPerp = computePerp(pitOutLL);
+
+    return { meta, pitIn, pitOut, pitInPerp, pitOutPerp };
   }, [geom.bounds, trackConfig]);
 
   // Kart positions on every render. We delegate the actual math to
@@ -187,18 +229,52 @@ export function TrackMapSVG({
       });
   }, [karts, trackConfig, countdownMs, direction, totalM]);
 
-  // "If I pit now" ghost: where our kart would rejoin relative to the
-  // field shown right now (static-field estimate, see helper).
-  const ghostPct = useMemo(() => {
+  // "If I pit now" ghost: dónde reapareceríamos en el trazado tras el
+  // pit (estimación estática del campo, ver helper). Devolvemos tres
+  // piezas:
+  //   - pct:   posición en %% sobre el path, para el label que monta
+  //            offset-path (movimiento suave vía CSS transition).
+  //   - point: coords SVG del ghost (para colocar la barra perpendicular
+  //            sin depender del runtime de offset-path).
+  //   - bar:   endpoints (p1, p2) de la barra perpendicular, calculados
+  //            con el mismo truco que `sensorPoints` para PIT-IN/OUT
+  //            (snap a polyline + tangente vía pointAtDistance(±5 m) +
+  //            rotación 90°). Halflen 22 m → barra ~44 m total, que
+  //            asoma por encima del cluster de karts (hasta ~30 markers
+  //            apilándose en el mismo tramo no pueden taparla).
+  // Recomputado en cada tick (countdownMs en deps) — coste despreciable
+  // (4 muestras de pointAtDistance + 1 snap, todas O(polyline)).
+  const ghostState = useMemo(() => {
+    const empty = { pct: null as number | null, point: null as [number, number] | null, bar: null as { p1: [number, number]; p2: [number, number] } | null };
+    if (!geom.bounds || totalM <= 0 || !trackConfig.trackPolyline) return empty;
     const mine = karts.find((k) => k.kartNumber === myKartNumber);
-    if (!mine) return null;
-    const walk = computePitGhostProgressM(mine, trackConfig, countdownMs, direction, pitTimeS);
-    return walk != null ? pctFromPolylineWalk(walk, totalM) : null;
-  }, [karts, myKartNumber, trackConfig, countdownMs, direction, pitTimeS, totalM]);
+    if (!mine) return empty;
+    const walkM = computePitGhostProgressM(mine, trackConfig, countdownMs, direction, pitTimeS);
+    if (walkM == null) return empty;
+    const pct = pctFromPolylineWalk(walkM, totalM);
+    const polyline = trackConfig.trackPolyline;
+    const ghostLL = pointAtDistance(polyline, walkM, true);
+    const proj = (lat: number, lon: number) => projectLatLon(lat, lon, geom.bounds as LatLonBounds);
+    const point = proj(ghostLL[0], ghostLL[1]);
+    const before = pointAtDistance(polyline, ((walkM - 5) % totalM + totalM) % totalM, true);
+    const after  = pointAtDistance(polyline, (walkM + 5) % totalM, true);
+    const cosLat = Math.cos(ghostLL[0] * Math.PI / 180);
+    const dLatM = (after[0] - before[0]) * 111000;
+    const dLonM = (after[1] - before[1]) * 111000 * cosLat;
+    const mag = Math.hypot(dLatM, dLonM);
+    if (mag === 0) return { pct, point, bar: null };
+    const halfLen = 22;
+    const dLatDeg = (-dLonM / mag) / 111000;
+    const dLonDeg = ( dLatM  / mag) / (111000 * cosLat);
+    const p1LL: [number, number] = [ghostLL[0] + dLatDeg * halfLen, ghostLL[1] + dLonDeg * halfLen];
+    const p2LL: [number, number] = [ghostLL[0] - dLatDeg * halfLen, ghostLL[1] - dLonDeg * halfLen];
+    return { pct, point, bar: { p1: proj(p1LL[0], p1LL[1]), p2: proj(p2LL[0], p2LL[1]) } };
+  }, [karts, myKartNumber, trackConfig, countdownMs, direction, pitTimeS, totalM, geom.bounds]);
+  const ghostPct = ghostState.pct;
 
-  // Free map rotation (deg). The whole SVG rotates; kart bubbles and
-  // sensor labels are counter-rotated so numbers/text stay upright.
-  const [rotation, setRotation] = useState(0);
+  // Rotation viene como prop desde TrackingTab (estado compartido).
+  // El SVG entero rota; kart bubbles y labels se contra-rotan para que
+  // los números y textos sigan derechos (counter-rotate angle).
   const cr = rotation ? `rotate(${-rotation})` : undefined;
 
   return (
@@ -262,17 +338,68 @@ export function TrackMapSVG({
                   style={{ paintOrder: "stroke", stroke: "#000", strokeWidth: 3 }}>META</text>
           </g>
         )}
-        {sensorPoints.pitIn && (
+        {/* PIT-IN / PIT-OUT: barra perpendicular al trazado para que se
+            vea aún con karts apilados encima. Misma geometría que en
+            TrackMap.tsx (Leaflet): outline negro grueso debajo + línea
+            naranja brillante encima. La barra rota con el SVG (no se
+            contra-rota) — al rotar el mapa, la barra rota con él
+            preservando su perpendicularidad al trazado. El label sí se
+            contra-rota (`cr`) para que el texto siga legible. */}
+        {sensorPoints.pitInPerp && sensorPoints.pitIn && (
+          <g>
+            <line
+              x1={sensorPoints.pitInPerp.p1[0]} y1={sensorPoints.pitInPerp.p1[1]}
+              x2={sensorPoints.pitInPerp.p2[0]} y2={sensorPoints.pitInPerp.p2[1]}
+              stroke="#000" strokeWidth={10} strokeLinecap="round"
+              opacity={0.9} vectorEffect="non-scaling-stroke"
+            />
+            <line
+              x1={sensorPoints.pitInPerp.p1[0]} y1={sensorPoints.pitInPerp.p1[1]}
+              x2={sensorPoints.pitInPerp.p2[0]} y2={sensorPoints.pitInPerp.p2[1]}
+              stroke="#ff9b1a" strokeWidth={5} strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+            <g transform={`translate(${sensorPoints.pitIn[0]} ${sensorPoints.pitIn[1]}) ${cr ?? ""}`}>
+              <text y={-14} textAnchor="middle" fontSize={10} fontWeight={700} fill="#ff9b1a"
+                    style={{ paintOrder: "stroke", stroke: "#000", strokeWidth: 3 }}>PIT-IN</text>
+            </g>
+          </g>
+        )}
+        {sensorPoints.pitOutPerp && sensorPoints.pitOut && (
+          <g>
+            <line
+              x1={sensorPoints.pitOutPerp.p1[0]} y1={sensorPoints.pitOutPerp.p1[1]}
+              x2={sensorPoints.pitOutPerp.p2[0]} y2={sensorPoints.pitOutPerp.p2[1]}
+              stroke="#000" strokeWidth={10} strokeLinecap="round"
+              opacity={0.9} vectorEffect="non-scaling-stroke"
+            />
+            <line
+              x1={sensorPoints.pitOutPerp.p1[0]} y1={sensorPoints.pitOutPerp.p1[1]}
+              x2={sensorPoints.pitOutPerp.p2[0]} y2={sensorPoints.pitOutPerp.p2[1]}
+              stroke="#ff9b1a" strokeWidth={5} strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+            <g transform={`translate(${sensorPoints.pitOut[0]} ${sensorPoints.pitOut[1]}) ${cr ?? ""}`}>
+              <text y={-14} textAnchor="middle" fontSize={10} fontWeight={700} fill="#ff9b1a"
+                    style={{ paintOrder: "stroke", stroke: "#000", strokeWidth: 3 }}>PIT-OUT</text>
+            </g>
+          </g>
+        )}
+        {/* Fallback al marker antiguo cuando NO se ha podido computar la
+            perpendicular (config sin polyline / sin trackLengthM /
+            tangente degenerada). Mantiene visibilidad mínima en
+            circuitos legacy a medio configurar. */}
+        {sensorPoints.pitIn && !sensorPoints.pitInPerp && (
           <g transform={`translate(${sensorPoints.pitIn[0]} ${sensorPoints.pitIn[1]}) ${cr ?? ""}`}>
-            <circle r={4} fill="#000" stroke="#e59a2e" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
-            <text y={-8} textAnchor="middle" fontSize={9} fill="#e59a2e"
+            <circle r={5} fill="#000" stroke="#ff9b1a" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+            <text y={-10} textAnchor="middle" fontSize={10} fontWeight={700} fill="#ff9b1a"
                   style={{ paintOrder: "stroke", stroke: "#000", strokeWidth: 3 }}>PIT-IN</text>
           </g>
         )}
-        {sensorPoints.pitOut && (
+        {sensorPoints.pitOut && !sensorPoints.pitOutPerp && (
           <g transform={`translate(${sensorPoints.pitOut[0]} ${sensorPoints.pitOut[1]}) ${cr ?? ""}`}>
-            <circle r={4} fill="#000" stroke="#e59a2e" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
-            <text y={-8} textAnchor="middle" fontSize={9} fill="#e59a2e"
+            <circle r={5} fill="#000" stroke="#ff9b1a" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+            <text y={-10} textAnchor="middle" fontSize={10} fontWeight={700} fill="#ff9b1a"
                   style={{ paintOrder: "stroke", stroke: "#000", strokeWidth: 3 }}>PIT-OUT</text>
           </g>
         )}
@@ -334,9 +461,39 @@ export function TrackMapSVG({
           })}
         </g>
 
-        {/* "If I pit now" ghost — where our kart would rejoin relative
-            to the field shown now. Dashed hollow ring so it reads as a
-            projection, not a real kart. Non-interactive. */}
+        {/* "If I pit now" ghost — dónde reapareceríamos tras el pit.
+            Antes era un circulito de r=8 con "PIT" dentro que se
+            perdía bajo el cluster de markers de karts (cada kart es
+            un círculo de r=6 más texto, hasta 30 apilándose).
+            Ahora son tres elementos:
+              · outline: línea negra perpendicular (strokeWidth 10)
+              · bar:     línea verde discontinua encima (strokeWidth 6)
+              · chip:    "PIT" rotando con offset-path (mantiene la
+                         animación suave del label) con halo verde
+                         y borde negro grueso para destacarse encima
+                         del enjambre de karts
+            Las dos primeras se posicionan via SVG coords proyectados
+            (no offset-path): se update-an una vez por React render
+            (10 Hz) — ligero jitter respecto al label de offset-path
+            pero la barra es lo bastante ancha como para que no se
+            note. */}
+        {ghostState.bar && (
+          <g style={{ pointerEvents: "none" }}>
+            <line
+              x1={ghostState.bar.p1[0]} y1={ghostState.bar.p1[1]}
+              x2={ghostState.bar.p2[0]} y2={ghostState.bar.p2[1]}
+              stroke="#000" strokeWidth={11} strokeLinecap="round"
+              opacity={0.9} vectorEffect="non-scaling-stroke"
+            />
+            <line
+              x1={ghostState.bar.p1[0]} y1={ghostState.bar.p1[1]}
+              x2={ghostState.bar.p2[0]} y2={ghostState.bar.p2[1]}
+              stroke="#9fe556" strokeWidth={6} strokeLinecap="round"
+              strokeDasharray="6 4"
+              vectorEffect="non-scaling-stroke"
+            />
+          </g>
+        )}
         {ghostPct != null && geom.trackPath && (
           <g
             className="tracking-svg-kart"
@@ -348,20 +505,28 @@ export function TrackMapSVG({
             }}
           >
             <g transform={cr}>
+              {/* Halo verde semi-transparente para destacar el chip
+                  por encima del cluster de karts */}
               <circle
-                r={8}
+                r={14}
+                fill="#9fe556"
+                opacity={0.25}
+                vectorEffect="non-scaling-stroke"
+              />
+              <circle
+                r={10}
                 fill="#9fe556"
                 stroke="#0a0a0a"
-                strokeWidth={1.5}
+                strokeWidth={2}
                 vectorEffect="non-scaling-stroke"
               />
               <text
                 textAnchor="middle"
                 dominantBaseline="central"
-                fontSize={6}
-                fontWeight={700}
+                fontSize={7}
+                fontWeight={800}
                 fill="#0a0a0a"
-                style={{ pointerEvents: "none" }}
+                style={{ pointerEvents: "none", letterSpacing: "0.5px" }}
               >
                 PIT
               </text>
@@ -376,34 +541,9 @@ export function TrackMapSVG({
         SVG {geom.autoGenerated ? "(auto)" : "(custom)"}
       </div>
 
-      {/* Free-rotation control. Sibling of the <svg> (HTML, not rotated)
-          so it stays put while the map turns. */}
-      <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded-md bg-black/70 border border-border px-2 py-1">
-        <span className="text-[9px] uppercase tracking-wider text-neutral-400">
-          {t("tracking.rotate")}
-        </span>
-        <input
-          type="range"
-          min={0}
-          max={359}
-          step={1}
-          value={rotation}
-          onChange={(e) => setRotation(Number(e.target.value))}
-          className="w-24 accent-accent cursor-pointer"
-          aria-label={t("tracking.rotate")}
-        />
-        <span className="text-[9px] font-mono tabular-nums text-neutral-300 w-7 text-right">
-          {rotation}°
-        </span>
-        <button
-          onClick={() => setRotation(0)}
-          disabled={rotation === 0}
-          title={t("tracking.rotate")}
-          className="text-[10px] text-neutral-400 hover:text-white disabled:opacity-30 leading-none"
-        >
-          ↺
-        </button>
-      </div>
+      {/* El slider de rotación local se eliminó: ahora vive en el top
+          bar de TrackingTab para que sea visible también en Leaflet y
+          se preserve cambiando de renderer. */}
     </div>
   );
 }

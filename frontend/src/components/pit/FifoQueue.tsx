@@ -546,7 +546,7 @@ export function FifoQueue() {
 }
 
 /* ── Frozen snow overlay ── */
-function FrozenOverlay() {
+export function FrozenOverlay() {
   return (
     <div className="frozen-snow absolute inset-0 pointer-events-none overflow-hidden rounded-lg">
       {Array.from({ length: 6 }).map((_, i) => (
@@ -613,7 +613,7 @@ function AdjustableCard({ label, value, field, min, max }: {
 }
 
 /* ── Kart detail modal (snapshot at pit entry) ── */
-function KartDetailModal({ entry, onClose }: {
+export function KartDetailModal({ entry, onClose }: {
   entry: FifoEntry;
   onClose: () => void;
 }) {
@@ -782,7 +782,7 @@ function KartDetailModal({ entry, onClose }: {
 }
 
 /* ── Small pit info card ── */
-function PitCard({ label, value, accent, warn }: { label: string; value: string; accent?: boolean; warn?: boolean }) {
+export function PitCard({ label, value, accent, warn }: { label: string; value: string; accent?: boolean; warn?: boolean }) {
   return (
     <div className={clsx(
       "bg-surface rounded-xl border p-2 sm:p-3 flex flex-col items-center justify-between",

@@ -170,17 +170,42 @@ export function computeKartProgressM(
 
 /**
  * Polyline-walk distance for the "if I pit NOW" ghost marker of our own
- * kart. It answers the strategist's question "where would I rejoin
- * relative to the field shown right now?": a static-field estimate that
- * drops our current track position back by the distance the field
- * advances during the configured pit time at our own pace.
+ * kart. Answers the strategist's question "where would I rejoin
+ * relative to the field shown right now?": a static-field estimate of
+ * which rival I'll come out next to after a pit cycle.
  *
- *   offsetM = (pitTimeS / lapSeconds) · trackLengthM
- *   ghost   = currentProgress − offsetM   (in race direction)
+ * Derivation (forward direction, with `pace = total / lapMs`):
  *
- * Because `computeKartProgressM` places the kart at
- * `anchor + sign·traveled`, shifting `traveled` by −offsetM is just
- * `currentProgress − sign·offsetM` (sign = +1 forward, −1 reversed).
+ *   t1     = (pitIn − D) / pace       (time to drive from now to PIT-IN)
+ *   t_pit  = pitTimeS                 (regulation pit duration, PIT-IN → PIT-OUT)
+ *   Δfield = pace · (t1 + t_pit)
+ *          = (pitIn − D) + pace · pitTimeS
+ *
+ *   At rejoin, I'm at PIT-OUT. A rival who is now at position R will
+ *   be at R + Δfield. Solving R + Δfield = pitOut gives:
+ *
+ *   Ghost  = pitOut − Δfield + D − D
+ *          = D + (pitOut − pitIn) − pace · pitTimeS
+ *
+ *   ↳ Loss in race-line distance = pace · pitTimeS − (pitOut − pitIn).
+ *
+ * The pit lane is a SHORTCUT on the racing line: the kart skips the
+ * `pitOut − pitIn` section by going through the pit lane and emerging
+ * at PIT-OUT. The previous version of this function ignored that and
+ * subtracted only `pace · pitTimeS`, which over-estimated the loss by
+ * the pit-section length (~5-15 % of a lap on typical endurance
+ * circuits — e.g. ~200 m on a 1400 m track = ~9 s of effective error
+ * at 1:00 lap pace).
+ *
+ * Unified for both directions: `raceGap` is the polyline-walk distance
+ * from PIT-IN to PIT-OUT measured in race direction (always in
+ * [0, total)). The ghost is then `current − sign · (fieldAdvance −
+ * raceGap)`, mirroring `computeKartProgressM`'s `sign` convention.
+ *
+ * Degrades to the old behaviour (`raceGap = 0`) when pit-in/out
+ * distances aren't configured (circuits set up with only lat/lon free
+ * placement) — the ghost still shows something useful, just biased by
+ * the unknown pit-section length.
  *
  * Returns null when not meaningful: no kart / in pit / no pace / no
  * pit time / no track length. The pace is clamped to a sane karting
@@ -212,8 +237,23 @@ export function computePitGhostProgressM(
   // stale 0.x value doesn't produce a nonsensical offset.
   lapMs = Math.min(600_000, Math.max(20_000, lapMs));
 
-  const offsetM = (pitTimeS * 1000 / lapMs) * total;
+  // Polyline-walk distance from PIT-IN to PIT-OUT in race direction.
+  // Normalised to [0, total) so it works even when the pit lane wraps
+  // polyline[0]. Falls back to 0 (= old maths) when the operator
+  // hasn't typed pit-in/out distances — typically circuits set up
+  // with only lat/lon, where projecting back to polyline-walk is
+  // non-trivial and not worth the corner-case complexity here.
+  let raceGap = 0;
+  if (cfg.pitEntryDistanceM != null && cfg.pitExitDistanceM != null) {
+    const rawGap = direction === "reversed"
+      ? cfg.pitEntryDistanceM - cfg.pitExitDistanceM
+      : cfg.pitExitDistanceM - cfg.pitEntryDistanceM;
+    raceGap = ((rawGap % total) + total) % total;
+  }
+
+  const fieldAdvanceM = (pitTimeS * 1000 / lapMs) * total;
+  const lossInRaceM = fieldAdvanceM - raceGap;
   const sign = direction === "reversed" ? -1 : 1;
-  const ghost = current - sign * offsetM;
+  const ghost = current - sign * lossInRaceM;
   return ((ghost % total) + total) % total;
 }
