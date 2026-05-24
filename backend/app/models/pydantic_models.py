@@ -397,6 +397,8 @@ class RaceSessionOut(BaseModel):
     min_pits: int
     pit_time_s: int
     min_driver_time_min: int
+    # 0 = sin restricción (= duración de la carrera).
+    max_driver_time_min: int = 0
     rain: bool
     pit_closed_start_min: int
     pit_closed_end_min: int
@@ -423,6 +425,7 @@ class RaceSessionCreate(BaseModel):
     min_pits: int = 3
     pit_time_s: int = 120
     min_driver_time_min: int = 30
+    max_driver_time_min: int = 0  # 0 = sin restricción
     rain: bool = False
     pit_closed_start_min: int = 0
     pit_closed_end_min: int = 0
@@ -443,6 +446,7 @@ class RaceSessionUpdate(BaseModel):
     min_pits: int | None = None
     pit_time_s: int | None = None
     min_driver_time_min: int | None = None
+    max_driver_time_min: int | None = None
     rain: bool | None = None
     pit_closed_start_min: int | None = None
     pit_closed_end_min: int | None = None

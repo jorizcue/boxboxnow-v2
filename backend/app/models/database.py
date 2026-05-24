@@ -84,6 +84,15 @@ async def init_db():
         except Exception:
             pass
 
+        # max_driver_time_min: tope superior simétrico a min_driver_time_min.
+        # Nullable / 0 = "sin restricción" (= duración de la carrera).
+        # Sesiones existentes se quedan en 0 → comportamiento idéntico al
+        # anterior; el pit-gate solo aplica el check cuando es > 0.
+        try:
+            await conn.execute(text("ALTER TABLE race_sessions ADD COLUMN max_driver_time_min INTEGER DEFAULT 0"))
+        except Exception:
+            pass
+
         # Recreate live_race_state if it has the old schema (race_session_id column)
         try:
             result = await conn.execute(text("PRAGMA table_info(live_race_state)"))

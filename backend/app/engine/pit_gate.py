@@ -34,6 +34,11 @@ class DriverTimeInfo:
     name: str
     accumulated_ms: int
     remaining_ms: int   # max(0, min_driver_time_ms - accumulated_ms)
+    # Margen restante hasta el máximo permitido. 0 cuando no hay
+    # restricción (max_driver_time_min = 0). Cuando >0, la UI usa este
+    # valor + max_stint_ms para decidir si pintar naranja (= "no le
+    # queda holgura para otro stint completo").
+    max_remaining_ms: int = 0
 
 
 @dataclass
@@ -42,13 +47,15 @@ class PitStatus:
     field of the WS snapshot / analytics / fifo_update messages."""
     is_open: bool
     # Close-reason enum (None when is_open == True):
-    #   regulation_start     — within pit_closed_start_min window
-    #   regulation_end       — within pit_closed_end_min window
-    #   stint_too_short      — pitting now would force future stints > max
-    #   stint_too_long       — pitting now would force future stints < min
-    #   driver_min_time      — some driver wouldn't reach min_driver_time_min
-    #   no_active_kart       — our kart isn't configured / not racing
-    #   not_running          — race not started / already finished
+    #   regulation_start         — within pit_closed_start_min window
+    #   regulation_end           — within pit_closed_end_min window
+    #   stint_too_short          — pitting now would force future stints > max
+    #   stint_too_long           — pitting now would force future stints < min
+    #   driver_min_time          — some driver wouldn't reach min_driver_time_min
+    #   driver_max_time_urgent   — current pilot reached/exceeded max_driver_time
+    #                              (URGENT — pit now, mismo patrón que stint_too_long)
+    #   no_active_kart           — our kart isn't configured / not racing
+    #   not_running              — race not started / already finished
     close_reason: str | None = None
     # When close_reason == "driver_min_time", which driver is the blocker
     # (the one with the largest remaining time). Drives the UI badge text:
@@ -115,6 +122,7 @@ def _is_driver_min_feasible(
     min_stint_ms: int,
     max_stint_ms: int,
     min_driver_time_ms: int,
+    max_driver_time_ms: int = 0,
     current_driver_idx: int | None = None,
 ) -> tuple[bool, str | None, int]:
     """O(K · N) greedy feasibility check.
@@ -123,6 +131,16 @@ def _is_driver_min_feasible(
     feasible is True, the blocking-driver fields are ("", 0). When False,
     they point to the driver with the largest unmet remaining time — the
     one we'll surface in the UI badge.
+
+    `max_driver_time_ms` (0 = sin restricción) añade un techo simétrico
+    al `min`. Cada piloto k sólo puede acumular hasta `max_driver_time_ms`
+    de drive total, lo que se traduce en:
+      - cap superior en x[k] = ⌊(max − acc[k]) / min_stint⌋ (no puede
+        hacer tantos stints que ni el más corto le quepa sin pasarse).
+      - cap superior en y[k] (drive total del piloto) = max − acc[k],
+        que limita el upper agregado de la asignación.
+    Cuando max=0 ambos caps son infinitos → comportamiento idéntico al
+    legacy.
 
     `current_driver_idx` (when supplied) is the index in `drivers` of the
     pilot CURRENTLY at the wheel. Pitting now means that pilot LEAVES the
@@ -151,6 +169,8 @@ def _is_driver_min_feasible(
                 worst_name, worst_rem = name, rem
         return (worst_rem == 0), worst_name, worst_rem
 
+    has_max = max_driver_time_ms > 0
+
     # Aggregate-length bounds: each stint must be in [min, max], summed
     # over n_future_stints must equal drive_remaining_ms.
     if drive_remaining_ms < min_stint_ms * n_future_stints:
@@ -175,6 +195,19 @@ def _is_driver_min_feasible(
 
     # Per-driver "remaining time" required to hit min_driver_time.
     remaining = [max(0, min_driver_time_ms - acc) for _, acc in drivers]
+
+    # Per-driver capacity (margin to max). Float('inf') cuando no hay max.
+    if has_max:
+        capacity = [max(0, max_driver_time_ms - acc) for _, acc in drivers]
+        # Max stints each driver can take (even at min_stint length each).
+        # If a driver is already at or past max, x_cap = 0.
+        x_cap = [
+            (int(capacity[k] // min_stint_ms) if min_stint_ms > 0 else n_future_stints)
+            for k in range(K)
+        ]
+    else:
+        capacity = [float("inf")] * K
+        x_cap = [n_future_stints] * K
 
     # Current-driver constraint: if we pit NOW, the pilot at the wheel
     # leaves the kart and at least one OTHER driver takes the next
@@ -206,6 +239,18 @@ def _is_driver_min_feasible(
         (math.ceil(r / max_stint_ms) if r > 0 else 0)
         for r in remaining
     ]
+
+    # Per-driver feasibility: ¿le caben los stints mínimos dentro de su
+    # capacity sin pasarse del máximo? Si NO, este piloto NO puede
+    # cumplir min y max a la vez (config rota o piloto saturado).
+    if has_max:
+        for k in range(K):
+            if x[k] > x_cap[k]:
+                # Worst case: el piloto está bloqueando por max (no por min);
+                # reportamos remaining (lo que le falta para el min) para
+                # consistencia con el callsite legacy.
+                return False, drivers[k][0], remaining[k]
+
     total_x = sum(x)
     if total_x > n_future_stints:
         # Drivers collectively need more stints than the race has left.
@@ -220,24 +265,36 @@ def _is_driver_min_feasible(
     # That cost is 0 while (x_k+1) · min_stint ≤ remaining_k (the remaining
     # constraint is still binding), and min_stint once x_k · min_stint
     # exceeds remaining_k. Greedy is optimal for non-negative costs.
+    # CON MAX: sólo a pilotos con `x[k] < x_cap[k]` (los demás están al tope).
     slack = n_future_stints - total_x
     for _ in range(slack):
-        best_k = 0
+        best_k = -1
         best_cost = float("inf")
         for k in range(K):
+            if x[k] >= x_cap[k]:
+                continue  # ya en el tope de su capacity
             old_lower = max(x[k] * min_stint_ms, remaining[k])
             new_lower = max((x[k] + 1) * min_stint_ms, remaining[k])
             cost = new_lower - old_lower
             if cost < best_cost:
                 best_cost = cost
                 best_k = k
+        if best_k < 0:
+            # Todos los pilotos al máximo de capacity y aún sobran stints
+            # → infeasible. Reportamos el peor blocker por min.
+            worst_idx = max(range(K), key=lambda i: remaining[i])
+            return False, drivers[worst_idx][0], remaining[worst_idx]
         x[best_k] += 1
 
     # Step 3: with the slack distributed, check the aggregate lower bound
     # fits within drive_remaining. If it does, the LP has a feasible (y_k)
     # for this x; we don't need to compute the y_k explicitly.
     total_lower = sum(max(x[k] * min_stint_ms, remaining[k]) for k in range(K))
-    total_upper = n_future_stints * max_stint_ms
+    # Total upper agregado: con max, cada piloto tope su drive a capacity.
+    if has_max:
+        total_upper = sum(min(x[k] * max_stint_ms, capacity[k]) for k in range(K))
+    else:
+        total_upper = n_future_stints * max_stint_ms
 
     if total_lower <= drive_remaining_ms <= total_upper:
         return True, None, 0
@@ -348,15 +405,21 @@ def compute_pit_status(state) -> PitStatus:
     # the current pilot has been driving.
     stint_elapsed_ms = int(stint_sec * 1000)
     min_driver_time_min = getattr(state, "min_driver_time_min", 0) or 0
+    max_driver_time_min = getattr(state, "max_driver_time_min", 0) or 0
     team_drivers_count = getattr(state, "team_drivers_count", 0) or 0
     min_driver_time_ms = min_driver_time_min * 60 * 1000
+    max_driver_time_ms = max_driver_time_min * 60 * 1000
 
     # Per-driver pair list (including the current driver's in-progress stint).
+    # Construimos la lista cuando hay min O max configurado — antes solo
+    # se construía con min>0, pero ahora la UI también necesita
+    # max_remaining_ms aunque min sea 0.
     drivers_pairs: list[tuple[str, int]] = []
     drivers_info_list: list[DriverTimeInfo] = []
     current_driver_race_remaining_ms = 0
+    current_acc_ms = 0
 
-    if min_driver_time_min > 0:
+    if min_driver_time_min > 0 or max_driver_time_min > 0:
         drivers_pairs = _driver_times_for_kart(
             getattr(our_kart, "driver_total_ms", {}),
             stint_elapsed_ms,
@@ -367,13 +430,15 @@ def compute_pit_status(state) -> PitStatus:
             DriverTimeInfo(
                 name=name,
                 accumulated_ms=int(acc),
-                remaining_ms=int(max(0, min_driver_time_ms - acc)),
+                remaining_ms=int(max(0, min_driver_time_ms - acc)) if min_driver_time_ms > 0 else 0,
+                max_remaining_ms=int(max(0, max_driver_time_ms - acc)) if max_driver_time_ms > 0 else 0,
             )
             for name, acc in drivers_pairs
         ]
         if current_driver:
-            current_acc = next((acc for n, acc in drivers_pairs if n == current_driver), 0)
-            current_driver_race_remaining_ms = max(0, min_driver_time_ms - current_acc)
+            current_acc_ms = next((acc for n, acc in drivers_pairs if n == current_driver), 0)
+            if min_driver_time_min > 0:
+                current_driver_race_remaining_ms = max(0, min_driver_time_ms - current_acc_ms)
 
     # Stint-based remaining (only positive when stint_too_short would fire).
     stint_pending_ms = max(0, int(real_min_stint_s * 1000) - int(stint_sec * 1000))
@@ -442,6 +507,22 @@ def compute_pit_status(state) -> PitStatus:
             drivers=drivers_info_list,
         )
 
+    # ─── Driver-MAX-time urgency (simétrico a stint_too_long) ───────────────
+    #
+    # Cuando el piloto actual ya alcanzó (o sobrepasó) su `max_driver_time_min`,
+    # pitar es OBLIGATORIO ya — cualquier metro extra fuera del cap legal.
+    # Se reporta como close_reason específico para que la UI lo distinga
+    # del overrun de stint y muestre quién es el blocker (el piloto que ha
+    # de salir). Misma UX que `stint_too_long`: badge URGENT.
+    if max_driver_time_min > 0 and current_driver and current_acc_ms >= max_driver_time_ms:
+        return PitStatus(
+            is_open=False,
+            close_reason="driver_max_time_urgent",
+            blocking_driver=current_driver,
+            blocking_driver_remaining_ms=int(current_acc_ms - max_driver_time_ms),
+            drivers=drivers_info_list,
+        )
+
     # ─── Driver-minimum-time feasibility ────────────────────────────────────
     if min_driver_time_min > 0:
         # Drive time remaining AFTER current pit, summed across future stints.
@@ -466,6 +547,7 @@ def compute_pit_status(state) -> PitStatus:
             int(min_stint_s * 1000),
             int(max_stint_s * 1000),
             min_driver_time_ms,
+            max_driver_time_ms=max_driver_time_ms,
             current_driver_idx=current_driver_idx_in_pairs,
         )
 
@@ -522,9 +604,13 @@ def _predict_next_open_countdown_ms(state, our_kart) -> int | None:
     min_stint_s = state.min_stint_min * 60
     max_stint_s = state.max_stint_min * 60
     min_driver_time_min = getattr(state, "min_driver_time_min", 0) or 0
-    if min_driver_time_min <= 0:
+    max_driver_time_min = getattr(state, "max_driver_time_min", 0) or 0
+    # Atajo: si NI min NI max están configurados, no hay nada que predecir.
+    # El gate ya está abierto (ningún constraint per-piloto activo).
+    if min_driver_time_min <= 0 and max_driver_time_min <= 0:
         return None
     min_driver_time_ms = min_driver_time_min * 60 * 1000
+    max_driver_time_ms = max_driver_time_min * 60 * 1000
     team_drivers_count = getattr(state, "team_drivers_count", 0) or 0
 
     stint_start_countdown_ms = getattr(our_kart, "stint_start_countdown_ms", 0)
@@ -601,6 +687,18 @@ def _predict_next_open_countdown_ms(state, our_kart) -> int | None:
         if drive_remaining_s < 0:
             return None
 
+        # Antes del feasibility check global: si el piloto actual ya
+        # superaría el max_driver_time en este slice futuro, este
+        # momento NO es válido (tendría que haber pitado antes).
+        if max_driver_time_ms > 0 and current_driver:
+            future_acc = next(
+                (acc for n, acc in drivers_pairs if n == current_driver), 0
+            )
+            if future_acc >= max_driver_time_ms:
+                # El piloto actual ya estaría sobre el max → el gate
+                # habría disparado URGENT antes. No es un próximo open.
+                continue
+
         feasible, _, _ = _is_driver_min_feasible(
             drivers_pairs,
             n_future_stints,
@@ -608,6 +706,7 @@ def _predict_next_open_countdown_ms(state, our_kart) -> int | None:
             int(min_stint_s * 1000),
             int(max_stint_s * 1000),
             min_driver_time_ms,
+            max_driver_time_ms=max_driver_time_ms,
             current_driver_idx=current_idx_in_pairs,
         )
         if feasible:

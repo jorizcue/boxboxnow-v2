@@ -143,6 +143,7 @@ async def pit_gate_debug(
             "max_stint_min": getattr(state, "max_stint_min", None),
             "pit_time_s": getattr(state, "pit_time_s", None),
             "min_driver_time_min": getattr(state, "min_driver_time_min", None),
+            "max_driver_time_min": getattr(state, "max_driver_time_min", None),
             "team_drivers_count": getattr(state, "team_drivers_count", None),
             "pit_closed_start_min": getattr(state, "pit_closed_start_min", None),
             "pit_closed_end_min": getattr(state, "pit_closed_end_min", None),

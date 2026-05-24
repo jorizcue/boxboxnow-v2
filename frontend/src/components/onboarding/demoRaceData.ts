@@ -222,6 +222,7 @@ export function buildDemoRaceState(): DemoRaceState {
     boxLines: 2,
     boxKarts: 30,
     minDriverTimeMin: 25,
+    maxDriverTimeMin: 0,
     teamDriversCount: 4,
     pitClosedStartMin: 0,
     pitClosedEndMin: 0,

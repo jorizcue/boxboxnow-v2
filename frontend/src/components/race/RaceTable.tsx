@@ -109,7 +109,13 @@ export function RaceTable() {
             const pitsRemaining = Math.max(0, config.minPits - kart.pitCount);
             const isExpanded = expandedKart === kart.kartNumber;
             const drivers = isExpanded
-              ? getDriverInfoForKart(kart, config.minDriverTimeMin, stintSecondsFor(kart) * 1000)
+              ? getDriverInfoForKart(
+                  kart,
+                  config.minDriverTimeMin,
+                  config.maxDriverTimeMin ?? 0,
+                  config.maxStintMin,
+                  stintSecondsFor(kart) * 1000,
+                )
               : [];
 
             return (
@@ -204,6 +210,7 @@ export function RaceTable() {
                     <DriverDetailsRow
                       drivers={drivers}
                       minDriverTimeMin={config.minDriverTimeMin}
+                      maxDriverTimeMin={config.maxDriverTimeMin ?? 0}
                       colSpan={COL_COUNT}
                     />
                   </tr>

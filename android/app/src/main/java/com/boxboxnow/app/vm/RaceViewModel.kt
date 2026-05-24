@@ -123,6 +123,10 @@ class RaceViewModel @Inject constructor(
     private val _minDriverTimeMin = MutableStateFlow(0.0)
     val minDriverTimeMin = _minDriverTimeMin.asStateFlow()
 
+    /** Tope superior por piloto (min). 0 = sin restricción. */
+    private val _maxDriverTimeMin = MutableStateFlow(0.0)
+    val maxDriverTimeMin = _maxDriverTimeMin.asStateFlow()
+
     private val _teamDriversCount = MutableStateFlow(0)
     val teamDriversCount = _teamDriversCount.asStateFlow()
 
@@ -549,6 +553,7 @@ class RaceViewModel @Inject constructor(
                     cfg["maxStintMin"]?.asDoubleOrNull()?.let { _maxStintMin.value = it }
                     cfg["minStintMin"]?.asDoubleOrNull()?.let { _minStintMin.value = it }
                     cfg["minDriverTimeMin"]?.asDoubleOrNull()?.let { _minDriverTimeMin.value = it }
+                    cfg["maxDriverTimeMin"]?.asDoubleOrNull()?.let { _maxDriverTimeMin.value = it }
                     cfg["teamDriversCount"]?.asIntOrNull()?.let { _teamDriversCount.value = it }
                 }
 

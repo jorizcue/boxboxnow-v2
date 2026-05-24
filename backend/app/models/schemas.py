@@ -257,6 +257,13 @@ class RaceSession(Base):
     min_pits = Column(Integer, default=3)
     pit_time_s = Column(Integer, default=120)
     min_driver_time_min = Column(Integer, default=30)
+    # Máximo tiempo (min) que un piloto puede acumular en la carrera.
+    # 0 / NULL = sin restricción (= duración de la carrera). Cuando se
+    # configura, el pit-gate fuerza un pit antes de que el piloto actual
+    # supere este valor (driver_max_time_urgent) y el panel del piloto
+    # marca naranja a los pilotos a los que ya no les queda holgura para
+    # otro stint completo sin pasarse.
+    max_driver_time_min = Column(Integer, default=0, nullable=True)
     rain = Column(Boolean, default=False)
 
     # Pit window

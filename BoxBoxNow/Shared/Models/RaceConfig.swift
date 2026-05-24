@@ -11,6 +11,10 @@ struct RaceSession: Codable {
     var minPits: Int
     var pitTimeS: Int
     var minDriverTimeMin: Int
+    /// Tope superior de tiempo por piloto (min). 0 = sin restricción
+    /// (= la duración de la carrera actúa de techo). Cuando >0, el
+    /// pit-gate fuerza un pit antes de que el piloto actual lo supere.
+    var maxDriverTimeMin: Int = 0
     var rain: Bool
     var pitClosedStartMin: Int
     var pitClosedEndMin: Int
@@ -42,6 +46,7 @@ struct RaceSession: Codable {
         case minPits = "min_pits"
         case pitTimeS = "pit_time_s"
         case minDriverTimeMin = "min_driver_time_min"
+        case maxDriverTimeMin = "max_driver_time_min"
         case pitClosedStartMin = "pit_closed_start_min"
         case pitClosedEndMin = "pit_closed_end_min"
         case boxLines = "box_lines"
@@ -56,7 +61,7 @@ struct RaceSession: Codable {
     static let empty = RaceSession(
         id: nil, circuitId: nil, circuitName: nil, name: nil,
         durationMin: 60, minStintMin: 5, maxStintMin: 35, minPits: 2,
-        pitTimeS: 180, minDriverTimeMin: 60, rain: false,
+        pitTimeS: 180, minDriverTimeMin: 60, maxDriverTimeMin: 0, rain: false,
         pitClosedStartMin: 5, pitClosedEndMin: 5, boxLines: 1, boxKarts: 1,
         ourKartNumber: 1, refreshIntervalS: 3, isActive: false,
         autoLoadTeams: false,
@@ -234,6 +239,9 @@ struct RaceConfig: Codable, Hashable {
     var boxLines: Int
     var boxKarts: Int
     var minDriverTimeMin: Int
+    /// Tope superior de tiempo por piloto (min). Opcional para compat con
+    /// payloads antiguos; nil/0 = sin restricción.
+    var maxDriverTimeMin: Int?
     /// Configured driver count for the team. 0 = fallback to Apex-observed
     /// drivers in the pit-gate check. Optional so older snapshots still
     /// decode cleanly (treated as 0 by call sites).

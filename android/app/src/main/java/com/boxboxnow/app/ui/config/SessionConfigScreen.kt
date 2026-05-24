@@ -261,6 +261,13 @@ fun SessionConfigScreen(onBack: () -> Unit) {
                         onValueChange = { vm.updateSession { s -> s.copy(minDriverTimeMin = it) } },
                         modifier = Modifier.weight(1f),
                     )
+                    NumberCard(
+                        title = t("session.maxDriverTimeTitle"),
+                        value = session.maxDriverTimeMin,
+                        tooltip = t("session.maxDriverTimeTooltip"),
+                        onValueChange = { vm.updateSession { s -> s.copy(maxDriverTimeMin = it) } },
+                        modifier = Modifier.weight(1f),
+                    )
                 }
                 // Pilot count goes in a second row — adding it as a 4th card
                 // to the row above crowded the phone width and the new card

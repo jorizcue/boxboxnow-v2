@@ -29,6 +29,38 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/config", tags=["config"])
 
 
+def _validate_driver_time_window(
+    min_driver_time_min: int | None,
+    max_driver_time_min: int | None,
+    max_stint_min: int | None,
+) -> None:
+    """Validar que el par (min, max) tiempo por piloto sea coherente.
+
+    `max_driver_time_min == 0` (o None) significa "sin restricción" — no
+    se valida nada en ese caso. Cuando max > 0:
+      - debe ser ≥ min (si no, ningún piloto puede cumplir ambos).
+      - debe ser ≥ max_stint_min (si no, ningún piloto cabe ni en un
+        stint completo, lo que rompe la matemática del pit-gate).
+    Lanza HTTPException 400 con mensaje claro para el cliente.
+    """
+    mx = max_driver_time_min or 0
+    if mx <= 0:
+        return
+    mn = min_driver_time_min or 0
+    if mn > 0 and mx < mn:
+        raise HTTPException(
+            400,
+            f"max_driver_time_min ({mx}) debe ser >= min_driver_time_min ({mn}).",
+        )
+    ms = max_stint_min or 0
+    if ms > 0 and mx < ms:
+        raise HTTPException(
+            400,
+            f"max_driver_time_min ({mx}) debe ser >= max_stint_min ({ms}): "
+            f"ningún piloto puede hacer ni un stint completo.",
+        )
+
+
 # --- Circuits (user sees only their accessible ones) ---
 
 @router.get("/circuits", response_model=list[CircuitOut])
@@ -128,6 +160,9 @@ async def create_session(
     """Create a new race session (deactivates any existing active session)."""
     # Verify circuit access
     await _verify_circuit_access(user, data.circuit_id, db)
+    _validate_driver_time_window(
+        data.min_driver_time_min, data.max_driver_time_min, data.max_stint_min
+    )
 
     # Deactivate existing active sessions
     result = await db.execute(
@@ -174,6 +209,7 @@ async def create_session(
             duration_min=session.duration_min,
             refresh_s=session.refresh_interval_s,
             min_driver_time_min=session.min_driver_time_min,
+            max_driver_time_min=session.max_driver_time_min or 0,
             team_drivers_count=session.team_drivers_count or 0,
             pit_closed_start_min=session.pit_closed_start_min or 0,
             pit_closed_end_min=session.pit_closed_end_min or 0,
@@ -212,6 +248,16 @@ async def update_session(
     if data.circuit_id and data.circuit_id != session.circuit_id:
         await _verify_circuit_access(user, data.circuit_id, db)
 
+    # Validar la ventana de tiempo por piloto tras aplicar los cambios
+    # de este PATCH: mezclo los valores entrantes con los persistidos
+    # para que el chequeo cubra updates parciales (e.g. cambiar solo
+    # max_driver_time_min sin tocar min ni max_stint_min).
+    _validate_driver_time_window(
+        data.min_driver_time_min if data.min_driver_time_min is not None else session.min_driver_time_min,
+        data.max_driver_time_min if data.max_driver_time_min is not None else (session.max_driver_time_min or 0),
+        data.max_stint_min if data.max_stint_min is not None else session.max_stint_min,
+    )
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(session, key, value)
 
@@ -248,6 +294,7 @@ async def update_session(
             duration_min=session.duration_min,
             refresh_s=session.refresh_interval_s,
             min_driver_time_min=session.min_driver_time_min,
+            max_driver_time_min=session.max_driver_time_min or 0,
             team_drivers_count=session.team_drivers_count or 0,
             pit_closed_start_min=session.pit_closed_start_min,
             pit_closed_end_min=session.pit_closed_end_min,
@@ -430,6 +477,7 @@ _REG_DEFAULTS = {
     "min_pits": 3,
     "pit_time_s": 120,
     "min_driver_time_min": 30,
+    "max_driver_time_min": 0,
     "pit_closed_start_min": 0,
     "pit_closed_end_min": 0,
 }

@@ -70,6 +70,8 @@ data class RaceSession(
     @SerialName("min_pits") val minPits: Int = 2,
     @SerialName("pit_time_s") val pitTimeS: Int = 180,
     @SerialName("min_driver_time_min") val minDriverTimeMin: Int = 60,
+    /** Tope superior por piloto (min). 0 = sin restricción. */
+    @SerialName("max_driver_time_min") val maxDriverTimeMin: Int = 0,
     val rain: Boolean = false,
     @SerialName("pit_closed_start_min") val pitClosedStartMin: Int = 5,
     @SerialName("pit_closed_end_min") val pitClosedEndMin: Int = 5,

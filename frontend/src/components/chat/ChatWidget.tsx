@@ -587,6 +587,7 @@ const PARAM_ROWS: { key: keyof RegulationExtractResult["proposed"]; label: strin
   { key: "min_pits", label: "Paradas mínimas" },
   { key: "pit_time_s", label: "Tiempo de pit", unit: "s" },
   { key: "min_driver_time_min", label: "Tiempo mín. / piloto", unit: "min" },
+  { key: "max_driver_time_min", label: "Tiempo máx. / piloto", unit: "min" },
   { key: "pit_closed_start_min", label: "Pit cerrado (inicio)", unit: "min" },
   { key: "pit_closed_end_min", label: "Pit cerrado (final)", unit: "min" },
 ];
@@ -651,6 +652,7 @@ function RegulationWizard({ onExit }: { onExit: () => void }) {
       minPits: p.min_pits,
       pitTime: p.pit_time_s,
       minDriverTime: p.min_driver_time_min,
+      maxDriverTime: p.max_driver_time_min ?? 0,
       teamDriversCount: Number(teamDrivers) || 0,
       rain: p.rain,
       pitClosedStart: p.pit_closed_start_min,

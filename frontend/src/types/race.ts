@@ -192,6 +192,12 @@ export interface RaceConfig {
   boxLines: number;
   boxKarts: number;
   minDriverTimeMin: number;
+  /** Tope superior de tiempo por piloto (min). 0 = sin restricción
+   *  (= la duración de la carrera actúa de techo). Cuando > 0, el
+   *  pit-gate fuerza un pit antes de que el piloto actual supere
+   *  este valor (`driver_max_time_urgent`), y el panel del piloto
+   *  marca naranja a los pilotos sin holgura para otro stint. */
+  maxDriverTimeMin?: number;
   /** Configured number of drivers in the team. When > 0 the pit gate
    *  enforces driver-min-time feasibility from lap 1; when 0 it falls
    *  back to the count observed in `kart.driverTotalMs` (Apex-discovered

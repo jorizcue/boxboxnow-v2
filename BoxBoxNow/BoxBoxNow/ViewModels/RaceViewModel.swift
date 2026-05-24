@@ -48,6 +48,8 @@ final class RaceViewModel: ObservableObject {
     @Published var maxStintMin: Double = 0
     @Published var minStintMin: Double = 0
     @Published var minDriverTimeMin: Double = 0
+    /// Tope superior por piloto (min). 0 = sin restricción.
+    @Published var maxDriverTimeMin: Double = 0
     @Published var teamDriversCount: Int = 0
 
     /// Pit-gate decision pushed by the backend on every snapshot /
@@ -553,6 +555,7 @@ final class RaceViewModel: ObservableObject {
                     maxStintMin = asDouble(cfg["maxStintMin"]) ?? maxStintMin
                     minStintMin = asDouble(cfg["minStintMin"]) ?? minStintMin
                     minDriverTimeMin = asDouble(cfg["minDriverTimeMin"]) ?? minDriverTimeMin
+                    maxDriverTimeMin = asDouble(cfg["maxDriverTimeMin"]) ?? maxDriverTimeMin
                     teamDriversCount = asInt(cfg["teamDriversCount"]) ?? teamDriversCount
                     print("[RaceVM] Config from WS: kart=\(ourKartNumber), circuitLength=\(circuitLengthM), minPits=\(minPits)")
                 }

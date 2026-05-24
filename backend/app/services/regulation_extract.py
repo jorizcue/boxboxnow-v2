@@ -34,6 +34,7 @@ _NUM_FIELDS = (
     "min_pits",
     "pit_time_s",
     "min_driver_time_min",
+    "max_driver_time_min",
     "pit_closed_start_min",
     "pit_closed_end_min",
 )
@@ -62,6 +63,9 @@ _PROMPT = (
     "esquema JSON.\n"
     "- Duraciones de carrera y tiempos por piloto en MINUTOS "
     "(una carrera de '3 horas' => 180; '6H' => 360).\n"
+    "- min_driver_time_min = tiempo MÍNIMO total por piloto. "
+    "max_driver_time_min = tiempo MÁXIMO total por piloto. Si no se "
+    "menciona, pon max_driver_time_min a 0 (= sin restricción).\n"
     "- pit_time_s en SEGUNDOS (tiempo de parada obligatoria / stop&go).\n"
     "- min_pits = número mínimo de paradas obligatorias.\n"
     "- pit_closed_start_min / pit_closed_end_min = minutos al inicio/final "

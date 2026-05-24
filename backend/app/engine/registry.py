@@ -358,6 +358,7 @@ class UserSession:
                   max_stint_min: int, min_stint_min: int, box_lines: int,
                   box_karts: int, duration_min: int, refresh_s: int,
                   min_driver_time_min: int = 30,
+                  max_driver_time_min: int = 0,
                   pit_closed_start_min: int = 0, pit_closed_end_min: int = 0,
                   finish_lat1: float | None = None, finish_lon1: float | None = None,
                   finish_lat2: float | None = None, finish_lon2: float | None = None,
@@ -375,6 +376,7 @@ class UserSession:
         self.state.max_stint_min = max_stint_min
         self.state.min_stint_min = min_stint_min
         self.state.min_driver_time_min = min_driver_time_min
+        self.state.max_driver_time_min = max(0, int(max_driver_time_min or 0))
         self.state.team_drivers_count = max(0, int(team_drivers_count or 0))
         self.state.pit_closed_start_min = pit_closed_start_min
         self.state.pit_closed_end_min = pit_closed_end_min
@@ -636,6 +638,7 @@ class UserSession:
                                     "boxLines": self.state.box_lines,
                                     "boxKarts": self.state.box_karts,
                                     "minDriverTimeMin": self.state.min_driver_time_min,
+                                    "maxDriverTimeMin": self.state.max_driver_time_min,
                                     "teamDriversCount": self.state.team_drivers_count,
                                     "pitClosedStartMin": self.state.pit_closed_start_min,
                                     "pitClosedEndMin": self.state.pit_closed_end_min,
@@ -965,6 +968,7 @@ class ReplaySession:
         self.state.min_pits = _val(session.min_pits, 3)
         self.state.pit_time_s = _val(session.pit_time_s, 120)
         self.state.min_driver_time_min = _val(session.min_driver_time_min, 30)
+        self.state.max_driver_time_min = max(0, int(_val(getattr(session, 'max_driver_time_min', 0), 0) or 0))
         self.state.team_drivers_count = max(0, int(_val(getattr(session, 'team_drivers_count', 0), 0) or 0))
         self.state.rain_mode = _val(getattr(session, 'rain', False), False)
         self.state.pit_closed_start_min = _val(getattr(session, 'pit_closed_start_min', 0), 0)
@@ -985,6 +989,7 @@ class ReplaySession:
         self.state.update_duration(session.duration_min)
         self.state.pit_time_s = session.pit_time_s
         self.state.min_driver_time_min = session.min_driver_time_min
+        self.state.max_driver_time_min = max(0, int(getattr(session, 'max_driver_time_min', 0) or 0))
         self.state.team_drivers_count = max(0, int(getattr(session, 'team_drivers_count', 0) or 0))
         self.state.rain_mode = getattr(session, 'rain', False) or False
         self.state.pit_closed_start_min = getattr(session, 'pit_closed_start_min', 0) or 0
@@ -1056,6 +1061,7 @@ class ReplaySession:
                                     "boxLines": self.state.box_lines,
                                     "boxKarts": self.state.box_karts,
                                     "minDriverTimeMin": self.state.min_driver_time_min,
+                                    "maxDriverTimeMin": self.state.max_driver_time_min,
                                     "teamDriversCount": self.state.team_drivers_count,
                                     "pitClosedStartMin": self.state.pit_closed_start_min,
                                     "pitClosedEndMin": self.state.pit_closed_end_min,

@@ -410,6 +410,11 @@ class RaceStateManager:
         self.max_stint_min: int = 40
         self.min_stint_min: int = 15
         self.min_driver_time_min: int = 30
+        # 0 = sin restricción (la duración de la carrera actúa como techo).
+        # Cuando >0 el pit-gate fuerza un pit antes de que el piloto
+        # actual supere este valor (driver_max_time_urgent) y la UI
+        # marca naranja a los pilotos sin holgura para otro stint.
+        self.max_driver_time_min: int = 0
         self.pit_closed_start_min: int = 0
         self.pit_closed_end_min: int = 0
         self.box_lines: int = 2
@@ -1617,6 +1622,7 @@ class RaceStateManager:
                     "boxLines": self.box_lines,
                     "boxKarts": self.box_karts,
                     "minDriverTimeMin": self.min_driver_time_min,
+                    "maxDriverTimeMin": self.max_driver_time_min,
                     "teamDriversCount": self.team_drivers_count,
                     "pitClosedStartMin": self.pit_closed_start_min,
                     "pitClosedEndMin": self.pit_closed_end_min,

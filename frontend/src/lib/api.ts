@@ -120,6 +120,8 @@ export interface RegulationExtractResult {
     min_pits: number;
     pit_time_s: number;
     min_driver_time_min: number;
+    /** Tope superior. 0/null = sin restricción. */
+    max_driver_time_min: number | null;
     pit_closed_start_min: number;
     pit_closed_end_min: number;
     rain: boolean;

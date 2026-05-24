@@ -160,7 +160,9 @@ const translations: Record<string, Record<Language, string>> = {
   "driver.totalTime": { es: "Tiempo total", en: "Total time", it: "Tempo totale", de: "Gesamtzeit", fr: "Temps total" },
   "driver.avgLap": { es: "Media vuelta", en: "Avg lap", it: "Media giro", de: "Schnitt Runde", fr: "Moy. tour" },
   "driver.remainingMin": { es: "Restante min.", en: "Remaining min.", it: "Minimo restante", de: "Verbleibend Min.", fr: "Min. restant" },
+  "driver.remainingMax": { es: "Margen al máx.", en: "Margin to max", it: "Margine al max.", de: "Restzeit z. Max", fr: "Marge max." },
   "driver.minPerDriver": { es: "Min. por piloto", en: "Min. per driver", it: "Min. per pilota", de: "Min. pro Fahrer", fr: "Min. par pilote" },
+  "driver.maxPerDriver": { es: "Máx. por piloto", en: "Max. per driver", it: "Max. per pilota", de: "Max. pro Fahrer", fr: "Max. par pilote" },
 
   // === Pit / FIFO ===
   "pit.pits": { es: "Pits", en: "Pits", it: "Pit", de: "Pits", fr: "Box" },
@@ -220,6 +222,7 @@ const translations: Record<string, Record<Language, string>> = {
   "config.minPits": { es: "Pits minimos", en: "Min pits", it: "Pit minimi", de: "Min Pits", fr: "Box min" },
   "config.pitTime": { es: "Tiempo pit (s)", en: "Pit time (s)", it: "Tempo pit (s)", de: "Pit-Zeit (s)", fr: "Temps box (s)" },
   "config.minDriverTime": { es: "Tiempo min piloto (min)", en: "Min driver time (min)", it: "Tempo min pilota (min)", de: "Min Fahrerzeit (Min)", fr: "Temps min pilote (min)" },
+  "config.maxDriverTime": { es: "Tiempo máx piloto (min)", en: "Max driver time (min)", it: "Tempo max pilota (min)", de: "Max Fahrerzeit (Min)", fr: "Temps max pilote (min)" },
   "config.teamDriversCount": { es: "Pilotos del equipo", en: "Team drivers", it: "Piloti del team", de: "Team-Fahrer", fr: "Pilotes de l'équipe" },
   "config.refresh": { es: "Refresh (s)", en: "Refresh (s)", it: "Refresh (s)", de: "Refresh (s)", fr: "Refresh (s)" },
   "config.boxLines": { es: "Lineas box", en: "Box lines", it: "Linee box", de: "Box-Reihen", fr: "Lignes box" },

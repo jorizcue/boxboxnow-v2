@@ -125,6 +125,7 @@ const defaultConfig: RaceConfig = {
   boxLines: 2,
   boxKarts: 30,
   minDriverTimeMin: 30,
+  maxDriverTimeMin: 0,
   pitClosedStartMin: 0,
   pitClosedEndMin: 0,
   rain: false,

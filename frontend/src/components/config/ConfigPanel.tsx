@@ -26,6 +26,7 @@ interface RaceSession {
   min_pits: number;
   pit_time_s: number;
   min_driver_time_min: number;
+  max_driver_time_min: number;
   team_drivers_count: number;
   rain: boolean;
   pit_closed_start_min: number;
@@ -48,6 +49,7 @@ interface ConfigValues {
   minPits: number;
   pitTime: number;
   minDriverTime: number;
+  maxDriverTime: number;
   teamDriversCount: number;
   rain: boolean;
   pitClosedStart: number;
@@ -86,6 +88,8 @@ function RaceSessionEditor() {
   const [minPits, setMinPits] = useState(3);
   const [pitTime, setPitTime] = useState(120);
   const [minDriverTime, setMinDriverTime] = useState(30);
+  // Tope superior de tiempo por piloto (0 = sin restricción).
+  const [maxDriverTime, setMaxDriverTime] = useState(0);
   // Number of drivers in the team. 0 = "not configured": the pit gate
   // falls back to counting Apex-observed drivers, which means the
   // driver-min-time constraint won't fire until at least one driver
@@ -152,6 +156,7 @@ function RaceSessionEditor() {
     setMinPits(s.min_pits);
     setPitTime(s.pit_time_s);
     setMinDriverTime(s.min_driver_time_min);
+    setMaxDriverTime(s.max_driver_time_min ?? 0);
     setTeamDriversCount(s.team_drivers_count ?? 0);
     setRain(s.rain);
     setPitClosedStart(s.pit_closed_start_min ?? 0);
@@ -192,6 +197,7 @@ function RaceSessionEditor() {
       min_pits: v.minPits,
       pit_time_s: v.pitTime,
       min_driver_time_min: v.minDriverTime,
+      max_driver_time_min: v.maxDriverTime,
       team_drivers_count: v.teamDriversCount,
       rain: v.rain,
       pit_closed_start_min: v.pitClosedStart,
@@ -229,6 +235,7 @@ function RaceSessionEditor() {
         boxLines: v.boxLines,
         boxKarts: v.boxKarts,
         minDriverTimeMin: v.minDriverTime,
+        maxDriverTimeMin: v.maxDriverTime,
         teamDriversCount: v.teamDriversCount,
         pitClosedStartMin: v.pitClosedStart,
         pitClosedEndMin: v.pitClosedEnd,
@@ -258,6 +265,7 @@ function RaceSessionEditor() {
     minPits,
     pitTime,
     minDriverTime,
+    maxDriverTime,
     teamDriversCount,
     rain,
     pitClosedStart,
@@ -388,6 +396,7 @@ function RaceSessionEditor() {
           <ConfigCard label={t("config.minStint")} value={minStint} onChange={setMinStint} />
           <ConfigCard label={t("config.maxStint")} value={maxStint} onChange={setMaxStint} />
           <ConfigCard label={t("config.minDriverTime")} value={minDriverTime} onChange={setMinDriverTime} />
+          <ConfigCard label={t("config.maxDriverTime")} value={maxDriverTime} onChange={setMaxDriverTime} />
           <ConfigCard label={t("config.teamDriversCount")} value={teamDriversCount} onChange={setTeamDriversCount} />
         </ConfigSection>
 

@@ -520,6 +520,7 @@ struct DriverView: View {
         if raceVM.maxStintMin == 0 { raceVM.maxStintMin = Double(s.maxStintMin) }
         if raceVM.minStintMin == 0 { raceVM.minStintMin = Double(s.minStintMin) }
         if raceVM.minDriverTimeMin == 0 { raceVM.minDriverTimeMin = Double(s.minDriverTimeMin) }
+        if raceVM.maxDriverTimeMin == 0 { raceVM.maxDriverTimeMin = Double(s.maxDriverTimeMin) }
     }
 
     /// Sync the GPS finish line into the lap tracker from the active

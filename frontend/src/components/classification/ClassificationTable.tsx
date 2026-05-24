@@ -59,7 +59,13 @@ export function ClassificationTable() {
               ? karts.find((k) => k.kartNumber === entry.kartNumber)
               : undefined;
             const drivers = kart
-              ? getDriverInfoForKart(kart, config.minDriverTimeMin, stintMsFor(kart))
+              ? getDriverInfoForKart(
+                  kart,
+                  config.minDriverTimeMin,
+                  config.maxDriverTimeMin ?? 0,
+                  config.maxStintMin,
+                  stintMsFor(kart),
+                )
               : [];
 
             return (
@@ -108,6 +114,7 @@ export function ClassificationTable() {
                     <DriverDetailsRow
                       drivers={drivers}
                       minDriverTimeMin={config.minDriverTimeMin}
+                      maxDriverTimeMin={config.maxDriverTimeMin ?? 0}
                       colSpan={COL_COUNT}
                     />
                   </tr>

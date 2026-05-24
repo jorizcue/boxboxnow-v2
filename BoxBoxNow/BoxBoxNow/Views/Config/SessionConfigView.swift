@@ -104,6 +104,13 @@ struct SessionConfigView: View {
                                 range: 0...300,
                                 tooltip: t("session.minDriverTimeTooltip")
                             )
+                            // Tope superior por piloto. 0 = sin restricción.
+                            NumberCard(
+                                title: t("session.maxDriverTimeTitle"),
+                                value: $configVM.session.maxDriverTimeMin,
+                                range: 0...600,
+                                tooltip: t("session.maxDriverTimeTooltip")
+                            )
                             // Pilot count used by the pit-gate feasibility
                             // check (see backend/app/engine/pit_gate.py).
                             // 0 = fallback to Apex-observed drivers.
