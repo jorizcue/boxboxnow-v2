@@ -70,11 +70,15 @@ export function TrackingTab() {
   // operator's choice survives reloads. Default is "svg" because we
   // expect it to be visibly smoother once we validate it.
   const [renderer, setRenderer] = useState<RendererPref>("svg");
-  // Map rotation (deg, 0–359). Vive aquí (no en los renderers) para
-  // que cambiar de Leaflet ↔ SVG preserve la orientación que el
-  // estratega ya tenía elegida. -180..180 mapea CCW/CW a un slider
-  // simétrico alrededor de 0 (norte arriba).
+  // Map rotation (deg, -180..180). Solo se aplica cuando el renderer
+  // activo es SVG; Leaflet no soporta rotación correctamente con CSS
+  // transform (los tiles dejan de cargarse y los labels giran). Al
+  // cambiar a Leaflet reseteamos a 0 para que el mapa quede como
+  // siempre.
   const [rotation, setRotation] = useState(0);
+  useEffect(() => {
+    if (renderer === "leaflet" && rotation !== 0) setRotation(0);
+  }, [renderer, rotation]);
   useEffect(() => {
     try {
       const stored = localStorage.getItem(RENDERER_PREF_KEY);
@@ -200,33 +204,36 @@ export function TrackingTab() {
           </button>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Rotación del mapa. Vive en el top bar (no dentro del
-              renderer) para que sea visible aunque el operador esté
-              en Leaflet — antes solo el renderer SVG la exponía. El
-              slider va de -180 a +180 grados con paso de 5° y un
-              botón ⟲ para volver a 0 (norte arriba). El valor se
-              propaga a ambos renderers via prop. */}
-          <div className="inline-flex items-center gap-1 text-[10px] text-neutral-400">
-            <span className="font-bold uppercase tracking-wider mr-1">{t("tracking.rotate")}</span>
-            <input
-              type="range"
-              min={-180}
-              max={180}
-              step={5}
-              value={rotation}
-              onChange={(e) => setRotation(Number(e.target.value))}
-              className="w-24 accent-accent"
-              title={`${rotation}°`}
-            />
-            <span className="font-mono w-9 text-right">{rotation}°</span>
-            <button
-              type="button"
-              onClick={() => setRotation(0)}
-              disabled={rotation === 0}
-              className="ml-0.5 px-1 py-0.5 rounded border border-border text-neutral-400 hover:text-white disabled:opacity-30 transition-colors"
-              title="Reset rotación"
-            >⟲</button>
-          </div>
+          {/* Rotación del mapa — solo visible cuando el renderer SVG
+              está activo. La rotación CSS sobre Leaflet rompía la
+              carga de tiles en las esquinas rotadas y giraba los
+              labels (META, PIT-IN…) al revés, así que el feature
+              vive solo donde es nativa. Al cambiar a Leaflet el
+              slider desaparece y el ángulo se reset-ea a 0 vía el
+              useEffect de abajo. */}
+          {renderer === "svg" && (
+            <div className="inline-flex items-center gap-1 text-[10px] text-neutral-400">
+              <span className="font-bold uppercase tracking-wider mr-1">{t("tracking.rotate")}</span>
+              <input
+                type="range"
+                min={-180}
+                max={180}
+                step={5}
+                value={rotation}
+                onChange={(e) => setRotation(Number(e.target.value))}
+                className="w-24 accent-accent"
+                title={`${rotation}°`}
+              />
+              <span className="font-mono w-9 text-right">{rotation}°</span>
+              <button
+                type="button"
+                onClick={() => setRotation(0)}
+                disabled={rotation === 0}
+                className="ml-0.5 px-1 py-0.5 rounded border border-border text-neutral-400 hover:text-white disabled:opacity-30 transition-colors"
+                title="Reset rotación"
+              >⟲</button>
+            </div>
+          )}
           {/* Renderer picker. The SVG path-based renderer (offset-path)
               is in beta — letting the operator A/B between them on
               the fly is the fastest way to validate the new approach

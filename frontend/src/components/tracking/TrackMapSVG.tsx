@@ -64,7 +64,7 @@ import {
   type LatLonBounds,
 } from "@/lib/svgPath";
 import { computeKartProgressM, isKartInPit, computePitGhostProgressM } from "@/lib/kartPosition";
-import { pointAtDistance, snapToPolyline } from "@/lib/polyline";
+import { pointAtDistance } from "@/lib/polyline";
 
 function tierColor(score: number | undefined): string {
   const s = score ?? 0;
@@ -147,8 +147,7 @@ export function TrackMapSVG({
   // metaDistanceM = 619.48 on a 707.90 m polyline, so polyline[0] is
   // at the bottom-right of the track and META is up on the top straight.
   const sensorPoints = useMemo(() => {
-    const empty = { meta: null, pitIn: null, pitOut: null, pitInPerp: null, pitOutPerp: null };
-    if (!geom.bounds) return empty;
+    if (!geom.bounds) return { meta: null, pitIn: null, pitOut: null };
     const proj = (lat: number, lon: number) => projectLatLon(lat, lon, geom.bounds as LatLonBounds);
     const polyline = trackConfig.trackPolyline;
     let meta: [number, number] | null = null;
@@ -157,48 +156,13 @@ export function TrackMapSVG({
       const [lat, lon] = pointAtDistance(polyline, metaDist, true);
       meta = proj(lat, lon);
     }
-    const pitInLL: [number, number] | null =
-      trackConfig.pitEntryLat != null && trackConfig.pitEntryLon != null
-        ? [trackConfig.pitEntryLat, trackConfig.pitEntryLon]
-        : null;
-    const pitOutLL: [number, number] | null =
-      trackConfig.pitExitLat != null && trackConfig.pitExitLon != null
-        ? [trackConfig.pitExitLat, trackConfig.pitExitLon]
-        : null;
-    const pitIn = pitInLL ? proj(pitInLL[0], pitInLL[1]) : null;
-    const pitOut = pitOutLL ? proj(pitOutLL[0], pitOutLL[1]) : null;
-
-    // Endpoints de la barra perpendicular al trazado en PIT-IN/OUT
-    // (~18 m a cada lado). Misma matemática que `drawPitBar` en
-    // TrackMap.tsx: snap a polyline, tangente vía pointAtDistance(±5),
-    // rotar 90° en planar local, convertir de vuelta a lat/lon y
-    // proyectar a SVG. La barra rota con el SVG igual que el
-    // polyline (lo cual es lo que queremos: si rotas el mapa, la
-    // barra rota con la pista).
-    const total = trackConfig.trackLengthM ?? 0;
-    const computePerp = (
-      ll: [number, number] | null,
-    ): { p1: [number, number]; p2: [number, number] } | null => {
-      if (!ll || !polyline || polyline.length < 2 || total <= 0) return null;
-      const [walkM] = snapToPolyline(polyline, ll, true);
-      const before = pointAtDistance(polyline, ((walkM - 5) % total + total) % total, true);
-      const after = pointAtDistance(polyline, (walkM + 5) % total, true);
-      const cosLat = Math.cos(ll[0] * Math.PI / 180);
-      const dLatM = (after[0] - before[0]) * 111000;
-      const dLonM = (after[1] - before[1]) * 111000 * cosLat;
-      const mag = Math.hypot(dLatM, dLonM);
-      if (mag === 0) return null;
-      const halfLen = 18;
-      const dLatDeg = (-dLonM / mag) / 111000;
-      const dLonDeg = ( dLatM  / mag) / (111000 * cosLat);
-      const p1LL: [number, number] = [ll[0] + dLatDeg * halfLen, ll[1] + dLonDeg * halfLen];
-      const p2LL: [number, number] = [ll[0] - dLatDeg * halfLen, ll[1] - dLonDeg * halfLen];
-      return { p1: proj(p1LL[0], p1LL[1]), p2: proj(p2LL[0], p2LL[1]) };
-    };
-    const pitInPerp = computePerp(pitInLL);
-    const pitOutPerp = computePerp(pitOutLL);
-
-    return { meta, pitIn, pitOut, pitInPerp, pitOutPerp };
+    const pitIn = trackConfig.pitEntryLat != null && trackConfig.pitEntryLon != null
+      ? proj(trackConfig.pitEntryLat, trackConfig.pitEntryLon)
+      : null;
+    const pitOut = trackConfig.pitExitLat != null && trackConfig.pitExitLon != null
+      ? proj(trackConfig.pitExitLat, trackConfig.pitExitLon)
+      : null;
+    return { meta, pitIn, pitOut };
   }, [geom.bounds, trackConfig]);
 
   // Kart positions on every render. We delegate the actual math to
@@ -338,68 +302,22 @@ export function TrackMapSVG({
                   style={{ paintOrder: "stroke", stroke: "#000", strokeWidth: 3 }}>META</text>
           </g>
         )}
-        {/* PIT-IN / PIT-OUT: barra perpendicular al trazado para que se
-            vea aún con karts apilados encima. Misma geometría que en
-            TrackMap.tsx (Leaflet): outline negro grueso debajo + línea
-            naranja brillante encima. La barra rota con el SVG (no se
-            contra-rota) — al rotar el mapa, la barra rota con él
-            preservando su perpendicularidad al trazado. El label sí se
-            contra-rota (`cr`) para que el texto siga legible. */}
-        {sensorPoints.pitInPerp && sensorPoints.pitIn && (
-          <g>
-            <line
-              x1={sensorPoints.pitInPerp.p1[0]} y1={sensorPoints.pitInPerp.p1[1]}
-              x2={sensorPoints.pitInPerp.p2[0]} y2={sensorPoints.pitInPerp.p2[1]}
-              stroke="#000" strokeWidth={10} strokeLinecap="round"
-              opacity={0.9} vectorEffect="non-scaling-stroke"
-            />
-            <line
-              x1={sensorPoints.pitInPerp.p1[0]} y1={sensorPoints.pitInPerp.p1[1]}
-              x2={sensorPoints.pitInPerp.p2[0]} y2={sensorPoints.pitInPerp.p2[1]}
-              stroke="#ff9b1a" strokeWidth={5} strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-            />
-            <g transform={`translate(${sensorPoints.pitIn[0]} ${sensorPoints.pitIn[1]}) ${cr ?? ""}`}>
-              <text y={-14} textAnchor="middle" fontSize={10} fontWeight={700} fill="#ff9b1a"
-                    style={{ paintOrder: "stroke", stroke: "#000", strokeWidth: 3 }}>PIT-IN</text>
-            </g>
-          </g>
-        )}
-        {sensorPoints.pitOutPerp && sensorPoints.pitOut && (
-          <g>
-            <line
-              x1={sensorPoints.pitOutPerp.p1[0]} y1={sensorPoints.pitOutPerp.p1[1]}
-              x2={sensorPoints.pitOutPerp.p2[0]} y2={sensorPoints.pitOutPerp.p2[1]}
-              stroke="#000" strokeWidth={10} strokeLinecap="round"
-              opacity={0.9} vectorEffect="non-scaling-stroke"
-            />
-            <line
-              x1={sensorPoints.pitOutPerp.p1[0]} y1={sensorPoints.pitOutPerp.p1[1]}
-              x2={sensorPoints.pitOutPerp.p2[0]} y2={sensorPoints.pitOutPerp.p2[1]}
-              stroke="#ff9b1a" strokeWidth={5} strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-            />
-            <g transform={`translate(${sensorPoints.pitOut[0]} ${sensorPoints.pitOut[1]}) ${cr ?? ""}`}>
-              <text y={-14} textAnchor="middle" fontSize={10} fontWeight={700} fill="#ff9b1a"
-                    style={{ paintOrder: "stroke", stroke: "#000", strokeWidth: 3 }}>PIT-OUT</text>
-            </g>
-          </g>
-        )}
-        {/* Fallback al marker antiguo cuando NO se ha podido computar la
-            perpendicular (config sin polyline / sin trackLengthM /
-            tangente degenerada). Mantiene visibilidad mínima en
-            circuitos legacy a medio configurar. */}
-        {sensorPoints.pitIn && !sensorPoints.pitInPerp && (
+        {/* PIT-IN / PIT-OUT: dot + tooltip clásico (igual que sectores).
+            Se probó una barra perpendicular pero confundía visualmente
+            con el ghost del "if I pit now" (que también es perpendicular
+            y se mueve por el trazado). Los sensores son fijos, sin
+            contenido dinámico — el marker simple basta. */}
+        {sensorPoints.pitIn && (
           <g transform={`translate(${sensorPoints.pitIn[0]} ${sensorPoints.pitIn[1]}) ${cr ?? ""}`}>
-            <circle r={5} fill="#000" stroke="#ff9b1a" strokeWidth={2} vectorEffect="non-scaling-stroke" />
-            <text y={-10} textAnchor="middle" fontSize={10} fontWeight={700} fill="#ff9b1a"
+            <circle r={4} fill="#000" stroke="#e59a2e" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+            <text y={-8} textAnchor="middle" fontSize={9} fill="#e59a2e"
                   style={{ paintOrder: "stroke", stroke: "#000", strokeWidth: 3 }}>PIT-IN</text>
           </g>
         )}
-        {sensorPoints.pitOut && !sensorPoints.pitOutPerp && (
+        {sensorPoints.pitOut && (
           <g transform={`translate(${sensorPoints.pitOut[0]} ${sensorPoints.pitOut[1]}) ${cr ?? ""}`}>
-            <circle r={5} fill="#000" stroke="#ff9b1a" strokeWidth={2} vectorEffect="non-scaling-stroke" />
-            <text y={-10} textAnchor="middle" fontSize={10} fontWeight={700} fill="#ff9b1a"
+            <circle r={4} fill="#000" stroke="#e59a2e" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+            <text y={-8} textAnchor="middle" fontSize={9} fill="#e59a2e"
                   style={{ paintOrder: "stroke", stroke: "#000", strokeWidth: 3 }}>PIT-OUT</text>
           </g>
         )}
