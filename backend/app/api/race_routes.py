@@ -7,6 +7,7 @@ message stream when they have an active session. No manual connect needed.
 import asyncio
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 from app.models.schemas import User
 from app.api.auth_routes import get_current_user, require_active_subscription, require_active_circuit_access
 
@@ -182,9 +183,52 @@ async def get_fifo(request: Request, user: User = Depends(get_current_user)):
     state = _get_user_state(request, user)
     return {
         "queue": state.fifo_queue,
+        "preQueue": state.fifo_pre_queue,
+        "manualMode": state.fifo_manual_mode,
         "score": state.fifo_score,
         "history": state.fifo_history[-10:],
     }
+
+
+class FifoAssignRequest(BaseModel):
+    """Body del POST /api/race/fifo/assign. Llega desde el frontend
+    cuando el estratega suelta un kart de la pre-cola sobre una fila
+    F{N} del Box. `line` es 0-indexed."""
+    kart_number: int
+    line: int
+
+
+@router.post("/fifo/assign")
+async def fifo_assign(
+    payload: FifoAssignRequest,
+    request: Request,
+    user: User = Depends(get_current_user),
+):
+    """Asignación manual de un kart en pre-cola a un carril concreto.
+
+    Errores controlados:
+      - 404: usuario sin UserSession activa (no está monitorizando)
+      - 409 (manual_off): el modo manual no está activo
+      - 409 (gone): el kart ya no está en pre-cola (race condition
+        multi-cliente o pit-out antes del deadline)
+
+    Tras la asignación, broadcast inmediato del nuevo estado fifo
+    a todos los clientes WS del usuario para que el resto de tabs
+    abiertas (web + iPad) vean la fila actualizada.
+    """
+    registry = request.app.state.registry
+    user_session = registry.get(user.id)
+    if not user_session:
+        raise HTTPException(404, "No active session")
+    if not user_session.fifo.manual_mode:
+        raise HTTPException(409, detail={"code": "manual_off", "msg": "Manual mode not active"})
+    ok = user_session.fifo.assign_manually(payload.kart_number, payload.line)
+    if not ok:
+        raise HTTPException(409, detail={"code": "gone", "msg": "Kart not in pre-queue or invalid line"})
+    # Reflejar al state + broadcast a todos los clientes WS del user.
+    user_session.fifo.apply_to_state(user_session.state)
+    await user_session._broadcast_fifo()
+    return {"ok": True}
 
 
 @router.get("/status")
