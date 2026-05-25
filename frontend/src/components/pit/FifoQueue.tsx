@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { DndContext } from "@dnd-kit/core";
 import { useRaceStore } from "@/hooks/useRaceState";
 import { useRaceClock } from "@/hooks/useRaceClock";
 import { useSimNow } from "@/hooks/useSimNow";
@@ -10,6 +11,11 @@ import { api } from "@/lib/api";
 import type { FifoEntry } from "@/types/race";
 import clsx from "clsx";
 import { useT } from "@/lib/i18n";
+import {
+  DroppableLane,
+  ManualPreQueueStrip,
+  useManualBoxDnD,
+} from "./ManualBoxDnD";
 // RainToggle moved to the global StatusBar (icon button).
 
 export function FifoQueue() {
@@ -243,12 +249,22 @@ export function FifoQueue() {
     boxScore >= 25 ? "bg-orange-500" :
     "bg-red-500";
 
+  // Modo manual: sensores + handler de drag-end + estado de error.
+  // El strip y las dropzones (DroppableLane envolviendo cada fila)
+  // solo se activan visualmente cuando `fifo.manualMode === true`;
+  // en auto el DndContext queda pasivo (zero coste de runtime).
+  const { sensors, handleDragEnd, assignError } = useManualBoxDnD(boxLines);
+
   return (
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
     <div className="race-layout flex flex-col h-full">
       {/* The strategy-metrics card bar (formerly duplicated here) is
           now the shared <MetricCardsBar/> rendered by the dashboard
           shell so it persists across Carrera / Box / Live / Tracking /
           Clasificación. Box body only below. */}
+
+      {/* ── Pre-cola del modo manual (no-op si manualMode=false) ── */}
+      <ManualPreQueueStrip assignError={assignError} />
 
       {/* ── Box score + FIFO queue rows ── */}
       <div className="flex gap-2 sm:gap-3 mt-2" data-tour="box-lanes">
@@ -271,7 +287,8 @@ export function FifoQueue() {
         <div className="flex-1 bg-surface rounded-xl border border-border p-2 sm:p-3">
           <div className="space-y-2 sm:space-y-3">
             {rows.map((row, rowIdx) => (
-              <div key={rowIdx} className="flex items-center gap-1.5 sm:gap-2">
+              <DroppableLane key={rowIdx} lineIdx={rowIdx} enabled={fifo.manualMode}>
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 {/* Checkered flag */}
                 <div className="flex-shrink-0 w-6 sm:w-8 text-center text-base sm:text-xl">🏁</div>
 
@@ -375,6 +392,7 @@ export function FifoQueue() {
                   <span className="text-red-400 text-xs sm:text-sm">&larr;</span>
                 </div>
               </div>
+              </DroppableLane>
             ))}
           </div>
         </div>
@@ -542,6 +560,7 @@ export function FifoQueue() {
         </div>
       )}
     </div>
+    </DndContext>
   );
 }
 
