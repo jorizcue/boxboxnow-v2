@@ -24,6 +24,7 @@ import "leaflet/dist/leaflet.css";
 import type { KartState, TrackConfig } from "@/types/race";
 import { pointAtDistance } from "@/lib/polyline";
 import { computeKartProgressM, isKartInPit, computePitGhostProgressM } from "@/lib/kartPosition";
+import { useRaceStore } from "@/hooks/useRaceState";
 import { KartPopup } from "./KartPopup";
 
 // Tier color resolver — mirrors `lib/formatters.ts::tierColorClass`
@@ -62,6 +63,10 @@ interface Props {
    *  para el viewport rotado y mantiene los markers en sus
    *  coordenadas geográficas correctas. */
   rotation?: number;
+  /** ID del circuito activo. Se usa como "etiqueta" del zoom/center
+   *  guardados en el store — al cambiar de circuito el view anterior
+   *  pierde validez y volvemos a `fitBounds` automáticamente. */
+  circuitId?: number | null;
 }
 
 export function TrackMap({
@@ -74,8 +79,14 @@ export function TrackMap({
   direction,
   pitTimeS,
   rotation = 0,
+  circuitId,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  // Vista persistida (zoom + center) entre cambios de pestaña.
+  // Lecturas reactivas para restaurar al init; setter para volcar
+  // los cambios del usuario (pan/zoom) al store.
+  const savedView = useRaceStore((s) => s.trackingView);
+  const setTrackingZoomCenter = useRaceStore((s) => s.setTrackingZoomCenter);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -155,17 +166,59 @@ export function TrackMap({
       },
     ).addTo(map);
 
-    // Fit camera to the polyline bounds with a small padding.
-    const bounds = L.latLngBounds(polyline.map((p) => L.latLng(p[0], p[1])));
-    map.fitBounds(bounds, { padding: [30, 30] });
+    // Restaurar zoom/center guardados si corresponden al circuito
+    // actual; si no, fit-to-bounds como antes. Esto se evalúa SOLO
+    // en el init del mapa (un solo disparo del effect) — los cambios
+    // posteriores los gestionan los listeners de moveend/zoomend.
+    const haveSavedView =
+      circuitId != null &&
+      savedView.circuitId === circuitId &&
+      savedView.zoom != null &&
+      savedView.centerLat != null &&
+      savedView.centerLng != null;
+    if (haveSavedView) {
+      map.setView(
+        [savedView.centerLat as number, savedView.centerLng as number],
+        savedView.zoom as number,
+        { animate: false },
+      );
+    } else {
+      const bounds = L.latLngBounds(polyline.map((p) => L.latLng(p[0], p[1])));
+      map.fitBounds(bounds, { padding: [30, 30] });
+    }
+
+    // Persistir cualquier cambio de pan/zoom al store. Filtramos
+    // moveend que no son de usuario (e.g., el `setView` inicial)
+    // mirando si el mapa ya está completamente inicializado vía un
+    // flag local. El primer fitBounds dispara un `moveend` que NO
+    // queremos persistir como "vista del usuario" — solo después
+    // del primer load es interacción genuina.
+    let mapReady = false;
+    const saveCurrentView = () => {
+      if (!mapReady || circuitId == null) return;
+      const c = map.getCenter();
+      setTrackingZoomCenter(map.getZoom(), c.lat, c.lng, circuitId);
+    };
+    map.whenReady(() => { mapReady = true; });
+    map.on("moveend", saveCurrentView);
+    map.on("zoomend", saveCurrentView);
 
     return () => {
+      map.off("moveend", saveCurrentView);
+      map.off("zoomend", saveCurrentView);
       map.remove();
       mapRef.current = null;
       layerRefs.current = { markers: new Map(), polyline: null, pitLane: null, sectors: [] };
       ghostLabelRef.current = null;
     };
-  }, [L, trackConfig.trackPolyline]);
+    // `savedView` y `setTrackingZoomCenter` quedan fuera de deps a
+    // propósito: este effect solo debe correr UNA VEZ al montar el
+    // mapa (per polyline change). Si `savedView` entrara en deps, la
+    // re-creación del mapa cada vez que el usuario hace pan rompería
+    // todo. La función `saveCurrentView` lee siempre el valor más
+    // reciente de circuitId via closure — suficiente.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [L, trackConfig.trackPolyline, circuitId]);
 
   // Aplica `rotation` (deg, CW desde norte) cada vez que cambia el
   // slider del top bar. `setBearing` es el método añadido por el

@@ -89,6 +89,42 @@ interface RaceStore {
    * Called from the WS hook after `applyUpdates` so per-kart sector
    * mutations and field-best refresh land in the same render. */
   applySectorMetaUpdate: (hasSectors: boolean, meta: SectorMeta | null, metaCurrent: SectorMeta | null) => void;
+
+  /** Estado de visualización del mapa en la pestaña Tracking.
+   *  Vive en el store (memoria) para sobrevivir a desmontes cuando
+   *  el usuario navega entre módulos (Carrera ↔ Box ↔ Tracking…).
+   *  En refresh de página se reset-ea — coherente con el ciclo de
+   *  vida del store de zustand (no se persiste a localStorage).
+   *
+   *  Cada vista está "etiquetada" con `circuitId`: al cambiar de
+   *  circuito el view se reset-ea automáticamente porque las
+   *  coords + zoom del previo no aplican al nuevo.
+   *
+   *    rotation  — grados (CW desde norte), tanto Leaflet (vía
+   *                plugin leaflet-rotate) como SVG (vía transform).
+   *    zoom      — zoom-level de Leaflet (entero, ~12..19). null
+   *                cuando no hay vista guardada — el mapa hace
+   *                fitBounds inicial.
+   *    centerLat/Lng — centro del mapa para `map.setView()`.
+   *                Mismas semánticas que zoom (null → fitBounds).
+   *
+   *  SVG renderer ignora zoom/center (no tiene pan/zoom — siempre
+   *  fit-to-viewBox); solo lee rotation. */
+  trackingView: {
+    rotation: number;
+    zoom: number | null;
+    centerLat: number | null;
+    centerLng: number | null;
+    circuitId: number | null;
+  };
+  setTrackingRotation: (rotation: number) => void;
+  /** Llamado desde TrackMap en `moveend` / `zoomend` para persistir
+   *  la nueva vista. circuitId va con el view para que un cambio de
+   *  circuito invalide el view anterior. */
+  setTrackingZoomCenter: (zoom: number, centerLat: number, centerLng: number, circuitId: number) => void;
+  /** Reset explícito — usado por TrackingTab cuando detecta cambio
+   *  de circuito (el view almacenado ya no corresponde). */
+  resetTrackingView: () => void;
 }
 
 const defaultFifo: FifoState = { queue: [], score: 0, history: [] };
@@ -155,6 +191,22 @@ export const useRaceStore = create<RaceStore>((set) => ({
   apexConnected: false,
   apexStatusMsg: "",
   setApexStatus: (connected, msg) => set({ apexConnected: connected, apexStatusMsg: msg }),
+
+  trackingView: {
+    rotation: 0,
+    zoom: null,
+    centerLat: null,
+    centerLng: null,
+    circuitId: null,
+  },
+  setTrackingRotation: (rotation) =>
+    set((s) => ({ trackingView: { ...s.trackingView, rotation } })),
+  setTrackingZoomCenter: (zoom, centerLat, centerLng, circuitId) =>
+    set((s) => ({
+      trackingView: { ...s.trackingView, zoom, centerLat, centerLng, circuitId },
+    })),
+  resetTrackingView: () =>
+    set({ trackingView: { rotation: 0, zoom: null, centerLat: null, centerLng: null, circuitId: null } }),
 
   replayActive: false,
   replayPaused: false,

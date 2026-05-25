@@ -70,12 +70,15 @@ export function TrackingTab() {
   // operator's choice survives reloads. Default is "svg" because we
   // expect it to be visibly smoother once we validate it.
   const [renderer, setRenderer] = useState<RendererPref>("svg");
-  // Map rotation (deg, -180..180). Vive aquí (no en los renderers)
-  // para que cambiar de Leaflet ↔ SVG preserve la orientación que el
-  // estratega ya tenía elegida. Leaflet usa el plugin leaflet-rotate
-  // (parchea L.Map con `setBearing`); SVG aplica un `<g transform>`
-  // sobre el viewBox. Ambos respetan el mismo prop.
-  const [rotation, setRotation] = useState(0);
+  // Map rotation (deg, -180..180). Vive en el zustand store
+  // (`trackingView.rotation`) para que sobreviva al desmontaje
+  // cuando el operador navega a otra pestaña (Carrera, Box, …) y
+  // vuelve. Se reset-ea automáticamente cuando cambia el circuito
+  // o cuando se refresca la página (el store es in-memory). Leaflet
+  // usa el plugin leaflet-rotate (parchea L.Map con `setBearing`);
+  // SVG aplica un `<g transform>` sobre el viewBox.
+  const rotation = useRaceStore((s) => s.trackingView.rotation);
+  const setRotation = useRaceStore((s) => s.setTrackingRotation);
   useEffect(() => {
     try {
       const stored = localStorage.getItem(RENDERER_PREF_KEY);
@@ -139,6 +142,18 @@ export function TrackingTab() {
   useEffect(() => {
     setDirectionOverride(null);
   }, [circuitId]);
+
+  // El view persistido (rotation + zoom + center) lleva su `circuitId`
+  // dentro: cuando el operador cambia de circuito invalidamos el view
+  // anterior y volvemos a 0 / fitBounds. Sin esto, el zoom/center de
+  // un circuito previo se aplicaría al nuevo en la primera carga.
+  const resetTrackingView = useRaceStore((s) => s.resetTrackingView);
+  const storedViewCircuit = useRaceStore((s) => s.trackingView.circuitId);
+  useEffect(() => {
+    if (circuitId != null && storedViewCircuit != null && storedViewCircuit !== circuitId) {
+      resetTrackingView();
+    }
+  }, [circuitId, storedViewCircuit, resetTrackingView]);
 
   // Sort karts by progress on track (descending = leading kart first).
   // Resolved client-side in OnTrackPanel since it needs the same
@@ -288,6 +303,7 @@ export function TrackingTab() {
               direction={direction}
               pitTimeS={config.pitTimeS}
               rotation={rotation}
+              circuitId={circuitId}
             />
           )}
           {/* Legend */}
