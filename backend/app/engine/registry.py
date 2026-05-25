@@ -411,6 +411,16 @@ class UserSession:
         # asignación que ya no va a llegar.
         if prev_manual and not self.fifo.manual_mode:
             self.fifo.flush_pending()
+        # Sincronizar el flag al state INMEDIATAMENTE para que el
+        # `broadcast_snapshot()` que dispara `config_routes` justo
+        # después de `configure()` vea el `manual_mode` nuevo. Si no
+        # hacemos esto, el snapshot lleva el valor stale (False) y el
+        # frontend nunca pinta el strip amarillo hasta el siguiente
+        # tick del analytics_loop (~30 s) o el próximo pit-in. Mismo
+        # razonamiento para `pre_queue` aunque en este punto está
+        # vacía: mantener `state` y `fifo` siempre alineados tras
+        # configurar.
+        self.fifo.apply_to_state(self.state)
 
     def set_php_api(self, php_api_url: str, php_api_port: int):
         """Configure the PHP API client for driver loading.
@@ -1075,6 +1085,13 @@ class ReplaySession:
             # manual → auto: drenar pre-cola
             self.fifo.flush_pending()
         self.fifo.manual_mode = desired
+        # Sync inmediato al state — los callers `apply_config` y
+        # `update_config_fields` no broadcastean explícitamente, pero
+        # `set_speed` sí lo hace (su propio `_broadcast_fifo` lee del
+        # state). Mantener `state.fifo_manual_mode` siempre alineado
+        # con `fifo.manual_mode` evita que un snapshot intermedio
+        # lleve el valor stale.
+        self.fifo.apply_to_state(self.state)
         return True
 
     async def set_speed(self, speed: float) -> None:
