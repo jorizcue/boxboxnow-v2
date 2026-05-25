@@ -118,6 +118,18 @@ export function OnTrackPanel({
 }: Props) {
   const t = useT();
 
+  // Refs para el scroll interno: `listRef` es el contenedor scrollable
+  // y `myRowRef` apunta al botón de NUESTRO kart, que centramos la
+  // primera vez que aparece (y cada vez que cambia el our_kart_number
+  // en la config). `centeredForKartRef` evita re-centrar en cada
+  // tick del countdown — si la posición de nuestro kart en la
+  // tabla cambia (subimos o bajamos en clasificación) NO forzamos
+  // re-scroll, porque eso robaría la posición de scroll si el
+  // estratega ha bajado a mirar otro kart.
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const myRowRef = useRef<HTMLButtonElement | null>(null);
+  const centeredForKartRef = useRef<number | null>(null);
+
   // META-crossing highlight: each time a kart's
   // `lastLapCompleteCountdownMs` changes (new lap closed) we flash the
   // corresponding row for ~1.5 s. The previous value is kept in a ref
@@ -187,12 +199,40 @@ export function OnTrackPanel({
       });
   }, [karts, trackConfig, countdownMs, direction]);
 
+  // Centrar la lista en NUESTRO kart la primera vez que aparece (y
+  // cada vez que el operador cambia su kart en config). Sin esto,
+  // con grids de 30+ karts el panel scrolea como bloque vertical y
+  // nuestro kart suele quedar fuera del viewport del lado del mapa.
+  // Solo re-centramos en cambio de `myKartNumber` (no en cada tick)
+  // para no robar la posición del scroll cuando el estratega ha
+  // bajado manualmente a inspeccionar otro kart.
+  const hasMyKart = useMemo(
+    () => karts.some((k) => k.kartNumber === myKartNumber),
+    [karts, myKartNumber],
+  );
+  useEffect(() => {
+    if (!hasMyKart || !myRowRef.current || !listRef.current) return;
+    if (centeredForKartRef.current === myKartNumber) return;
+    // `scrollIntoView` scrolea el ancestor scrollable más cercano,
+    // que es `listRef.current` gracias al `overflow-y-auto` del
+    // contenedor. `block: "center"` posiciona el botón en el
+    // centro vertical del viewport del scroll.
+    myRowRef.current.scrollIntoView({ block: "center", behavior: "auto" });
+    centeredForKartRef.current = myKartNumber;
+  }, [hasMyKart, myKartNumber]);
+
   return (
-    <aside className="bg-surface border border-border rounded-xl p-3">
-      <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-2 px-1">
+    // El aside se estira a la altura del mapa por defecto (grid
+    // items-stretch). Con `flex flex-col` + `min-h-0` el div interno
+    // puede tener su propio scroll sin empujar al aside más alto que
+    // el mapa. Sin estas dos clases, con 30+ karts la lista crecía
+    // verticalmente arrastrando al grid entero y los paneles de Box
+    // quedaban muy abajo en la pantalla.
+    <aside className="bg-surface border border-border rounded-xl p-3 flex flex-col min-h-0">
+      <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-2 px-1 shrink-0">
         {t("tracking.panel.title")}
       </h3>
-      <div className="space-y-0">
+      <div ref={listRef} className="space-y-0 overflow-y-auto flex-1 min-h-0 pr-1 -mr-1">
         {rows.map(({ kart, inPit, sector, lapPct, currentLapMs }) => {
           const isMine = kart.kartNumber === myKartNumber;
           const isSelected = kart.kartNumber === selectedKart;
@@ -206,6 +246,7 @@ export function OnTrackPanel({
           return (
             <button
               key={kart.kartNumber}
+              ref={isMine ? myRowRef : undefined}
               onClick={() => onSelectKart(isSelected ? null : kart.kartNumber)}
               className={`w-full text-left flex items-center gap-2 px-1.5 py-1.5 rounded-lg transition-colors border-b border-border/40 last:border-0 ${
                 isMine
