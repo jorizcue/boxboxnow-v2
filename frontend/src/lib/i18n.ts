@@ -820,6 +820,7 @@ const translations: Record<string, Record<Language, string>> = {
   "tracking.legend.tier": { es: "Tier:", en: "Tier:", it: "Tier:", de: "Tier:", fr: "Tier:" },
   "tracking.legend.mine": { es: "Mi kart", en: "My kart", it: "Il mio kart", de: "Mein Kart", fr: "Mon kart" },
   "tracking.panel.title": { es: "Orden en pista", en: "Order on track", it: "Ordine in pista", de: "Reihenfolge auf der Strecke", fr: "Ordre sur la piste" },
+  "tracking.panel.recenter": { es: "Centrar mi kart", en: "Center my kart", it: "Centra il mio kart", de: "Mein Kart zentrieren", fr: "Centrer mon kart" },
   "tracking.rotate": { es: "Girar", en: "Rotate", it: "Ruota", de: "Drehen", fr: "Pivoter" },
   "tracking.panel.inPit": { es: "EN PIT", en: "IN PIT", it: "IN PIT", de: "IN BOX", fr: "AU STAND" },
   "tracking.popup.driver": { es: "PILOTO", en: "DRIVER", it: "PILOTA", de: "FAHRER", fr: "PILOTE" },

@@ -12,7 +12,7 @@
  *
  * Clicking a row selects the kart in the map (opens its popup).
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import type { KartState, TrackConfig } from "@/types/race";
 import { computeKartProgressM, isKartInPit } from "@/lib/kartPosition";
@@ -221,6 +221,16 @@ export function OnTrackPanel({
     centeredForKartRef.current = myKartNumber;
   }, [hasMyKart, myKartNumber]);
 
+  // Botón "centrar mi kart" en la cabecera del panel: re-centra a
+  // demanda cuando el estratega ha bajado a inspeccionar otro kart
+  // y quiere volver a ver el suyo. Usa `behavior: "smooth"` (en lugar
+  // del "auto" del effect inicial) para que la animación se sienta
+  // como una acción explícita en lugar de un salto.
+  const recenterMyKart = useCallback(() => {
+    if (!myRowRef.current) return;
+    myRowRef.current.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, []);
+
   return (
     // El aside se estira a la altura del mapa por defecto (grid
     // items-stretch). Con `flex flex-col` + `min-h-0` el div interno
@@ -229,9 +239,27 @@ export function OnTrackPanel({
     // verticalmente arrastrando al grid entero y los paneles de Box
     // quedaban muy abajo en la pantalla.
     <aside className="bg-surface border border-border rounded-xl p-3 flex flex-col min-h-0">
-      <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-2 px-1 shrink-0">
-        {t("tracking.panel.title")}
-      </h3>
+      <div className="flex items-center justify-between gap-2 mb-2 px-1 shrink-0">
+        <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">
+          {t("tracking.panel.title")}
+        </h3>
+        {/* "Centrar mi kart" — solo se muestra cuando nuestro kart
+            está en la lista. Útil cuando el estratega ha scroleado
+            para ver otro kart y quiere volver al suyo sin tener
+            que buscar en la lista. El icono (⊙) está inspirado en
+            el "center on me" de mapas tipo Google Maps. */}
+        {hasMyKart && (
+          <button
+            type="button"
+            onClick={recenterMyKart}
+            title={t("tracking.panel.recenter")}
+            aria-label={t("tracking.panel.recenter")}
+            className="text-accent hover:text-accent-hover text-sm leading-none px-1 py-0.5 rounded transition-colors"
+          >
+            ⊙
+          </button>
+        )}
+      </div>
       <div ref={listRef} className="space-y-0 overflow-y-auto flex-1 min-h-0 pr-1 -mr-1">
         {rows.map(({ kart, inPit, sector, lapPct, currentLapMs }) => {
           const isMine = kart.kartNumber === myKartNumber;
