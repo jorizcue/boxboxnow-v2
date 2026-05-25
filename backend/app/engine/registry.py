@@ -728,6 +728,12 @@ class ReplaySession:
         self._analytics_task: asyncio.Task | None = None
 
         self._init_teams_loaded = False  # Track if we already auto-loaded teams
+        # "Intención" del operador sobre el modo manual. Se captura
+        # desde la BD en `apply_config` / `update_config_fields`. El
+        # flag efectivo en `self.fifo.manual_mode` lo deriva
+        # `_sync_manual_mode` combinando esto con la velocidad del
+        # replay (solo a 1x se activa).
+        self._manual_mode_requested = False
 
         from app.apex.replay import ReplayEngine
 
@@ -1002,6 +1008,13 @@ class ReplaySession:
         self.state.rain_mode = _val(getattr(session, 'rain', False), False)
         self.state.pit_closed_start_min = _val(getattr(session, 'pit_closed_start_min', 0), 0)
         self.state.pit_closed_end_min = _val(getattr(session, 'pit_closed_end_min', 0), 0)
+        # Modo box manual: capturamos la intención del usuario y la
+        # combinamos con la velocidad del replay. Solo activa el flow
+        # manual a velocidad EXACTAMENTE 1x; en >1x el timer de 15 s
+        # real no se corresponde con tiempo de carrera. Ver
+        # `_sync_manual_mode` para la regla.
+        self._manual_mode_requested = bool(getattr(session, 'box_manual_mode', False))
+        self._sync_manual_mode()
         if circuit:
             self.state.circuit_length_m = _val(circuit.length_m, 1100)
             self.state.laps_discard = _val(circuit.laps_discard, 2)
@@ -1023,11 +1036,61 @@ class ReplaySession:
         self.state.rain_mode = getattr(session, 'rain', False) or False
         self.state.pit_closed_start_min = getattr(session, 'pit_closed_start_min', 0) or 0
         self.state.pit_closed_end_min = getattr(session, 'pit_closed_end_min', 0) or 0
+        # Captura el toggle del operador y re-evalúa contra la
+        # velocidad actual (ver `_sync_manual_mode`).
+        self._manual_mode_requested = bool(getattr(session, 'box_manual_mode', False))
+        self._sync_manual_mode()
         if circuit:
             self.state.circuit_length_m = circuit.length_m or self.state.circuit_length_m
         if (self.fifo.queue_size != session.box_karts
                 or self.fifo.box_lines != session.box_lines):
             self.fifo.update_config(session.box_karts, session.box_lines)
+
+    def _sync_manual_mode(self) -> bool:
+        """Reconcilia `fifo.manual_mode` con la intención del usuario
+        (`_manual_mode_requested`) y la velocidad actual del replay.
+
+        Regla: el flow manual SOLO está activo a velocidad 1x exacta.
+        A otras velocidades el timer real de 15 s se descorrelaciona
+        del tiempo de carrera (a 10x los 15 s reales son 150 s de
+        carrera; a 0.5x son solo 7.5 s) y la frecuencia de pit-ins
+        comprimidos hace inviable la decisión humana.
+
+        Transiciones que gestiona:
+          - auto → manual (se baja a 1x con toggle on): solo setea
+            el flag; las próximas pit-ins irán a la pre-cola.
+          - manual → auto (se sube de 1x, o se apaga el toggle):
+            `flush_pending()` drena la pre-cola a auto para que no
+            queden karts colgados esperando una asignación que ya
+            no podrán recibir.
+
+        Devuelve True si hubo transición (para que el caller pueda
+        decidir si vale la pena broadcastear el cambio).
+        """
+        engine_speed = getattr(self.engine, '_speed', 1.0) if hasattr(self, 'engine') else 1.0
+        desired = bool(getattr(self, '_manual_mode_requested', False)) and engine_speed == 1.0
+        if desired == self.fifo.manual_mode:
+            return False
+        if not desired and self.fifo.manual_mode:
+            # manual → auto: drenar pre-cola
+            self.fifo.flush_pending()
+        self.fifo.manual_mode = desired
+        return True
+
+    async def set_speed(self, speed: float) -> None:
+        """Cambia la velocidad del replay y reconcilia manual_mode.
+
+        Wrapper sobre `engine.set_speed` para que cualquier transición
+        a/desde 1x dispare la re-evaluación + broadcast del nuevo
+        estado fifo. El endpoint `/api/replay/speed` llama a este
+        método en lugar de directamente al engine.
+        """
+        await self.engine.set_speed(speed)
+        if self._sync_manual_mode():
+            # Refleja al state + broadcast para que el frontend
+            # quite/muestre el strip de pre-cola inmediatamente.
+            self.fifo.apply_to_state(self.state)
+            await self._broadcast_fifo()
 
     async def _broadcast_fifo(self):
         if not self.state._ws_clients:

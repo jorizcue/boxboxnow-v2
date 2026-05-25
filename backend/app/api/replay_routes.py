@@ -632,10 +632,17 @@ async def set_speed(
     request: Request,
     user: User = Depends(get_current_user),
 ):
-    """Set replay speed."""
+    """Set replay speed.
+
+    Llamamos al wrapper `ReplaySession.set_speed` (no directo al
+    engine) para que también reconcilie `fifo.manual_mode` con la
+    nueva velocidad: si subes de 1x con modo manual activo se
+    drena la pre-cola a auto y se broadcastea el cambio; al volver
+    a 1x con el toggle on se re-activa el modo manual.
+    """
     replay_reg = _get_replay_registry(request)
     replay_session = replay_reg.get(user.id)
     if not replay_session:
         raise HTTPException(400, "No active replay")
-    await replay_session.engine.set_speed(data.speed)
+    await replay_session.set_speed(data.speed)
     return {"speed": replay_session.engine._speed}
