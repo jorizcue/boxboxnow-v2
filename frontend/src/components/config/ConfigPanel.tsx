@@ -28,6 +28,7 @@ interface RaceSession {
   min_driver_time_min: number;
   max_driver_time_min: number;
   team_drivers_count: number;
+  box_manual_mode: boolean;
   rain: boolean;
   pit_closed_start_min: number;
   pit_closed_end_min: number;
@@ -51,6 +52,7 @@ interface ConfigValues {
   minDriverTime: number;
   maxDriverTime: number;
   teamDriversCount: number;
+  boxManualMode: boolean;
   rain: boolean;
   pitClosedStart: number;
   pitClosedEnd: number;
@@ -96,6 +98,9 @@ function RaceSessionEditor() {
   // change has happened. Setting it up-front to the real roster size
   // makes the gate enforce the constraint from lap 1.
   const [teamDriversCount, setTeamDriversCount] = useState(0);
+  // Modo box manual (drag&drop con fallback auto en 15 s). Solo
+  // afecta a sesiones live — el backend lo ignora en replay.
+  const [boxManualMode, setBoxManualMode] = useState(false);
   const [rain, setRain] = useState(false);
   const [pitClosedStart, setPitClosedStart] = useState(0);
   const [pitClosedEnd, setPitClosedEnd] = useState(0);
@@ -158,6 +163,7 @@ function RaceSessionEditor() {
     setMinDriverTime(s.min_driver_time_min);
     setMaxDriverTime(s.max_driver_time_min ?? 0);
     setTeamDriversCount(s.team_drivers_count ?? 0);
+    setBoxManualMode(!!s.box_manual_mode);
     setRain(s.rain);
     setPitClosedStart(s.pit_closed_start_min ?? 0);
     setPitClosedEnd(s.pit_closed_end_min ?? 0);
@@ -199,6 +205,7 @@ function RaceSessionEditor() {
       min_driver_time_min: v.minDriverTime,
       max_driver_time_min: v.maxDriverTime,
       team_drivers_count: v.teamDriversCount,
+      box_manual_mode: v.boxManualMode,
       rain: v.rain,
       pit_closed_start_min: v.pitClosedStart,
       pit_closed_end_min: v.pitClosedEnd,
@@ -237,6 +244,7 @@ function RaceSessionEditor() {
         minDriverTimeMin: v.minDriverTime,
         maxDriverTimeMin: v.maxDriverTime,
         teamDriversCount: v.teamDriversCount,
+        boxManualMode: v.boxManualMode,
         pitClosedStartMin: v.pitClosedStart,
         pitClosedEndMin: v.pitClosedEnd,
         rain: v.rain,
@@ -267,6 +275,7 @@ function RaceSessionEditor() {
     minDriverTime,
     maxDriverTime,
     teamDriversCount,
+    boxManualMode,
     rain,
     pitClosedStart,
     pitClosedEnd,
@@ -390,6 +399,26 @@ function RaceSessionEditor() {
           <ConfigCard label={t("config.pitTime")} value={pitTime} onChange={setPitTime} />
           <ConfigCard label={t("config.pitClosedStart")} value={pitClosedStart} onChange={setPitClosedStart} />
           <ConfigCard label={t("config.pitClosedEnd")} value={pitClosedEnd} onChange={setPitClosedEnd} />
+          {/* Modo box manual: ocupa una "celda" del grid completa
+              porque es un toggle, no un número. La descripción
+              recuerda al operador que esto solo aplica en live —
+              durante un replay el backend siempre fuerza auto.  */}
+          <label className="bg-card border border-border rounded-lg p-2.5 flex flex-col gap-1 cursor-pointer hover:border-accent/40 transition-colors col-span-2 sm:col-span-1">
+            <span className="text-[10px] uppercase tracking-wider font-bold text-neutral-400">
+              {t("config.boxManualMode")}
+            </span>
+            <div className="flex items-center justify-between gap-2">
+              <input
+                type="checkbox"
+                checked={boxManualMode}
+                onChange={(e) => setBoxManualMode(e.target.checked)}
+                className="w-4 h-4 accent-accent cursor-pointer"
+              />
+              <span className="text-[9px] text-neutral-500 leading-tight text-right">
+                {t("config.boxManualModeHint")}
+              </span>
+            </div>
+          </label>
         </ConfigSection>
 
         <ConfigSection title={t("config.sectionStints")}>
