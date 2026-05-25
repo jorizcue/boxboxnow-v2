@@ -661,6 +661,16 @@ class UserSession:
                                 )],
                                 "fifo": {
                                     "queue": self.state.fifo_queue,
+                                    # `preQueue` y `manualMode` deben viajar en
+                                    # CADA frame de analytics — el frontend
+                                    # trata el bloque `fifo` como reemplazo
+                                    # total, así que omitirlos los borra del
+                                    # store cada ~10-30 s. Bug observado:
+                                    # tras guardar config con box_manual_mode,
+                                    # el strip aparecía 1 vez (snapshot) y
+                                    # desaparecía al primer tick de analytics.
+                                    "preQueue": self.state.fifo_pre_queue,
+                                    "manualMode": self.state.fifo_manual_mode,
                                     "score": self.state.fifo_score,
                                     "history": self.state.fifo_history[-10:],
                                 },
@@ -1161,6 +1171,14 @@ class ReplaySession:
                                 )],
                                 "fifo": {
                                     "queue": self.state.fifo_queue,
+                                    # Mismo bug-fix que en UserSession: el
+                                    # frontend trata el bloque `fifo` del
+                                    # analytics como reemplazo, así que
+                                    # `preQueue`/`manualMode` deben viajar
+                                    # también aquí — relevante cuando el
+                                    # replay está en 1x con manual_mode on.
+                                    "preQueue": self.state.fifo_pre_queue,
+                                    "manualMode": self.state.fifo_manual_mode,
                                     "score": self.state.fifo_score,
                                     "history": self.state.fifo_history[-10:],
                                 },

@@ -453,9 +453,29 @@ export const useRaceStore = create<RaceStore>((set) => ({
 
   applyAnalytics: (data) =>
     set((state) => {
+      // Merge defensivo del fifo (mismo razonamiento que en
+      // `applyFifoUpdate`): el broadcast de analytics PUEDE no
+      // traer `preQueue` o `manualMode` si el backend está en una
+      // versión vieja, o si por alguna razón se omiten. Sin este
+      // merge el strip del modo manual desaparecía al primer tick
+      // de analytics (~10-30s) tras guardar config con
+      // box_manual_mode=true, porque `data.fifo || defaultFifo`
+      // pisaba con un objeto sin esos campos.
+      const incomingFifo = data.fifo;
+      const mergedFifo = incomingFifo
+        ? {
+            queue: incomingFifo.queue ?? [],
+            preQueue:
+              (incomingFifo as any).preQueue ?? state.fifo.preQueue,
+            manualMode:
+              (incomingFifo as any).manualMode ?? state.fifo.manualMode,
+            score: incomingFifo.score ?? 0,
+            history: incomingFifo.history ?? [],
+          }
+        : defaultFifo;
       const out: Partial<RaceStore> = {
         karts: data.karts || [],
-        fifo: data.fifo || defaultFifo,
+        fifo: mergedFifo,
         classification: data.classification || [],
         classificationMeta: data.classificationMeta ?? state.classificationMeta,
         // Merge config if present (allows live config updates without reconnect)
