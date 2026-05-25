@@ -296,6 +296,15 @@ class RaceSession(Base):
     # constraint from lap 1.
     team_drivers_count = Column(Integer, default=0, nullable=False)
 
+    # Box "manual" mode: cada pit-in entra en una pre-cola y el
+    # estratega arrastra el kart a un carril concreto (drag & drop
+    # en `BoxStatusPanel`). Si no hay asignación en 15 s, cae a
+    # round-robin auto. Default False → comportamiento previo.
+    # Aplica SOLO a sesiones en vivo — la `ReplaySession` mantiene
+    # siempre auto (su `FifoManager` nunca lee este flag, lo que
+    # evita timers de 15 s reales durante reproducciones a x10/x100).
+    box_manual_mode = Column(Boolean, default=False, nullable=False)
+
     # State
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())

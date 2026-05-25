@@ -410,6 +410,9 @@ class RaceSessionOut(BaseModel):
     # Number of drivers in the team. 0 = not configured; the pit-gate
     # feasibility check falls back to counting Apex-observed drivers.
     team_drivers_count: int = 0
+    # Box manual mode (drag & drop con fallback a auto en 15 s).
+    # False por default → comportamiento round-robin clásico.
+    box_manual_mode: bool = False
     is_active: bool
     team_positions: list["TeamPositionOut"] = []
 
@@ -435,6 +438,7 @@ class RaceSessionCreate(BaseModel):
     refresh_interval_s: int = 30
     auto_load_teams: bool = False
     team_drivers_count: int = 0
+    box_manual_mode: bool = False
 
 
 class RaceSessionUpdate(BaseModel):
@@ -456,6 +460,7 @@ class RaceSessionUpdate(BaseModel):
     refresh_interval_s: int | None = None
     auto_load_teams: bool | None = None
     team_drivers_count: int | None = None
+    box_manual_mode: bool | None = None
 
 
 # --- User Preferences (driver view config) ---

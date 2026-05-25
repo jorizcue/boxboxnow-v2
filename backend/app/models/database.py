@@ -93,6 +93,16 @@ async def init_db():
         except Exception:
             pass
 
+        # box_manual_mode: toggle por sesión del flow manual de box
+        # (pre-cola + drag & drop con timeout 15 s). False por
+        # default → la matriz de filas F1/F2/... se sigue rellenando
+        # con round-robin auto como hasta ahora. Sesiones antiguas
+        # se quedan en False, sin cambio observable.
+        try:
+            await conn.execute(text("ALTER TABLE race_sessions ADD COLUMN box_manual_mode BOOLEAN DEFAULT 0 NOT NULL"))
+        except Exception:
+            pass
+
         # Recreate live_race_state if it has the old schema (race_session_id column)
         try:
             result = await conn.execute(text("PRAGMA table_info(live_race_state)"))
