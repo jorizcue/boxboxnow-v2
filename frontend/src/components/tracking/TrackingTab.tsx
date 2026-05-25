@@ -256,7 +256,13 @@ export function TrackingTab() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-3">
+      {/* `lg:items-start` evita que el grid estire el aside del lado
+          derecho a la altura del mapa cuando éste es la card más
+          alta (o al revés). El aside lleva su propia altura fija
+          (`lg:h-[504px]`) y scroll interno; sin items-start, el grid
+          forzaría a ambos al mismo alto y la lista del lado derecho
+          empujaba al box hacia abajo en carreras con 30+ karts. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] lg:items-start gap-3">
         {/* Map */}
         <div className="bg-surface border border-border rounded-xl p-3 overflow-hidden">
           {renderer === "svg" ? (

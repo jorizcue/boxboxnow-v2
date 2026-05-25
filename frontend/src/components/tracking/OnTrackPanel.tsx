@@ -232,13 +232,15 @@ export function OnTrackPanel({
   }, []);
 
   return (
-    // El aside se estira a la altura del mapa por defecto (grid
-    // items-stretch). Con `flex flex-col` + `min-h-0` el div interno
-    // puede tener su propio scroll sin empujar al aside más alto que
-    // el mapa. Sin estas dos clases, con 30+ karts la lista crecía
-    // verticalmente arrastrando al grid entero y los paneles de Box
-    // quedaban muy abajo en la pantalla.
-    <aside className="bg-surface border border-border rounded-xl p-3 flex flex-col min-h-0">
+    // Altura FIJA del aside a 504 px en lg+ (= h-[480px] del mapa +
+    // padding del card). Sin esto el grid items-stretch hace que la
+    // row tome la altura del item más alto, y con 30+ karts el aside
+    // crecía hasta ~700 px arrastrando al mapa con él. El parent
+    // grid lleva `lg:items-start` (en TrackingTab) para que el aside
+    // se quede en su altura declarada en vez de estirarse a la row.
+    // En móviles el aside crece a contenido normalmente — la lista
+    // larga es aceptable al ir todo apilado verticalmente.
+    <aside className="bg-surface border border-border rounded-xl p-3 flex flex-col min-h-0 lg:h-[504px]">
       <div className="flex items-center justify-between gap-2 mb-2 px-1 shrink-0">
         <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">
           {t("tracking.panel.title")}
