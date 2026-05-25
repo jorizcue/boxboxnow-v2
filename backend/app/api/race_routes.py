@@ -86,6 +86,7 @@ async def ensure_monitoring(app_state, user_id: int):
         min_driver_time_min=session.min_driver_time_min,
         max_driver_time_min=session.max_driver_time_min or 0,
         team_drivers_count=session.team_drivers_count or 0,
+        box_manual_mode=bool(session.box_manual_mode),
         pit_closed_start_min=session.pit_closed_start_min or 0,
         pit_closed_end_min=session.pit_closed_end_min or 0,
         finish_lat1=circuit.finish_lat1,

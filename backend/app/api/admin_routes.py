@@ -145,6 +145,8 @@ async def pit_gate_debug(
             "min_driver_time_min": getattr(state, "min_driver_time_min", None),
             "max_driver_time_min": getattr(state, "max_driver_time_min", None),
             "team_drivers_count": getattr(state, "team_drivers_count", None),
+            "fifo_manual_mode": getattr(state, "fifo_manual_mode", None),
+            "fifo_pre_queue_size": len(getattr(state, "fifo_pre_queue", []) or []),
             "pit_closed_start_min": getattr(state, "pit_closed_start_min", None),
             "pit_closed_end_min": getattr(state, "pit_closed_end_min", None),
             "our_kart": kart_dump,

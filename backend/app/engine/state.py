@@ -1616,6 +1616,8 @@ class RaceStateManager:
                 "karts": [k.to_dict(max_stint_min=self.max_stint_min) for k in sorted_karts],
                 "fifo": {
                     "queue": self.fifo_queue,
+                    "preQueue": self.fifo_pre_queue,
+                    "manualMode": self.fifo_manual_mode,
                     "score": self.fifo_score,
                     "history": self.fifo_history[-10:],
                 },

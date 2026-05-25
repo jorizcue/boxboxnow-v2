@@ -83,6 +83,14 @@ class UserSession:
                 if (kart.pit_status == "in_pit"
                         and pre_pit_status.get(row_id) != "in_pit"):
                     pit_in_karts.append(kart)
+                # Transición in_pit → racing (pit-out): si el kart
+                # estaba en la pre-cola manual esperando asignación,
+                # quitarlo. Solo es relevante en modo manual (cero
+                # coste en auto porque la pre-cola está vacía).
+                if (pre_pit_status.get(row_id) == "in_pit"
+                        and kart.pit_status == "racing"
+                        and self.fifo.manual_mode):
+                    self.fifo.cancel_pending(kart.kart_number)
 
             if pit_in_karts:
                 # Re-compute clustering BEFORE adding to FIFO so tier_score
@@ -363,7 +371,8 @@ class UserSession:
                   finish_lat1: float | None = None, finish_lon1: float | None = None,
                   finish_lat2: float | None = None, finish_lon2: float | None = None,
                   warmup_laps_to_skip: int = 3,
-                  team_drivers_count: int = 0):
+                  team_drivers_count: int = 0,
+                  box_manual_mode: bool = False):
         """Apply race session config to state and fifo."""
         self.state.circuit_length_m = circuit_length_m or 1100
         self.state.pit_time_s = pit_time_s or 120
@@ -389,6 +398,19 @@ class UserSession:
         self.state.update_duration(duration_min)
         self._refresh_s = refresh_s
         self.fifo.update_config(box_karts, box_lines)
+        # Aplicar el flag de modo manual al fifo. CLAVE: esto SOLO
+        # se hace en UserSession (live). `ReplaySession.apply_config`
+        # y `update_config_fields` NUNCA tocan `self.fifo.manual_mode`,
+        # así que su FifoManager se queda en False forever y los
+        # timers de 15 s reales nunca aparecen durante un replay
+        # acelerado. Cero código de guard runtime necesario.
+        prev_manual = self.fifo.manual_mode
+        self.fifo.manual_mode = bool(box_manual_mode)
+        # Transición manual → auto mid-race: drenar la pre-cola a
+        # auto en vez de dejar karts colgados ahí esperando una
+        # asignación que ya no va a llegar.
+        if prev_manual and not self.fifo.manual_mode:
+            self.fifo.flush_pending()
 
     def set_php_api(self, php_api_url: str, php_api_port: int):
         """Configure the PHP API client for driver loading.
@@ -572,6 +594,13 @@ class UserSession:
             "data": {
                 "fifo": {
                     "queue": self.state.fifo_queue,
+                    # Pre-cola del modo manual + flag. En live con
+                    # manual_mode=False ambas vienen vacías/False
+                    # → cero overhead. En replay (ReplaySession)
+                    # también vacías/False porque NUNCA activa
+                    # manual_mode — replay-safe por construcción.
+                    "preQueue": self.state.fifo_pre_queue,
+                    "manualMode": self.state.fifo_manual_mode,
                     "score": self.state.fifo_score,
                     "history": self.state.fifo_history[-10:],
                 },
@@ -1008,6 +1037,13 @@ class ReplaySession:
             "data": {
                 "fifo": {
                     "queue": self.state.fifo_queue,
+                    # Pre-cola del modo manual + flag. En live con
+                    # manual_mode=False ambas vienen vacías/False
+                    # → cero overhead. En replay (ReplaySession)
+                    # también vacías/False porque NUNCA activa
+                    # manual_mode — replay-safe por construcción.
+                    "preQueue": self.state.fifo_pre_queue,
+                    "manualMode": self.state.fifo_manual_mode,
                     "score": self.state.fifo_score,
                     "history": self.state.fifo_history[-10:],
                 },
