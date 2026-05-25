@@ -82,18 +82,23 @@ export function FifoQueue() {
     const realByLine: FifoEntry[][] = Array.from({ length: boxLines }, () => []);
     const defaults: (FifoEntry | number)[] = [];
 
-    // Separate real pit entries from race-start placeholders. We
-    // intentionally IGNORE the `line` field that the backend stamps
-    // on each entry: it's assigned at pit-in time using the box_lines
-    // value of THAT moment, which becomes stale the instant the
-    // strategist changes box_lines mid-race. The symptom was that
-    // dropping from 2 rows to 1 left every line=1 entry treated as a
-    // "default" (since line >= new boxLines), which then got dumped
-    // to the LEFT of the row before the real entries — losing the
-    // chronological ordering the strategist relies on to decide which
-    // kart is closest to its next pit. Instead, we re-bucket by
-    // chronological position % boxLines so the order is always
-    // consistent with the current box_lines value.
+    // Separate real pit entries from race-start placeholders.
+    //
+    // Asignación de fila: respetamos `entry.line` del backend cuando
+    // está presente Y dentro del rango actual de `box_lines`. Esto es
+    // CRÍTICO en modo manual: si ignoramos `line` y aplicamos
+    // round-robin propio (`idx % boxLines`), el drop del estratega
+    // sobre la fila F2 acaba pintándose donde le toque al RR del
+    // frontend, no donde lo soltó.
+    //
+    // Caso de fallback (`line >= boxLines`): el estratega cambió
+    // `box_lines` mid-race a un valor menor y la entry tiene `line=1`
+    // pero ahora solo hay 1 fila. Si la dejáramos en "defaults" la
+    // empujaría a la izquierda de la fila (rompiendo el orden
+    // cronológico — el bug que motivó el round-robin original).
+    // En su lugar, la rebucketamos por su posición cronológica
+    // (`idx % boxLines`) para que entre en una fila válida sin
+    // perder su sitio respecto a las demás entries reales.
     const realEntries: FifoEntry[] = [];
     for (const entry of queue) {
       const kartNumber = typeof entry === "object" && entry?.kartNumber ? entry.kartNumber : 0;
@@ -104,7 +109,12 @@ export function FifoQueue() {
       }
     }
     realEntries.forEach((entry, idx) => {
-      realByLine[idx % boxLines].push(entry);
+      const declaredLine = typeof entry.line === "number" ? entry.line : -1;
+      const targetLine =
+        declaredLine >= 0 && declaredLine < boxLines
+          ? declaredLine
+          : idx % boxLines;
+      realByLine[targetLine].push(entry);
     });
 
     // Build each row: defaults on the left, real entries on the right

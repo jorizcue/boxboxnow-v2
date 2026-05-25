@@ -88,6 +88,13 @@ export function BoxFifoView() {
     const realByLine: FifoEntry[][] = Array.from({ length: boxLines }, () => []);
     const defaults: (FifoEntry | number)[] = [];
 
+    // Asignación de fila: respetamos `entry.line` del backend cuando
+    // está dentro de rango. Necesario para que el drop del modo
+    // manual aparezca en la fila destino. Si `line >= boxLines` (el
+    // estratega bajó box_lines mid-race) caemos a `idx % boxLines`
+    // como fallback en vez de empujar la entry a "defaults" — ese
+    // path rompe el orden cronológico. Misma lógica que `FifoQueue`
+    // (la pestaña Box principal).
     const realEntries: FifoEntry[] = [];
     for (const entry of queue) {
       const kartNumber = typeof entry === "object" && entry?.kartNumber ? entry.kartNumber : 0;
@@ -98,7 +105,12 @@ export function BoxFifoView() {
       }
     }
     realEntries.forEach((entry, idx) => {
-      realByLine[idx % boxLines].push(entry);
+      const declaredLine = typeof entry.line === "number" ? entry.line : -1;
+      const targetLine =
+        declaredLine >= 0 && declaredLine < boxLines
+          ? declaredLine
+          : idx % boxLines;
+      realByLine[targetLine].push(entry);
     });
 
     for (let r = 0; r < boxLines; r++) {
