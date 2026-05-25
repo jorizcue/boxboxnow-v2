@@ -12,7 +12,7 @@
  *
  * Clicking a row selects the kart in the map (opens its popup).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import type { KartState, TrackConfig } from "@/types/race";
 import { computeKartProgressM, isKartInPit } from "@/lib/kartPosition";
@@ -166,103 +166,134 @@ export function OnTrackPanel({
   }, [karts]);
 
   // Compute progress + race-position for each kart once per render.
-  // `lapPct` is the kart's lap progress 0…100 % from META in race
-  // direction — drives the per-row progress bar.
-  // `currentLapMs` is the time elapsed since the kart last crossed
-  // META (live, ticks at the race-clock cadence).
-  const rows = useMemo(() => {
+  //   `progressM`     — distancia en el polyline (m). null si en pit.
+  //   `raceProgress`  — distancia recorrida desde META en sentido de
+  //                     carrera (0..total). Crece monotónicamente
+  //                     durante una vuelta. null si en pit.
+  //   `lapPct`        — % de vuelta para la barra inferior.
+  //   `currentLapMs`  — tiempo desde el último cruce de META.
+  const allRows = useMemo(() => {
     const total = trackConfig.trackLengthM ?? 0;
-    return karts
-      .map((k) => {
-        const inPit = isKartInPit(k);
-        const progressM = inPit ? null : computeKartProgressM(k, trackConfig, countdownMs, direction);
-        const sector = progressM != null ? sectorProgress(progressM, trackConfig, direction) : null;
-        const raceProgress = progressM != null
-          ? raceProgressFromMeta(progressM, trackConfig, direction)
-          : null;
-        const lapPct = raceProgress != null && total > 0
-          ? Math.min(100, (raceProgress / total) * 100)
-          : 0;
-        const lastLap = k.lastLapCompleteCountdownMs ?? 0;
-        const currentLapMs = lastLap > 0 ? Math.max(0, lastLap - countdownMs) : 0;
-        return { kart: k, inPit, progressM, sector, lapPct, currentLapMs };
-      })
-      .sort((a, b) => {
-        // Strictly the Apex timing-table order: P1 first. Karts without
-        // an Apex position yet (0/undefined — practice, race start) go
-        // to the bottom, tie-broken by kart number so the order is
-        // stable and NEVER biased toward our configured/selected kart.
+    return karts.map((k) => {
+      const inPit = isKartInPit(k);
+      const progressM = inPit ? null : computeKartProgressM(k, trackConfig, countdownMs, direction);
+      const sector = progressM != null ? sectorProgress(progressM, trackConfig, direction) : null;
+      const raceProgress = progressM != null
+        ? raceProgressFromMeta(progressM, trackConfig, direction)
+        : null;
+      const lapPct = raceProgress != null && total > 0
+        ? Math.min(100, (raceProgress / total) * 100)
+        : 0;
+      const lastLap = k.lastLapCompleteCountdownMs ?? 0;
+      const currentLapMs = lastLap > 0 ? Math.max(0, lastLap - countdownMs) : 0;
+      return { kart: k, inPit, progressM, raceProgress, sector, lapPct, currentLapMs };
+    });
+  }, [karts, trackConfig, countdownMs, direction]);
+
+  // ─── Modo "ventana de 9 alrededor de mi kart" ────────────────────
+  //
+  // Sustituye la lista clásica (P1..PN del timing-table) por una
+  // ventana de 4 delante + yo + 4 detrás según el ORDEN FÍSICO EN
+  // PISTA (no la clasificación). Lo que es "delante en pista" se
+  // calcula con `raceProgressFromMeta`: a más recorrido en la
+  // vuelta actual, más cerca de META → físicamente más adelante.
+  //
+  // Reglas (acordadas con el user):
+  //   - Karts en pit se excluyen del orden — no están en pista.
+  //   - Si MI kart está en pit (o no configurado) caemos a la
+  //     lista clásica ordenada por posición Apex con scroll, igual
+  //     que antes. La ventana solo aplica cuando estoy en pista.
+  //   - Wrap-around modulo N: si soy el líder, los "4 delante" son
+  //     los 4 últimos del campo en el polyline (físicamente delante
+  //     de mí si sigo avanzando, aunque estén una vuelta por detrás
+  //     en clasificación).
+  const myRow = useMemo(
+    () => allRows.find((r) => r.kart.kartNumber === myKartNumber),
+    [allRows, myKartNumber],
+  );
+  const useWindow = !!myRow && !myRow.inPit && myRow.raceProgress != null && myKartNumber > 0;
+
+  const { rows, windowMode } = useMemo(() => {
+    if (!useWindow) {
+      // Fallback: lista completa por posición Apex, con scroll.
+      const sortedByPos = [...allRows].sort((a, b) => {
         const pa = a.kart.position && a.kart.position > 0 ? a.kart.position : Infinity;
         const pb = b.kart.position && b.kart.position > 0 ? b.kart.position : Infinity;
         if (pa !== pb) return pa - pb;
         return a.kart.kartNumber - b.kart.kartNumber;
       });
-  }, [karts, trackConfig, countdownMs, direction]);
+      return { rows: sortedByPos, windowMode: false };
+    }
 
-  // Centrar la lista en NUESTRO kart la primera vez que aparece (y
-  // cada vez que el operador cambia su kart en config). Sin esto,
-  // con grids de 30+ karts el panel scrolea como bloque vertical y
-  // nuestro kart suele quedar fuera del viewport del lado del mapa.
-  // Solo re-centramos en cambio de `myKartNumber` (no en cada tick)
-  // para no robar la posición del scroll cuando el estratega ha
-  // bajado manualmente a inspeccionar otro kart.
+    // Ordenar SOLO los on-track por raceFromMeta descendente
+    // (mayor = más recorrido en la vuelta = físicamente más
+    // adelante). Empates por número de kart para estabilidad.
+    const onTrack = allRows
+      .filter((r) => !r.inPit && r.raceProgress != null)
+      .sort((a, b) => {
+        const dr = (b.raceProgress as number) - (a.raceProgress as number);
+        if (dr !== 0) return dr;
+        return a.kart.kartNumber - b.kart.kartNumber;
+      });
+
+    const N = onTrack.length;
+    // Con menos de 9 on-track no hay nada que recortar.
+    if (N <= 9) return { rows: onTrack, windowMode: true };
+
+    const myIdx = onTrack.findIndex((r) => r.kart.kartNumber === myKartNumber);
+    if (myIdx < 0) return { rows: onTrack.slice(0, 9), windowMode: true };
+
+    // Ventana ±4 con wrap-around. `off=-4` arriba (más delante),
+    // `off=+4` abajo (más detrás).
+    const win: typeof onTrack = [];
+    for (let off = -4; off <= 4; off++) {
+      const idx = ((myIdx + off) % N + N) % N;
+      win.push(onTrack[idx]);
+    }
+    return { rows: win, windowMode: true };
+  }, [allRows, useWindow, myKartNumber]);
+
+  // Auto-centrar la lista en NUESTRO kart SOLO en modo fallback (mi
+  // kart en pit, o sin kart configurado): ahí mostramos la lista
+  // completa con scroll y conviene centrarla automáticamente la
+  // primera vez. En modo ventana el kart está siempre centrado por
+  // construcción y no hace falta scroll alguno.
   const hasMyKart = useMemo(
     () => karts.some((k) => k.kartNumber === myKartNumber),
     [karts, myKartNumber],
   );
   useEffect(() => {
+    if (windowMode) return; // ventana = ya centrado por construcción
     if (!hasMyKart || !myRowRef.current || !listRef.current) return;
     if (centeredForKartRef.current === myKartNumber) return;
-    // `scrollIntoView` scrolea el ancestor scrollable más cercano,
-    // que es `listRef.current` gracias al `overflow-y-auto` del
-    // contenedor. `block: "center"` posiciona el botón en el
-    // centro vertical del viewport del scroll.
     myRowRef.current.scrollIntoView({ block: "center", behavior: "auto" });
     centeredForKartRef.current = myKartNumber;
-  }, [hasMyKart, myKartNumber]);
-
-  // Botón "centrar mi kart" en la cabecera del panel: re-centra a
-  // demanda cuando el estratega ha bajado a inspeccionar otro kart
-  // y quiere volver a ver el suyo. Usa `behavior: "smooth"` (en lugar
-  // del "auto" del effect inicial) para que la animación se sienta
-  // como una acción explícita en lugar de un salto.
-  const recenterMyKart = useCallback(() => {
-    if (!myRowRef.current) return;
-    myRowRef.current.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, []);
+  }, [hasMyKart, myKartNumber, windowMode]);
 
   return (
-    // Altura FIJA del aside a 504 px en lg+ (= h-[480px] del mapa +
-    // padding del card). Sin esto el grid items-stretch hace que la
-    // row tome la altura del item más alto, y con 30+ karts el aside
-    // crecía hasta ~700 px arrastrando al mapa con él. El parent
-    // grid lleva `lg:items-start` (en TrackingTab) para que el aside
-    // se quede en su altura declarada en vez de estirarse a la row.
-    // En móviles el aside crece a contenido normalmente — la lista
-    // larga es aceptable al ir todo apilado verticalmente.
-    <aside className="bg-surface border border-border rounded-xl p-3 flex flex-col min-h-0 lg:h-[504px]">
-      <div className="flex items-center justify-between gap-2 mb-2 px-1 shrink-0">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">
-          {t("tracking.panel.title")}
-        </h3>
-        {/* "Centrar mi kart" — solo se muestra cuando nuestro kart
-            está en la lista. Útil cuando el estratega ha scroleado
-            para ver otro kart y quiere volver al suyo sin tener
-            que buscar en la lista. El icono (⊙) está inspirado en
-            el "center on me" de mapas tipo Google Maps. */}
-        {hasMyKart && (
-          <button
-            type="button"
-            onClick={recenterMyKart}
-            title={t("tracking.panel.recenter")}
-            aria-label={t("tracking.panel.recenter")}
-            className="text-accent hover:text-accent-hover text-sm leading-none px-1 py-0.5 rounded transition-colors"
-          >
-            ⊙
-          </button>
-        )}
-      </div>
-      <div ref={listRef} className="space-y-0 overflow-y-auto flex-1 min-h-0 pr-1 -mr-1">
+    // En modo VENTANA (kart configurado y on-track) el aside sizea a
+    // contenido — 9 filas exactas + labels delante/detrás + header.
+    // En modo FALLBACK (mi kart en pit, o sin kart configurado)
+    // mantiene `lg:h-[504px]` con scroll interno como antes.
+    // `lg:items-start` en el grid parent (TrackingTab) permite que
+    // el aside no se estire a la altura del map card cuando es más
+    // bajo o más alto.
+    <aside className={`bg-surface border border-border rounded-xl p-3 flex flex-col min-h-0 ${windowMode ? "" : "lg:h-[504px]"}`}>
+      <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-2 px-1 shrink-0">
+        {t("tracking.panel.title")}
+      </h3>
+      {/* Label "▲ DELANTE EN PISTA" — solo en modo ventana. Enmarca
+          las 4 filas superiores que están físicamente por delante de
+          nosotros en la vuelta actual (con wrap-around si somos
+          líderes). Color tenue para no robar protagonismo a las
+          filas de karts. */}
+      {windowMode && rows.length > 1 && (
+        <div className="text-[9px] font-semibold uppercase tracking-widest text-neutral-600 px-1 pb-0.5 flex items-center gap-1 shrink-0">
+          <span className="text-accent">▲</span>
+          <span>{t("tracking.panel.ahead")}</span>
+        </div>
+      )}
+      <div ref={listRef} className={`space-y-0 ${windowMode ? "shrink-0" : "overflow-y-auto flex-1 min-h-0 pr-1 -mr-1"}`}>
         {rows.map(({ kart, inPit, sector, lapPct, currentLapMs }) => {
           const isMine = kart.kartNumber === myKartNumber;
           const isSelected = kart.kartNumber === selectedKart;
@@ -387,6 +418,16 @@ export function OnTrackPanel({
           );
         })}
       </div>
+      {/* Label "▼ DETRÁS EN PISTA" — cierra la ventana de 9. Mismo
+          tratamiento visual que el de delante para mantener la
+          simetría. Se oculta en fallback (todos los karts ordenados
+          por Apex). */}
+      {windowMode && rows.length > 1 && (
+        <div className="text-[9px] font-semibold uppercase tracking-widest text-neutral-600 px-1 pt-0.5 flex items-center gap-1 shrink-0">
+          <span className="text-accent">▼</span>
+          <span>{t("tracking.panel.behind")}</span>
+        </div>
+      )}
     </aside>
   );
 }
