@@ -344,6 +344,15 @@ class RaceStateManager:
 
         # Analytics state
         self.fifo_queue: list[dict] = []
+        # Karts esperando asignación manual a un carril (modo box
+        # manual). Vacío en modo auto. Frontend lo renderiza como
+        # strip "pre-cola" encima del grid F1/F2/...
+        self.fifo_pre_queue: list[dict] = []
+        # Flag de manual mode reflejado en cada snapshot WS. Cuando
+        # cambia, la UI muestra/oculta el strip + dropzones. Es FALSE
+        # siempre en replay (`ReplaySession` no toca `FifoManager.
+        # manual_mode`), independientemente del valor en BD.
+        self.fifo_manual_mode: bool = False
         self.fifo_score: float = 0.0
         self.fifo_history: list[dict] = []
         self.classification: list[dict] = []
@@ -578,6 +587,10 @@ class RaceStateManager:
         self.real_start_time = ""
         self._event_buffer.clear()
         self.fifo_queue.clear()
+        self.fifo_pre_queue.clear()
+        # `fifo_manual_mode` se preserva — refleja la config del
+        # operador, no del kart. La caller (`UserSession`) la
+        # re-aplica desde la BD tras el reset si hace falta.
         self.fifo_score = 0.0
         self.fifo_history.clear()
         self.classification.clear()

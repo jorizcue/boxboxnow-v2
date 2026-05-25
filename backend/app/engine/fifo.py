@@ -8,8 +8,22 @@ The score is a PERCENTAGE 0-100 where:
 
 Each queue entry is a dict:
   {"score": int, "kartNumber": int, "teamName": str, "driverName": str}
+
+Two assignment flows coexist:
+  - Auto (default): `add_entry` pushes to the rolling deque with a
+    round-robin line via `_best_line` (lane with fewest pending
+    entries, tiebreak by counter).
+  - Manual (when `manual_mode = True`): `add_entry` redirects to a
+    pre-queue. The strategist drags the kart to a specific lane via
+    `assign_manually`. If 15 s elapse with no manual action, the
+    entry falls back to auto via `_pre_queue_timers`. The
+    `manual_mode` flag is set ONLY by `UserSession.configure()`;
+    `ReplaySession` never touches it, so replays always use auto by
+    construction (avoids real-time 15 s timers during sped-up
+    reproductions).
 """
 
+import asyncio
 import logging
 import time
 from collections import deque
@@ -19,6 +33,7 @@ from app.engine.state import RaceStateManager
 logger = logging.getLogger(__name__)
 
 DEFAULT_SCORE = 25
+MANUAL_TIMEOUT_S = 15.0  # fallback to auto after this many seconds with no manual pick
 
 
 def _default_entry(score: int = DEFAULT_SCORE) -> dict:
@@ -33,7 +48,14 @@ class FifoManager:
             [_default_entry() for _ in range(queue_size)], maxlen=queue_size
         )
         self._history: list[dict] = []
-        self._next_line: int = 0  # Round-robin line counter for stable row assignment
+        self._next_line: int = 0  # round-robin tiebreaker counter
+        # Manual mode state — only used when manual_mode == True.
+        # UserSession.configure() sets manual_mode from the DB session.
+        # ReplaySession NEVER touches it, so its FifoManager stays
+        # manual_mode=False forever (no real-time timers during replay).
+        self.manual_mode: bool = False
+        self.pre_queue: list[dict] = []
+        self._pre_queue_timers: dict[int, asyncio.Task] = {}
 
     def update_config(self, queue_size: int, box_lines: int):
         """Update queue size and box lines, preserving existing kart entries.
@@ -56,7 +78,11 @@ class FifoManager:
         # Keep _next_line and _history intact so history is preserved
 
     def reset(self, queue_size: int | None = None, box_lines: int | None = None):
-        """Full reset — used when starting a new replay or new race."""
+        """Full reset — used when starting a new replay or new race.
+        Cancels any pre-queue timers so the new session doesn't get
+        stale fallback commits 15 s in. `manual_mode` is preserved
+        (the caller — UserSession — re-applies it from the DB
+        session after reset)."""
         if queue_size is not None:
             self.queue_size = queue_size
         if box_lines is not None:
@@ -66,6 +92,13 @@ class FifoManager:
         )
         self._history.clear()
         self._next_line = 0
+        # Cancel timers + drop pending entries without committing —
+        # the karts that were "waiting" belong to the previous
+        # session and shouldn't show up in the new one.
+        for t in self._pre_queue_timers.values():
+            t.cancel()
+        self._pre_queue_timers.clear()
+        self.pre_queue.clear()
 
     def add_entry(self, tier_score: int, kart_number: int = 0,
                   team_name: str = "", driver_name: str = "",
@@ -77,9 +110,21 @@ class FifoManager:
         """Add a kart's tier score when it enters the pit.
         Also records a history snapshot (only on actual pit entries).
         timestamp: epoch seconds. Defaults to time.time() (wall clock).
-                   For replay, pass the replay block's actual datetime."""
-        assigned_line = self._next_line % self.box_lines
-        self._next_line += 1
+                   For replay, pass the replay block's actual datetime.
+
+        Manual mode: if `self.manual_mode` is True and we have a real
+        kart_number, the entry goes to `pre_queue` instead of the
+        rolling deque. The strategist later assigns it via
+        `assign_manually` (drag & drop in the BoxStatusPanel UI). A
+        15 s `asyncio.Task` falls back to auto if no manual pick is
+        made — see `_timeout_fallback`."""
+        # GC: purge any task that's already done (cancelled or finished)
+        # so the dict doesn't leak across long sessions. Cheap O(N) on
+        # a dict that's bounded by the number of in-pit karts at once.
+        self._pre_queue_timers = {
+            k: t for k, t in self._pre_queue_timers.items() if not t.done()
+        }
+
         entry = {
             "score": tier_score,
             "kartNumber": kart_number,
@@ -90,10 +135,134 @@ class FifoManager:
             "recentLaps": recent_laps or [],
             "pitCount": pit_count,
             "stintLaps": stint_laps,
-            "line": assigned_line,
         }
+
+        if self.manual_mode and kart_number > 0:
+            self._enqueue_pending(entry, timestamp)
+            return
+
+        # Auto: commit directly with the best line.
+        self._commit_entry(entry, line=self._best_line(), timestamp=timestamp)
+
+    # ── Pre-queue (manual mode) ──────────────────────────────────────
+
+    def _enqueue_pending(self, entry: dict, timestamp: float | None) -> None:
+        """Push to pre-queue + spawn 15 s fallback timer. If the kart
+        is already in pre-queue (duplicate pit-in from Apex repaint),
+        ignore — first pit-in wins. NO `line` assigned yet; that
+        happens in `_commit_entry` on manual pick or timeout."""
+        kart_number = entry["kartNumber"]
+        if any(e["kartNumber"] == kart_number for e in self.pre_queue):
+            return
+        entry["enqueuedAt"] = timestamp if timestamp is not None else time.time()
+        self.pre_queue.append(entry)
+        # asyncio.create_task may fail if no running loop (e.g. unit
+        # tests in sync context). In that case we still queue but
+        # without auto-fallback — the entry waits forever for manual
+        # pick. Tests should call `assign_manually` or
+        # `cancel_pending` explicitly.
+        try:
+            loop = asyncio.get_running_loop()
+            self._pre_queue_timers[kart_number] = loop.create_task(
+                self._timeout_fallback(kart_number)
+            )
+        except RuntimeError:
+            pass
+
+    async def _timeout_fallback(self, kart_number: int) -> None:
+        """Wait MANUAL_TIMEOUT_S and commit to auto if still pending.
+        Cancelled by `assign_manually`, `cancel_pending`, `reset` and
+        `flush_pending`."""
+        try:
+            await asyncio.sleep(MANUAL_TIMEOUT_S)
+        except asyncio.CancelledError:
+            return
+        # Re-check the entry hasn't been removed in the meantime.
+        entry = next((e for e in self.pre_queue if e["kartNumber"] == kart_number), None)
+        if entry is None:
+            return
+        self.pre_queue.remove(entry)
+        self._commit_entry(entry, line=self._best_line(), timestamp=time.time())
+        self._pre_queue_timers.pop(kart_number, None)
+
+    def assign_manually(self, kart_number: int, line: int) -> bool:
+        """Pop kart from pre-queue and commit to the requested line.
+        Returns False on race conditions (kart already gone, line out
+        of range) so the API can reply 409 and the UI can rollback
+        its optimistic move."""
+        if not (0 <= line < self.box_lines):
+            return False
+        entry = next((e for e in self.pre_queue if e["kartNumber"] == kart_number), None)
+        if entry is None:
+            return False
+        self.pre_queue.remove(entry)
+        self._cancel_timer(kart_number)
+        self._commit_entry(entry, line=line, timestamp=time.time())
+        return True
+
+    def cancel_pending(self, kart_number: int) -> None:
+        """Remove from pre-queue (used on pit-out before the 15 s
+        deadline). Safe to call when the kart isn't pending."""
+        self.pre_queue = [e for e in self.pre_queue if e["kartNumber"] != kart_number]
+        self._cancel_timer(kart_number)
+
+    def flush_pending(self) -> None:
+        """Drain pre-queue into auto immediately. Used when the user
+        toggles manual_mode off mid-race AND in `reset()` to clear
+        state between sessions."""
+        pending = list(self.pre_queue)
+        self.pre_queue.clear()
+        for entry in pending:
+            self._commit_entry(entry, line=self._best_line(), timestamp=time.time())
+        for t in self._pre_queue_timers.values():
+            t.cancel()
+        self._pre_queue_timers.clear()
+
+    def _cancel_timer(self, kart_number: int) -> None:
+        t = self._pre_queue_timers.pop(kart_number, None)
+        if t is not None and not t.done():
+            t.cancel()
+
+    # ── Line assignment + commit ─────────────────────────────────────
+
+    def _best_line(self) -> int:
+        """Lane with fewest entries currently in the rolling fifo.
+        Ties broken by the round-robin counter so the lane rotation
+        is stable across equal-count states.
+
+        Replaces the legacy `_next_line % box_lines` which biased
+        toward whichever lane the operator manually picked most
+        recently (the counter would advance, leaving the other lanes
+        underused)."""
+        if self.box_lines <= 1:
+            return 0
+        counts = [0] * self.box_lines
+        for e in self.fifo:
+            ln = e.get("line", -1)
+            if 0 <= ln < self.box_lines:
+                counts[ln] += 1
+        best_count = min(counts)
+        candidates = [i for i, c in enumerate(counts) if c == best_count]
+        if len(candidates) == 1:
+            return candidates[0]
+        # Tiebreak via the counter, scanning forward to the next
+        # candidate so subsequent calls rotate stably.
+        line = self._next_line % self.box_lines
+        self._next_line += 1
+        while line not in candidates:
+            line = (line + 1) % self.box_lines
+        return line
+
+    def _commit_entry(self, entry: dict, line: int, timestamp: float | None) -> None:
+        """Push entry to the rolling fifo + history snapshot.
+        Internal — used by both the auto path (add_entry) and the
+        manual path (assign_manually / timeout fallback)."""
+        entry["line"] = line
+        # Remove pre-queue-only field so the serialized payload stays
+        # clean; clients distinguish pre_queue vs queue by which list
+        # the entry belongs to, not by this field.
+        entry.pop("enqueuedAt", None)
         self.fifo.append(entry)
-        # Save history only when a kart actually enters pit
         score = self.get_weighted_score()
         self._history.append({
             "timestamp": timestamp if timestamp is not None else time.time(),
@@ -146,9 +315,17 @@ class FifoManager:
     def get_queue_snapshot(self) -> list[dict]:
         return list(self.fifo)
 
+    def get_pre_queue_snapshot(self) -> list[dict]:
+        """Pre-queue serialized for the WS payload. Frontend renders
+        each entry as a draggable card with a 15 s countdown derived
+        from `enqueuedAt` (epoch seconds set on enqueue)."""
+        return list(self.pre_queue)
+
     def apply_to_state(self, state: RaceStateManager):
         """Update state with current FIFO data (called by analytics loop).
         Does NOT record history — history is recorded only on pit entries."""
         state.fifo_queue = self.get_queue_snapshot()
+        state.fifo_pre_queue = self.get_pre_queue_snapshot()
+        state.fifo_manual_mode = self.manual_mode
         state.fifo_score = round(self.get_weighted_score(), 2)
         state.fifo_history = self._history[-20:]
