@@ -206,28 +206,50 @@ async def fifo_assign(
 ):
     """Asignación manual de un kart en pre-cola a un carril concreto.
 
+    Routing live ↔ replay
+    ---------------------
+    El usuario puede tener simultáneamente una `UserSession` (live)
+    y una `ReplaySession` activa. El WS prioriza el replay cuando
+    su engine está activo (ver `_resolve_state` en `app.ws.server`),
+    así que el strip que el frontend renderiza viene de la sesión
+    activa-según-el-WS. Si rutearámos siempre a la live registry,
+    los drops desde el replay 1x con manual_mode darían 409 `gone`
+    crónicamente porque el kart está en la `pre_queue` del replay,
+    NO en la del live. Replicamos aquí la misma prioridad.
+
     Errores controlados:
-      - 404: usuario sin UserSession activa (no está monitorizando)
+      - 404: usuario sin sesión activa (ni live ni replay)
       - 409 (manual_off): el modo manual no está activo
       - 409 (gone): el kart ya no está en pre-cola (race condition
-        multi-cliente o pit-out antes del deadline)
+        multi-cliente, pit-out antes del deadline, o timeout 15 s)
 
     Tras la asignación, broadcast inmediato del nuevo estado fifo
     a todos los clientes WS del usuario para que el resto de tabs
     abiertas (web + iPad) vean la fila actualizada.
     """
     registry = request.app.state.registry
-    user_session = registry.get(user.id)
-    if not user_session:
+    replay_registry = getattr(request.app.state, "replay_registry", None)
+
+    # Prioridad idéntica a `_resolve_state`: si hay un replay con
+    # engine activo, lo usamos; si no, caemos a la live; si no
+    # tampoco hay live, 404.
+    target_session = None
+    replay_session = replay_registry.get(user.id) if replay_registry else None
+    if replay_session and replay_session.engine._active:
+        target_session = replay_session
+    else:
+        target_session = registry.get(user.id)
+
+    if not target_session:
         raise HTTPException(404, "No active session")
-    if not user_session.fifo.manual_mode:
+    if not target_session.fifo.manual_mode:
         raise HTTPException(409, detail={"code": "manual_off", "msg": "Manual mode not active"})
-    ok = user_session.fifo.assign_manually(payload.kart_number, payload.line)
+    ok = target_session.fifo.assign_manually(payload.kart_number, payload.line)
     if not ok:
         raise HTTPException(409, detail={"code": "gone", "msg": "Kart not in pre-queue or invalid line"})
     # Reflejar al state + broadcast a todos los clientes WS del user.
-    user_session.fifo.apply_to_state(user_session.state)
-    await user_session._broadcast_fifo()
+    target_session.fifo.apply_to_state(target_session.state)
+    await target_session._broadcast_fifo()
     return {"ok": True}
 
 
