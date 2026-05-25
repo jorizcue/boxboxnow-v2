@@ -114,7 +114,7 @@ export interface DemoRaceState {
   trackName: string;
   durationMs: number;
   karts: KartState[];
-  fifo: { queue: FifoEntry[]; score: number; history: FifoSnapshot[] };
+  fifo: { queue: FifoEntry[]; preQueue: FifoEntry[]; manualMode: boolean; score: number; history: FifoSnapshot[] };
   classification: [];
   classificationMeta: null;
   config: RaceConfig;
@@ -249,7 +249,7 @@ export function buildDemoRaceState(): DemoRaceState {
     trackName: "Karting Demo Circuit",
     durationMs: DURATION_MS,
     karts,
-    fifo: { queue, score: 21.5, history },
+    fifo: { queue, preQueue: [], manualMode: false, score: 21.5, history },
     classification: [],
     classificationMeta: null,
     config,

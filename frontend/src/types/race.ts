@@ -140,11 +140,25 @@ export interface FifoEntry {
   recentLaps?: { lapTime: number; totalLap: number; driverName: string }[];
   pitCount?: number;
   stintLaps?: number;
-  line?: number;  // Assigned pit line (stable across queue shifts)
+  /** Carril asignado (estable a través de los shifts del deque).
+   *  Solo presente en entries de `queue` — las del `preQueue` NO
+   *  tienen line porque esperan asignación manual. */
+  line?: number;
+  /** Epoch seconds del pit-in. Solo presente en entries de `preQueue`
+   *  para que el cliente calcule el countdown de 15 s hasta el
+   *  fallback automático. */
+  enqueuedAt?: number;
 }
 
 export interface FifoState {
   queue: FifoEntry[];
+  /** Karts esperando asignación manual (modo box manual). Vacío
+   *  cuando `manualMode` es false. */
+  preQueue: FifoEntry[];
+  /** True cuando la sesión activa está en modo manual. Siempre
+   *  false en replay sessions (la `ReplaySession` del backend
+   *  nunca activa manual_mode → replay-safe por arquitectura). */
+  manualMode: boolean;
   score: number;
   history: FifoSnapshot[];
 }
@@ -203,6 +217,10 @@ export interface RaceConfig {
    *  back to the count observed in `kart.driverTotalMs` (Apex-discovered
    *  drivers). Strategists set this in the SessionConfig form. */
   teamDriversCount?: number;
+  /** Modo box manual (drag&drop). False = round-robin auto clásico.
+   *  Solo aplica a sesiones live; en replay el backend siempre fuerza
+   *  el comportamiento auto. */
+  boxManualMode?: boolean;
   pitClosedStartMin: number;
   pitClosedEndMin: number;
   rain: boolean;

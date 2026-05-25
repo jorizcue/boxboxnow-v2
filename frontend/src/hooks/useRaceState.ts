@@ -127,7 +127,13 @@ interface RaceStore {
   resetTrackingView: () => void;
 }
 
-const defaultFifo: FifoState = { queue: [], score: 0, history: [] };
+const defaultFifo: FifoState = {
+  queue: [],
+  preQueue: [],
+  manualMode: false,
+  score: 0,
+  history: [],
+};
 
 /** Normalize the snake_case pit_status dict sent by the backend (Python
  *  dataclass field names) into the camelCase `PitStatus` shape used by
@@ -423,7 +429,20 @@ export const useRaceStore = create<RaceStore>((set) => ({
 
   applyFifoUpdate: (data) =>
     set((state) => ({
-      fifo: data.fifo || { queue: [], score: 0, history: [] },
+      // Merge defensivo del fifo: si el payload omite `preQueue` o
+      // `manualMode` (backends antiguos o un broadcast parcial)
+      // preservamos el valor anterior en lugar de pisarlo con
+      // undefined. Sí pisamos `queue`/`score`/`history` porque
+      // siempre vienen completos en el broadcast.
+      fifo: data.fifo
+        ? {
+            queue: data.fifo.queue ?? [],
+            preQueue: data.fifo.preQueue ?? state.fifo.preQueue,
+            manualMode: data.fifo.manualMode ?? state.fifo.manualMode,
+            score: data.fifo.score ?? 0,
+            history: data.fifo.history ?? [],
+          }
+        : state.fifo,
       // Backend bundles the recomputed pit-gate state on every
       // fifo_update so the badge reacts immediately to a pit-in / pit-
       // out shifting driver totals. Missing field → keep previous value.

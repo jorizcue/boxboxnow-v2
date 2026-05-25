@@ -312,6 +312,16 @@ export const api = {
     fetchApi<any>("/api/config/session", { method: "POST", body: JSON.stringify(data) }),
   updateSession: (data: any) =>
     fetchApi<any>("/api/config/session", { method: "PATCH", body: JSON.stringify(data) }),
+  /** Asignación manual de un kart en pre-cola a un carril concreto.
+   *  Solo válido cuando la sesión activa tiene `box_manual_mode=true`.
+   *  El backend devuelve 409 si el kart ya no está en pre-cola (race
+   *  condition multi-cliente o pit-out antes de los 15 s) — el caller
+   *  debe hacer rollback de la UI optimistic + toast. */
+  fifoAssign: (kartNumber: number, line: number) =>
+    fetchApi<{ ok: boolean }>("/api/race/fifo/assign", {
+      method: "POST",
+      body: JSON.stringify({ kart_number: kartNumber, line }),
+    }),
   // Multipart upload: don't go through fetchApi (it forces JSON
   // Content-Type, which would break the multipart boundary).
   extractRegulation: async (file: File): Promise<RegulationExtractResult> => {
