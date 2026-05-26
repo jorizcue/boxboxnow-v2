@@ -233,7 +233,21 @@ class FifoManager:
         Replaces the legacy `_next_line % box_lines` which biased
         toward whichever lane the operator manually picked most
         recently (the counter would advance, leaving the other lanes
-        underused)."""
+        underused).
+
+        IMPORTANTE: `_next_line` se sincroniza con la línea
+        ASIGNADA en TODOS los caminos (tiebreak Y single-candidate).
+        El bug histórico: la rama de single-candidate (línea con menos
+        entries claras) no actualizaba el counter, así que el
+        siguiente tiebreak seguía apuntando a la línea recién llenada.
+        Caso reproducible (3 lanes, fifo vacío de reales):
+            entry 1: tiebreak [0,1,2]   → 0,  counter 0→1
+            entry 2: tiebreak [1,2]     → 1,  counter 1→2
+            entry 3: único [2]          → 2,  counter QUEDA en 2  ← antes
+            entry 4: tiebreak [0,1,2]   → 2 ❌  (debería ser 0)
+        Tras el fix, entry 3 deja el counter en 3 (=0%3 al saltar) y
+        entry 4 cae en 0 (F1) como espera el operador.
+        """
         if self.box_lines <= 1:
             return 0
         counts = [0] * self.box_lines
@@ -244,13 +258,17 @@ class FifoManager:
         best_count = min(counts)
         candidates = [i for i, c in enumerate(counts) if c == best_count]
         if len(candidates) == 1:
-            return candidates[0]
-        # Tiebreak via the counter, scanning forward to the next
-        # candidate so subsequent calls rotate stably.
+            chosen = candidates[0]
+            # Sincronizar el counter también aquí — el path de
+            # single-candidate es la fuente del bug original.
+            self._next_line = (chosen + 1) % self.box_lines
+            return chosen
+        # Tiebreak: arrancar desde donde dejamos la última vez y
+        # escanear hasta encontrar un candidate.
         line = self._next_line % self.box_lines
-        self._next_line += 1
         while line not in candidates:
             line = (line + 1) % self.box_lines
+        self._next_line = (line + 1) % self.box_lines
         return line
 
     def _commit_entry(self, entry: dict, line: int, timestamp: float | None) -> None:

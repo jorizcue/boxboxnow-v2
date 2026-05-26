@@ -158,6 +158,45 @@ def test_best_line_tiebreak_with_counter():
     assert {first, second, third} == {0, 1, 2}
 
 
+def test_best_line_round_robin_5_karts_3_lanes():
+    """Regresión del bug reportado por el operador: con 3 carriles
+    vacíos, 5 pit-ins seguidos deben quedar 2-2-1 distribuidos en
+    orden F1, F2, F3, F1, F2 — NO con el 4º en F3 y el 5º en F1.
+
+    Causa histórica: la rama de single-candidate de _best_line no
+    sincronizaba _next_line, así que tras el 3º pit-in (que era el
+    único candidato porque las otras dos lanes ya estaban llenas)
+    el counter quedaba apuntando a la línea recién asignada y el
+    siguiente tiebreak la elegía otra vez.
+    """
+    m = FifoManager(queue_size=9, box_lines=3)
+    karts = [("German", 11), ("Rodriguez", 22), ("Mendez", 33),
+             ("JuanJose", 44), ("Urbiola", 55)]
+    for name, kart in karts:
+        m.add_entry(tier_score=50, kart_number=kart, team_name=name)
+
+    real = [e for e in m.fifo if e["kartNumber"] > 0]
+    by_kart = {e["kartNumber"]: e["line"] for e in real}
+    assert by_kart == {11: 0, 22: 1, 33: 2, 44: 0, 55: 1}, \
+        f"Distribución incorrecta: {by_kart}"
+
+
+def test_best_line_alternates_after_single_candidate():
+    """Cubre el corazón del fix: tras una asignación por
+    single-candidate, _next_line debe avanzar a (chosen+1)%box_lines
+    para que el siguiente tiebreak no recaiga sobre la misma lane.
+    """
+    m = FifoManager(queue_size=10, box_lines=3)
+    # Forzar counts = [1, 1, 0] mediante commits directos.
+    m._commit_entry({"score": 50, "kartNumber": 1}, line=0, timestamp=None)
+    m._commit_entry({"score": 50, "kartNumber": 2}, line=1, timestamp=None)
+    # Single-candidate → line 2.
+    assert m._best_line() == 2
+    # Ahora counts = [1, 1, 1] → tiebreak debe arrancar en 0, no en 2.
+    m._commit_entry({"score": 50, "kartNumber": 3}, line=2, timestamp=None)
+    assert m._best_line() == 0
+
+
 # ── Timer fallback (event loop requerido) ────────────────────────────
 
 
