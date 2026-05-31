@@ -599,7 +599,7 @@ private fun CardContent(
             val lapsTextColor =
                 if (accent == DriverCard.LapsToMaxStint.accent) Color.White else accent
             Text(
-                laps?.let { "%.1f".format(it) } ?: "0",
+                laps?.let { "%.2f".format(it) } ?: "0",
                 color = lapsTextColor,
                 fontSize = bigFont,
                 fontWeight = FontWeight.Black,

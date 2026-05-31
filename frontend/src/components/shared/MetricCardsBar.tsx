@@ -233,7 +233,7 @@ export function MetricCardsBar() {
           {t("metric.lapsToMaxStint")}
         </span>
         <span className={`text-lg sm:text-xl font-mono font-black leading-none ${lapsToMaxColor}`}>
-          {lapsToMaxStint > 0 ? lapsToMaxStint.toFixed(1) : "0"}
+          {lapsToMaxStint > 0 ? lapsToMaxStint.toFixed(2) : "0"}
         </span>
       </div>
 

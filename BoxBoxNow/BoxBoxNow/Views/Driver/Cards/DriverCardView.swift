@@ -493,7 +493,7 @@ struct DriverCardView: View {
             let laps = stintCalc.lapsToMax
             let realMax = stintCalc.realMaxStintMin
             VStack(spacing: 2 * scale) {
-                Text(laps != nil && laps! > 0 ? String(format: "%.1f", laps!) : "0")
+                Text(laps != nil && laps! > 0 ? String(format: "%.2f", laps!) : "0")
                     .font(.system(size: bigFont, weight: .black, design: .monospaced))
                     .foregroundColor(lapsToMaxTextColor)
                     .minimumScaleFactor(0.5)

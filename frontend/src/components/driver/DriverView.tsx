@@ -1426,7 +1426,7 @@ export function DriverView() {
                     ? "text-green-400"
                     : "text-white"
           }`}>
-            {lapsToMaxStint !== null && lapsToMaxStint > 0 ? lapsToMaxStint.toFixed(1) : "0"}
+            {lapsToMaxStint !== null && lapsToMaxStint > 0 ? lapsToMaxStint.toFixed(2) : "0"}
           </span>
           {realMaxStintMin !== null && realMaxStintMin < config.maxStintMin && (
             <span className="text-[8px] sm:text-[9px] text-orange-400 font-mono mt-0.5">
