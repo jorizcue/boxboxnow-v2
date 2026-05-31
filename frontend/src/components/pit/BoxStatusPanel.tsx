@@ -181,13 +181,29 @@ export function BoxFifoView() {
                         const liveKart = kartNum
                           ? karts.find((k) => k.kartNumber === kartNum)
                           : null;
+                        const raceElapsedMs = config.durationMin * 60 * 1000 - raceClockMs;
+                        // Preferimos el timestamp PROPIO de la entry
+                        // (entry.pitInRaceTimeMs) sobre `pit_history[-1]`
+                        // del kart. Cuando un kart tiene N entries en
+                        // el FIFO (varias pits dentro del rolling
+                        // window), pit_history[-1] devuelve la última
+                        // → todas las cards mostraban el mismo timer.
+                        // El backend emite `pitInRaceTimeMs` desde el
+                        // commit del `add_entry`; los backends viejos
+                        // no lo envían y caemos al fallback antiguo.
+                        const entryPitMs =
+                          typeof entry === "object" && entry && typeof entry.pitInRaceTimeMs === "number"
+                            ? entry.pitInRaceTimeMs
+                            : 0;
                         const lastPit = liveKart?.pitHistory?.length
                           ? liveKart.pitHistory[liveKart.pitHistory.length - 1]
                           : null;
-                        const raceElapsedMs = config.durationMin * 60 * 1000 - raceClockMs;
+                        const refPitMs = entryPitMs > 0
+                          ? entryPitMs
+                          : (lastPit?.raceTimeMs ?? 0);
                         const sinceLastPitSec =
-                          lastPit && lastPit.raceTimeMs > 0 && raceElapsedMs > lastPit.raceTimeMs
-                            ? (raceElapsedMs - lastPit.raceTimeMs) / 1000
+                          refPitMs > 0 && raceElapsedMs > refPitMs
+                            ? (raceElapsedMs - refPitMs) / 1000
                             : 0;
                         const showPitTimer = sinceLastPitSec > 0;
                         const isInPit = liveKart?.pitStatus === "in_pit";

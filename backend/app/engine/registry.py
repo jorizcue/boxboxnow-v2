@@ -130,6 +130,15 @@ class UserSession:
                         recent_laps=recent,
                         pit_count=kart.pit_count,
                         stint_laps=last_pit.stint_laps if last_pit else 0,
+                        # Race-time del pit-in que ACABA DE OCURRIR.
+                        # Es el último elemento del pit_history porque
+                        # `handle_events` lo acaba de pushear arriba
+                        # (handler PIT_IN). Sin esto el cliente
+                        # solo puede leer pit_history[-1] del kart,
+                        # que es el mismo para todas las entries del
+                        # FIFO del mismo kart → bug observado de dos
+                        # cards con timer idéntico.
+                        pit_in_race_time_ms=(last_pit.race_time_ms if last_pit else 0),
                     )
 
                 # Broadcast FIFO immediately so the box tab updates in real-time
@@ -878,6 +887,9 @@ class ReplaySession:
                         pit_count=kart.pit_count,
                         stint_laps=last_pit.stint_laps if last_pit else 0,
                         timestamp=block_ts,
+                        # Mismo razonamiento que en UserSession: cada
+                        # entry persiste el race-time de SU pit-in.
+                        pit_in_race_time_ms=(last_pit.race_time_ms if last_pit else 0),
                     )
 
                 self.fifo.apply_to_state(self.state)

@@ -106,11 +106,20 @@ class FifoManager:
                   recent_laps: list[dict] | None = None,
                   pit_count: int = 0,
                   stint_laps: int = 0,
-                  timestamp: float | None = None):
+                  timestamp: float | None = None,
+                  pit_in_race_time_ms: int = 0):
         """Add a kart's tier score when it enters the pit.
         Also records a history snapshot (only on actual pit entries).
         timestamp: epoch seconds. Defaults to time.time() (wall clock).
                    For replay, pass the replay block's actual datetime.
+        pit_in_race_time_ms: race-elapsed time (ms) at the moment of
+                   this pit-in. Persists with the entry so the UI can
+                   show a per-entry "tiempo desde pit" timer instead
+                   of falling back to `kart.pit_history[-1].raceTimeMs`
+                   (which loses precision when the same kart has
+                   several pits inside the rolling window — observed
+                   bug: two cards of the same team displaying the same
+                   `00:07:50` even though pits were 16 min apart).
 
         Manual mode: if `self.manual_mode` is True and we have a real
         kart_number, the entry goes to `pre_queue` instead of the
@@ -135,6 +144,7 @@ class FifoManager:
             "recentLaps": recent_laps or [],
             "pitCount": pit_count,
             "stintLaps": stint_laps,
+            "pitInRaceTimeMs": pit_in_race_time_ms,
         }
 
         if self.manual_mode and kart_number > 0:
@@ -274,11 +284,19 @@ class FifoManager:
     def _commit_entry(self, entry: dict, line: int, timestamp: float | None) -> None:
         """Push entry to the rolling fifo + history snapshot.
         Internal — used by both the auto path (add_entry) and the
-        manual path (assign_manually / timeout fallback)."""
+        manual path (assign_manually / timeout fallback).
+
+        Conserva `pitInRaceTimeMs` (race-time del pit-in en ms) en el
+        entry committeado para que el cliente pueda mostrar un timer
+        per-entry en lugar de leer `kart.pit_history[-1]` (que pisa
+        todas las cards del mismo kart con el último pit cuando hay
+        varias entries en el rolling window).
+        """
         entry["line"] = line
         # Remove pre-queue-only field so the serialized payload stays
         # clean; clients distinguish pre_queue vs queue by which list
-        # the entry belongs to, not by this field.
+        # the entry belongs to, not by this field. NOTE: we do NOT
+        # pop `pitInRaceTimeMs` — ése lo necesita el render.
         entry.pop("enqueuedAt", None)
         self.fifo.append(entry)
         score = self.get_weighted_score()

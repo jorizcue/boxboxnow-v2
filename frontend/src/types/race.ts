@@ -148,6 +148,15 @@ export interface FifoEntry {
    *  para que el cliente calcule el countdown de 15 s hasta el
    *  fallback automático. */
   enqueuedAt?: number;
+  /** Race-elapsed time (ms) en el INSTANTE del pit-in que originó
+   *  esta entry. Lo emite el backend en cada `add_entry`; permite al
+   *  cliente pintar un timer "tiempo desde pit" por entry incluso
+   *  cuando el mismo kart tiene varias entries en el FIFO. Sin
+   *  este campo (backends antiguos) caemos a leer `pit_history[-1]`
+   *  del kart, que es el mismo para todas sus entries → bug
+   *  observado de dos cards de LOS EMILIOS mostrando `00:07:50`
+   *  ambas, pese a tener pits con ~16 min de diferencia real. */
+  pitInRaceTimeMs?: number;
 }
 
 export interface FifoState {

@@ -239,3 +239,56 @@ async def test_cancel_pending_cancels_timer(fast_timeout):
     await asyncio.sleep(0.15)
     real = [e for e in m.fifo if e["kartNumber"] > 0]
     assert real == []
+
+
+# ── Per-entry pitInRaceTimeMs (fix de duplicado timer en FIFO) ───────
+
+
+def test_add_entry_persists_pit_in_race_time_ms():
+    """Cada entry committeada al FIFO debe llevar SU PROPIO race-time
+    del pit-in. Esto permite al cliente pintar timers distintos para
+    dos entries del mismo kart. Bug observado: dos cards de LOS
+    EMILIOS mostraban 00:07:50 ambas porque el cliente leía
+    pit_history[-1] del kart en vez de un campo por-entry.
+    """
+    m = FifoManager(queue_size=10, box_lines=2)
+    # Mismo kart, dos pit-ins en momentos distintos (race-elapsed ms).
+    m.add_entry(tier_score=50, kart_number=18, team_name="LOS EMILIOS",
+                driver_name="BARREDA", pit_in_race_time_ms=3_600_000)
+    m.add_entry(tier_score=25, kart_number=18, team_name="LOS EMILIOS",
+                driver_name="EMILIO", pit_in_race_time_ms=4_800_000)
+
+    real = [e for e in m.fifo if e.get("kartNumber") == 18]
+    assert len(real) == 2
+    pit_times = sorted(e["pitInRaceTimeMs"] for e in real)
+    assert pit_times == [3_600_000, 4_800_000], (
+        f"Cada entry debe persistir su propio pitInRaceTimeMs, "
+        f"got {pit_times}")
+
+
+def test_add_entry_default_pit_in_race_time_ms_zero():
+    """Sin pasar el kwarg, el campo está presente con valor 0 (no
+    None) para evitar comprobaciones extra en el cliente."""
+    m = FifoManager(queue_size=10, box_lines=2)
+    m.add_entry(tier_score=50, kart_number=7)
+    real = [e for e in m.fifo if e.get("kartNumber") == 7]
+    assert len(real) == 1
+    assert real[0]["pitInRaceTimeMs"] == 0
+
+
+def test_manual_assign_preserves_pit_in_race_time_ms():
+    """Cuando una entry del pre_queue se commitea via `assign_manually`,
+    debe preservar `pitInRaceTimeMs`. El bug original popeaba
+    `enqueuedAt` en `_commit_entry`; nos aseguramos de que la nueva
+    columna NO se pierde en la misma transición.
+    """
+    m = FifoManager(queue_size=10, box_lines=2)
+    m.manual_mode = True
+    m.add_entry(tier_score=80, kart_number=42, pit_in_race_time_ms=1_234_567)
+    # Antes del assign está en pre_queue con el campo.
+    assert m.pre_queue[0]["pitInRaceTimeMs"] == 1_234_567
+    ok = m.assign_manually(42, line=0)
+    assert ok
+    real = [e for e in m.fifo if e.get("kartNumber") == 42]
+    assert len(real) == 1
+    assert real[0]["pitInRaceTimeMs"] == 1_234_567

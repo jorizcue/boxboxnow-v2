@@ -149,7 +149,14 @@ export function TrackMap({
       // hay un slider en TrackingTab; touchRotate / shiftKeyRotate
       // off para no robar gestos al pan/zoom del estratega.
       rotate: true,
-      bearing: 0,
+      // `bearing` SE INICIALIZA con el valor actual del store. Si el
+      // operador giró el mapa (e.g. 30°), abrió otra pestaña y volvió,
+      // el componente se desmontó y re-montó. El useEffect que llama
+      // a `setBearing(rotation)` solo dispara cuando rotation CAMBIA,
+      // pero en el re-mount el valor ya es 30 → React no detecta
+      // cambio → el bearing inicial se queda en 0. Pasar `rotation`
+      // aquí garantiza que el mapa nazca ya con la rotación correcta.
+      bearing: rotation,
       rotateControl: false,
       touchRotate: false,
       shiftKeyRotate: false,
