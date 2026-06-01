@@ -34,6 +34,7 @@ import {
 
 import { useRaceStore } from "@/hooks/useRaceState";
 import { api } from "@/lib/api";
+import { resolveBoxLineColors } from "@/lib/boxLineColors";
 import { tierHex } from "@/lib/formatters";
 import { useT } from "@/lib/i18n";
 import type { FifoEntry } from "@/types/race";
@@ -147,13 +148,30 @@ export function ManualPreQueueStrip({ assignError }: { assignError: string | nul
 
 /**
  * Card del strip de pre-cola con cuenta atrás del timeout (15 s).
- * Usa `useDraggable` para integrarse con el DndContext del parent.
- * El countdown es un %% calculado en cada render a partir de
- * `enqueuedAt` (epoch s); cuando llega a 0 el backend ya habrá
- * commiteado al auto, así que la entry desaparecerá del preQueue
- * via WS (no la quitamos nosotros aquí). */
+ *
+ * Dos formas de asignar a una fila del Box:
+ *   1) Drag&drop sobre la fila destino — el handler de @dnd-kit
+ *      registrado por el padre lo resuelve. La zona "draggable"
+ *      cubre el HEADER y el BODY (score, countdown, equipo/piloto).
+ *   2) Click en uno de los botones de color al pie de la card — un
+ *      botón por fila configurada. Cada botón muestra el color de
+ *      su fila (configurable por el operador en la cabecera del
+ *      grid) y la etiqueta "F1", "F2", … Es la vía táctil rápida
+ *      en iPad, que evita los segundos de imprecisión del drag.
+ *
+ * Los botones de color usan `e.stopPropagation()` + `onPointerDown`
+ * para que el listener de drag no los confunda con el inicio de un
+ * arrastre. El countdown del timeout es un %% calculado en cada
+ * render a partir de `enqueuedAt` (epoch s); cuando llega a 0 el
+ * backend ya habrá commiteado al auto y la entry desaparece del
+ * preQueue via WS.
+ */
 export function DraggableKart({ entry }: { entry: FifoEntry }) {
   const t = useT();
+  const config = useRaceStore((s) => s.config);
+  const boxLines = config.boxLines || 2;
+  const colors = resolveBoxLineColors(config.boxLineColors, boxLines);
+
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(entry.kartNumber),
   });
@@ -173,31 +191,79 @@ export function DraggableKart({ entry }: { entry: FifoEntry }) {
     ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
     : undefined;
 
+  const [pendingLine, setPendingLine] = useState<number | null>(null);
+  const onQuickAssign = async (line: number) => {
+    setPendingLine(line);
+    try {
+      await api.fifoAssign(entry.kartNumber, line);
+      // Optimistic: la entry desaparece del store cuando llegue el
+      // broadcast del backend (fifo_update). Si falla, el broadcast
+      // posterior la re-añadirá; no hacemos rollback local.
+    } catch (e) {
+      console.warn("fifoAssign failed", e);
+    } finally {
+      setPendingLine(null);
+    }
+  };
+
   return (
     <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
       style={{ transform: transformStyle }}
       className={clsx(
-        "flex-shrink-0 min-w-[72px] rounded-lg border-2 border-yellow-400/70 bg-yellow-950/30 px-2 py-1 cursor-grab active:cursor-grabbing select-none relative overflow-hidden touch-none",
+        "flex-shrink-0 min-w-[88px] rounded-lg border-2 border-yellow-400/70 bg-yellow-950/30 select-none relative overflow-hidden touch-none",
         isDragging && "opacity-60 z-50",
       )}
-      title={t("box.preQueue.dragHint")}
     >
-      <div className="flex items-center justify-between gap-1">
-        <span
-          className="text-lg font-bold leading-none"
-          style={{ color: tierHex(entry.score ?? 25) }}
-        >
-          {entry.score ?? 25}
-        </span>
-        <span className="text-[9px] font-mono font-bold text-yellow-200 tabular-nums">
-          {Math.ceil(remaining)}s
-        </span>
+      {/* Zona arrastrable: header + body. NO incluye los botones
+          de abajo (cada botón captura su propio pointerdown). */}
+      <div
+        ref={setNodeRef}
+        {...listeners}
+        {...attributes}
+        title={t("box.preQueue.dragHint")}
+        className="cursor-grab active:cursor-grabbing px-2 pt-1 pb-1"
+      >
+        <div className="flex items-center justify-between gap-1">
+          <span
+            className="text-lg font-bold leading-none"
+            style={{ color: tierHex(entry.score ?? 25) }}
+          >
+            {entry.score ?? 25}
+          </span>
+          <span className="text-[9px] font-mono font-bold text-yellow-200 tabular-nums">
+            {Math.ceil(remaining)}s
+          </span>
+        </div>
+        <div className="text-[8px] text-neutral-200 truncate font-medium">
+          {entry.teamName || entry.driverName || `K#${entry.kartNumber}`}
+        </div>
       </div>
-      <div className="text-[8px] text-neutral-200 truncate font-medium">
-        {entry.teamName || entry.driverName || `K#${entry.kartNumber}`}
+      {/* Botones de asignación rápida — uno por fila configurada.
+          Color de fondo = color de la fila destino para asociación
+          visual instantánea con la cabecera del grid. */}
+      <div className="flex gap-0.5 px-1 pb-1.5">
+        {colors.map((c, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onQuickAssign(idx);
+            }}
+            disabled={pendingLine !== null}
+            title={`Asignar a F${idx + 1}`}
+            className={clsx(
+              "flex-1 min-w-[18px] h-5 rounded text-[8px] font-bold text-white/95 border border-black/40 leading-none transition-opacity",
+              pendingLine === idx ? "opacity-60 animate-pulse" :
+              pendingLine !== null ? "opacity-40 cursor-not-allowed" :
+              "active:scale-90 hover:brightness-110",
+            )}
+            style={{ backgroundColor: c }}
+          >
+            F{idx + 1}
+          </button>
+        ))}
       </div>
       {/* Barra de progreso del countdown */}
       <div className="absolute bottom-0 left-0 h-0.5 bg-yellow-400" style={{ width: `${pct}%` }} />

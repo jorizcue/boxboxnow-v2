@@ -230,6 +230,14 @@ export interface RaceConfig {
    *  Solo aplica a sesiones live; en replay el backend siempre fuerza
    *  el comportamiento auto. */
   boxManualMode?: boolean;
+  /** Colores hex por fila del box (`["#3b82f6", "#ef4444", …]`).
+   *  Persistido por sesión en `RaceSession.box_line_colors`. Cuando
+   *  es `null` / `undefined` / lista más corta que `boxLines`, el
+   *  cliente aplica defaults (azul, rojo, verde, amarillo, morado).
+   *  Habilita la asignación manual rápida por botón de color
+   *  (alternativa al drag&drop) y refuerzo visual del borde de las
+   *  cards del grid. */
+  boxLineColors?: string[] | null;
   pitClosedStartMin: number;
   pitClosedEndMin: number;
   rain: boolean;

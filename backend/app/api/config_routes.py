@@ -29,6 +29,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/config", tags=["config"])
 
 
+def _parse_box_line_colors_db(raw: str | None) -> list[str] | None:
+    """`RaceSession.box_line_colors` se almacena como TEXT (JSON
+    serializado). Devuelve list[str] o None si vacío/inválido."""
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, list) else None
+    except Exception:
+        return None
+
+
 def _validate_driver_time_window(
     min_driver_time_min: int | None,
     max_driver_time_min: int | None,
@@ -260,6 +272,12 @@ async def update_session(
     )
 
     for key, value in data.model_dump(exclude_unset=True).items():
+        # `box_line_colors` viaja como list[str] | None en pydantic, pero
+        # la columna en BD es TEXT (JSON serializado). Convertimos aquí
+        # para no requerir un TypeDecorator en SQLAlchemy.
+        if key == "box_line_colors":
+            session.box_line_colors = json.dumps(value) if value is not None else None
+            continue
         setattr(session, key, value)
 
     await db.commit()
@@ -298,6 +316,7 @@ async def update_session(
             max_driver_time_min=session.max_driver_time_min or 0,
             team_drivers_count=session.team_drivers_count or 0,
             box_manual_mode=bool(session.box_manual_mode),
+            box_line_colors=_parse_box_line_colors_db(session.box_line_colors),
             pit_closed_start_min=session.pit_closed_start_min,
             pit_closed_end_min=session.pit_closed_end_min,
             finish_lat1=c.finish_lat1 if c else None,

@@ -11,11 +11,13 @@ import { api } from "@/lib/api";
 import type { FifoEntry } from "@/types/race";
 import clsx from "clsx";
 import { useT } from "@/lib/i18n";
+import { resolveBoxLineColors } from "@/lib/boxLineColors";
 import {
   DroppableLane,
   ManualPreQueueStrip,
   useManualBoxDnD,
 } from "./ManualBoxDnD";
+import { LineColorChip } from "./LineColorChip";
 // RainToggle moved to the global StatusBar (icon button).
 
 export function FifoQueue() {
@@ -42,6 +44,8 @@ export function FifoQueue() {
 
   const boxLines = config.boxLines || 2;
   const boxKarts = config.boxKarts || 4;
+  // Colores por fila — ver BoxStatusPanel para el razonamiento.
+  const lineColors = resolveBoxLineColors(config.boxLineColors, boxLines);
 
   // Build a set of kart numbers that are "frozen" (cold):
   // - Karts whose last pit entry was > 15 min ago
@@ -358,6 +362,13 @@ export function FifoQueue() {
                             ? "border-blue-400/70 bg-blue-950/30 hover:bg-blue-900/40"
                             : "border-neutral-600 bg-neutral-800/50 hover:bg-neutral-700/50"
                         )}
+                        // Franja izquierda con el color de la fila para
+                        // refuerzo visual; solo en entries reales (con kart).
+                        style={
+                          kartNum
+                            ? { boxShadow: `inset 4px 0 0 ${lineColors[rowIdx] ?? "transparent"}` }
+                            : undefined
+                        }
                       >
                         {isFrozen && <FrozenOverlay />}
 
@@ -410,7 +421,8 @@ export function FifoQueue() {
                 </div>
 
                 {/* Row label */}
-                <div className="flex-shrink-0 flex items-center gap-0.5">
+                <div className="flex-shrink-0 flex items-center gap-1">
+                  <LineColorChip lineIdx={rowIdx} boxLines={boxLines} />
                   <span className="text-[10px] sm:text-xs text-red-400 font-bold">F{rowIdx + 1}</span>
                   <span className="text-red-400 text-xs sm:text-sm">&larr;</span>
                 </div>

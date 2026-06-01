@@ -37,7 +37,9 @@ import { tierHex, secondsToHMS } from "@/lib/formatters";
 import { useT } from "@/lib/i18n";
 import type { FifoEntry } from "@/types/race";
 
+import { resolveBoxLineColors } from "@/lib/boxLineColors";
 import { FrozenOverlay, KartDetailModal, PitCard } from "./FifoQueue";
+import { LineColorChip } from "./LineColorChip";
 import {
   DroppableLane,
   ManualPreQueueStrip,
@@ -51,6 +53,10 @@ export function BoxFifoView() {
   const [selectedEntry, setSelectedEntry] = useState<FifoEntry | null>(null);
 
   const boxLines = config.boxLines || 2;
+  // Colores por fila: defaults + override del operador. Se usan tanto
+  // para el chip de la cabecera, los botones de asignación rápida en
+  // el strip, y el refuerzo visual del borde-izquierdo de cada card.
+  const lineColors = resolveBoxLineColors(config.boxLineColors, boxLines);
   const boxKarts = config.boxKarts || 4;
   const kartsPerRow = Math.max(1, Math.ceil(boxKarts / boxLines));
 
@@ -218,6 +224,16 @@ export function BoxFifoView() {
                                 ? "border-blue-400/70 bg-blue-950/30 hover:bg-blue-900/40"
                                 : "border-neutral-600 bg-neutral-800/50 hover:bg-neutral-700/50"
                             )}
+                            // Refuerzo visual: franja de color en el
+                            // borde izquierdo del color de SU fila.
+                            // Solo cuando es una entry real (con kart);
+                            // los placeholders 25/Box no llevan franja
+                            // para no enturbiar el grid.
+                            style={
+                              kartNum
+                                ? { boxShadow: `inset 4px 0 0 ${lineColors[rowIdx] ?? "transparent"}` }
+                                : undefined
+                            }
                           >
                             {isFrozen && <FrozenOverlay />}
 
@@ -262,7 +278,8 @@ export function BoxFifoView() {
                       })}
                     </div>
 
-                    <div className="flex-shrink-0 flex items-center gap-0.5">
+                    <div className="flex-shrink-0 flex items-center gap-1">
+                      <LineColorChip lineIdx={rowIdx} boxLines={boxLines} />
                       <span className="text-[10px] sm:text-xs text-red-400 font-bold">F{rowIdx + 1}</span>
                       <span className="text-red-400 text-xs sm:text-sm">&larr;</span>
                     </div>

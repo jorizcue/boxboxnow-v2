@@ -1,3 +1,4 @@
+import json as _json
 import re
 from pydantic import BaseModel, field_validator
 from datetime import datetime
@@ -413,8 +414,24 @@ class RaceSessionOut(BaseModel):
     # Box manual mode (drag & drop con fallback a auto en 15 s).
     # False por default → comportamiento round-robin clásico.
     box_manual_mode: bool = False
+    # Colores hex por fila del box. Persiste como JSON Text en DB; el
+    # validador acepta tanto list[str] (cliente / serialización pydantic)
+    # como str (SQLAlchemy lee la columna como string). None → cliente
+    # aplica defaults [azul, rojo, verde, amarillo, morado, …].
+    box_line_colors: list[str] | None = None
     is_active: bool
     team_positions: list["TeamPositionOut"] = []
+
+    @field_validator("box_line_colors", mode="before")
+    @classmethod
+    def _parse_box_line_colors(cls, v):
+        if isinstance(v, str):
+            try:
+                parsed = _json.loads(v)
+                return parsed if isinstance(parsed, list) else None
+            except Exception:
+                return None
+        return v
 
     model_config = {"from_attributes": True}
 
@@ -439,6 +456,7 @@ class RaceSessionCreate(BaseModel):
     auto_load_teams: bool = False
     team_drivers_count: int = 0
     box_manual_mode: bool = False
+    box_line_colors: list[str] | None = None
 
 
 class RaceSessionUpdate(BaseModel):
@@ -461,6 +479,7 @@ class RaceSessionUpdate(BaseModel):
     auto_load_teams: bool | None = None
     team_drivers_count: int | None = None
     box_manual_mode: bool | None = None
+    box_line_colors: list[str] | None = None
 
 
 # --- User Preferences (driver view config) ---

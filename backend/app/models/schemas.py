@@ -305,6 +305,17 @@ class RaceSession(Base):
     # evita timers de 15 s reales durante reproducciones a x10/x100).
     box_manual_mode = Column(Boolean, default=False, nullable=False)
 
+    # Colores asignados por el operador a las filas del box (F1, F2, …).
+    # JSON: lista de strings hex (`["#3b82f6", "#ef4444", …]`) — un
+    # color por fila. Permite asignación rápida click-en-color (botones
+    # en la card de la pre-cola) y refuerzo visual del borde de las
+    # cards del grid. Si es `null` o más corto que `box_lines`, el
+    # cliente rellena con defaults (`["#3b82f6", "#ef4444", "#10b981",
+    # "#eab308", "#a855f7", …]`). Por-sesión a propósito: distintas
+    # carreras pueden tener esquemas distintos sin afectar al perfil
+    # global del usuario.
+    box_line_colors = Column(Text, nullable=True)
+
     # State
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())

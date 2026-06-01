@@ -103,6 +103,15 @@ async def init_db():
         except Exception:
             pass
 
+        # box_line_colors: JSON array de colores hex por fila del box
+        # (`["#3b82f6", "#ef4444", …]`). NULL = el cliente aplica
+        # defaults. Sesiones antiguas mantienen NULL — comportamiento
+        # equivalente al anterior (cabeceras grises).
+        try:
+            await conn.execute(text("ALTER TABLE race_sessions ADD COLUMN box_line_colors TEXT"))
+        except Exception:
+            pass
+
         # Recreate live_race_state if it has the old schema (race_session_id column)
         try:
             result = await conn.execute(text("PRAGMA table_info(live_race_state)"))

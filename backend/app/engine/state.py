@@ -428,6 +428,11 @@ class RaceStateManager:
         self.pit_closed_end_min: int = 0
         self.box_lines: int = 2
         self.box_karts: int = 30
+        # Colores hex por fila del box configurados por el operador.
+        # `None` o lista más corta que `box_lines` → el cliente aplica
+        # defaults. Por-sesión; los `UserSession.configure` /
+        # `ReplaySession.apply_config` lo propagan desde `RaceSession`.
+        self.box_line_colors: list[str] | None = None
         self.duration_min: int = 180
         # Number of drivers in the team. 0 = not configured; the pit-gate
         # falls back to Apex-observed drivers. Set from RaceSession by
@@ -1636,6 +1641,7 @@ class RaceStateManager:
                     "durationMin": self.duration_min,
                     "boxLines": self.box_lines,
                     "boxKarts": self.box_karts,
+                    "boxLineColors": self.box_line_colors,
                     "minDriverTimeMin": self.min_driver_time_min,
                     "maxDriverTimeMin": self.max_driver_time_min,
                     "teamDriversCount": self.team_drivers_count,

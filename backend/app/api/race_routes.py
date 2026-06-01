@@ -5,6 +5,7 @@ message stream when they have an active session. No manual connect needed.
 """
 
 import asyncio
+import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -12,6 +13,19 @@ from app.models.schemas import User
 from app.api.auth_routes import get_current_user, require_active_subscription, require_active_circuit_access
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_box_line_colors(raw: str | None) -> list[str] | None:
+    """Parse `box_line_colors` desde la columna TEXT JSON de RaceSession.
+    Devuelve `None` si raw es None / vacío / JSON inválido / no-list.
+    El cliente aplicará defaults cuando reciba None."""
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, list) else None
+    except Exception:
+        return None
 
 # Router-level access gate: every endpoint here requires a valid JWT AND
 # an active/trialing subscription AND at least one currently-valid
@@ -88,6 +102,7 @@ async def ensure_monitoring(app_state, user_id: int):
         max_driver_time_min=session.max_driver_time_min or 0,
         team_drivers_count=session.team_drivers_count or 0,
         box_manual_mode=bool(session.box_manual_mode),
+        box_line_colors=_parse_box_line_colors(session.box_line_colors),
         pit_closed_start_min=session.pit_closed_start_min or 0,
         pit_closed_end_min=session.pit_closed_end_min or 0,
         finish_lat1=circuit.finish_lat1,

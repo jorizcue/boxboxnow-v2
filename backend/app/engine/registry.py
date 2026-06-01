@@ -18,6 +18,24 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 
 
+def _parse_box_line_colors_raw(raw) -> list[str] | None:
+    """Parse `box_line_colors` desde la columna TEXT de RaceSession.
+    Si ya viene como list (improbable pero seguro), passthru. Si
+    es string JSON, intenta deserializar. Cualquier inconsistencia
+    devuelve None y el cliente aplica defaults."""
+    if raw is None:
+        return None
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, str) and raw:
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, list) else None
+        except Exception:
+            return None
+    return None
+
+
 class UserSession:
     """All runtime state for a single user's active race."""
 
@@ -381,7 +399,8 @@ class UserSession:
                   finish_lat2: float | None = None, finish_lon2: float | None = None,
                   warmup_laps_to_skip: int = 3,
                   team_drivers_count: int = 0,
-                  box_manual_mode: bool = False):
+                  box_manual_mode: bool = False,
+                  box_line_colors: list[str] | None = None):
         """Apply race session config to state and fifo."""
         self.state.circuit_length_m = circuit_length_m or 1100
         self.state.pit_time_s = pit_time_s or 120
@@ -400,6 +419,7 @@ class UserSession:
         self.state.pit_closed_end_min = pit_closed_end_min
         self.state.box_lines = box_lines
         self.state.box_karts = box_karts
+        self.state.box_line_colors = box_line_colors
         self.state.finish_lat1 = finish_lat1
         self.state.finish_lon1 = finish_lon1
         self.state.finish_lat2 = finish_lat2
@@ -695,6 +715,7 @@ class UserSession:
                                     "durationMin": self.state.duration_min,
                                     "boxLines": self.state.box_lines,
                                     "boxKarts": self.state.box_karts,
+                                    "boxLineColors": self.state.box_line_colors,
                                     "minDriverTimeMin": self.state.min_driver_time_min,
                                     "maxDriverTimeMin": self.state.max_driver_time_min,
                                     "teamDriversCount": self.state.team_drivers_count,
@@ -1028,6 +1049,8 @@ class ReplaySession:
 
         self.state.box_karts = _val(session.box_karts, 30)
         self.state.box_lines = _val(session.box_lines, 2)
+        self.state.box_line_colors = _parse_box_line_colors_raw(
+            getattr(session, "box_line_colors", None))
         self.state.our_kart_number = _val(session.our_kart_number, 0)
         self.state.duration_min = _val(session.duration_min, 180)
         self.state.max_stint_min = _val(session.max_stint_min, 40)
@@ -1060,6 +1083,8 @@ class ReplaySession:
         self.state.min_stint_min = session.min_stint_min
         self.state.box_lines = session.box_lines
         self.state.box_karts = session.box_karts
+        self.state.box_line_colors = _parse_box_line_colors_raw(
+            getattr(session, "box_line_colors", None))
         self.state.update_duration(session.duration_min)
         self.state.pit_time_s = session.pit_time_s
         self.state.min_driver_time_min = session.min_driver_time_min
@@ -1206,6 +1231,7 @@ class ReplaySession:
                                     "durationMin": self.state.duration_min,
                                     "boxLines": self.state.box_lines,
                                     "boxKarts": self.state.box_karts,
+                                    "boxLineColors": self.state.box_line_colors,
                                     "minDriverTimeMin": self.state.min_driver_time_min,
                                     "maxDriverTimeMin": self.state.max_driver_time_min,
                                     "teamDriversCount": self.state.team_drivers_count,
