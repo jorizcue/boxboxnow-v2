@@ -914,10 +914,24 @@ class CircuitHub:
             conn.unsubscribe(user_id)
 
     async def start_connection(self, circuit_id: int) -> bool:
-        """Start (or restart) a single circuit connection from DB."""
+        """Start (or restart) a single circuit connection from DB.
+
+        Caso de "no-op silencioso" históricamente: si `conn._running`
+        era True devolvíamos True sin hacer nada — pero el flag
+        `_running` solo indica que el `_run()` task está vivo, NO que
+        el WS esté conectado. Cuando Apex migra el endpoint legacy
+        (típico) o el host responde con timeout, `_run()` queda
+        atascado en un `await sleep(30s)` indefinido con
+        `_connected=False`. El usuario pulsaba "arrancar" en la UI
+        admin y no pasaba nada visible.
+
+        Ahora: si el conn está atascado (running pero no connected),
+        forzamos `stop()` + nueva conexión con la URL fresca de BD y
+        backoff reseteado a 1 s.
+        """
         conn = self._connections.get(circuit_id)
-        if conn and conn._running:
-            return True  # Already running
+        if conn and conn._running and conn._connected:
+            return True  # Already running AND connected — no-op real
 
         from app.models.database import async_session
         from app.models.schemas import Circuit
