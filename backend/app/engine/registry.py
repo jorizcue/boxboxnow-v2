@@ -48,9 +48,15 @@ class UserSession:
         self.api_client: ApexApiClient | None = None
         self._load_drivers_task: asyncio.Task | None = None
         self._analytics_task: asyncio.Task | None = None
-        self._race_log_id: int | None = None
-        self._saved_laps_per_kart: dict[int, int] = {}  # kart_number -> count of saved laps
-        self._save_lock = asyncio.Lock()
+        # Nota: la persistencia de race_logs + KartLaps NO la hace
+        # UserSession. La hace `CircuitConnection._save_lap_state_to_db`
+        # (circuit_hub.py) con `user_id=NULL` por cada sesión Apex
+        # observada, esté o no monitorizando algún usuario. Tener
+        # también un write path aquí duplicaba cada lap × N usuarios
+        # sin valor: el módulo de analítica filtra por circuit_id +
+        # rango de fechas (nunca por user_id), y el `_dedup_laps`
+        # colapsaba los duplicados al leer, pero el disco crecía
+        # ~×(N+1). Eliminado el camino por-usuario.
 
         async def on_events(events):
             # Track which karts were NOT in pit before processing
@@ -163,10 +169,10 @@ class UserSession:
                 self.fifo.apply_to_state(self.state)
                 await self._broadcast_fifo()
 
-            # Real-time lap saving
-            lap_events = [e for e in events if e.type == EventType.LAP]
-            if lap_events:
-                asyncio.create_task(self._save_realtime_laps())
+            # Lap-save by-user removed: see comment in __init__. La
+            # persistencia ya la hace `CircuitConnection` headless
+            # del hub, una vez por sesión Apex independientemente
+            # de cuántos usuarios la estén mirando.
 
         self._on_events = on_events
 
@@ -186,13 +192,7 @@ class UserSession:
         logger.info(f"User session started (user_id={self.user_id}, circuit={self.circuit_id})")
 
     async def stop(self):
-        """Stop all tasks and save race data."""
-        # Save race laps before stopping
-        try:
-            await self.save_race_laps()
-        except Exception as e:
-            logger.error(f"Failed to save race laps on stop (user={self.user_id}): {e}")
-
+        """Stop all tasks (no lap persistence — la hace el hub headless)."""
         if self._analytics_task:
             self._analytics_task.cancel()
             try:
@@ -205,188 +205,12 @@ class UserSession:
             await self.api_client.close()
         logger.info(f"User session stopped (user_id={self.user_id})")
 
-    async def _save_realtime_laps(self):
-        """Save newly arrived laps to DB in real-time."""
-        from app.models.database import async_session
-        from app.models.schemas import RaceLog, KartLap
-        from datetime import datetime, timezone
-        from sqlalchemy import select
-
-        try:
-            async with self._save_lock:
-                async with async_session() as db:
-                    # Create or reuse race_log
-                    if self._race_log_id is None:
-                        session_name = self.state.track_name or f"Race {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-                        today_start = datetime.now(timezone.utc).replace(
-                            hour=0, minute=0, second=0, microsecond=0)
-
-                        # Check for existing RaceLog with same session today
-                        existing = (await db.execute(
-                            select(RaceLog).where(
-                                RaceLog.circuit_id == self.circuit_id,
-                                RaceLog.user_id == self.user_id,
-                                RaceLog.session_name == session_name,
-                                RaceLog.race_date >= today_start,
-                            )
-                        )).scalar_one_or_none()
-
-                        if existing:
-                            self._race_log_id = existing.id
-                            from sqlalchemy import func as sqlfunc
-                            rows = (await db.execute(
-                                select(KartLap.kart_number, sqlfunc.max(KartLap.lap_number))
-                                .where(KartLap.race_log_id == existing.id)
-                                .group_by(KartLap.kart_number)
-                            )).all()
-                            for kart_number, max_lap in rows:
-                                self._saved_laps_per_kart[kart_number] = max_lap
-                            logger.info(f"Reusing race_log #{existing.id} for '{session_name}' (user={self.user_id})")
-                        else:
-                            race_log = RaceLog(
-                                circuit_id=self.circuit_id,
-                                user_id=self.user_id,
-                                race_date=datetime.now(timezone.utc),
-                                session_name=session_name,
-                                duration_min=self.state.duration_min,
-                                total_karts=len(self.state.karts),
-                            )
-                            db.add(race_log)
-                            await db.flush()
-                            self._race_log_id = race_log.id
-                            logger.info(f"Created race_log #{race_log.id} for '{session_name}' (user={self.user_id})")
-
-                    # Save only NEW laps per kart (track count per kart_number)
-                    new_count = 0
-                    for kart in self.state.karts.values():
-                        saved = self._saved_laps_per_kart.get(kart.kart_number, 0)
-                        if len(kart.all_laps) <= saved:
-                            continue
-                        valid_set = {(vl["totalLap"], vl["lapTime"]) for vl in kart.valid_laps}
-                        for lap in kart.all_laps[saved:]:
-                            kart_lap = KartLap(
-                                race_log_id=self._race_log_id,
-                                kart_number=kart.kart_number,
-                                team_name=kart.team_name,
-                                driver_name=lap.get("driverName", ""),
-                                lap_number=lap["totalLap"],
-                                lap_time_ms=lap["lapTime"],
-                                is_valid=(lap["totalLap"], lap["lapTime"]) in valid_set,
-                                recorded_at=datetime.now(timezone.utc),
-                            )
-                            db.add(kart_lap)
-                            new_count += 1
-                        self._saved_laps_per_kart[kart.kart_number] = len(kart.all_laps)
-
-                    if new_count == 0:
-                        return
-
-                    await db.commit()
-        except Exception as e:
-            logger.error(f"Real-time lap save failed (user={self.user_id}): {e}")
-
-    async def save_race_laps(self):
-        """Final save: persist any remaining unsaved laps and update race_log metadata."""
-        from datetime import datetime, timezone
-        from app.models.database import async_session
-        from app.models.schemas import RaceLog, KartLap
-        from sqlalchemy import update
-
-        total_laps = sum(len(k.all_laps) for k in self.state.karts.values())
-
-        if self._race_log_id is not None:
-            # Already saving in real-time, just flush remaining laps and update metadata
-            try:
-                await self._save_realtime_laps()  # Flush any pending
-                async with async_session() as db:
-                    await db.execute(
-                        update(RaceLog)
-                        .where(RaceLog.id == self._race_log_id)
-                        .values(
-                            total_karts=len(self.state.karts),
-                            duration_min=self.state.duration_min,
-                        )
-                    )
-                    await db.commit()
-                logger.info(f"Updated race_log #{self._race_log_id} on stop: {total_laps} total laps")
-            except Exception as e:
-                logger.error(f"Failed to finalize race_log on stop: {e}")
-            return
-
-        # Fallback: bulk save if real-time wasn't active
-        if total_laps < 10:
-            logger.info(f"Skipping race save: only {total_laps} laps (user={self.user_id})")
-            return
-
-        from sqlalchemy import select, func as sqlfunc
-
-        async with async_session() as db:
-            # Dedup: check for existing RaceLog with same session today
-            session_name = self.state.track_name or f"Race {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-            today_start = datetime.now(timezone.utc).replace(
-                hour=0, minute=0, second=0, microsecond=0)
-
-            existing = (await db.execute(
-                select(RaceLog).where(
-                    RaceLog.circuit_id == self.circuit_id,
-                    RaceLog.user_id == self.user_id,
-                    RaceLog.session_name == session_name,
-                    RaceLog.race_date >= today_start,
-                )
-            )).scalar_one_or_none()
-
-            if existing:
-                race_log_id = existing.id
-                # Rebuild saved counts to know which laps already exist
-                rows = (await db.execute(
-                    select(KartLap.kart_number, sqlfunc.max(KartLap.lap_number))
-                    .where(KartLap.race_log_id == existing.id)
-                    .group_by(KartLap.kart_number)
-                )).all()
-                saved_per_kart = {kart_number: max_lap for kart_number, max_lap in rows}
-                logger.info(f"Reusing race_log #{existing.id} for fallback save '{session_name}' (user={self.user_id})")
-            else:
-                race_log = RaceLog(
-                    circuit_id=self.circuit_id,
-                    user_id=self.user_id,
-                    race_date=datetime.now(timezone.utc),
-                    session_name=session_name,
-                    duration_min=self.state.duration_min,
-                    total_karts=len(self.state.karts),
-                )
-                db.add(race_log)
-                await db.flush()
-                race_log_id = race_log.id
-                saved_per_kart = {}
-                logger.info(f"Created race_log #{race_log.id} for fallback save '{session_name}' (user={self.user_id})")
-
-            # Collect valid lap times from valid_laps set for quick lookup
-            new_count = 0
-            for kart in self.state.karts.values():
-                saved = saved_per_kart.get(kart.kart_number, 0)
-                valid_lap_set = set()
-                for vl in kart.valid_laps:
-                    valid_lap_set.add((vl["totalLap"], vl["lapTime"]))
-
-                for lap in kart.all_laps[saved:]:
-                    kart_lap = KartLap(
-                        race_log_id=race_log_id,
-                        kart_number=kart.kart_number,
-                        team_name=kart.team_name,
-                        driver_name=lap.get("driverName", ""),
-                        lap_number=lap["totalLap"],
-                        lap_time_ms=lap["lapTime"],
-                        is_valid=(lap["totalLap"], lap["lapTime"]) in valid_lap_set,
-                        recorded_at=datetime.now(timezone.utc),
-                    )
-                    db.add(kart_lap)
-                    new_count += 1
-
-            if new_count > 0:
-                await db.commit()
-            logger.info(f"Fallback save race_log #{race_log_id}: {new_count} new laps, "
-                        f"{len(self.state.karts)} karts (user={self.user_id}, "
-                        f"circuit={self.circuit_id})")
+    # Eliminados `_save_realtime_laps` y `save_race_laps`.
+    # La persistencia de RaceLog + KartLap la realiza
+    # `CircuitConnection._save_lap_state_to_db` en
+    # `app/apex/circuit_hub.py` con `user_id=NULL`, una vez por
+    # sesión Apex observada — sin dependencia de qué usuarios
+    # estén monitorizando.
 
     def configure(self, circuit_length_m: int, pit_time_s: int, laps_discard: int,
                   lap_differential: float, rain: bool, our_kart: int, min_pits: int,
