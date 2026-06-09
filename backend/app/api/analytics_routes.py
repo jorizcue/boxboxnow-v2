@@ -149,6 +149,28 @@ async def _get_race_log_ids(db: AsyncSession, circuit_id: int, dt_from, dt_to) -
     return [r[0] for r in result.all()]
 
 
+async def _filter_race_log_ids_by_circuit(
+    db: AsyncSession, rl_ids: list[int], circuit_id: int
+) -> list[int]:
+    """Keep only the race_log ids that actually belong to `circuit_id`.
+
+    Client-supplied `race_log_ids` were previously trusted verbatim, so a
+    user with access to circuit A could pass ids of circuit B (ids are
+    sequential/enumerable) and read B's paid telemetry + driver/team names
+    — a cross-circuit IDOR. Since `_check_circuit_access` already verified
+    access to `circuit_id`, restricting the ids to that circuit closes it.
+    """
+    if not rl_ids:
+        return []
+    rows = await db.execute(
+        select(RaceLog.id).where(
+            RaceLog.id.in_(rl_ids),
+            RaceLog.circuit_id == circuit_id,
+        )
+    )
+    return [r[0] for r in rows.all()]
+
+
 @router.get("/kart-stats", response_model=list[KartStatsOut])
 async def get_kart_stats(
     circuit_id: int,
@@ -164,6 +186,8 @@ async def get_kart_stats(
 
     if race_log_ids:
         rl_ids = [int(x) for x in race_log_ids.split(",") if x.strip()]
+        # IDOR guard: restrict client-supplied ids to the authorized circuit.
+        rl_ids = await _filter_race_log_ids_by_circuit(db, rl_ids, circuit_id)
     else:
         dt_from, dt_to = _parse_date_range(date_from, date_to)
         rl_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)
@@ -248,6 +272,8 @@ async def get_kart_best_laps(
 
     if race_log_ids:
         rl_ids = [int(x) for x in race_log_ids.split(",") if x.strip()]
+        # IDOR guard: restrict client-supplied ids to the authorized circuit.
+        rl_ids = await _filter_race_log_ids_by_circuit(db, rl_ids, circuit_id)
     else:
         dt_from, dt_to = _parse_date_range(date_from, date_to)
         rl_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)
@@ -322,6 +348,8 @@ async def get_kart_drivers(
 
     if race_log_ids:
         rl_ids = [int(x) for x in race_log_ids.split(",") if x.strip()]
+        # IDOR guard: restrict client-supplied ids to the authorized circuit.
+        rl_ids = await _filter_race_log_ids_by_circuit(db, rl_ids, circuit_id)
     else:
         dt_from, dt_to = _parse_date_range(date_from, date_to)
         rl_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)
@@ -400,6 +428,8 @@ async def get_kart_driver_laps(
 
     if race_log_ids:
         rl_ids = [int(x) for x in race_log_ids.split(",") if x.strip()]
+        # IDOR guard: restrict client-supplied ids to the authorized circuit.
+        rl_ids = await _filter_race_log_ids_by_circuit(db, rl_ids, circuit_id)
     else:
         dt_from, dt_to = _parse_date_range(date_from, date_to)
         rl_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)
@@ -465,6 +495,8 @@ async def get_scope_drivers(
 
     if race_log_ids:
         rl_ids = [int(x) for x in race_log_ids.split(",") if x.strip()]
+        # IDOR guard: restrict client-supplied ids to the authorized circuit.
+        rl_ids = await _filter_race_log_ids_by_circuit(db, rl_ids, circuit_id)
     else:
         dt_from, dt_to = _parse_date_range(date_from, date_to)
         rl_ids = await _get_race_log_ids(db, circuit_id, dt_from, dt_to)

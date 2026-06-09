@@ -93,6 +93,24 @@ def _resolve_logs_dir(user: User, owner_id: int | None = None,
     return os.path.join(LOGS_BASE_DIR, str(user.id))
 
 
+async def _verify_circuit_dir_access(db: AsyncSession, user: User,
+                                     circuit_dir: str | None) -> None:
+    """Raise 403 unless the user has access to the circuit whose recordings
+    live under `circuit_dir`. No-op when `circuit_dir` is None (own/legacy
+    logs are already user-scoped by `_resolve_logs_dir`).
+
+    The router gate only checks "access to SOME circuit"; this enforces
+    access to the SPECIFIC circuit being requested, closing the
+    cross-circuit IDOR on replay recordings (paywall + cross-tenant data).
+    """
+    if not circuit_dir:
+        return
+    from app.api.auth_routes import user_can_access_circuit_dir
+    clean = Path(circuit_dir).name
+    if not await user_can_access_circuit_dir(db, user.id, user.is_admin, clean):
+        raise HTTPException(403, "No access to this circuit's recordings")
+
+
 def _list_log_files(directory: Path) -> list[Path]:
     """List .log and .log.gz files in a directory."""
     logs = list(directory.glob("*.log"))
@@ -299,10 +317,12 @@ async def analyze_log(
     user: User = Depends(get_current_user),
     owner_id: int | None = Query(None),
     circuit_dir: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
 ):
     """Analyze a log file: total blocks, race start positions, time range."""
     from app.apex.parser import ApexMessageParser
 
+    await _verify_circuit_dir_access(db, user, circuit_dir)
     logs_dir = _resolve_logs_dir(user, owner_id, circuit_dir)
     filename = _safe_filename(filename)
 
@@ -350,13 +370,14 @@ async def start_replay(
     """Start replaying a log file. Creates per-user replay session."""
     replay_reg = _get_replay_registry(request)
 
-    # Resolve which directory to read from
-    if data.circuit_dir:
-        logs_dir = os.path.join(RECORDINGS_BASE_DIR, data.circuit_dir)
-    elif data.owner_id is not None and user.is_admin:
-        logs_dir = os.path.join(LOGS_BASE_DIR, str(data.owner_id))
-    else:
-        logs_dir = os.path.join(LOGS_BASE_DIR, str(user.id))
+    # Per-circuit access for recordings (paywall + cross-tenant guard).
+    await _verify_circuit_dir_access(db, user, data.circuit_dir)
+
+    # Resolve which directory to read from. Use the shared resolver (which
+    # sanitizes circuit_dir against path traversal) instead of an inline
+    # os.path.join — the previous inline version let `circuit_dir='../..'`
+    # escape data/recordings/.
+    logs_dir = _resolve_logs_dir(user, data.owner_id, data.circuit_dir)
 
     data.filename = _safe_filename(data.filename)
 
@@ -574,10 +595,12 @@ async def download_session(
     circuit_dir: str | None = Query(None),
     owner_id: int | None = Query(None),
     user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Download raw log lines for a specific session (block range) as a text file."""
     from app.apex.parser import ApexMessageParser
 
+    await _verify_circuit_dir_access(db, user, circuit_dir)
     logs_dir = _resolve_logs_dir(user, owner_id, circuit_dir)
     filename = _safe_filename(filename)
 

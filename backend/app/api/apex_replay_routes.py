@@ -88,19 +88,41 @@ async def apex_images(filename: str):
 
 
 def _resolve_log_path(filename: str, circuit_dir: str | None = None) -> str | None:
-    """Find the log file path."""
+    """Find the log file path, guarding against path traversal.
+
+    Both `filename` and `circuit_dir` are reduced to a single path
+    component (`Path(x).name` strips any directory parts and `..`), and
+    the resolved candidate is then verified to stay inside its intended
+    base dir via `resolve().relative_to(base)`. This closes the traversal
+    that let `circuit_dir='..'` + `filename='<other_user>/x.log.gz'` reach
+    arbitrary files / other users' logs (the process runs as root in the
+    container). Returns None on any traversal attempt or missing file.
+    """
+    safe_file = Path(filename).name
+    if not safe_file or safe_file in (".", ".."):
+        return None
+
+    candidates: list[tuple[Path, Path]] = []
     if circuit_dir:
-        path = Path(RECORDINGS_BASE_DIR) / circuit_dir / filename
-        if path.exists():
-            return str(path)
-        # Try .gz
-        gz_path = Path(RECORDINGS_BASE_DIR) / circuit_dir / f"{filename}.gz"
-        if gz_path.exists():
-            return str(gz_path)
-    # Try root logs
-    path = Path(LOGS_BASE_DIR) / filename
-    if path.exists():
-        return str(path)
+        safe_dir = Path(circuit_dir).name
+        if not safe_dir or safe_dir in (".", ".."):
+            return None
+        rec_base = Path(RECORDINGS_BASE_DIR) / safe_dir
+        candidates.append((rec_base, rec_base / safe_file))
+        candidates.append((rec_base, rec_base / f"{safe_file}.gz"))
+    log_base = Path(LOGS_BASE_DIR)
+    candidates.append((log_base, log_base / safe_file))
+
+    for base, candidate in candidates:
+        try:
+            resolved = candidate.resolve()
+            # Defense-in-depth: ensure we never escape the base dir even
+            # if a symlink or odd component slips past the basename check.
+            resolved.relative_to(base.resolve())
+        except (ValueError, OSError):
+            continue
+        if resolved.exists() and resolved.is_file():
+            return str(resolved)
     return None
 
 
@@ -196,6 +218,22 @@ async def apex_replay_ws(
         # 403-on-handshake is what curl / the apex viewer expect.
         await websocket.close(code=4001, reason="Unauthorized")
         return
+
+    # Per-circuit access: a recording under `circuit_dir` requires access
+    # to THAT circuit, not merely any circuit (which is all _ws_authenticate
+    # verified). Without this, a subscriber of one circuit could replay any
+    # other circuit's recordings (the dir slugs are enumerable). Admins pass.
+    if circuit_dir:
+        async with async_session() as db:
+            is_admin = bool((await db.execute(
+                select(User.is_admin).where(User.id == user_id)
+            )).scalar_one_or_none())
+            from app.api.auth_routes import user_can_access_circuit_dir
+            if not await user_can_access_circuit_dir(
+                db, user_id, is_admin, Path(circuit_dir).name
+            ):
+                await websocket.close(code=4003, reason="Forbidden")
+                return
 
     await websocket.accept()
 

@@ -869,6 +869,41 @@ async def user_has_any_active_circuit_access(db, user_id: int) -> bool:
     return allg.first() is not None
 
 
+async def user_can_access_circuit_dir(
+    db, user_id: int, is_admin: bool, circuit_dir: str
+) -> bool:
+    """Does the user have access to the circuit whose recordings live
+    under data/recordings/<circuit_dir>?
+
+    `circuit_dir` is the slug of a circuit's name (``_safe_name(circuit.name)``,
+    set by the CircuitHub recorder). We map it back to its Circuit row(s)
+    and require per-circuit access — NOT merely "access to some circuit",
+    which is all the router-level `require_active_circuit_access` gate
+    checks. Closes the cross-circuit IDOR where a subscriber of one
+    circuit could enumerate/replay/download recordings of any other
+    circuit (the dir slugs are public/enumerable).
+
+    Admins bypass. An unknown / unmatched `circuit_dir` denies (False):
+    callers should treat that as 403/4003 rather than silently proceeding.
+    """
+    if is_admin:
+        return True
+    if not circuit_dir:
+        return False
+    # circuit_dir is a derived slug; there is no SQL column for it, so we
+    # map all circuit names through the same _safe_name transform and
+    # match. ~25 circuits → cheap. Import here to avoid a module cycle.
+    from app.apex.circuit_hub import _safe_name
+    rows = (await db.execute(select(Circuit.id, Circuit.name))).all()
+    matched_ids = [cid for (cid, name) in rows if _safe_name(name or "") == circuit_dir]
+    if not matched_ids:
+        return False
+    for cid in matched_ids:
+        if await user_has_circuit_access(db, user_id, cid):
+            return True
+    return False
+
+
 async def require_active_circuit_access(
     user: User = Depends(get_current_user),
 ) -> User:
