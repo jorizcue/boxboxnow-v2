@@ -2086,7 +2086,21 @@ async def reset_password(request: Request, db: AsyncSession = Depends(get_db)):
     user.password_hash = hash_password(new_password)
     user.password_reset_token = None
     user.password_reset_expires = None
+    # Revoke ALL sessions. A password reset is the "I think I'm
+    # compromised" flow, so every existing JWT/DeviceSession — including
+    # an attacker's — must die. Without this, a stolen session survived
+    # the reset until its 4h JWT expired (get_current_user only checks
+    # that the DeviceSession row still exists). Collect tokens first so
+    # we can also close any live WebSocket after the delete commits.
+    revoked_tokens = (await db.execute(
+        select(DeviceSession.session_token).where(DeviceSession.user_id == user.id)
+    )).scalars().all()
+    await db.execute(delete(DeviceSession).where(DeviceSession.user_id == user.id))
     await db.commit()
+
+    from app.ws.server import close_ws_for_session
+    for tok in revoked_tokens:
+        await close_ws_for_session(tok)
 
     return {"ok": True, "message": "Contrasena actualizada correctamente"}
 
@@ -2245,7 +2259,29 @@ async def set_password(request: Request, user: User = Depends(get_current_user),
 
     user.password_hash = hash_password(new_password)
     user.has_custom_password = True
+    # Revoke all OTHER sessions on an authenticated password change, but
+    # keep THIS device logged in (better UX than forcing a re-login on
+    # the device that just changed the password). Identify the current
+    # session from the bearer JWT's `sid`; if we can't, revoke all.
+    current_sid = None
+    authz = request.headers.get("authorization", "")
+    if authz.lower().startswith("bearer "):
+        try:
+            current_sid = decode_token(authz[7:]).get("sid")
+        except Exception:
+            current_sid = None
+    revoke_cond = [DeviceSession.user_id == user.id]
+    if current_sid:
+        revoke_cond.append(DeviceSession.session_token != current_sid)
+    revoked_tokens = (await db.execute(
+        select(DeviceSession.session_token).where(*revoke_cond)
+    )).scalars().all()
+    await db.execute(delete(DeviceSession).where(*revoke_cond))
     await db.commit()
+
+    from app.ws.server import close_ws_for_session
+    for tok in revoked_tokens:
+        await close_ws_for_session(tok)
 
     return {"ok": True, "message": "Contrasena establecida correctamente"}
 
@@ -2279,16 +2315,37 @@ async def join_waitlist(request: Request, db: AsyncSession = Depends(get_db)):
 async def kill_session_unauthenticated(
     data: LoginRequest,
     session_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """Kill a session by re-authenticating (for when user is locked out).
     Called from the 'device limit reached' screen.
+
+    This endpoint verifies credentials, so it MUST share /login's
+    brute-force throttle — otherwise it's a password oracle that
+    bypasses the login limiter entirely (401 wrong-pass vs 404
+    valid-pass/foreign-session reveals correct passwords, and each
+    attempt costs a bcrypt verify = CPU DoS). We key the same
+    `login_limiter` by IP and by account so an attacker can't split
+    the brute-force budget across /login and /kill-session.
     """
+    ip = _client_ip(request)
+    login_limiter.check(ip)
+    acct_key = f"acct:{data.username.strip().lower()}"
+    login_limiter.check(acct_key)
+
     result = await db.execute(select(User).where(User.username == data.username))
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(data.password, user.password_hash):
+        # Count against both IP and account (same as /login).
+        login_limiter.record_failure(ip)
+        login_limiter.record_failure(acct_key)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+
+    # Valid credentials → clear the streak (mirrors /login).
+    login_limiter.reset(ip)
+    login_limiter.reset(acct_key)
 
     # Verify session belongs to this user
     result = await db.execute(

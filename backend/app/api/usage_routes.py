@@ -36,7 +36,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_routes import decode_token, require_admin
+from app.api.auth_routes import RateLimiter, _client_ip, decode_token, require_admin
 from app.models.database import get_db
 from app.models.schemas import (
     DeviceSession,
@@ -46,6 +46,15 @@ from app.models.schemas import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/usage", tags=["usage"])
+
+# Per-IP throttle for the UNAUTHENTICATED ingest endpoint. Without it,
+# anyone could POST batches of up to 100 events in a loop (only gated by
+# a UA-regex bot filter, trivially spoofable) and bloat the single-file
+# SQLite DB / EC2 disk, degrading login + WS that share the same file.
+# 120 batches/min/IP is far above any legitimate SPA flush cadence
+# (~1 flush every few seconds) yet caps an attacker. Keyed by the real
+# client IP (Caddy rewrites X-Forwarded-For, so it's not spoofable).
+usage_limiter = RateLimiter(max_attempts=120, window_seconds=60)
 
 
 # Conservative bot/crawler regex — broad enough to catch the common ones
@@ -135,6 +144,13 @@ async def post_events(
     `user_id`; otherwise the rows are anonymous and visitor_id is the
     only join key. Bot UAs are dropped silently.
     """
+    # Per-IP throttle BEFORE any work (JSON parse / DB write). Counts
+    # every call (check then record), so a flood from one IP hits 429
+    # and never reaches the DB. 429 raised by usage_limiter.check.
+    ip = _client_ip(request)
+    usage_limiter.check(ip)
+    usage_limiter.record_failure(ip)
+
     ua = (request.headers.get("user-agent") or "").lower()
     if _is_bot(ua):
         return {"ok": True, "dropped": "bot"}
