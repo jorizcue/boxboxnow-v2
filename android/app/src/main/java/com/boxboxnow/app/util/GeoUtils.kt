@@ -51,6 +51,25 @@ object GeoUtils {
         return if (t in 0.0..1.0 && u in 0.0..1.0) t else null
     }
 
+    /** Projects point p onto segment a→b in local flat-earth meters.
+     * Returns (t, perpMeters): the clamped fraction along the segment of the
+     * perpendicular foot, and the perpendicular distance in meters. */
+    fun crossTrackProjection(
+        pLat: Double, pLon: Double,
+        aLat: Double, aLon: Double,
+        bLat: Double, bLon: Double,
+    ): Pair<Double, Double> {
+        val mLon = degToMLon((aLat + bLat) / 2)
+        val px = (pLat - aLat) * DEG_TO_M_LAT; val py = (pLon - aLon) * mLon
+        val bx = (bLat - aLat) * DEG_TO_M_LAT; val by = (bLon - aLon) * mLon
+        val len2 = bx * bx + by * by
+        if (len2 < 1e-9) return 0.0 to sqrt(px * px + py * py)
+        var t = (px * bx + py * by) / len2
+        t = t.coerceIn(0.0, 1.0)
+        val dx = px - t * bx; val dy = py - t * by
+        return t to sqrt(dx * dx + dy * dy)
+    }
+
     fun bearingBetween(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val dLon = (lon2 - lon1) * PI / 180
         val la1 = lat1 * PI / 180
