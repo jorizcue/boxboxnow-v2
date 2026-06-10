@@ -86,4 +86,6 @@ dependencies {
     implementation(libs.androidx.browser)
     implementation(libs.androidx.splashscreen)
     implementation(libs.reorderable)
+
+    testImplementation(libs.junit4)
 }
