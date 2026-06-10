@@ -54,6 +54,12 @@ class FifoManager:
         # ReplaySession NEVER touches it, so its FifoManager stays
         # manual_mode=False forever (no real-time timers during replay).
         self.manual_mode: bool = False
+        # Fallback timeout (s) del modo manual. Default = MANUAL_TIMEOUT_S.
+        # UserSession.configure() lo sobreescribe desde la sesión en DB.
+        # ReplaySession nunca lo toca (queda en el default, irrelevante
+        # porque su manual_mode permanece False y _timeout_fallback no se
+        # programa durante replays).
+        self.manual_timeout_s: float = float(MANUAL_TIMEOUT_S)
         self.pre_queue: list[dict] = []
         self._pre_queue_timers: dict[int, asyncio.Task] = {}
 
@@ -180,11 +186,11 @@ class FifoManager:
             pass
 
     async def _timeout_fallback(self, kart_number: int) -> None:
-        """Wait MANUAL_TIMEOUT_S and commit to auto if still pending.
+        """Wait `self.manual_timeout_s` and commit to auto if still pending.
         Cancelled by `assign_manually`, `cancel_pending`, `reset` and
         `flush_pending`."""
         try:
-            await asyncio.sleep(MANUAL_TIMEOUT_S)
+            await asyncio.sleep(self.manual_timeout_s)
         except asyncio.CancelledError:
             return
         # Re-check the entry hasn't been removed in the meantime.

@@ -224,6 +224,7 @@ class UserSession:
                   warmup_laps_to_skip: int = 3,
                   team_drivers_count: int = 0,
                   box_manual_mode: bool = False,
+                  box_manual_timeout_s: int = 15,
                   box_line_colors: list[str] | None = None):
         """Apply race session config to state and fifo."""
         self.state.circuit_length_m = circuit_length_m or 1100
@@ -259,6 +260,11 @@ class UserSession:
         # acelerado. Cero código de guard runtime necesario.
         prev_manual = self.fifo.manual_mode
         self.fifo.manual_mode = bool(box_manual_mode)
+        # Timeout configurable del fallback manual→auto. Sin clamp en
+        # backend (el input web acota a 5–60). Solo se aplica al fifo
+        # live; ReplaySession nunca llega aquí, así que su fifo conserva
+        # el default y no programa timers reales durante replays.
+        self.fifo.manual_timeout_s = float(box_manual_timeout_s)
         # Transición manual → auto mid-race: drenar la pre-cola a
         # auto en vez de dejar karts colgados ahí esperando una
         # asignación que ya no va a llegar.

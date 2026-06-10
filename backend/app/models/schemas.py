@@ -305,6 +305,12 @@ class RaceSession(Base):
     # evita timers de 15 s reales durante reproducciones a x10/x100).
     box_manual_mode = Column(Boolean, default=False, nullable=False)
 
+    # Box manual fallback timeout (segundos). Si el estratega no asigna
+    # un carril vía drag&drop en este tiempo, el kart cae a round-robin
+    # auto. Default 15 → reproduce el hardcode anterior. El input web
+    # acota a 5–60; el backend solo almacena/usa el valor sin clamp.
+    box_manual_timeout_s = Column(Integer, default=15, nullable=False)
+
     # Colores asignados por el operador a las filas del box (F1, F2, …).
     # JSON: lista de strings hex (`["#3b82f6", "#ef4444", …]`) — un
     # color por fila. Permite asignación rápida click-en-color (botones

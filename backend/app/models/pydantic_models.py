@@ -414,6 +414,8 @@ class RaceSessionOut(BaseModel):
     # Box manual mode (drag & drop con fallback a auto en 15 s).
     # False por default → comportamiento round-robin clásico.
     box_manual_mode: bool = False
+    # Timeout (s) del fallback manual→auto. Default 15.
+    box_manual_timeout_s: int = 15
     # Colores hex por fila del box. Persiste como JSON Text en DB; el
     # validador acepta tanto list[str] (cliente / serialización pydantic)
     # como str (SQLAlchemy lee la columna como string). None → cliente
@@ -456,6 +458,7 @@ class RaceSessionCreate(BaseModel):
     auto_load_teams: bool = False
     team_drivers_count: int = 0
     box_manual_mode: bool = False
+    box_manual_timeout_s: int = 15
     box_line_colors: list[str] | None = None
 
 
@@ -479,6 +482,7 @@ class RaceSessionUpdate(BaseModel):
     auto_load_teams: bool | None = None
     team_drivers_count: int | None = None
     box_manual_mode: bool | None = None
+    box_manual_timeout_s: int | None = None
     box_line_colors: list[str] | None = None
 
 

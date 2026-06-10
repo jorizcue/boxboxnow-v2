@@ -102,6 +102,7 @@ async def ensure_monitoring(app_state, user_id: int):
         max_driver_time_min=session.max_driver_time_min or 0,
         team_drivers_count=session.team_drivers_count or 0,
         box_manual_mode=bool(session.box_manual_mode),
+        box_manual_timeout_s=getattr(session, "box_manual_timeout_s", 15) or 15,
         box_line_colors=_parse_box_line_colors(session.box_line_colors),
         pit_closed_start_min=session.pit_closed_start_min or 0,
         pit_closed_end_min=session.pit_closed_end_min or 0,

@@ -103,6 +103,15 @@ async def init_db():
         except Exception:
             pass
 
+        # box_manual_timeout_s: fallback timeout (segundos) del modo
+        # manual de box. Si no hay asignación drag&drop en este tiempo,
+        # el kart cae a round-robin auto. Default 15 → comportamiento
+        # previo (el hardcode anterior). Configurable por sesión.
+        try:
+            await conn.execute(text("ALTER TABLE race_sessions ADD COLUMN box_manual_timeout_s INTEGER DEFAULT 15 NOT NULL"))
+        except Exception:
+            pass
+
         # box_line_colors: JSON array de colores hex por fila del box
         # (`["#3b82f6", "#ef4444", …]`). NULL = el cliente aplica
         # defaults. Sesiones antiguas mantienen NULL — comportamiento
