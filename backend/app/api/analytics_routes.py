@@ -692,6 +692,11 @@ async def reprocess_day(
             old_track = state.track_name
             old_title = state.session_title
             state.karts.clear()
+            # Defense-in-depth: karts (and their pit_history) were just wiped,
+            # so the cached field-wide pit median is stale — force a recompute
+            # on next read. (This offline path doesn't read it today, but keeps
+            # the invariant honest if it ever calls compute_classification.)
+            state._field_pit_median_dirty = True
             state.category = old_category
             state.track_name = old_track
             state.session_title = old_title
