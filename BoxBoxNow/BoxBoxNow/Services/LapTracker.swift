@@ -38,6 +38,18 @@ final class LapTracker: ObservableObject {
     private var curGforceLat: [Double] = []
     private var curGforceLon: [Double] = []
 
+    @Published var projectedLapMs: Double?
+
+    private static let searchFwd = 60
+    private static let searchBack = 20
+    private static let maxPerpM = 25.0
+    private static let smoothCap = 10
+
+    private var refAnchorBest = 0
+    private var refAnchorPrev = 0
+    private var bestSmoothBuf: [Double] = []
+    private var prevSmoothBuf: [Double] = []
+
     // Reference laps for delta calculation
     private var bestLap: LapRecord?
     private var prevLap: LapRecord?
@@ -115,6 +127,9 @@ final class LapTracker: ObservableObject {
         bestLap = nil; prevLap = nil
         lastCrossingTime = -3600
         uploadedLapCount = 0
+        refAnchorBest = 0; refAnchorPrev = 0
+        bestSmoothBuf.removeAll(); prevSmoothBuf.removeAll()
+        projectedLapMs = nil
     }
 
     /// Clears the best-lap reference (and the live delta) so the next
@@ -125,6 +140,7 @@ final class LapTracker: ObservableObject {
         bestLapMs = nil
         bestLap = nil
         deltaBestMs = nil
+        refAnchorBest = 0; bestSmoothBuf.removeAll(); projectedLapMs = nil
     }
 
     private func resetCurrentArrays() {
@@ -224,71 +240,85 @@ final class LapTracker: ObservableObject {
         deltaBestMs = nil
         deltaPrevMs = nil
         currentLapElapsedMs = 0
+        refAnchorBest = 0; refAnchorPrev = 0
+        bestSmoothBuf.removeAll(); prevSmoothBuf.removeAll()
+        projectedLapMs = nil
 
         // Auto-upload new laps to backend
         uploadNewLaps()
     }
 
-    // MARK: - Distance-interpolated delta (matching web computeDelta)
+    // MARK: - Cross-track (position-based) delta
 
-    private func computeDeltas() {
-        guard let start = lapStartTime, let last = lastSample else {
-            deltaBestMs = nil; deltaPrevMs = nil; return
-        }
-        let currentElapsedMs = (last.timestamp - start) * 1000
-        let currentDist = lapDistanceM
-
-        deltaBestMs = interpolateDelta(
-            currentDist: currentDist,
-            currentElapsedMs: currentElapsedMs,
-            ref: bestLap
-        )
-        deltaPrevMs = interpolateDelta(
-            currentDist: currentDist,
-            currentElapsedMs: currentElapsedMs,
-            ref: prevLap
-        )
+    private func smooth(_ buf: inout [Double], _ v: Double) -> Double {
+        buf.append(v)
+        if buf.count > Self.smoothCap { buf.removeFirst() }
+        return buf.reduce(0, +) / Double(buf.count)
     }
 
-    /// Binary search + linear interpolation to find reference lap time
-    /// at the same distance, then return the time delta in ms.
-    /// Positive = behind reference, negative = ahead of reference.
-    private func interpolateDelta(
-        currentDist: Double,
-        currentElapsedMs: Double,
-        ref: LapRecord?
-    ) -> Double? {
-        guard let ref = ref, ref.distances.count >= 2, currentDist > 0 else {
-            return nil
+    /// Cross-track delta vs a reference lap using a monotonic moving anchor.
+    /// Returns (rawDeltaMs, matchedSegmentIndex) or nil if no valid projection
+    /// (off the reference line, or no reference). Sign: + = behind reference.
+    private func crossTrackDelta(
+        lat: Double, lon: Double, currentElapsedMs: Double,
+        ref: LapRecord, anchor: Int
+    ) -> (delta: Double, index: Int)? {
+        let pos = ref.positions
+        let n = pos.count
+        guard n >= 2 else { return nil }
+        var bestPerp = Double.greatestFiniteMagnitude
+        var bestK = -1, bestT = 0.0
+        func scan(_ lo: Int, _ hi: Int) {
+            guard lo <= hi else { return }
+            var k = lo
+            while k <= hi {
+                let r = GeoUtils.crossTrackProjection(
+                    pLat: lat, pLon: lon,
+                    aLat: pos[k].lat, aLon: pos[k].lon,
+                    bLat: pos[k + 1].lat, bLon: pos[k + 1].lon)
+                if r.perpMeters < bestPerp { bestPerp = r.perpMeters; bestK = k; bestT = r.t }
+                k += 1
+            }
         }
-        let dists = ref.distances
-        let times = ref.timestamps
-
-        // Beyond reference lap distance
-        guard currentDist <= dists[dists.count - 1] else { return nil }
-
-        // Binary search
-        var lo = 0, hi = dists.count - 1
-        while lo < hi {
-            let mid = (lo + hi) >> 1
-            if dists[mid] < currentDist { lo = mid + 1 }
-            else { hi = mid }
+        let a = min(max(0, anchor), n - 2)
+        scan(a, min(n - 2, a + Self.searchFwd))
+        if bestK < 0 || bestPerp > Self.maxPerpM {
+            scan(max(0, a - Self.searchBack), a)
         }
+        guard bestK >= 0, bestPerp <= Self.maxPerpM else { return nil }
+        let t0 = ref.timestamps[0]
+        let refTimeS = (ref.timestamps[bestK]
+            + bestT * (ref.timestamps[bestK + 1] - ref.timestamps[bestK])) - t0
+        return (currentElapsedMs - refTimeS * 1000, bestK)
+    }
 
-        // Linear interpolation
-        let i = max(0, lo - 1)
-        let j = min(lo, dists.count - 1)
+    private func computeDeltas() {
+        guard let start = lapStartTime, let last = lastSample, last.fixType >= 3 else {
+            deltaBestMs = nil; deltaPrevMs = nil; projectedLapMs = nil
+            bestSmoothBuf.removeAll(); prevSmoothBuf.removeAll()
+            return
+        }
+        let elapsed = (last.timestamp - start) * 1000
 
-        let refElapsedMs: Double
-        if i == j || dists[j] == dists[i] {
-            refElapsedMs = (times[i] - times[0]) * 1000
+        if let ref = bestLap,
+           let r = crossTrackDelta(lat: last.lat, lon: last.lon,
+                                   currentElapsedMs: elapsed, ref: ref, anchor: refAnchorBest) {
+            refAnchorBest = r.index
+            let d = smooth(&bestSmoothBuf, r.delta)
+            deltaBestMs = d
+            projectedLapMs = ref.durationMs + d
         } else {
-            let frac = (currentDist - dists[i]) / (dists[j] - dists[i])
-            let refTime = times[i] + frac * (times[j] - times[i])
-            refElapsedMs = (refTime - times[0]) * 1000
+            deltaBestMs = nil; projectedLapMs = nil; bestSmoothBuf.removeAll()
         }
 
-        return currentElapsedMs - refElapsedMs
+        if let ref = prevLap,
+           let r = crossTrackDelta(lat: last.lat, lon: last.lon,
+                                   currentElapsedMs: elapsed, ref: ref, anchor: refAnchorPrev) {
+            refAnchorPrev = r.index
+            deltaPrevMs = smooth(&prevSmoothBuf, r.delta)
+        } else {
+            deltaPrevMs = nil; prevSmoothBuf.removeAll()
+        }
     }
 
     // MARK: - Upload laps to backend (matching web useGpsTelemetrySave)
@@ -331,5 +361,13 @@ final class LapTracker: ObservableObject {
             }
         }
     }
+
+    #if DEBUG
+    func setBestLapForTest(_ r: LapRecord) { bestLap = r; refAnchorBest = 0; bestSmoothBuf.removeAll() }
+    func crossTrackDeltaForTest(lat: Double, lon: Double, currentElapsedMs: Double) -> (delta: Double, index: Int)? {
+        guard let ref = bestLap else { return nil }
+        return crossTrackDelta(lat: lat, lon: lon, currentElapsedMs: currentElapsedMs, ref: ref, anchor: refAnchorBest)
+    }
+    #endif
 
 }
