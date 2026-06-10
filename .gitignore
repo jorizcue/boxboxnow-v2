@@ -48,3 +48,7 @@ backend/data/recordings/
 docker-compose.override.yml
 *.db-shm
 *.db-wal
+
+# Reverse-engineering artifacts (large; do not commit)
+RaceboxApk/
+MKT/
