@@ -12,6 +12,7 @@
 
 /* Begin PBXFileReference section */
 		244C0A812F8D3A2A0047102F /* BoxBoxNow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BoxBoxNow.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B1A0000000000000000000T1 /* BoxBoxNowTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BoxBoxNowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		860D0E4D002830EFD61AD88F /* TemplateWizardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TemplateWizardView.swift; sourceTree = "<group>"; };
 		C2C533B2DA82843B7A10971F /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
@@ -40,10 +41,22 @@
 			path = BoxBoxNow;
 			sourceTree = "<group>";
 		};
+		B1A0000000000000000000G1 /* BoxBoxNowTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = BoxBoxNowTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		244C0A7E2F8D3A2A0047102F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B1A0000000000000000000F1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -65,6 +78,7 @@
 			isa = PBXGroup;
 			children = (
 				244C0A832F8D3A2A0047102F /* BoxBoxNow */,
+				B1A0000000000000000000G1 /* BoxBoxNowTests */,
 				244C0A822F8D3A2A0047102F /* Products */,
 				6DA2DEE9AC55C61895B71D0E /* Frameworks */,
 				14C1079D210221371A8FA163 /* Shared */,
@@ -76,6 +90,7 @@
 			isa = PBXGroup;
 			children = (
 				244C0A812F8D3A2A0047102F /* BoxBoxNow.app */,
+				B1A0000000000000000000T1 /* BoxBoxNowTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -136,6 +151,27 @@
 			productReference = 244C0A812F8D3A2A0047102F /* BoxBoxNow.app */;
 			productType = "com.apple.product-type.application";
 		};
+		B1A0000000000000000000N1 /* BoxBoxNowTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B1A0000000000000000000C1 /* Build configuration list for PBXNativeTarget "BoxBoxNowTests" */;
+			buildPhases = (
+				B1A0000000000000000000S1 /* Sources */,
+				B1A0000000000000000000F1 /* Frameworks */,
+				B1A0000000000000000000R1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B1A0000000000000000000D1 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B1A0000000000000000000G1 /* BoxBoxNowTests */,
+			);
+			name = BoxBoxNowTests;
+			productName = BoxBoxNowTests;
+			productReference = B1A0000000000000000000T1 /* BoxBoxNowTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -148,6 +184,10 @@
 				TargetAttributes = {
 					244C0A802F8D3A2A0047102F = {
 						CreatedOnToolsVersion = 26.4;
+					};
+					B1A0000000000000000000N1 = {
+						CreatedOnToolsVersion = 26.4;
+						TestTargetID = 244C0A802F8D3A2A0047102F;
 					};
 				};
 			};
@@ -166,12 +206,20 @@
 			projectRoot = "";
 			targets = (
 				244C0A802F8D3A2A0047102F /* BoxBoxNow */,
+				B1A0000000000000000000N1 /* BoxBoxNowTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		244C0A7F2F8D3A2A0047102F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B1A0000000000000000000R1 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -189,7 +237,32 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B1A0000000000000000000S1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXContainerItemProxy section */
+		B1A0000000000000000000P1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 244C0A792F8D3A2A0047102F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 244C0A802F8D3A2A0047102F;
+			remoteInfo = BoxBoxNow;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		B1A0000000000000000000D1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 244C0A802F8D3A2A0047102F /* BoxBoxNow */;
+			targetProxy = B1A0000000000000000000P1 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		244C0A8A2F8D3A2C0047102F /* Debug */ = {
@@ -381,6 +454,50 @@
 			};
 			name = Release;
 		};
+		B1A0000000000000000000C2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8HBXJXJC68;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jizcue.BoxBoxNowTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BoxBoxNow.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BoxBoxNow";
+			};
+			name = Debug;
+		};
+		B1A0000000000000000000C3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8HBXJXJC68;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jizcue.BoxBoxNowTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BoxBoxNow.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BoxBoxNow";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -398,6 +515,15 @@
 			buildConfigurations = (
 				244C0A8D2F8D3A2C0047102F /* Debug */,
 				244C0A8E2F8D3A2C0047102F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B1A0000000000000000000C1 /* Build configuration list for PBXNativeTarget "BoxBoxNowTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B1A0000000000000000000C2 /* Debug */,
+				B1A0000000000000000000C3 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
