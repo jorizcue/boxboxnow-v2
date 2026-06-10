@@ -55,6 +55,28 @@ enum GeoUtils {
         return nil
     }
 
+    /// Projects point p onto the segment a→b in local flat-earth meters.
+    /// Returns the clamped fraction `t` (0…1) of the nearest point along the
+    /// segment (the perpendicular foot) and the perpendicular distance in
+    /// meters from p to that foot. Accurate for kart-scale (~1 km) circuits.
+    static func crossTrackProjection(
+        pLat: Double, pLon: Double,
+        aLat: Double, aLon: Double,
+        bLat: Double, bLon: Double
+    ) -> (t: Double, perpMeters: Double) {
+        let mLon = degToMLon(at: (aLat + bLat) / 2)
+        let px = (pLat - aLat) * degToMLat, py = (pLon - aLon) * mLon
+        let bx = (bLat - aLat) * degToMLat, by = (bLon - aLon) * mLon
+        let len2 = bx * bx + by * by
+        if len2 < 1e-9 {
+            return (0, (px * px + py * py).squareRoot())
+        }
+        var t = (px * bx + py * by) / len2
+        t = min(1, max(0, t))
+        let dx = px - t * bx, dy = py - t * by
+        return (t, (dx * dx + dy * dy).squareRoot())
+    }
+
     static func bearingBetween(lat1: Double, lon1: Double, lat2: Double, lon2: Double) -> Double {
         let dLon = (lon2 - lon1) * .pi / 180
         let la1 = lat1 * .pi / 180, la2 = lat2 * .pi / 180
