@@ -110,6 +110,11 @@ struct DriverCardView: View {
                 return "Delta Stint · \(Formatters.msToLapTime(bestMs))"
             }
             return card.displayName
+        case .projectedLap:
+            if let lapNum = lapTracker?.currentLap, lapNum > 0 {
+                return "\(card.displayName) · V\(lapNum)"
+            }
+            return card.displayName
         case .gpsLapDelta:
             if let lapNum = lapTracker?.currentLap, lapNum > 0 {
                 return "\(card.displayName) · V\(lapNum)"
@@ -178,6 +183,14 @@ struct DriverCardView: View {
                 return last <= best ? .green : .red
             }
             return .purple
+
+        case .projectedLap:
+            // Color by the live delta sign (mirrors .deltaBestLap):
+            // green when ahead of the reference lap, red when behind.
+            if let d = lapTracker?.deltaBestMs {
+                return d < 0 ? .green : .red
+            }
+            return .cyan
 
         case .gpsLapDelta:
             if let d = lapTracker?.deltaPrevMs {
@@ -303,6 +316,11 @@ struct DriverCardView: View {
                 smallFont: smallFont,
                 scale: scale
             )
+
+        // ── Projected Lap (GPS) — reference lap + smoothed cross-track
+        // delta, with the live delta as a secondary line.
+        case .projectedLap:
+            ProjectedLapContent(lapTracker: lapTracker)
 
         // ── G-Force Radar (GPS) ──
         case .gForceRadar:
@@ -994,6 +1012,11 @@ struct DriverCardView: View {
                 return "Delta vs mejor del stint: \(String(format: "%@%.2f segundos", d < 0 ? "" : "+", d / 1000))"
             }
             return "Delta vs mejor: sin datos"
+        case .projectedLap:
+            if let p = lapTracker?.projectedLapMs {
+                return "Vuelta proyectada: \(Formatters.msToLapTime(p))"
+            }
+            return "Vuelta proyectada: sin datos"
         case .gForceRadar:
             return "Radar de fuerza G"
         case .position:
@@ -1283,6 +1306,31 @@ private struct DeltaBestLapContent: View {
                 if Task.isCancelled { break }
                 snapDelta = lapTracker?.deltaBestMs
                 snapElapsed = lapTracker?.currentLapElapsedMs ?? 0
+            }
+        }
+    }
+}
+
+// ── Projected lap (GPS) ──
+// Primary line = reference lap + smoothed cross-track delta
+// (lapTracker.projectedLapMs); secondary line = the live cross-track
+// delta vs best (deltaBestMs), colored green (ahead) / red (behind).
+// `lapTracker` is passed the same optional way as DeltaBestLapContent.
+private struct ProjectedLapContent: View {
+    let lapTracker: LapTracker?
+    var body: some View {
+        VStack(spacing: 2) {
+            if let p = lapTracker?.projectedLapMs {
+                Text(Formatters.msToLapTime(p))
+                    .font(.system(.title2, design: .monospaced)).bold()
+                if let d = lapTracker?.deltaBestMs {
+                    Text((d < 0 ? "" : "+") + String(format: "%.2fs", d / 1000))
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(d < 0 ? .green : .red)
+                }
+            } else {
+                Text("--:--.---").font(.system(.title2, design: .monospaced))
+                    .foregroundColor(Color(.systemGray))
             }
         }
     }

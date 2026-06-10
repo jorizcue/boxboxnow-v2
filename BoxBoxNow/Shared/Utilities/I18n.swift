@@ -359,4 +359,5 @@ private let translations: [String: [Language: String]] = [
     "card.gForceRadar":      [.es: "G-Force (diana)", .en: "G-Force (target)", .it: "G-Force (bersaglio)", .de: "G-Force (Zielscheibe)", .fr: "G-Force (cible)"],
     "card.gpsGForce":        [.es: "G-Force (números)", .en: "G-Force (numbers)", .it: "G-Force (numeri)", .de: "G-Force (Zahlen)", .fr: "G-Force (chiffres)"],
     "card.gpsSpeed":         [.es: "Velocidad GPS", .en: "GPS speed", .it: "Velocità GPS", .de: "GPS-Geschwindigkeit", .fr: "Vitesse GPS"],
+    "card.projectedLap":     [.es: "Vuelta proyectada (GPS)", .en: "Projected lap (GPS)", .it: "Giro proiettato (GPS)", .de: "Projizierte Runde (GPS)", .fr: "Tour projeté (GPS)"],
 ]

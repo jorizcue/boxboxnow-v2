@@ -86,6 +86,7 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
     // GPS fix to be useful (without GPS we don't know "where in the lap"
     // the kart is).
     case deltaBestLap
+    case projectedLap
     case gpsLapDelta
     case gForceRadar
     case gpsGForce
@@ -98,7 +99,7 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .boxScore, .pitCount, .currentPit, .pitWindow:
             return .box
-        case .currentLapTime, .deltaBestLap, .gForceRadar, .gpsLapDelta, .gpsSpeed, .gpsGForce:
+        case .currentLapTime, .deltaBestLap, .projectedLap, .gForceRadar, .gpsLapDelta, .gpsSpeed, .gpsGForce:
             // GPS group. `currentLapTime` lives here because it needs a
             // GPS fix to be useful.
             return .gps
@@ -135,6 +136,7 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .currentLapTime: return "stopwatch"
         case .lastLap:        return "clock"
         case .deltaBestLap:   return "plusminus"
+        case .projectedLap:   return "flag.checkered"
         case .gForceRadar:    return "gyroscope"
         case .position:       return "trophy.fill"
         case .realPos:        return "trophy"
@@ -182,7 +184,7 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
     /// GPS isn't available, so it's not strictly GPS-required anymore.
     var requiresGPS: Bool {
         switch self {
-        case .currentLapTime, .gForceRadar, .gpsLapDelta, .gpsSpeed, .gpsGForce:
+        case .currentLapTime, .projectedLap, .gForceRadar, .gpsLapDelta, .gpsSpeed, .gpsGForce:
             return true
         default:
             return false
@@ -213,6 +215,7 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .currentLapTime: return "0:42.318"
         case .lastLap:        return "1:02.456"
         case .deltaBestLap:   return "-0.32s"
+        case .projectedLap:   return "1:01.45"
         case .gForceRadar:    return "G"
         case .position:       return "P3/12"
         case .realPos:        return "P5/12"
@@ -262,6 +265,7 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
         case .currentLapTime: return .blue
         case .lastLap:        return .gray
         case .deltaBestLap:   return .purple
+        case .projectedLap:   return .cyan
         case .gForceRadar:    return .gray
         case .position:       return .purple
         case .realPos:        return .accentColor

@@ -198,7 +198,7 @@ final class LapTracker: ObservableObject {
             currentLapElapsedMs = (sample.timestamp - start) * 1000
         }
 
-        // Compute distance-interpolated deltas
+        // Compute cross-track deltas
         computeDeltas()
     }
 
