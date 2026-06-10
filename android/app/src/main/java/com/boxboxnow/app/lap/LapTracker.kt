@@ -53,6 +53,9 @@ class LapTracker(
     private val _deltaPrevMs = MutableStateFlow<Double?>(null)
     val deltaPrevMs = _deltaPrevMs.asStateFlow()
 
+    private val _projectedLapMs = MutableStateFlow<Double?>(null)
+    val projectedLapMs = _projectedLapMs.asStateFlow()
+
     private val _currentLapElapsedMs = MutableStateFlow(0.0)
     val currentLapElapsedMs = _currentLapElapsedMs.asStateFlow()
 
@@ -71,6 +74,11 @@ class LapTracker(
 
     private var bestLap: LapRecord? = null
     private var prevLap: LapRecord? = null
+
+    private var refAnchorBest = 0
+    private var refAnchorPrev = 0
+    private val bestSmoothBuf = ArrayDeque<Double>()
+    private val prevSmoothBuf = ArrayDeque<Double>()
 
     // Cooldown: ignore crossings within this many seconds after the last
     // detected one. Time-based so it works at any source rate (RaceBox 50Hz,
@@ -124,6 +132,7 @@ class LapTracker(
         _lastLapMs.value = null
         _deltaBestMs.value = null
         _deltaPrevMs.value = null
+        _projectedLapMs.value = null
         _currentLapElapsedMs.value = 0.0
         lapStartTime = null
         lastSample = null
@@ -132,6 +141,10 @@ class LapTracker(
         resetCurrentArrays()
         bestLap = null
         prevLap = null
+        refAnchorBest = 0
+        refAnchorPrev = 0
+        bestSmoothBuf.clear()
+        prevSmoothBuf.clear()
         lastCrossingTime = -3600.0
         uploadedLapCount = 0
     }
@@ -146,6 +159,9 @@ class LapTracker(
         _bestLapMs.value = null
         bestLap = null
         _deltaBestMs.value = null
+        refAnchorBest = 0
+        bestSmoothBuf.clear()
+        _projectedLapMs.value = null
     }
 
     private fun resetCurrentArrays() {
@@ -230,51 +246,48 @@ class LapTracker(
         _deltaBestMs.value = null
         _deltaPrevMs.value = null
         _currentLapElapsedMs.value = 0.0
+        refAnchorBest = 0
+        refAnchorPrev = 0
+        bestSmoothBuf.clear()
+        prevSmoothBuf.clear()
+        _projectedLapMs.value = null
 
         uploadNewLaps()
     }
 
-    private fun computeDeltas() {
-        val start = lapStartTime
-        val last = lastSample
-        if (start == null || last == null) {
-            _deltaBestMs.value = null
-            _deltaPrevMs.value = null
-            return
-        }
-        val currentElapsedMs = (last.timestamp - start) * 1000
-        val currentDist = lapDistanceM
-        _deltaBestMs.value = interpolateDelta(currentDist, currentElapsedMs, bestLap)
-        _deltaPrevMs.value = interpolateDelta(currentDist, currentElapsedMs, prevLap)
+    private fun smooth(buf: ArrayDeque<Double>, v: Double): Double {
+        buf.addLast(v)
+        while (buf.size > SMOOTH_CAP) buf.removeFirst()
+        return buf.sum() / buf.size
     }
 
-    private fun interpolateDelta(
-        currentDist: Double,
-        currentElapsedMs: Double,
-        ref: LapRecord?,
-    ): Double? {
-        if (ref == null || ref.distances.size < 2 || currentDist <= 0) return null
-        val dists = ref.distances
-        val times = ref.timestamps
-        if (currentDist > dists.last()) return null
-
-        var lo = 0
-        var hi = dists.size - 1
-        while (lo < hi) {
-            val mid = (lo + hi) ushr 1
-            if (dists[mid] < currentDist) lo = mid + 1 else hi = mid
+    private fun computeDeltas() {
+        val start = lapStartTime; val last = lastSample
+        if (start == null || last == null || last.fixType < 3) {
+            _deltaBestMs.value = null; _deltaPrevMs.value = null; _projectedLapMs.value = null
+            bestSmoothBuf.clear(); prevSmoothBuf.clear(); return
         }
-        val i = maxOf(0, lo - 1)
-        val j = minOf(lo, dists.size - 1)
+        val elapsed = (last.timestamp - start) * 1000
 
-        val refElapsedMs = if (i == j || dists[j] == dists[i]) {
-            (times[i] - times[0]) * 1000
+        val b = bestLap
+        val rb = if (b != null) crossTrackDelta(b, last.lat, last.lon, elapsed, refAnchorBest) else null
+        if (b != null && rb != null) {
+            refAnchorBest = rb.second
+            val d = smooth(bestSmoothBuf, rb.first)
+            _deltaBestMs.value = d
+            _projectedLapMs.value = b.durationMs + d
         } else {
-            val frac = (currentDist - dists[i]) / (dists[j] - dists[i])
-            val refTime = times[i] + frac * (times[j] - times[i])
-            (refTime - times[0]) * 1000
+            _deltaBestMs.value = null; _projectedLapMs.value = null; bestSmoothBuf.clear()
         }
-        return currentElapsedMs - refElapsedMs
+
+        val p = prevLap
+        val rp = if (p != null) crossTrackDelta(p, last.lat, last.lon, elapsed, refAnchorPrev) else null
+        if (p != null && rp != null) {
+            refAnchorPrev = rp.second
+            _deltaPrevMs.value = smooth(prevSmoothBuf, rp.first)
+        } else {
+            _deltaPrevMs.value = null; prevSmoothBuf.clear()
+        }
     }
 
     private fun uploadNewLaps() {
@@ -311,5 +324,41 @@ class LapTracker(
                 uploadedLapCount -= newLaps.size
             }
         }
+    }
+
+    companion object {
+        private const val SEARCH_FWD = 60
+        private const val SEARCH_BACK = 20
+        private const val MAX_PERP_M = 25.0
+        private const val SMOOTH_CAP = 10
+
+        /** Pure cross-track delta against a reference lap. Returns (deltaMs, segmentIndex)
+         *  or null if no valid projection. Sign: + = behind reference. */
+        fun crossTrackDelta(ref: LapRecord, lat: Double, lon: Double, currentElapsedMs: Double, anchor: Int): Pair<Double, Int>? {
+            val pos = ref.positions
+            val n = pos.size
+            if (n < 2) return null
+            var bestPerp = Double.MAX_VALUE; var bestK = -1; var bestT = 0.0
+            fun scan(lo: Int, hi: Int) {
+                var k = lo
+                while (k in 0..hi && k < n - 1) {
+                    val (t, perp) = GeoUtils.crossTrackProjection(
+                        lat, lon, pos[k].first, pos[k].second, pos[k + 1].first, pos[k + 1].second)
+                    if (perp < bestPerp) { bestPerp = perp; bestK = k; bestT = t }
+                    k++
+                }
+            }
+            val a = anchor.coerceIn(0, n - 2)
+            scan(a, minOf(n - 2, a + SEARCH_FWD))
+            if (bestK < 0 || bestPerp > MAX_PERP_M) scan(maxOf(0, a - SEARCH_BACK), a)
+            if (bestK < 0 || bestPerp > MAX_PERP_M) return null
+            val t0 = ref.timestamps[0]
+            val refTimeS = (ref.timestamps[bestK] + bestT * (ref.timestamps[bestK + 1] - ref.timestamps[bestK])) - t0
+            return (currentElapsedMs - refTimeS * 1000) to bestK
+        }
+
+        // Test hook (pure; no instance state).
+        fun crossTrackDeltaForTest(ref: LapRecord, lat: Double, lon: Double, elapsedMs: Double) =
+            crossTrackDelta(ref, lat, lon, elapsedMs, 0)
     }
 }
