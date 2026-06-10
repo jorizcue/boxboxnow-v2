@@ -29,6 +29,7 @@ interface RaceSession {
   max_driver_time_min: number;
   team_drivers_count: number;
   box_manual_mode: boolean;
+  box_manual_timeout_s: number;
   rain: boolean;
   pit_closed_start_min: number;
   pit_closed_end_min: number;
@@ -53,6 +54,7 @@ interface ConfigValues {
   maxDriverTime: number;
   teamDriversCount: number;
   boxManualMode: boolean;
+  boxManualTimeoutS: number;
   rain: boolean;
   pitClosedStart: number;
   pitClosedEnd: number;
@@ -101,6 +103,9 @@ function RaceSessionEditor() {
   // Modo box manual (drag&drop con fallback auto en 15 s). Solo
   // afecta a sesiones live — el backend lo ignora en replay.
   const [boxManualMode, setBoxManualMode] = useState(false);
+  // Segundos antes de que el modo box manual auto-asigne el kart si el
+  // operador no lo coloca a mano. Rango 5–60; default 15 (== backend).
+  const [boxManualTimeoutS, setBoxManualTimeoutS] = useState(15);
   const [rain, setRain] = useState(false);
   const [pitClosedStart, setPitClosedStart] = useState(0);
   const [pitClosedEnd, setPitClosedEnd] = useState(0);
@@ -164,6 +169,7 @@ function RaceSessionEditor() {
     setMaxDriverTime(s.max_driver_time_min ?? 0);
     setTeamDriversCount(s.team_drivers_count ?? 0);
     setBoxManualMode(!!s.box_manual_mode);
+    setBoxManualTimeoutS(s.box_manual_timeout_s ?? 15);
     setRain(s.rain);
     setPitClosedStart(s.pit_closed_start_min ?? 0);
     setPitClosedEnd(s.pit_closed_end_min ?? 0);
@@ -206,6 +212,7 @@ function RaceSessionEditor() {
       max_driver_time_min: v.maxDriverTime,
       team_drivers_count: v.teamDriversCount,
       box_manual_mode: v.boxManualMode,
+      box_manual_timeout_s: v.boxManualTimeoutS,
       rain: v.rain,
       pit_closed_start_min: v.pitClosedStart,
       pit_closed_end_min: v.pitClosedEnd,
@@ -276,6 +283,7 @@ function RaceSessionEditor() {
     maxDriverTime,
     teamDriversCount,
     boxManualMode,
+    boxManualTimeoutS,
     rain,
     pitClosedStart,
     pitClosedEnd,
@@ -419,6 +427,30 @@ function RaceSessionEditor() {
               </span>
             </div>
           </label>
+          {/* Timeout configurable — solo visible con el modo box manual
+              activo. Acota el valor a 5–60 s (mismo rango que valida el
+              backend) tanto en onChange como onBlur. Ocupa toda la fila
+              del grid de 3 columnas. */}
+          {boxManualMode && (
+            <div className="col-span-3 bg-surface rounded-xl border border-border p-2.5 sm:p-3 flex flex-col items-center">
+              <label className="text-[8px] sm:text-[9px] text-neutral-400 uppercase tracking-widest font-bold mb-1.5 text-center leading-tight">
+                {t("config.boxManualTimeout")}
+              </label>
+              <input
+                type="number"
+                min={5}
+                max={60}
+                value={boxManualTimeoutS}
+                onChange={(e) =>
+                  setBoxManualTimeoutS(Math.max(5, Math.min(60, Math.round(Number(e.target.value) || 0))))
+                }
+                onBlur={(e) =>
+                  setBoxManualTimeoutS(Math.max(5, Math.min(60, Math.round(Number(e.target.value) || 0))))
+                }
+                className="w-full bg-black/50 border border-border rounded-lg px-2 py-1.5 text-center text-base sm:text-lg font-mono font-bold text-white focus:border-accent/50 focus:outline-none transition-colors"
+              />
+            </div>
+          )}
         </ConfigSection>
 
         <ConfigSection title={t("config.sectionStints")}>

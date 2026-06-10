@@ -225,6 +225,7 @@ const translations: Record<string, Record<Language, string>> = {
   "config.maxDriverTime": { es: "Tiempo máx piloto (min)", en: "Max driver time (min)", it: "Tempo max pilota (min)", de: "Max Fahrerzeit (Min)", fr: "Temps max pilote (min)" },
   "config.boxManualMode": { es: "Modo box manual", en: "Manual box mode", it: "Modo box manuale", de: "Manueller Boxenmodus", fr: "Mode box manuel" },
   "config.boxManualModeHint": { es: "Drag&drop con timeout 15s. Solo live.", en: "Drag&drop with 15s timeout. Live only.", it: "Drag&drop con timeout 15s. Solo live.", de: "Drag&Drop mit 15-Sek-Timeout. Nur live.", fr: "Glisser-déposer avec délai 15s. Live uniquement." },
+  "config.boxManualTimeout": { es: "Segundos antes de auto-asignar", en: "Seconds before auto-assign", it: "Secondi prima dell'auto-assegnazione", de: "Sekunden bis zur Auto-Zuweisung", fr: "Secondes avant l'auto-attribution" },
   "box.preQueue.title": { es: "Asignar manualmente", en: "Assign manually", it: "Assegna manualmente", de: "Manuell zuweisen", fr: "Assigner manuellement" },
   "box.preQueue.empty": { es: "Sin karts esperando asignación.", en: "No karts waiting for assignment.", it: "Nessun kart in attesa di assegnazione.", de: "Keine Karts warten auf Zuweisung.", fr: "Aucun kart en attente d'assignation." },
   "box.preQueue.dragHint": { es: "Arrastra a una fila (F1, F2…)", en: "Drag to a lane (F1, F2…)", it: "Trascina su una corsia (F1, F2…)", de: "Auf eine Spur ziehen (F1, F2…)", fr: "Glissez vers une voie (F1, F2…)" },
