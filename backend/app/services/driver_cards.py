@@ -67,6 +67,7 @@ ALL_DRIVER_CARD_IDS: list[str] = [
     # real"), not in BBN.
     "deltaBestLap",
     "gpsLapDelta",
+    "projectedLap",
     "gForceRadar",
     "gpsGForce",
     "gpsSpeed",

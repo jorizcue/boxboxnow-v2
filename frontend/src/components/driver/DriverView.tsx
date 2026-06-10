@@ -1361,6 +1361,30 @@ export function DriverView() {
         </div>
       ),
     },
+    projectedLap: {
+      label: t("card.projectedLap"),
+      accent: gps.deltaBestMs !== null
+        ? gps.deltaBestMs < 0
+          ? "from-green-500/25 to-green-500/5 border-green-400/50"
+          : "from-red-500/25 to-red-500/5 border-red-400/50"
+        : "from-cyan-500/20 to-cyan-500/5 border-cyan-500/30",
+      content: !gpsConnected ? (
+        <span className="text-lg text-neutral-600 font-mono">GPS --</span>
+      ) : gps.bestLapMs > 0 && gps.deltaBestMs !== null ? (
+        <div className="flex flex-col items-center">
+          <span className="text-3xl sm:text-4xl font-mono font-black text-white leading-none">
+            {msToLapTime(Math.round(gps.bestLapMs + gps.deltaBestMs))}
+          </span>
+          <span className={`text-[10px] font-mono mt-1 ${
+            gps.deltaBestMs < 0 ? "text-green-400" : "text-red-400"
+          }`}>
+            {gps.deltaBestMs < 0 ? "" : "+"}{(gps.deltaBestMs / 1000).toFixed(2)}s
+          </span>
+        </div>
+      ) : (
+        <span className="text-2xl font-mono font-bold text-neutral-500">--:--.---</span>
+      ),
+    },
     gpsSpeed: {
       label: t("driver.gpsSpeed"),
       accent: "from-sky-500/20 to-sky-500/5 border-sky-500/30",

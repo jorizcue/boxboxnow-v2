@@ -57,6 +57,7 @@ export type DriverCardId =
   // useful (without GPS we don't know "where in the lap" the kart is).
   | "deltaBestLap"
   | "gpsLapDelta"
+  | "projectedLap"
   | "gForceRadar"
   | "gpsGForce"
   | "gpsSpeed"
@@ -130,6 +131,7 @@ export const ALL_DRIVER_CARDS: {
   //     only race-tab card that requires a GPS fix to be useful. ---
   { id: "deltaBestLap", labelKey: "card.deltaBestLap", label: "Delta vs Best Lap (GPS)", requiresGps: true, group: "gps" },
   { id: "gpsLapDelta", labelKey: "card.gpsLapDelta", label: "Delta vuelta anterior GPS", requiresGps: true, group: "gps" },
+  { id: "projectedLap", labelKey: "card.projectedLap", label: "Vuelta proyectada (GPS)", requiresGps: true, group: "gps" },
   { id: "gForceRadar", labelKey: "card.gForceRadar", label: "G-Force (diana)", requiresGps: true, group: "gps" },
   { id: "gpsGForce", labelKey: "card.gpsGForce", label: "G-Force (números)", requiresGps: true, group: "gps" },
   { id: "gpsSpeed", labelKey: "card.gpsSpeed", label: "Velocidad GPS", requiresGps: true, group: "gps" },

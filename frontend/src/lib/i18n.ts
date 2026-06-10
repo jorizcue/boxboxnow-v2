@@ -807,6 +807,7 @@ const translations: Record<string, Record<Language, string>> = {
   "card.bestS3": { es: "Mejor S3", en: "Best S3", it: "Miglior S3", de: "Beste S3", fr: "Meilleur S3" },
   "card.timeToMaxStint": { es: "Tiempo hasta stint máximo", en: "Time to max stint", it: "Tempo al stint massimo", de: "Zeit bis Max-Stint", fr: "Temps jusqu'au relais max" },
   "card.kartTier": { es: "Calificación del kart", en: "Kart tier", it: "Categoria kart", de: "Kart-Stufe", fr: "Catégorie kart" },
+  "card.projectedLap": { es: "Vuelta proyectada (GPS)", en: "Projected lap (GPS)", it: "Giro proiettato (GPS)", de: "Projizierte Runde (GPS)", fr: "Tour projeté (GPS)" },
 
   // === Tracking (live spatial map) ===
   "tracking.title": { es: "Tracking en vivo", en: "Live tracking", it: "Tracking live", de: "Live-Tracking", fr: "Suivi en direct" },
