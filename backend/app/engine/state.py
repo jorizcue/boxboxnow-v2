@@ -140,6 +140,18 @@ class KartState:
     current_stint_lap_count: int = 0
     current_stint_best_lap_ms: int = 0
 
+    # Incremental running sum of every lap's `lapTime` (ms) across the
+    # whole race. Mirrors the classification.py scan
+    # `sum(int(lap.get('lapTime', 0)) for lap in kart.all_laps)`, which ran
+    # on EVERY LAP event (compute_classification is invoked per lap), scaling
+    # O(all_laps) and driving the linear CPU ramp on 24h/40-kart races.
+    # `all_laps` is strictly append-only, so this only ever adds on append
+    # (never subtracts). Uses the identical `int(... .get('lapTime', 0))`
+    # parse so the value is bit-identical to the old sum. Defaults to 0 and
+    # is rebuilt with the kart on a genuine new session (karts are cleared in
+    # `_reset_for_new_session`).
+    all_laps_sum_ms: int = 0
+
     # Analytics results (set by clustering/classification engines)
     tier_score: int = 50
     avg_lap_ms: float = 0.0
@@ -356,6 +368,18 @@ class RaceStateManager:
         self.fifo_score: float = 0.0
         self.fifo_history: list[dict] = []
         self.classification: list[dict] = []
+        # Cached field-wide median of completed pit durations (ms), used by
+        # classification.py as `pit_time_ref`. The old code rebuilt the full
+        # `all_pit_times_ms` list across EVERY kart's `pit_history` and ran
+        # `statistics.median` on EVERY classification compute (i.e. per LAP
+        # event) — O(total_pits) per lap, growing all race long. The median
+        # only changes when a pit COMPLETES (a `pit_time_ms > 0` is assigned in
+        # the PIT_OUT handler), so we mark the cache dirty there and recompute
+        # lazily on the next read. `None` means "no completed pit yet" (same
+        # sentinel the classification fallback keys off). Reset in
+        # `_reset_for_new_session`.
+        self._field_pit_median_ms: float | None = None
+        self._field_pit_median_dirty: bool = True
         # Reference values used by the latest classification compute pass:
         # minPits, pitTimeRefS, medianFieldSpeedMs, raceTimeS. Surfaced to
         # the frontend so the UI can show "Pits oblig.: N · Ref. pit: X.Xs".
@@ -486,6 +510,30 @@ class RaceStateManager:
             elapsed_s = 0
         return max(0, self.countdown_ms - int(elapsed_s * 1000))
 
+    def field_pit_median_ms(self) -> float | None:
+        """Field-wide median of completed pit durations (ms), cached.
+
+        Recomputed lazily only when a pit has completed since the last read
+        (dirty flag set in the PIT_OUT handler). Returns `None` when no pit
+        has completed yet. Bit-identical to the old per-classification scan
+        `statistics.median([p.pit_time_ms for k in karts.values()
+        for p in k.pit_history if p.pit_time_ms > 0])` — same inputs, same
+        `statistics.median`, just memoised between pit completions.
+        """
+        if self._field_pit_median_dirty:
+            import statistics
+            all_pit_times_ms = [
+                p.pit_time_ms
+                for kart in self.karts.values()
+                for p in kart.pit_history
+                if p.pit_time_ms > 0
+            ]
+            self._field_pit_median_ms = (
+                statistics.median(all_pit_times_ms) if all_pit_times_ms else None
+            )
+            self._field_pit_median_dirty = False
+        return self._field_pit_median_ms
+
     def _session_sig(self) -> str:
         """Stable identity of the current Apex session (category||title).
         Le Mans/CIK increments the title every heat ("Session 13" →
@@ -501,6 +549,11 @@ class RaceStateManager:
         sectorless circuit doesn't carry the flag from the previous
         session (live mode keeps the same RaceStateManager)."""
         self.karts.clear()
+        # Karts (and their pit_history) were just wiped, so the cached
+        # field-wide pit median must be invalidated; force a recompute (over
+        # the now-empty field → None) on next read.
+        self._field_pit_median_ms = None
+        self._field_pit_median_dirty = True
         self.race_started = False
         self.race_finished = False
         self.countdown_ms = 0
@@ -581,6 +634,9 @@ class RaceStateManager:
     def reset(self):
         """Reset all race state (used when starting/stopping replay)."""
         self.karts.clear()
+        # Invalidate the cached field-wide pit median (pit_history wiped).
+        self._field_pit_median_ms = None
+        self._field_pit_median_dirty = True
         self.race_started = False
         self.race_finished = False
         self.countdown_ms = 0
@@ -736,6 +792,10 @@ class RaceStateManager:
 
         # Always add to all_laps
         kart.all_laps.append(lap_record)
+        # Incremental mirror of classification.py's
+        # `sum(int(lap.get('lapTime', 0)) for lap in kart.all_laps)`.
+        # Same parse, applied once per append → bit-identical to the scan.
+        kart.all_laps_sum_ms += int(lap_record.get('lapTime', 0))
         # Mirror of the old `sum(1 for lap in all_laps if pitNumber ==
         # pit_count)` in `stint_lap_count()` — same filter (every lap
         # for the current pit number), but O(1). Resets to 0 in PIT_OUT.
@@ -1125,7 +1185,14 @@ class RaceStateManager:
             icd = self._interpolated_countdown_ms()
             on_track_ms = kart.stint_start_countdown_ms - icd
             race_time_ms = duration_total_ms - icd if icd > 0 else abs(icd) + duration_total_ms
-            stint_laps = sum(1 for lap in kart.all_laps if lap.get("pitNumber") == kart.pit_count - 1)
+            # `current_stint_lap_count` is incremented per LAP and reset to 0
+            # at PIT_OUT, so at this point (PIT_IN, pit_count already bumped on
+            # line 1105) it holds the lap count of the just-finished stint —
+            # identical to the old O(all_laps) scan
+            # `sum(1 for lap in kart.all_laps if lap.get("pitNumber") == kart.pit_count - 1)`.
+            # Proven equivalent across multiple stints + the zero-lap pit edge
+            # case by test_incremental_analytics_equivalence.py (W2).
+            stint_laps = kart.current_stint_lap_count
 
             # Update per-driver cumulative time
             driver = kart.driver_name or "Unknown"
@@ -1167,6 +1234,11 @@ class RaceStateManager:
                 # Update the last pit record with pit_time
                 if kart.pit_history:
                     kart.pit_history[-1].pit_time_ms = pit_time_ms
+                    # A completed pit changes the field-wide pit-time set, so
+                    # invalidate the cached classification median (recomputed
+                    # lazily on next read in field_pit_median_ms()).
+                    if pit_time_ms > 0:
+                        self._field_pit_median_dirty = True
 
             kart.pit_status = "racing"
             kart.stint_start_time = time.time()

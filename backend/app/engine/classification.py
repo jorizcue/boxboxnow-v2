@@ -75,14 +75,14 @@ def compute_classification(state: RaceStateManager) -> None:
     # --- Reference values (field-wide) -------------------------------------
 
     # Reference pit duration: median of completed pits across the field.
-    all_pit_times_ms = [
-        p.pit_time_ms
-        for kart in state.karts.values()
-        for p in kart.pit_history
-        if p.pit_time_ms > 0
-    ]
-    if all_pit_times_ms:
-        pit_time_ref_s = statistics.median(all_pit_times_ms) / 1000
+    # Cached on the state (recomputed only when a pit completes) instead of
+    # rebuilding the full pit-time list + median on every classification
+    # compute (per LAP event). `field_pit_median_ms()` returns the identical
+    # `statistics.median([... if p.pit_time_ms > 0])` value, or None when no
+    # pit has completed yet — same condition the fallback keyed off.
+    field_pit_median_ms = state.field_pit_median_ms()
+    if field_pit_median_ms is not None:
+        pit_time_ref_s = field_pit_median_ms / 1000
     else:
         pit_time_ref_s = float(state.pit_time_s) if state.pit_time_s > 0 else 60.0
 
@@ -125,9 +125,12 @@ def compute_classification(state: RaceStateManager) -> None:
         # Lap durations include any pit time spent on the same lap (pit lap
         # time = on-track portion + pit duration), so this naturally
         # accounts for completed pit penalties.
-        sum_lap_times_ms = sum(
-            int(lap.get('lapTime', 0)) for lap in kart.all_laps
-        )
+        #
+        # Incremental: `kart.all_laps_sum_ms` is maintained in `_record_lap`
+        # (state.py) as the running sum of `int(lap.get('lapTime', 0))` over
+        # the strictly-append-only `all_laps`. Bit-identical to the old
+        # per-call O(all_laps) scan, now O(1) per classification compute.
+        sum_lap_times_ms = kart.all_laps_sum_ms
         sum_lap_times_s = sum_lap_times_ms / 1000
 
         # Pit-in race time (if currently in pit) and elapsed in current pit.
