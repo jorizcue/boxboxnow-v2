@@ -98,6 +98,7 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
     //     a live GPS fix to be useful. ---
     DeltaBestLap("deltaBestLap", "Delta vs Best Lap (GPS)", "-0.32s"),
     GpsLapDelta("gpsLapDelta", "Delta vuelta anterior GPS", "+0.15s"),
+    ProjectedLap("projectedLap", "Vuelta proyectada (GPS)", "1:01.45"),
     GForceRadar("gForceRadar", "G-Force (diana)", "G"),
     GpsGForce("gpsGForce", "G-Force (números)", "1.2G"),
     GpsSpeed("gpsSpeed", "Velocidad GPS", "94 km/h"),
@@ -105,14 +106,14 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
 
     val group: DriverCardGroup get() = when (this) {
         BoxScore, PitCount, CurrentPit, PitWindow -> DriverCardGroup.BOX
-        CurrentLapTime, DeltaBestLap, GForceRadar, GpsLapDelta, GpsSpeed, GpsGForce -> DriverCardGroup.GPS
+        CurrentLapTime, DeltaBestLap, GForceRadar, GpsLapDelta, ProjectedLap, GpsSpeed, GpsGForce -> DriverCardGroup.GPS
         RaceTimer, StintTime, BestStintLap, LastLap, ApexPosition, TotalLaps, StintLaps,
         IntervalAhead, IntervalBehind, Sectors, BestS1, BestS2, BestS3 -> DriverCardGroup.RACE_APEX
         else -> DriverCardGroup.RACE_BBN
     }
 
     val requiresGPS: Boolean get() = when (this) {
-        CurrentLapTime, DeltaBestLap, GForceRadar, GpsLapDelta, GpsSpeed, GpsGForce -> true
+        CurrentLapTime, DeltaBestLap, GForceRadar, GpsLapDelta, ProjectedLap, GpsSpeed, GpsGForce -> true
         else -> false
     }
 
@@ -132,6 +133,7 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
         BoxScore -> Color(0xFFFFCC00)         // yellow
         BestStintLap -> Color(0xFF9C27B0)     // purple
         GpsLapDelta -> Color(0xFF00BCD4)      // cyan
+        ProjectedLap -> Color(0xFF00BCD4)     // cyan, same as GpsLapDelta
         GpsSpeed -> Color(0xFF2196F3)         // blue
         GpsGForce -> Color(0xFF34C759)        // emerald
         LapsToMaxStint -> Color(0xFF00BFA5)   // teal
@@ -172,6 +174,7 @@ enum class DriverCard(val key: String, val display: String, val sampleValue: Str
         BoxScore -> Icons.Filled.Speed
         BestStintLap -> Icons.Filled.StarOutline
         GpsLapDelta -> Icons.Filled.TrendingFlat
+        ProjectedLap -> Icons.Filled.TrendingFlat
         GpsSpeed -> Icons.Filled.Speed
         GpsGForce -> Icons.Filled.OpenWith
         LapsToMaxStint -> Icons.Filled.Refresh

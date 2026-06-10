@@ -228,6 +228,17 @@ private fun DriverScreenContent(onBack: () -> Unit) {
         initial = driverVM.lapTracker.deltaBestMs.value,
     )
 
+    // Projected lap (cross-track): sampled at the same cadence as the GPS
+    // delta so the ProjectedLap card flips at 1/2/4 Hz, not per GPS sample.
+    val projectedLapSampled = remember(refreshHz) {
+        driverVM.lapTracker.projectedLapMs.sample(
+            (1000L / refreshHz.coerceAtLeast(1)).coerceAtLeast(50L)
+        )
+    }
+    val projectedLap by projectedLapSampled.collectAsState(
+        initial = driverVM.lapTracker.projectedLapMs.value,
+    )
+
     val hasSectors by raceVM.hasSectors.collectAsState()
     val sectorMeta by raceVM.sectorMeta.collectAsState()
     val orientation by driverVM.orientationLock.collectAsState()
@@ -414,6 +425,7 @@ private fun DriverScreenContent(onBack: () -> Unit) {
                     lastLapMs = lastLap,
                     bestLapMs = bestLap,
                     deltaBestMs = deltaBest,
+                    projectedLapMs = projectedLap,
                     gps = gps,
                     boxScore = boxScore,
                     hasSectors = hasSectors,
@@ -530,6 +542,7 @@ private fun CardsGrid(
     lastLapMs: Double?,
     bestLapMs: Double?,
     deltaBestMs: Double?,
+    projectedLapMs: Double?,
     gps: com.boxboxnow.app.models.GPSSample?,
     boxScore: Double,
     hasSectors: Boolean,
@@ -570,6 +583,7 @@ private fun CardsGrid(
                                 lastLapMs = lastLapMs,
                                 bestLapMs = bestLapMs,
                                 deltaBestMs = deltaBestMs,
+                                projectedLapMs = projectedLapMs,
                                 gps = gps,
                                 boxScore = boxScore,
                                 hasSectors = hasSectors,
@@ -603,6 +617,7 @@ private fun CardsGrid(
                                 lastLapMs = lastLapMs,
                                 bestLapMs = bestLapMs,
                                 deltaBestMs = deltaBestMs,
+                                projectedLapMs = projectedLapMs,
                                 gps = gps,
                                 boxScore = boxScore,
                                 hasSectors = hasSectors,

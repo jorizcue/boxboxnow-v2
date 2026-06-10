@@ -76,6 +76,7 @@ fun DriverCardView(
     lastLapMs: Double?,
     bestLapMs: Double?,
     deltaBestMs: Double?,
+    projectedLapMs: Double?,
     gps: GPSSample?,
     boxScore: Double,
     hasSectors: Boolean,
@@ -188,6 +189,7 @@ fun DriverCardView(
                     lastLapMs = lastLapMs,
                     bestLapMs = bestLapMs,
                     deltaBestMs = deltaBestMs,
+                    projectedLapMs = projectedLapMs,
                     gps = gps,
                     boxScore = boxScore,
                     hasSectors = hasSectors,
@@ -382,6 +384,7 @@ private fun CardContent(
     lastLapMs: Double?,
     bestLapMs: Double?,
     deltaBestMs: Double?,
+    projectedLapMs: Double?,
     gps: GPSSample?,
     boxScore: Double,
     hasSectors: Boolean,
@@ -552,6 +555,15 @@ private fun CardContent(
                     if (deltaBestMs < 0) Color(0xFF30D158) else Color(0xFFFF453A),
                     mainFont,
                 )
+            } else {
+                MonoValue("--:--.---", BoxBoxNowColors.SystemGray, mainFont)
+            }
+        }
+        DriverCard.ProjectedLap -> {
+            if (gps == null) {
+                Text("GPS --", color = BoxBoxNowColors.SystemGray4, fontSize = (16f * scale).sp)
+            } else if (projectedLapMs != null) {
+                MonoValue(Formatters.msToLapTime(projectedLapMs), Color(0xFF00BCD4), mainFont)
             } else {
                 MonoValue("--:--.---", BoxBoxNowColors.SystemGray, mainFont)
             }
