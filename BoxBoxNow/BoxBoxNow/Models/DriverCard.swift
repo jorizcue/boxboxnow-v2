@@ -86,8 +86,8 @@ enum DriverCard: String, CaseIterable, Codable, Identifiable {
     // GPS fix to be useful (without GPS we don't know "where in the lap"
     // the kart is).
     case deltaBestLap
-    case projectedLap
     case gpsLapDelta
+    case projectedLap
     case gForceRadar
     case gpsGForce
     case gpsSpeed

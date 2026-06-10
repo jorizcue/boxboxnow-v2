@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
 
 /**
- * GPS lap tracker with finish-line crossing detection and distance-interpolated
+ * GPS lap tracker with finish-line crossing detection and cross-track
  * delta vs best/prev lap. Matches iOS LapTracker / web useGpsTelemetrySave.
  */
 class LapTracker(
