@@ -29,6 +29,9 @@ interface UserRow {
   mfa_enabled: boolean;
   mfa_required: boolean;
   tab_access: string[];
+  // Contact email — served by /api/admin/users. May be null for legacy
+  // accounts created before the email field existed; rendered as "—".
+  email: string | null;
 }
 
 interface CircuitRow {
@@ -452,6 +455,9 @@ function UsersManager() {
                   {!u.is_admin && u.is_internal && <span className="ml-1.5 text-[9px] bg-sky-500/20 text-sky-300 px-1.5 py-0.5 rounded font-semibold uppercase">Interno</span>}
                   {u.mfa_enabled && <span className="ml-1 text-[9px] bg-green-500/15 text-green-400 px-1.5 py-0.5 rounded font-semibold uppercase">MFA</span>}
                   {u.mfa_required && !u.mfa_enabled && <span className="ml-1 text-[9px] bg-yellow-500/15 text-yellow-400 px-1.5 py-0.5 rounded font-semibold uppercase">MFA pendiente</span>}
+                </div>
+                <div className="text-[10px] text-neutral-500 truncate mt-0.5" title={u.email || undefined}>
+                  {u.email || "—"}
                 </div>
                 <div className="flex gap-2 text-[10px] text-neutral-400 mt-0.5">
                   <span>{t("admin.devicesShort")} {u.max_devices}</span>
