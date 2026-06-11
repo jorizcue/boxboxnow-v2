@@ -355,6 +355,15 @@ private val translations: Map<String, Map<Language, String>> = mapOf(
     // (I18n.swift) so the pilot view translates fully. Rendered via
     // t(card.labelKey); DriverCard.display stays as the ES fallback.
     "card.raceTimer"        to mapOf(Language.ES to "Tiempo de carrera", Language.EN to "Race time", Language.IT to "Tempo di gara", Language.DE to "Rennzeit", Language.FR to "Temps de course"),
+    "card.stintTime"        to mapOf(Language.ES to "Tiempo de stint", Language.EN to "Stint time", Language.IT to "Tempo stint", Language.DE to "Stint-Zeit", Language.FR to "Temps du relais"),
+    "card.totalLaps"        to mapOf(Language.ES to "Número de vueltas totales", Language.EN to "Total laps", Language.IT to "Giri totali", Language.DE to "Gesamtrunden", Language.FR to "Tours totaux"),
+    "card.stintLaps"        to mapOf(Language.ES to "Número de vueltas stint", Language.EN to "Stint laps", Language.IT to "Giri nello stint", Language.DE to "Stint-Runden", Language.FR to "Tours du relais"),
+    "card.sectors"          to mapOf(Language.ES to "Mejores sectores", Language.EN to "Best sectors", Language.IT to "Migliori settori", Language.DE to "Beste Sektoren", Language.FR to "Meilleurs secteurs"),
+    "card.bestS1"           to mapOf(Language.ES to "Mejor S1", Language.EN to "Best S1", Language.IT to "Miglior S1", Language.DE to "Beste S1", Language.FR to "Meilleur S1"),
+    "card.bestS2"           to mapOf(Language.ES to "Mejor S2", Language.EN to "Best S2", Language.IT to "Miglior S2", Language.DE to "Beste S2", Language.FR to "Meilleur S2"),
+    "card.bestS3"           to mapOf(Language.ES to "Mejor S3", Language.EN to "Best S3", Language.IT to "Miglior S3", Language.DE to "Beste S3", Language.FR to "Meilleur S3"),
+    "card.timeToMaxStint"   to mapOf(Language.ES to "Tiempo hasta stint máximo", Language.EN to "Time to max stint", Language.IT to "Tempo al stint massimo", Language.DE to "Zeit bis Max-Stint", Language.FR to "Temps jusqu'au relais max"),
+    "card.kartTier"         to mapOf(Language.ES to "Calificación del kart", Language.EN to "Kart tier", Language.IT to "Categoria kart", Language.DE to "Kart-Stufe", Language.FR to "Catégorie kart"),
     "card.lastLap"          to mapOf(Language.ES to "Última vuelta", Language.EN to "Last lap", Language.IT to "Ultimo giro", Language.DE to "Letzte Runde", Language.FR to "Dernier tour"),
     "card.bestStintLap"     to mapOf(Language.ES to "Mejor vuelta stint", Language.EN to "Best stint lap", Language.IT to "Miglior giro stint", Language.DE to "Beste Stint-Runde", Language.FR to "Meilleur tour relais"),
     "card.apexPosition"     to mapOf(Language.ES to "Posición Apex", Language.EN to "Apex position", Language.IT to "Posizione Apex", Language.DE to "Apex-Position", Language.FR to "Position Apex"),
